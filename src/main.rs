@@ -1,43 +1,42 @@
-type data_t = u16;
-type ind_t = u32;
+type MemoryWord = u16;
+type MemoryIndex = u32;
 
 trait MemorySegment
 {
-    fn get(&self, ind: ind_t) -> data_t;
+    fn get(&self, ind: MemoryIndex) -> MemoryWord;
 
-    fn set(&mut self, ind: ind_t, data: data_t) -> bool;
+    fn set(&mut self, ind: MemoryIndex, data: MemoryWord) -> bool;
 
-    fn start_address(&self) -> ind_t;
+    fn start_address(&self) -> MemoryIndex;
 
-    fn address_len(&self) -> usize;
+    fn address_len(&self) -> MemoryIndex;
 
-    fn within(&self, ind: ind_t) -> bool;
+    fn within(&self, ind: MemoryIndex) -> bool;
 }
 
 struct ReadWriteMemory
 {
-    base: ind_t,
-    data: Vec<data_t>
+    base: MemoryIndex,
+    top: MemoryIndex,
+    data: Vec<MemoryWord>
 }
 
 impl ReadWriteMemory
 {
-    fn new(base_addr: ind_t, size: ind_t) -> ReadWriteMemory
+    fn new(base_addr: MemoryIndex, size: usize) -> ReadWriteMemory
     {
-        if ((base_addr as usize) + (size as usize)) as ind_t > ind_t::MAX
+        let top_addr = (base_addr as usize + size) as MemoryIndex;
+        if top_addr < base_addr
         {
             panic!();
         }
 
-        let mut data_vec = Vec::<data_t>::new();
-        for _ in 0..size
-        {
-            data_vec.push(0);
-        }
+        let data_vec: Vec::<MemoryWord> = (0..size).map(|_| 0 as MemoryWord).collect();
 
         return ReadWriteMemory
         {
             base: base_addr,
+            top: top_addr,
             data: data_vec
         };
     }
@@ -46,23 +45,23 @@ impl ReadWriteMemory
 
 impl MemorySegment for ReadWriteMemory
 {
-    fn get(&self, ind: ind_t) -> data_t
+    fn get(&self, ind: MemoryIndex) -> MemoryWord
     {
-        if (ind as usize) < self.data.len()
+        return if self.within(ind)
         {
-            return self.data[ind as usize];
+            self.data[(ind - self.base) as usize]
         }
         else
         {
-            return 0;
-        }
+            0
+        };
     }
 
-    fn set(&mut self, ind: ind_t, data: data_t) -> bool
+    fn set(&mut self, ind: MemoryIndex, data: MemoryWord) -> bool
     {
-        if (ind as usize) < self.data.len()
+        if self.within(ind)
         {
-            self.data[ind as usize] = data;
+            self.data[(ind - self.base) as usize] = data;
             return true;
         }
         else
@@ -71,19 +70,19 @@ impl MemorySegment for ReadWriteMemory
         }
     }
 
-    fn start_address(&self) -> ind_t
+    fn start_address(&self) -> MemoryIndex
     {
         return self.base;
     }
 
-    fn address_len(&self) -> usize
+    fn address_len(&self) -> MemoryIndex
     {
-        return self.data.len();
+        return self.data.len() as MemoryIndex;
     }
 
-    fn within(&self, ind: ind_t) -> bool
+    fn within(&self, ind: MemoryIndex) -> bool
     {
-        return ind >= self.base && ind <= (self.base as usize + self.data.len()) as ind_t;
+        return ind >= self.base && ind < self.top;
     }
 }
 
