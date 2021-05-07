@@ -1,4 +1,5 @@
 mod memory;
+mod scpu;
 
 use memory::read_write_memory::ReadWriteMemory;
 

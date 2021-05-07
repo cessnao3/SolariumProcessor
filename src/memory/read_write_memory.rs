@@ -1,4 +1,4 @@
-use crate::memory::memory_segment::{MemoryWord, MemoryIndex, MemorySize, MemorySegment};
+use crate::memory::*;
 
 pub struct ReadWriteMemory
 {
