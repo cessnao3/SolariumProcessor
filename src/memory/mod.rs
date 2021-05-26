@@ -16,6 +16,8 @@ pub trait MemorySegment
 
     fn address_len(&self) -> MemoryIndex;
 
+    fn reset(&mut self);
+
     fn within(&self, ind: MemoryIndex) -> bool;
 }
 

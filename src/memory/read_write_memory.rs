@@ -56,6 +56,15 @@ impl MemorySegment for ReadWriteMemory
         }
     }
 
+    fn reset(&mut self)
+    {
+        // Reset all data values to 0
+        for seg in self.data.as_mut()
+        {
+            seg = 0;
+        }
+    }
+
     fn start_address(&self) -> MemoryIndex
     {
         return self.base;
