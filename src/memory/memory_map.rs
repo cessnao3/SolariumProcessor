@@ -26,16 +26,29 @@ impl MemoryMap
 
     pub fn set(&mut self, ind: MemoryIndex, data: MemoryWord) -> bool
     {
-        return match self.segment_for_index(ind).as_mut()
+        return match self.segment_for_index_mut(ind)
         {
             Some(seg) => seg.set(ind, data),
             None => false
         };
     }
 
-    fn segment_for_index(&self, ind: MemoryIndex) -> Option<Box<dyn MemorySegment>>
+    fn segment_for_index(&self, ind: MemoryIndex) -> Option<&Box<dyn MemorySegment>>
     {
-        for seg in self.memory_map
+        for seg in self.memory_map.iter()
+        {
+            if seg.within(ind)
+            {
+                return Some(seg);
+            }
+        }
+
+        return None;
+    }
+
+    fn segment_for_index_mut(&mut self, ind: MemoryIndex) -> Option<&mut Box<dyn MemorySegment>>
+    {
+        for seg in self.memory_map.iter_mut()
         {
             if seg.within(ind)
             {
@@ -48,7 +61,7 @@ impl MemoryMap
 
     pub fn reset(&mut self)
     {
-        for seg in self.memory_map.as_mut()
+        for seg in self.memory_map.iter_mut()
         {
             seg.reset();
         }

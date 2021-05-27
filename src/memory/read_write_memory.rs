@@ -28,7 +28,6 @@ impl ReadWriteMemory
     }
 }
 
-
 impl MemorySegment for ReadWriteMemory
 {
     fn get(&self, ind: MemoryIndex) -> MemoryWord
@@ -59,9 +58,9 @@ impl MemorySegment for ReadWriteMemory
     fn reset(&mut self)
     {
         // Reset all data values to 0
-        for seg in self.data.as_mut()
+        for val in self.data.iter_mut()
         {
-            seg = 0;
+            *val = 0;
         }
     }
 
