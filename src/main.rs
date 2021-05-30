@@ -1,11 +1,11 @@
 mod memory;
-mod scpu;
+mod cpu;
 
 use memory::read_write_memory::ReadWriteMemory;
 
 fn main()
 {
     println!("Initializing CPU");
-    let scpu = scpu::SolariumCPU::new();
+    let scpu = cpu::processor::SolariumCPU::new();
 }
 

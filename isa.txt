@@ -3,36 +3,77 @@ R0-15
 R0 = PC
 R1 = SP
 R2 = STATUS
-R3 = ZERO/NULL
-R4-15 = Registers
+R3 = ZERO
+R4-15 = General Purpose Registers
+
+# Basic Instruction Syntax
+
+0x000F | 0x00F0 | 0x0F00 | 0xF000
+opcode |  arg1  |  arg2  |  arg3
 
 # Jump Instructions
-JNE/JNZ
-JEQ/JEZ
-JN
-JP
-JGE
-JG
-JL
-JLE
-JMP
 
-# Move/Arithmetic
-MOV
-ADD
-SUB
+Instruction Format
+    arg1 = Register 1
+    arg2 = Register 2
+    arg3 = Relative Address (+/- 128) or Absolute (Register 3)
 
-# Bit Ooperations
+Base Offset:
+    0x10 for Immediate-Relative
+    0x20 for Register-Absolute
+
+JMP = 0
+JNE/JNZ = 1
+JEQ/JEZ = 2
+JN = 3
+JP = 4
+JGE = 5
+JG = 6
+JL = 7
+JLE = 8
+JMP = 9
+
+# Move
+
+Instruction Format
+    arg1 =
+        0x1 -> source is register
+        0x2 -> destination is register
+    arg2 = Register 1 (Source, 0x0F) and Register 2 (Destination, 0x0F0)
+    arg3 = ??
+
+COPY = 0x30
+
+# Arithmetic
+
+Instruction Format
+    arg1 =
+        0x1 -> register 3 is address
+        0x2 -> register 1 is immediate (-128 to 127)
+        0xF0 -> register 3 (Destination)
+    arg2 = Register 1 (Operand A)
+    arg3 = Register 2 (Operand B)
+
+MULT = 0x40
+DIV = 0x41
+MOD = 0x42
+ADD = 0x43
+SUB = 0x44
+
+# Bit Operations
 BAND
 BOR
 
-# Extra Instructions
 BSHIFT
-SXT
+
+# Extra Instructions
 PUSH
 CALL
 RET
 POP
+NOOP = 0x00
+HALT = 0x01
+INTERRUPT
 
 # Memory
 
