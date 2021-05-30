@@ -5,6 +5,7 @@ use memory::read_write_memory::ReadWriteMemory;
 
 fn main()
 {
-    let seg1 = ReadWriteMemory::new(0, 1024);
+    println!("Initializing CPU");
+    let scpu = scpu::SolariumCPU::new();
 }
 

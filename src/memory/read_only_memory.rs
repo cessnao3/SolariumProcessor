@@ -1,23 +1,26 @@
 use crate::memory::*;
 
-pub struct ReadWriteMemory
+pub struct ReadOnlyMemory
 {
     base_address: MemoryWord,
     top_address: MemoryWord,
     data: Vec<MemoryWord>
 }
 
-impl ReadWriteMemory
+impl ReadOnlyMemory
 {
-    pub fn new(base_address: MemoryWord, size: MemoryWord) -> ReadWriteMemory
+    pub fn new(base_address: MemoryWord, size: MemoryWord, data: &[MemoryWord]) -> ReadOnlyMemory
     {
         let top_address = (base_address + size) as MemoryWord;
 
         assert!(top_address >= base_address);
+        assert!(data.len() <= size as usize);
 
-        let data: Vec::<MemoryWord> = (0..size).map(|_| 0 as MemoryWord).collect();
+        let data: Vec::<MemoryWord> = (0..size as usize)
+            .map(|i| if i < data.len() { data[i] } else { 0 } as MemoryWord)
+            .collect();
 
-        return ReadWriteMemory
+        return ReadOnlyMemory
         {
             base_address,
             top_address,
@@ -26,7 +29,7 @@ impl ReadWriteMemory
     }
 }
 
-impl MemorySegment for ReadWriteMemory
+impl MemorySegment for ReadOnlyMemory
 {
     fn get(&self, ind: MemoryWord) -> MemoryWord
     {
@@ -44,8 +47,7 @@ impl MemorySegment for ReadWriteMemory
     {
         if self.within(ind)
         {
-            self.data[(ind - self.base_address) as usize] = data;
-            return true;
+            return false;
         }
         else
         {
@@ -55,11 +57,7 @@ impl MemorySegment for ReadWriteMemory
 
     fn reset(&mut self)
     {
-        // Reset all data values to 0
-        for val in self.data.iter_mut()
-        {
-            *val = 0;
-        }
+        // Do Nothing
     }
 
     fn start_address(&self) -> MemoryWord
@@ -86,10 +84,12 @@ mod tests {
     #[test]
     fn test_init()
     {
-        let base = 0;
-        let size = 1024;
+        let base = 0 as MemoryWord;
+        let size = 1024 as MemoryWord;
 
-        let mem = ReadWriteMemory::new(base, size);
+        let data_in: Vec<MemoryWord> = (0..20).map(|v| v as MemoryWord).collect();
+
+        let mem = ReadOnlyMemory::new(base, size, &data_in);
 
         assert_eq!(mem.start_address(), base);
         assert_eq!(mem.address_len(), size);
@@ -99,6 +99,20 @@ mod tests {
             assert_eq!(mem.within(i), true);
         }
         assert_eq!(mem.within(1024), false);
+
+        for i in base as usize .. size as usize
+        {
+            let mem_val = mem.get(i as MemoryWord);
+
+            if i < data_in.len()
+            {
+                assert_eq!(data_in[i], mem_val);
+            }
+            else
+            {
+                assert_eq!(0, mem_val);
+            }
+        }
     }
 
     #[test]
@@ -107,7 +121,12 @@ mod tests {
         let base = 256;
         let size = 1024;
 
-        let mem = ReadWriteMemory::new(base, size);
+        let data_in: Vec<MemoryWord> = (0..size as usize)
+            .map(|v| v as MemoryWord)
+            .collect();
+
+
+        let mem = ReadOnlyMemory::new(base, size, &data_in);
 
         for i in 0..2048
         {

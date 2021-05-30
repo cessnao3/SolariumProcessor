@@ -15,7 +15,7 @@ impl MemoryMap
         };
     }
 
-    pub fn get(&self, ind: MemoryIndex) -> MemoryWord
+    pub fn get(&self, ind: MemoryWord) -> MemoryWord
     {
         return match self.segment_for_index(ind)
         {
@@ -24,7 +24,7 @@ impl MemoryMap
         };
     }
 
-    pub fn set(&mut self, ind: MemoryIndex, data: MemoryWord) -> bool
+    pub fn set(&mut self, ind: MemoryWord, data: MemoryWord) -> bool
     {
         return match self.segment_for_index_mut(ind)
         {
@@ -33,7 +33,7 @@ impl MemoryMap
         };
     }
 
-    fn segment_for_index(&self, ind: MemoryIndex) -> Option<&Box<dyn MemorySegment>>
+    fn segment_for_index(&self, ind: MemoryWord) -> Option<&Box<dyn MemorySegment>>
     {
         for seg in self.memory_map.iter()
         {
@@ -46,7 +46,7 @@ impl MemoryMap
         return None;
     }
 
-    fn segment_for_index_mut(&mut self, ind: MemoryIndex) -> Option<&mut Box<dyn MemorySegment>>
+    fn segment_for_index_mut(&mut self, ind: MemoryWord) -> Option<&mut Box<dyn MemorySegment>>
     {
         for seg in self.memory_map.iter_mut()
         {
