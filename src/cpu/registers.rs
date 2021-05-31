@@ -120,7 +120,7 @@ mod tests {
         for register in get_registers().iter()
         {
             // Determine values ot iterate over
-            for v in MemoryWord::MIN..MemoryWord::MAX
+            for v in 0..1000
             {
                 // Define the expected value, ensuring that the zero register is always 0
                 let expected_value: MemoryWord = if register.to_index() == zero_ind
