@@ -37,8 +37,8 @@ JMP = 9
 
 Instruction Format
     arg1 =
-        0x1 -> source is register
-        0x2 -> destination is register
+        0x1 -> source is register (otherwise, uses address in register)
+        0x2 -> destination is register (otherwise, uses address in register)
     arg2 = Register 1 (Source, 0x0F) and Register 2 (Destination, 0x0F0)
     arg3 = ??
 
