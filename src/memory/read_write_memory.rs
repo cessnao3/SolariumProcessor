@@ -80,7 +80,7 @@ impl MemorySegment for ReadWriteMemory
 
 #[cfg(test)]
 mod tests {
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    // Pull in the super instance
     use super::*;
 
     #[test]
