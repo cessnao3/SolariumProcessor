@@ -9,56 +9,53 @@ R4-15 = General Purpose Registers
 # Basic Instruction Syntax
 
 0x000F | 0x00F0 | 0x0F00 | 0xF000
-opcode |  arg1  |  arg2  |  arg3
+opcode |  arg0  |  arg1  |  arg2
 
 # Jump Instructions
 
 Instruction Format
-    arg1 = Register 1
-    arg2 = Register 2
-    arg3 = Relative Address (+/- 128) or Absolute (Register 3)
+    arg0 =
+        0x1 -> Arg 2 is relative
+    arg1 = Register 1 (0xF), Register 2 (0xF0)
+    arg2 = Relative Address (+/- 128) or Absolute (Register 3)
 
-Base Offset:
-    0x10 for Immediate-Relative
-    0x20 for Register-Absolute
-
-JMP = 0
-JNE/JNZ = 1
-JEQ/JEZ = 2
-JN = 3
-JP = 4
-JGE = 5
-JG = 6
-JL = 7
-JLE = 8
-JMP = 9
+JMP = 0x20
+JNE/JNZ = 0x21
+JEQ/JEZ = 0x22
+JN = 0x23
+JP = 0x24
+JGE = 0x25
+JG = 0x26
+JL = 0x27
+JLE = 0x28
 
 # Move
 
 Instruction Format
-    arg1 =
+    arg0 =
         0x1 -> source is register (otherwise, uses address in register)
         0x2 -> destination is register (otherwise, uses address in register)
-    arg2 = Register 1 (Source, 0x0F) and Register 2 (Destination, 0x0F0)
-    arg3 = ??
+    arg1 = Register 1 (Source, 0x0F) and Register 2 (Destination, 0x0F0)
+    arg2 = ??
 
 COPY = 0x30
 
 # Arithmetic
 
 Instruction Format
-    arg1 =
+    arg0 =
         0x1 -> register 3 is address
-        0x2 -> register 1 is immediate (-128 to 127)
+        0x2 -> Operand A is immediate (-128 to 127)
+        0x4 -> Operand B is immediate (-128 to 127)
         0xF0 -> register 3 (Destination)
-    arg2 = Register 1 (Operand A)
-    arg3 = Register 2 (Operand B)
+    arg1 = Register 1 (Operand A)
+    arg2 = Register 2 (Operand B)
 
-MULT = 0x40
-DIV = 0x41
-MOD = 0x42
-ADD = 0x43
-SUB = 0x44
+ADD = 0x40
+SUB = 0x41
+MUL = 0x42
+DIV = 0x43
+MOD = 0x44
 
 # Bit Operations
 BAND
