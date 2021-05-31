@@ -66,9 +66,4 @@ impl MemoryMap
             seg.reset();
         }
     }
-
-    pub fn clear(&mut self)
-    {
-        self.memory_map.clear();
-    }
 }
