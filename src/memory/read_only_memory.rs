@@ -43,7 +43,7 @@ impl MemorySegment for ReadOnlyMemory
         };
     }
 
-    fn set(&mut self, ind: MemoryWord, data: MemoryWord) -> bool
+    fn set(&mut self, ind: MemoryWord, _data: MemoryWord) -> bool
     {
         if self.within(ind)
         {
