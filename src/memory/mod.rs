@@ -3,6 +3,7 @@ pub mod read_write_memory;
 pub mod read_only_memory;
 
 pub type MemoryWord = u32;
+pub type MemoryWordSigned = i32;
 
 pub trait MemorySegment
 {
