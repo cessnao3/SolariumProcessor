@@ -54,10 +54,10 @@ impl SolariumCPU
         self.registers.set(&Register::ProgramCounter, pc);
 
         // Extract the different argument types
-        let opcode = (inst & 0xF) as u8;
-        let arg0 = ((inst & 0xF0) >> 8) as u8;
-        let arg1 = ((inst & 0xF00) >> 16) as u8;
-        let arg2 = ((inst & 0xF000) >> 32) as u8;
+        let opcode = (inst & 0xFF) as u8;
+        let arg0 = ((inst & 0xFF00) >> 8) as u8;
+        let arg1 = ((inst & 0xFF0000) >> 16) as u8;
+        let arg2 = ((inst & 0xFF000000) >> 24) as u8;
 
         // Match opcode parameters
         if opcode == 0x0
@@ -117,7 +117,7 @@ impl SolariumCPU
             let op_b_is_immediate = arg0 & 0x4 > 0;
 
             // Determine the register 3 value
-            let reg_c = Register::GP(((arg0 & 0xF0) >> 8) as usize);
+            let reg_c = Register::GP(((arg0 & 0xF0) >> 4) as usize);
 
             // Determine the values of A and B operands
             let op_a = get_operand(self, arg1, op_a_is_immediate);
@@ -150,7 +150,7 @@ impl SolariumCPU
             // Extract arguments
             let is_immediate_relative = arg0 & 0x1 > 0;
             let reg_1_val = self.registers.get(&Register::GP((arg1 & 0xF) as usize)) as MemoryWordSigned;
-            let reg_2_val = self.registers.get(&Register::GP(((arg2 & 0xF0) >> 8) as usize)) as MemoryWordSigned;
+            let reg_2_val = self.registers.get(&Register::GP(((arg2 & 0xF0) >> 4) as usize)) as MemoryWordSigned;
 
             // Determine the new program counter
             let new_pc;
