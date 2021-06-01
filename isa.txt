@@ -29,7 +29,7 @@ JG = 0x26
 JL = 0x27
 JLE = 0x28
 
-# Move
+# Copy
 
 Instruction Format
     arg0 =

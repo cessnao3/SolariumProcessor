@@ -1,5 +1,6 @@
-mod memory;
 mod cpu;
+mod memory;
+mod assembler;
 
 //use memory::read_write_memory::ReadWriteMemory;
 

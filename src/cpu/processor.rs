@@ -1,7 +1,7 @@
 use crate::memory::{MemoryWord, MemoryWordSigned};
 use crate::memory::memory_map::MemoryMap;
 
-use crate::cpu::registers::{Register, RegisterManager};
+use super::registers::{Register, RegisterManager};
 
 /// Defines the reset vector location
 const VECTOR_RESET: MemoryWord = 0x400;
@@ -60,11 +60,11 @@ impl SolariumCPU
         let arg2 = ((inst & 0xFF000000) >> 24) as u8;
 
         // Match opcode parameters
-        if opcode == 0x0
+        if opcode == 0x0 // NOOP
         {
             // NOOP
         }
-        else if opcode == 0x30
+        else if opcode == 0x30 // COPY
         {
             // Determine the source and destination
             let src_is_reg = 0x1 & arg0 > 0;
@@ -95,7 +95,7 @@ impl SolariumCPU
                 self.memory_map.set(self.registers.get(&dst_reg), source_val);
             }
         }
-        else if opcode >= 0x40 && opcode < 0x50
+        else if opcode >= 0x40 && opcode < 0x50 // Arithmetic
         {
             // Define a function to obtain an operand value
             fn get_operand(cpu: &SolariumCPU, arg: u8, is_immediate: bool) -> MemoryWordSigned
@@ -145,7 +145,7 @@ impl SolariumCPU
                 self.registers.set(&reg_c, result);
             }
         }
-        else if opcode >= 0x20 && opcode < 0x30
+        else if opcode >= 0x20 && opcode < 0x30 // Jump
         {
             // Extract arguments
             let is_immediate_relative = arg0 & 0x1 > 0;

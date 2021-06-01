@@ -1,4 +1,4 @@
-use crate::memory::*;
+use super::*;
 
 pub struct ReadWriteMemory
 {

@@ -17,7 +17,7 @@ pub enum Register
 impl Register
 {
     /// Converts the enumeration types to an index for a registry array
-    fn to_index(&self) -> usize
+    pub fn to_index(&self) -> usize
     {
         // Determine the index
         let ind: usize = match self
