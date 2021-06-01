@@ -7,7 +7,7 @@ use crate::memory::MemoryWord;
 use crate::cpu::registers::Register;
 use crate::assembler::inst_jump::InstructionJump;
 
-pub fn assemble(lines: Vec<String>) -> Result<Vec<MemoryWord>, String>
+pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
 {
     // Define the assembled result
     let mut assembled: Vec<MemoryWord> = Vec::new();
