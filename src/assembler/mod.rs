@@ -1,10 +1,11 @@
 mod register_def;
+mod inst_jump;
 
 use self::register_def::RegisterDefinition;
 
 use crate::memory::MemoryWord;
-use crate::cpu::processor::
 use crate::cpu::registers::Register;
+use crate::assembler::inst_jump::InstructionJump;
 
 pub fn assemble(lines: Vec<String>) -> Result<Vec<MemoryWord>, String>
 {
@@ -45,7 +46,7 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<MemoryWord>, String>
             .collect();
 
         // Define the individual components for each argument
-        let mut opcode = 0u8;
+        let opcode = 0u8;
         let mut arg0 = 0u8;
         let mut arg1 = 0u8;
         let mut arg2 = 0u8;
@@ -98,58 +99,22 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<MemoryWord>, String>
         }
         else if jmp_instructions.contains(&inst_word)
         {
-            // Determine the number of operands to search for
-            let num_operands: usize;
+            // Obtain the jump instruction
+            let inst;
+            match InstructionJump::get_by_name(&inst_word)
+            {
+                Ok(v) => inst = v,
+                Err(e) => return Err(e)
+            };
 
-            // Determine whether the second operand is zero
-            let second_op_is_zero: bool;
-
-            // Define the opcode based on the input word
-            if inst_word == "jmp"
+            // Ensure that the number of words matches
+            if inst.expected_words() != words.len()
             {
-                opcode = 0x20;
-                num_operands = 0;
-                second_op_is_zero = false;
-            }
-            else if inst_word == "jne"
-            {
-                opcode = 0x21;
-                num_operands = 2;
-                second_op_is_zero = false;
-            }
-            else if inst_word == "jnz"
-            {
-                opcode = 0x21;
-                num_operands = 1;
-                second_op_is_zero = true;
-            }
-            else if inst_word == "jeq"
-            {
-                opcode = 0x22;
-                num_operands = 2;
-                second_op_is_zero = false;
-            }
-            else if inst_word == "jez"
-            {
-                opcode = 0x22;
-                num_operands = 1;
-                second_op_is_zero = true;
-            }
-            else if inst_word == "jn"
-            {
-                opcode = 0x23;
-                num_operands = 1;
-                second_op_is_zero = false;
-            }
-            else if inst_word == "jp"
-            {
-                opcode = 0x24;
-                num_operands = 1;
-                second_op_is_zero = false;
-            }
-            else
-            {
-                panic!();
+                return Err(format!(
+                    "instruction \"{0:}\" expected {1:} operands; got {2:}",
+                    l,
+                    inst.expected_words(),
+                    words.len()));
             }
 
             // Define the current index
@@ -157,7 +122,7 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<MemoryWord>, String>
 
             // Set the register parameters
             let op_a: Option<RegisterDefinition>;
-            if num_operands > 0
+            if inst.num_operands > 0
             {
                 match words[current_ind].parse()
                 {
@@ -172,7 +137,7 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<MemoryWord>, String>
             }
 
             let op_b: Option<RegisterDefinition>;
-            if num_operands > 1
+            if inst.num_operands > 1
             {
                 match words[current_ind].parse()
                 {
@@ -181,7 +146,7 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<MemoryWord>, String>
                 };
                 current_ind += 1;
             }
-            else if second_op_is_zero
+            else if inst.second_is_zero
             {
                 op_b = Some(RegisterDefinition::new(
                     Register::Zero.to_index() as u8,
@@ -191,6 +156,37 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<MemoryWord>, String>
             {
                 op_b = None;
             }
+
+            // Set the operand values
+            match op_a
+            {
+                Some(v) => arg1 |= v.index,
+                None => ()
+            };
+
+            match op_b
+            {
+                Some(v) => arg1 |= v.index << 4,
+                None => ()
+            }
+
+            // Determine the last word
+            let jump_word = &words[current_ind];
+
+            // Check if we can parse the jump word directly
+            match jump_word.parse::<i8>()
+            {
+                Ok(v) =>
+                    {
+                        arg0 |= 1;
+                        arg2 = v as u8;
+                    },
+                Err(_) => match jump_word.parse::<RegisterDefinition>()
+                {
+                    Ok(v) => arg2 = v.index,
+                    Err(_) => return Err(format!("unknown jump destination for {0:}", l))
+                }
+            };
         }
         else
         {
