@@ -1,8 +1,5 @@
 use crate::memory::MemoryWord;
 
-/// Defines the number of registers available in the processor
-const NUM_REGISTERS: usize = 16;
-
 #[derive(Clone)]
 /// Defines the enumeration for available registers
 pub enum Register
@@ -16,6 +13,9 @@ pub enum Register
 
 impl Register
 {
+    /// Defines the number of registers available in the processor
+    pub const NUM_REGISTERS: usize = 16;
+
     /// Converts the enumeration types to an index for a registry array
     pub fn to_index(&self) -> usize
     {
@@ -30,7 +30,7 @@ impl Register
         };
 
         // Check for the index values
-        if ind < NUM_REGISTERS
+        if ind < Self::NUM_REGISTERS
         {
             return ind;
         }
@@ -44,7 +44,7 @@ impl Register
 /// Defines a register manager to maintain register values
 pub struct RegisterManager
 {
-    registers: [MemoryWord; NUM_REGISTERS]
+    registers: [MemoryWord; Register::NUM_REGISTERS]
 }
 
 impl RegisterManager
@@ -54,7 +54,7 @@ impl RegisterManager
     {
         return RegisterManager
         {
-            registers: [0; NUM_REGISTERS]
+            registers: [0; Register::NUM_REGISTERS]
         };
     }
 
@@ -97,7 +97,7 @@ mod tests {
         };
 
         // Add the register indices
-        for i in 0..NUM_REGISTERS
+        for i in 0..Register::NUM_REGISTERS
         {
             registers.push(Register::GP(i));
         }
@@ -147,13 +147,13 @@ mod tests {
         let mut register_manager = RegisterManager::new();
 
         // Add a value to each register
-        for i in 0..NUM_REGISTERS
+        for i in 0..Register::NUM_REGISTERS
         {
             register_manager.set(&Register::GP(i), i as MemoryWord);
         }
 
         // Ensure that we can get the resulting value out
-        for i in 0..NUM_REGISTERS
+        for i in 0..Register::NUM_REGISTERS
         {
             let val = register_manager.get(&Register::GP(i));
 

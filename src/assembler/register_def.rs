@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use crate::cpu::registers::Register;
 
 /// Defines the register input definition
 pub struct RegisterDefinition
@@ -11,17 +12,17 @@ impl RegisterDefinition
 {
     pub fn new(index: u8, is_immediate: bool) -> Result<RegisterDefinition, String>
     {
-        return if (index & 0xF0) > 0
-        {
-            Err(format!("register index {0:} is greater than allowed", index))
-        }
-        else
+        return if (index as usize) < Register::NUM_REGISTERS
         {
             Ok(RegisterDefinition
             {
                 index,
                 is_immediate
             })
+        }
+        else
+        {
+            Err(format!("register index {0:} is greater than allowed", index))
         };
     }
 }
