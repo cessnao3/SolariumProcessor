@@ -9,7 +9,8 @@ fn main()
     println!("Assembly Test");
     let line_test = vec!{
         "copy r5 $6",
-        "jmp 16",
+        "jmp 63",
+        "jmp -64",
         "jg r4 r5 r8", // TODO - Allow address-based registers here?
     };
 
