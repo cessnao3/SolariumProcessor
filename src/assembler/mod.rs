@@ -1,7 +1,9 @@
 mod register_def;
 mod inst_jump;
+mod location;
 
 use self::register_def::RegisterDefinition;
+use self::location::Location;
 
 use crate::memory::MemoryWord;
 use crate::cpu::registers::Register;
