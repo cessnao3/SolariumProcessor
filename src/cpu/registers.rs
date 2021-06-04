@@ -16,6 +16,19 @@ impl Register
     /// Defines the number of registers available in the processor
     pub const NUM_REGISTERS: usize = 16;
 
+    /// Provides a General-Purpose register from a given index
+    pub fn from_index(ind: usize) -> Register
+    {
+        if ind < Self::NUM_REGISTERS
+        {
+            return Register::GP(ind);
+        }
+        else
+        {
+            panic!(format!("unable to create a register from index {0:}", ind));
+        }
+    }
+
     /// Converts the enumeration types to an index for a registry array
     pub fn to_index(&self) -> usize
     {
@@ -74,10 +87,11 @@ impl RegisterManager
     }
 
     /// Sets the selecteed register value
-    pub fn set(&mut self, register: &Register, value: MemoryWord)
+    pub fn set(&mut self, register: &Register, value: MemoryWord) -> bool
     {
         let reg_ind = register.to_index();
         self.registers[reg_ind] = if reg_ind == Register::Zero.to_index() { 0 } else { value };
+        return true;
     }
 }
 

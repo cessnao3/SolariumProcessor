@@ -1,6 +1,7 @@
 use crate::memory::{MemoryWord, MemoryWordSigned};
 use crate::memory::memory_map::MemoryMap;
 
+use super::location::Location;
 use super::registers::{Register, RegisterManager};
 
 /// Defines the reset vector location
@@ -43,8 +44,28 @@ impl SolariumCPU
         self.registers.set(&Register::ProgramCounter, VECTOR_RESET);
     }
 
+    fn get_location_value(&self, loc: &Location) -> Result<MemoryWord, String>
+    {
+        return match loc
+        {
+            Location::Register(ind) => Ok(self.registers.get(&Register::from_index(*ind))),
+            Location::AddressOf(ind) => Ok(self.memory_map.get(self.registers.get(&Register::from_index(*ind)))),
+            Location::Value(v) => Ok(*v as MemoryWord)
+        }
+    }
+
+    fn set_location_value(&mut self, loc: &Location, val: MemoryWord) -> Result<bool, String>
+    {
+        return match loc
+        {
+            Location::Register(ind) => Ok(self.registers.set(&Register::from_index(*ind), val)),
+            Location::AddressOf(ind) => Ok(self.memory_map.set(self.registers.get(&Register::from_index(*ind)), val)),
+            Location::Value(_) => Err("cannot set an immediate value".to_string())
+        }
+    }
+
     /// Step the CPU
-    pub fn step(&mut self)
+    pub fn step(&mut self) -> bool
     {
         // Define the current memory word
         let pc = self.registers.get(&Register::ProgramCounter);
@@ -66,33 +87,29 @@ impl SolariumCPU
         }
         else if opcode == 0x30 // COPY
         {
-            // Determine the source and destination
-            let src_is_reg = 0x1 & arg0 > 0;
-            let dst_is_reg = 0x2 & arg0 > 0;
+            // Determine the source and controller
+            let src_loc = match Location::from_arg(arg0)
+            {
+                Ok(v) => v,
+                Err(e) => panic!(e)
+            };
+            let dst_loc = match Location::from_arg(arg1)
+            {
+                Ok(v) => v,
+                Err(e) => panic!(e)
+            };
 
-            // Process Results
-            let src_reg_val = self.registers.get(&Register::GP(arg1 as usize & 0xF));
-            let dst_reg = Register::GP((arg1 as usize & 0xF0) >> 8);
+            // Copy from one location to the other
+            let src_val = match self.get_location_value(&src_loc)
+            {
+                Ok(v) => v,
+                Err(e) => panic!(e)
+            };
 
-            // Determine the source parameter
-            let source_val;
-            if src_is_reg
+            match self.set_location_value(&dst_loc, src_val)
             {
-                source_val = src_reg_val;
-            }
-            else
-            {
-                source_val = self.memory_map.get(src_reg_val);
-            }
-
-            // Save to the destination parameter
-            if dst_is_reg
-            {
-                self.registers.set(&dst_reg, source_val);
-            }
-            else
-            {
-                self.memory_map.set(self.registers.get(&dst_reg), source_val);
+                Ok(b) => if !b { println!("Unable to set memory location with given value {0:}", src_val); },
+                Err(e) => panic!(e)
             }
         }
         else if opcode >= 0x40 && opcode < 0x50 // Arithmetic
@@ -191,5 +208,8 @@ impl SolariumCPU
         {
             panic!("unknown instruction provided");
         }
+
+        // Return success
+        return true;
     }
 }

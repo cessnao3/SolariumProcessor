@@ -1,4 +1,5 @@
-use crate::cpu::registers::Register;
+use super::registers::Register;
+
 use std::str::FromStr;
 
 /// Provides the location of the register address provided to the assembler

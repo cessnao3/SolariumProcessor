@@ -1,10 +1,9 @@
-mod inst_jump;
-mod location;
+use self::inst_jump::InstructionJump;
 
-use self::location::Location;
-
+use crate::cpu::location::Location;
 use crate::memory::MemoryWord;
-use crate::assembler::inst_jump::InstructionJump;
+
+mod inst_jump;
 
 pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
 {
@@ -80,13 +79,13 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             };
 
             // Add the location values to the arguments
-            arg1 = match src_loc.to_arg()
+            arg0 = match src_loc.to_arg()
             {
                 Ok(v) => v,
                 Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
             };
 
-            arg2 = match dst_loc.to_arg()
+            arg1 = match dst_loc.to_arg()
             {
                 Ok(v) => v,
                 Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
