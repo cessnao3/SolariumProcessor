@@ -1,12 +1,9 @@
-mod register_def;
 mod inst_jump;
 mod location;
 
-use self::register_def::RegisterDefinition;
 use self::location::Location;
 
 use crate::memory::MemoryWord;
-use crate::cpu::registers::Register;
 use crate::assembler::inst_jump::InstructionJump;
 
 pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
@@ -14,13 +11,13 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
     // Define the assembled result
     let mut assembled: Vec<MemoryWord> = Vec::new();
 
+    // TODO - Add keyword replacement for zero register? Other registers?
+
     // Define the available jump instructions
     let jmp_instructions: Vec<String> = vec!{
         "jmp",
         "jne",
-        "jnz",
         "jeq",
-        "jez",
         "jn",
         "jp",
         "jge",
@@ -59,7 +56,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
         // Define the opcode and parameters for the different
         if inst_word == "noop"
         {
-            // Skip parameters and leave at 0
+            // Skip parameters and leave output at zero
         }
         else if inst_word == "copy"
         {
@@ -70,34 +67,30 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             }
 
             // Extract the source and destination values
-            let src_reg;
-            match words[1].parse::<RegisterDefinition>()
+            let src_loc = match words[1].parse::<Location>()
             {
-                Ok(v) => src_reg = v,
-                Err(e) => return Err(e)
-            }
+                Ok(v) => v,
+                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+            };
 
-            let dst_reg;
-            match words[2].parse::<RegisterDefinition>()
+            let dst_loc = match words[2].parse::<Location>()
             {
-                Ok(v) => dst_reg = v,
-                Err(e) => return Err(e)
-            }
+                Ok(v) => v,
+                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+            };
 
-            // Add the argument values
-            if src_reg.is_immediate
+            // Add the location values to the arguments
+            arg1 = match src_loc.to_arg()
             {
-                arg0 |= 1;
-            }
+                Ok(v) => v,
+                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+            };
 
-            if dst_reg.is_immediate
+            arg2 = match dst_loc.to_arg()
             {
-                arg0 |= 2;
+                Ok(v) => v,
+                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
             }
-
-            // Add the parameters to the given argument
-            arg1 |= src_reg.index;
-            arg1 |= dst_reg.index << 4;
         }
         else if jmp_instructions.contains(&inst_word)
         {
@@ -106,7 +99,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             match InstructionJump::get_by_name(&inst_word)
             {
                 Ok(v) => inst = v,
-                Err(e) => return Err(e)
+                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
             };
 
             // Ensure that the number of words matches
@@ -123,13 +116,13 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             let mut current_ind: usize = 1;
 
             // Set the register parameters
-            let op_a: Option<RegisterDefinition>;
+            let op_a: Option<Location>;
             if inst.num_operands > 0
             {
                 match words[current_ind].parse()
                 {
                     Ok(v)  => op_a = Some(v),
-                    Err(e) => return Err(e)
+                    Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
                 };
                 current_ind += 1;
             }
@@ -138,21 +131,15 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
                 op_a = None;
             }
 
-            let op_b: Option<RegisterDefinition>;
+            let op_b: Option<Location>;
             if inst.num_operands > 1
             {
                 match words[current_ind].parse()
                 {
                     Ok(v) => op_b = Some(v),
-                    Err(e) => return Err(e)
+                    Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
                 };
                 current_ind += 1;
-            }
-            else if inst.second_is_zero
-            {
-                op_b = Some(RegisterDefinition::new(
-                    Register::Zero.to_index() as u8,
-                    true).unwrap());
             }
             else
             {
@@ -162,33 +149,43 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             // Set the operand values
             match op_a
             {
-                Some(v) => arg1 |= v.index,
+                Some(v) =>
+                    {
+                        arg0 = match v.to_arg()
+                        {
+                            Ok(a) => a,
+                            Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+                        }
+                    },
                 None => ()
             };
 
             match op_b
             {
-                Some(v) => arg1 |= v.index << 4,
+                Some(v) =>
+                    {
+                        match v.to_arg()
+                        {
+                            Ok(a) => arg1 = a,
+                            Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+                        }
+                    }
                 None => ()
             }
 
-            // Determine the last word
-            let jump_word = &words[current_ind];
-
-            // Check if we can parse the jump word directly
-            match jump_word.parse::<i8>()
+            // Determine the last word/location to jump to
+            match words[current_ind].parse::<Location>()
             {
                 Ok(v) =>
                     {
-                        arg0 |= 1;
-                        arg2 = v as u8;
+                        match v.to_arg()
+                        {
+                            Ok(a) => arg2 = a,
+                            Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+                        }
                     },
-                Err(_) => match jump_word.parse::<RegisterDefinition>()
-                {
-                    Ok(v) => arg2 = v.index,
-                    Err(_) => return Err(format!("unknown jump destination for {0:}", l))
-                }
-            };
+                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+            }
         }
         else
         {

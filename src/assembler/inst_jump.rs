@@ -1,8 +1,7 @@
 pub struct InstructionJump
 {
     pub opcode: u8,
-    pub num_operands: usize,
-    pub second_is_zero: bool
+    pub num_operands: usize
 }
 
 impl InstructionJump
@@ -12,7 +11,6 @@ impl InstructionJump
         // Determine parameter values
         let opcode: u8;
         let num_operands: usize;
-        let mut second_is_zero: bool = false;
 
         // Change based on input name
         if name == "jmp"
@@ -25,22 +23,10 @@ impl InstructionJump
             opcode = 0x21;
             num_operands = 2;
         }
-        else if name == "jnz"
-        {
-            opcode = 0x21;
-            num_operands = 1;
-            second_is_zero = true;
-        }
         else if name == "jeq"
         {
             opcode = 0x22;
             num_operands = 2;
-        }
-        else if name == "jez"
-        {
-            opcode = 0x22;
-            num_operands = 1;
-            second_is_zero = true;
         }
         else if name == "jn"
         {
@@ -81,8 +67,7 @@ impl InstructionJump
         return Ok(InstructionJump
         {
             opcode,
-            num_operands,
-            second_is_zero
+            num_operands
         });
     }
 

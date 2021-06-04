@@ -18,7 +18,7 @@ impl FromStr for Location
     fn from_str(s: &str) -> Result<Location, Self::Err>
     {
         // Ensure not empty
-        let trimmed = s.trim();
+        let trimmed = s.trim().to_ascii_lowercase();
 
         if trimmed.len() == 0
         {
@@ -38,7 +38,7 @@ impl FromStr for Location
         }
         else
         {
-            trimmed
+            &trimmed
         };
 
         // Parse the value string
@@ -119,7 +119,7 @@ impl Location
     {
         // Determine the flag value
         let flag = (arg & Self::MASK_FLAG) >> Self::FLAG_OFFSET;
-        let param = (arg & Self::MASK_PARAM);
+        let param = arg & Self::MASK_PARAM;
 
         // Determine if the flag value is a valid register
         fn get_register_index(parameter: u8) -> Result<usize, String>
