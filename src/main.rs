@@ -10,7 +10,7 @@ fn main()
     let line_test = vec!{
         "copy r5 $6",
         "jmp 16",
-        "jg r4 r5 r8",
+        "jg r4 r5 r8", // TODO - Allow address-based registers here?
     };
 
     match assembler::assemble(line_test)
