@@ -114,52 +114,58 @@ impl SolariumCPU
         }
         else if opcode >= 0x40 && opcode < 0x50 // Arithmetic
         {
-            // Define a function to obtain an operand value
-            fn get_operand(cpu: &SolariumCPU, arg: u8, is_immediate: bool) -> MemoryWordSigned
+            // Obtain the locations and values for each of the three arguments
+            let loc_a = match Location::from_arg(arg0)
             {
-                return if is_immediate
-                {
-                    (arg as i8) as MemoryWordSigned
-                }
-                else
-                {
-                    let reg_val = cpu.registers.get(&Register::GP(arg as usize));
-                    cpu.memory_map.get(reg_val) as MemoryWordSigned
-                };
-            }
+                Ok(v) => v,
+                Err(e) => panic!(e)
+            };
 
-            // Extract flag values
-            let op_c_is_address = arg0 & 0x1 > 0;
-            let op_a_is_immediate = arg0 & 0x2 > 0;
-            let op_b_is_immediate = arg0 & 0x4 > 0;
+            let loc_b = match Location::from_arg(arg1)
+            {
+                Ok(v) => v,
+                Err(e) => panic!(e)
+            };
 
-            // Determine the register 3 value
-            let reg_c = Register::GP(((arg0 & 0xF0) >> 4) as usize);
+            let loc_c = match Location::from_arg(arg2)
+            {
+                Ok(v) => v,
+                Err(e) => panic!(e)
+            };
 
-            // Determine the values of A and B operands
-            let op_a = get_operand(self, arg1, op_a_is_immediate);
-            let op_b = get_operand(self, arg2, op_b_is_immediate);
+            let val_a = match self.get_location_value(&loc_a)
+            {
+                Ok(v) => v,
+                Err(e) => panic!(e)
+            };
+
+            let val_c = match self.get_location_value(&loc_b)
+            {
+                Ok(v) => v,
+                Err(e) => panic!(e)
+            };
 
             // Determine the resulting values
             let result = match opcode & 0xF
             {
-                0 => op_a + op_b,
-                1 => op_a - op_b,
-                2 => op_a * op_b,
-                3 => op_a / op_b,
-                4 => op_a % op_b,
+                0 => val_a + val_b,
+                1 => val_a - val_b,
+                2 => val_a * val_b,
+                3 => val_a / val_b,
+                4 => val_a % val_b,
                 _ => panic!("unknown opcode provided")
             } as MemoryWord;
 
             // Store the resulting value
-            if op_c_is_address
+            let result = match self.set_location_value(&loc_c, result)
             {
-                let address = self.registers.get(&reg_c);
-                self.memory_map.set(address, result);
-            }
-            else
+                Ok(v) => v,
+                Err(e) => panic!(e)
+            };
+
+            if !result
             {
-                self.registers.set(&reg_c, result);
+                panic!("unable to set memory location for instruction {0:}", inst);
             }
         }
         else if opcode >= 0x20 && opcode < 0x30 // Jump
