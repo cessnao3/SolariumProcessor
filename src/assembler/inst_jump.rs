@@ -1,3 +1,4 @@
+/// Provides basic information for the different types of jump instructions
 pub struct InstructionJump
 {
     pub opcode: u8,
@@ -6,6 +7,8 @@ pub struct InstructionJump
 
 impl InstructionJump
 {
+    /// Provides instruction data for the given instruction name to map assembly language to the
+    /// machine language implementation
     pub fn get_by_name(name: &str) -> Result<InstructionJump, String>
     {
         // Determine parameter values
