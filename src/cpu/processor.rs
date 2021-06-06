@@ -146,7 +146,7 @@ impl SolariumCPU
             };
 
             // Determine the resulting values
-            let result = match opcode & 0xF
+            let result = match opcode - 0x40
             {
                 0 => val_a + val_b,
                 1 => val_a - val_b,

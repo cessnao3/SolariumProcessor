@@ -27,6 +27,16 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
         .map(|v| v.to_string())
         .collect();
 
+    let arithmetic_instructions: Vec<String> = vec!{
+        "add",
+        "sub",
+        "mult",
+        "div",
+        "mod"
+    }.iter()
+        .map(|v| v.to_string())
+        .collect();
+
     // Iterate over each line
     for l in lines.iter()
     {
@@ -44,7 +54,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             .collect();
 
         // Define the individual components for each argument
-        let opcode = 0u8;
+        let opcode: u8;
         let mut arg0 = 0u8;
         let mut arg1 = 0u8;
         let mut arg2 = 0u8;
@@ -56,6 +66,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
         if inst_word == "noop"
         {
             // Skip parameters and leave output at zero
+            opcode = 0x00;
         }
         else if inst_word == "copy"
         {
@@ -78,6 +89,9 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
                 Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
             };
 
+            // Save the opcode
+            opcode = 0x30;
+
             // Add the location values to the arguments
             arg0 = match src_loc.to_arg()
             {
@@ -90,6 +104,81 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
                 Ok(v) => v,
                 Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
             }
+        }
+        else if arithmetic_instructions.contains(&inst_word)
+        {
+            // Ensure that we have the correct number of arguments
+            if words.len() != 4
+            {
+                return Err(format!("arithmetic instructions expected 4 argumetns, got {:0}", words.len()))
+            }
+
+            // Check the opcode instruction
+            opcode = if inst_word == "add"
+            {
+                0x40
+            }
+            else if inst_word == "sub"
+            {
+                0x41
+            }
+            else if inst_word == "mult"
+            {
+                0x42
+            }
+            else if inst_word == "div"
+            {
+                0x43
+            }
+            else if inst_word == "mod"
+            {
+                0x44
+            }
+            else
+            {
+                return Err(e)
+            };
+
+            // Get the input/output locations
+            let loc_a = match words[1].parse::<Location>()
+            {
+                Ok(v) => v,
+                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+            };
+
+            let loc_b = match words[2].parse::<Location>()
+            {
+                Ok(v) => v,
+                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+            };
+
+            let loc_c = match words[3].parse::<Location>()
+            {
+                Ok(v) => v,
+                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+            };
+
+            arg0 = match loc_a.to_arg()
+            {
+                Ok(v) => v,
+                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+            };
+
+            arg1 = match loc_b.to_arg()
+            {
+                Ok(v) => v,
+                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+            };
+
+            arg2 = match loc_c
+            {
+                Location::Value(_) => return Err(format!("Line {0:} error: destination may not be immediate", l)),
+                loc => match loc.to_arg()
+                {
+                    Ok(v) => v,
+                    Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+                }
+            };
         }
         else if jmp_instructions.contains(&inst_word)
         {
@@ -185,6 +274,9 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
                     },
                 Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
             }
+
+            // Save the opcode
+            opcode = inst.opcode;
         }
         else
         {
