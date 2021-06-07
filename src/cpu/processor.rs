@@ -91,25 +91,25 @@ impl SolariumCPU
             let src_loc = match Location::from_arg(arg0)
             {
                 Ok(v) => v,
-                Err(e) => panic!(e)
+                Err(e) => panic!("{0:}", e)
             };
             let dst_loc = match Location::from_arg(arg1)
             {
                 Ok(v) => v,
-                Err(e) => panic!(e)
+                Err(e) => panic!("{0:}", e)
             };
 
             // Copy from one location to the other
             let src_val = match self.get_location_value(&src_loc)
             {
                 Ok(v) => v,
-                Err(e) => panic!(e)
+                Err(e) => panic!("{0:}", e)
             };
 
             match self.set_location_value(&dst_loc, src_val)
             {
                 Ok(b) => if !b { println!("Unable to set memory location with given value {0:}", src_val); },
-                Err(e) => panic!(e)
+                Err(e) => panic!("{0:}", e)
             }
         }
         else if opcode >= 0x40 && opcode < 0x50 // Arithmetic
@@ -118,31 +118,31 @@ impl SolariumCPU
             let loc_a = match Location::from_arg(arg0)
             {
                 Ok(v) => v,
-                Err(e) => panic!(e)
+                Err(e) => panic!("{0:}", e)
             };
 
             let loc_b = match Location::from_arg(arg1)
             {
                 Ok(v) => v,
-                Err(e) => panic!(e)
+                Err(e) => panic!("{0:}", e)
             };
 
             let loc_c = match Location::from_arg(arg2)
             {
                 Ok(v) => v,
-                Err(e) => panic!(e)
+                Err(e) => panic!("{0:}", e)
             };
 
             let val_a = match self.get_location_value(&loc_a)
             {
                 Ok(v) => v,
-                Err(e) => panic!(e)
+                Err(e) => panic!("{0:}", e)
             };
 
-            let val_c = match self.get_location_value(&loc_b)
+            let val_b = match self.get_location_value(&loc_b)
             {
                 Ok(v) => v,
-                Err(e) => panic!(e)
+                Err(e) => panic!("{0:}", e)
             };
 
             // Determine the resulting values
@@ -160,7 +160,7 @@ impl SolariumCPU
             let result = match self.set_location_value(&loc_c, result)
             {
                 Ok(v) => v,
-                Err(e) => panic!(e)
+                Err(e) => panic!("{0:}", e)
             };
 
             if !result

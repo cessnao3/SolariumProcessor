@@ -2,15 +2,34 @@ use self::inst_jump::InstructionJump;
 
 use crate::cpu::location::Location;
 use crate::memory::MemoryWord;
+use std::collections::HashMap;
 
 mod inst_jump;
 
+macro_rules! match_err
+{
+    ($a: expr, $l: expr) =>
+    {
+        // Match the input value argument
+        match $a
+        {
+            Ok(v) => v,
+            Err(e) => return Err(format!("Line {0:} error: {1:}", $l, e))
+        };
+    }
+}
+
 pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
 {
-    // Define the assembled result
-    let mut assembled: Vec<MemoryWord> = Vec::new();
+    // Define the offset address
+    let mut offset_address: MemoryWord = 0;
+
+    // Define a dictionary of addresses to provide the resulting assembled parameters
+    let mut address_dict = HashMap::<MemoryWord, MemoryWord>::new();
 
     // TODO - Add keyword replacement for zero register? Other registers?
+
+    // TODO - Add dictionary to map locations, labels
 
     // Define the available jump instructions
     let jmp_instructions: Vec<String> = vec!{
@@ -30,7 +49,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
     let arithmetic_instructions: Vec<String> = vec!{
         "add",
         "sub",
-        "mult",
+        "mul",
         "div",
         "mod"
     }.iter()
@@ -48,10 +67,14 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
 
         // Extract words
         let words: Vec<String> = l
+            .trim()
             .split(' ')
             .map(|v| v.trim().to_ascii_lowercase())
             .filter(|v| v.len() > 0)
             .collect();
+
+        // Determine the number of arguments (will always be >= 0 due to check above for empty)
+        let num_args = words.len() - 1;
 
         // Define the individual components for each argument
         let opcode: u8;
@@ -68,12 +91,46 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             // Skip parameters and leave output at zero
             opcode = 0x00;
         }
+        else if inst_word == "push"
+        {
+            // Ensure that there are two arguments
+            if num_args != 1
+            {
+                return Err(format!("{0:} expected 1 argument, got {1:}", inst_word, num_args));
+            }
+
+            // Extract the resulting value to push
+            let loc_src = match_err!(Location::from_arg(arg0), l);
+            /*
+            let loc_src = match Location::from_arg(arg0)
+            {
+                Ok(v) => v,
+                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
+            }
+             */
+
+            // Extract the resulting value
+            opcode = 0x10;
+            arg0 = match_err!(loc_src.to_arg(), l);
+        }
+        else if inst_word == "pop"
+        {
+            // Check the number of arguments
+            if num_args > 0
+            {
+                return Err(format!("{0:} expected 0 arguments, got {1:}", inst_word, num_args));
+            }
+            else
+            {
+                opcode = 0x11;
+            }
+        }
         else if inst_word == "copy"
         {
             // Check that there are sufficient words
-            if words.len() != 3
+            if num_args != 2
             {
-                return Err(format!("expected three arguments for a copy in line \"{0:}\"", l));
+                return Err(format!("expected 2 arguments for a copy in line \"{0:}\"", l));
             }
 
             // Extract the source and destination values
@@ -108,9 +165,11 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
         else if arithmetic_instructions.contains(&inst_word)
         {
             // Ensure that we have the correct number of arguments
-            if words.len() != 4
+            if num_args != 3
             {
-                return Err(format!("arithmetic instructions expected 4 argumetns, got {:0}", words.len()))
+                return Err(format!(
+                    "arithmetic instructions expected 3 arguments, got {:0}",
+                    num_args))
             }
 
             // Check the opcode instruction
@@ -122,7 +181,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             {
                 0x41
             }
-            else if inst_word == "mult"
+            else if inst_word == "mul"
             {
                 0x42
             }
@@ -136,7 +195,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             }
             else
             {
-                return Err(e)
+                return Err(format!("no instruction for \"{0:}\" found", inst_word));
             };
 
             // Get the input/output locations
@@ -191,13 +250,13 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             };
 
             // Ensure that the number of words matches
-            if inst.expected_words() != words.len()
+            if inst.expected_args() != num_args
             {
                 return Err(format!(
-                    "instruction \"{0:}\" expected {1:} operands; got {2:}",
+                    "instruction \"{0:}\" expected {1:} arguments; got {2:}",
                     l,
-                    inst.expected_words(),
-                    words.len()));
+                    inst.expected_args(),
+                    num_args));
             }
 
             // Define the current index
@@ -291,7 +350,37 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
                 (arg2 as MemoryWord) << 24;
 
         // Add to the instruction to the assembled parameters
-        assembled.push(instruction);
+        if address_dict.contains_key(&offset_address)
+        {
+            return Err(format!("address {0:X} is already provided", offset_address));
+        }
+        else
+        {
+            // Add the instruction
+            address_dict.insert(
+                offset_address,
+                instruction);
+
+            // Increment the offset address
+            offset_address += 1;
+        }
+    }
+
+    // Construct the resulting addresses
+    let mut assembled: Vec<MemoryWord> = Vec::new();
+    for (address, val) in address_dict.iter()
+    {
+        // Define the address index
+        let address_index = *address as usize;
+
+        // Add zeros for any address
+        while address_index >= assembled.len()
+        {
+            assembled.push(0);
+        }
+
+        // Save the address value
+        assembled[address_index] = *val;
     }
 
     // Return the assembled results

@@ -25,7 +25,7 @@ impl Register
         }
         else
         {
-            panic!(format!("unable to create a register from index {0:}", ind));
+            panic!("unable to create a register from index {0:}", ind);
         }
     }
 

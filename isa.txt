@@ -64,10 +64,10 @@ BOR
 BSHIFT
 
 # Extra Instructions
-PUSH
-CALL
-RET
-POP
+PUSH <R> = 0x10
+POP = 0x11
+CALL <LOC> = 0x13
+RET = 0x14
 NOOP = 0x00
 HALT = 0x01
 INTERRUPT

@@ -74,8 +74,9 @@ impl InstructionJump
         });
     }
 
-    pub fn expected_words(&self) -> usize
+    pub fn expected_args(&self) -> usize
     {
-        return 1 + self.num_operands + 1;
+        // Provide the number of operands, plus one for the destination location
+        return self.num_operands + 1;
     }
 }
