@@ -6,7 +6,7 @@ pub enum Register
 {
     ProgramCounter,
     StackPointer,
-    StatusFlag,
+    Return,
     Zero,
     GP(usize)
 }
@@ -37,7 +37,7 @@ impl Register
         {
             Register::ProgramCounter => 0,
             Register::StackPointer => 1,
-            Register::StatusFlag => 2,
+            Register::Return => 2,
             Register::Zero => 3,
             Register::GP(ind) => *ind
         };
@@ -107,7 +107,7 @@ mod tests {
             Register::Zero,
             Register::ProgramCounter,
             Register::StackPointer,
-            Register::StatusFlag
+            Register::Return
         };
 
         // Add the register indices

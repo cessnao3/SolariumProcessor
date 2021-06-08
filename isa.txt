@@ -2,7 +2,7 @@
 R0-15
 R0 = PC
 R1 = SP
-R2 = STATUS
+R2 = RETURN
 R3 = ZERO
 R4-15 = General Purpose Registers
 

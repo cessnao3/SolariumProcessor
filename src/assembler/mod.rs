@@ -32,19 +32,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
     // TODO - Add dictionary to map locations, labels
 
     // Define the available jump instructions
-    let jmp_instructions: Vec<String> = vec!{
-        "jmp",
-        "jne",
-        "jeq",
-        "jn",
-        "jp",
-        "jge",
-        "jg",
-        "jl",
-        "jle"
-    }.iter()
-        .map(|v| v.to_string())
-        .collect();
+    let jmp_instructions = InstructionJump::get_instructions();
 
     let arithmetic_instructions: Vec<String> = vec!{
         "add",
@@ -101,13 +89,6 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
 
             // Extract the resulting value to push
             let loc_src = match_err!(Location::from_arg(arg0), l);
-            /*
-            let loc_src = match Location::from_arg(arg0)
-            {
-                Ok(v) => v,
-                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-            }
-             */
 
             // Extract the resulting value
             opcode = 0x10;
@@ -239,15 +220,10 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
                 }
             };
         }
-        else if jmp_instructions.contains(&inst_word)
+        else if jmp_instructions.contains_key(inst_word)
         {
             // Obtain the jump instruction
-            let inst;
-            match InstructionJump::get_by_name(&inst_word)
-            {
-                Ok(v) => inst = v,
-                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-            };
+            let inst = jmp_instructions.get(inst_word).unwrap();
 
             // Ensure that the number of words matches
             if inst.expected_args() != num_args
@@ -266,11 +242,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             let op_a: Option<Location>;
             if inst.num_operands > 0
             {
-                match words[current_ind].parse()
-                {
-                    Ok(v)  => op_a = Some(v),
-                    Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-                };
+                op_a = Some(match_err!(words[current_ind].parse(), l));
                 current_ind += 1;
             }
             else
@@ -281,11 +253,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             let op_b: Option<Location>;
             if inst.num_operands > 1
             {
-                match words[current_ind].parse()
-                {
-                    Ok(v) => op_b = Some(v),
-                    Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-                };
+                op_b = Some(match_err!(words[current_ind].parse(), l));
                 current_ind += 1;
             }
             else
