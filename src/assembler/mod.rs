@@ -115,33 +115,15 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             }
 
             // Extract the source and destination values
-            let src_loc = match words[1].parse::<Location>()
-            {
-                Ok(v) => v,
-                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-            };
-
-            let dst_loc = match words[2].parse::<Location>()
-            {
-                Ok(v) => v,
-                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-            };
+            let src_loc = match_err!(words[1].parse::<Location>(), l);
+            let dst_loc = match_err!(words[2].parse::<Location>(), l);
 
             // Save the opcode
             opcode = 0x30;
 
             // Add the location values to the arguments
-            arg0 = match src_loc.to_arg()
-            {
-                Ok(v) => v,
-                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-            };
-
-            arg1 = match dst_loc.to_arg()
-            {
-                Ok(v) => v,
-                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-            }
+            arg0 = match_err!(src_loc.to_arg(), l);
+            arg1 = match_err!(dst_loc.to_arg(), l);
         }
         else if arithmetic_instructions.contains(&inst_word)
         {
@@ -180,44 +162,17 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             };
 
             // Get the input/output locations
-            let loc_a = match words[1].parse::<Location>()
-            {
-                Ok(v) => v,
-                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-            };
+            let loc_a = match_err!(words[1].parse::<Location>(), l);
+            let loc_b = match_err!(words[2].parse::<Location>(), l);
+            let loc_c = match_err!(words[3].parse::<Location>(), l);
 
-            let loc_b = match words[2].parse::<Location>()
-            {
-                Ok(v) => v,
-                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-            };
-
-            let loc_c = match words[3].parse::<Location>()
-            {
-                Ok(v) => v,
-                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-            };
-
-            arg0 = match loc_a.to_arg()
-            {
-                Ok(v) => v,
-                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-            };
-
-            arg1 = match loc_b.to_arg()
-            {
-                Ok(v) => v,
-                Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-            };
+            arg0 = match_err!(loc_a.to_arg(), l);
+            arg1 = match_err!(loc_b.to_arg(), l);
 
             arg2 = match loc_c
             {
                 Location::Value(_) => return Err(format!("Line {0:} error: destination may not be immediate", l)),
-                loc => match loc.to_arg()
-                {
-                    Ok(v) => v,
-                    Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-                }
+                loc => match_err!(loc.to_arg(), l)
             };
         }
         else if jmp_instructions.contains_key(inst_word)
@@ -264,41 +219,20 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             // Set the operand values
             match op_a
             {
-                Some(v) =>
-                    {
-                        arg0 = match v.to_arg()
-                        {
-                            Ok(a) => a,
-                            Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-                        }
-                    },
+                Some(v) => arg0 = match_err!(v.to_arg(), l),
                 None => ()
             };
 
             match op_b
             {
-                Some(v) =>
-                    {
-                        match v.to_arg()
-                        {
-                            Ok(a) => arg1 = a,
-                            Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-                        }
-                    }
+                Some(v) => arg1 = match_err!(v.to_arg(), l),
                 None => ()
             }
 
             // Determine the last word/location to jump to
             match words[current_ind].parse::<Location>()
             {
-                Ok(v) =>
-                    {
-                        match v.to_arg()
-                        {
-                            Ok(a) => arg2 = a,
-                            Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
-                        }
-                    },
+                Ok(v) => arg2 = match_err!(v.to_arg(), l),
                 Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
             }
 
