@@ -22,5 +22,9 @@ fn main()
 
     println!("Initializing CPU");
     let mut cpu = cpu::processor::SolariumCPU::new();
-    cpu.step();
+    for i in 0..100
+    {
+        println!("Step {0:}", i + 1);
+        cpu.step();
+    }
 }
