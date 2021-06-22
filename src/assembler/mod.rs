@@ -1,23 +1,17 @@
-use self::inst_jump::InstructionJump;
+mod asm_instruction;
+#[macro_use]
+mod asm_macro;
 
-use crate::cpu::location::Location;
+mod instruction_jump;
+
 use crate::memory::MemoryWord;
 use std::collections::HashMap;
 
-mod inst_jump;
+use crate::cpu::location::Location;
 
-macro_rules! match_err
-{
-    ($a: expr, $l: expr) =>
-    {
-        // Match the input value argument
-        match $a
-        {
-            Ok(v) => v,
-            Err(e) => return Err(format!("Line {0:} error: {1:}", $l, e))
-        };
-    }
-}
+use self::asm_instruction::AsmInstruction;
+
+use self::instruction_jump::InstructionJump;
 
 pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
 {
@@ -65,10 +59,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
         let num_args = words.len() - 1;
 
         // Define the individual components for each argument
-        let opcode: u8;
-        let mut arg0 = 0u8;
-        let mut arg1 = 0u8;
-        let mut arg2 = 0u8;
+        let mut inst_val = AsmInstruction::new();
 
         // Define the instruction type
         let inst_word = &words[0];
@@ -77,7 +68,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
         if inst_word == "noop"
         {
             // Skip parameters and leave output at zero
-            opcode = 0x00;
+            inst_val.opcode = 0x00;
         }
         else if inst_word == "push"
         {
@@ -88,11 +79,11 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             }
 
             // Extract the resulting value to push
-            let loc_src = match_err!(Location::from_arg(arg0), l);
+            let loc_src = match_err!(Location::from_arg(inst_val.arg0), l);
 
             // Extract the resulting value
-            opcode = 0x10;
-            arg0 = match_err!(loc_src.to_arg(), l);
+            inst_val.opcode = 0x10;
+            inst_val.arg0 = match_err!(loc_src.to_arg(), l);
         }
         else if inst_word == "pop"
         {
@@ -103,7 +94,9 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             }
             else
             {
-                opcode = 0x11;
+                // TODO - Pop to register?
+                // TODO - Read to register?
+                inst_val.opcode = 0x11;
             }
         }
         else if inst_word == "copy"
@@ -119,11 +112,11 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             let dst_loc = match_err!(words[2].parse::<Location>(), l);
 
             // Save the opcode
-            opcode = 0x30;
+            inst_val.opcode = 0x30;
 
             // Add the location values to the arguments
-            arg0 = match_err!(src_loc.to_arg(), l);
-            arg1 = match_err!(dst_loc.to_arg(), l);
+            inst_val.arg0 = match_err!(src_loc.to_arg(), l);
+            inst_val.arg1 = match_err!(dst_loc.to_arg(), l);
         }
         else if arithmetic_instructions.contains(&inst_word)
         {
@@ -136,7 +129,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             }
 
             // Check the opcode instruction
-            opcode = if inst_word == "add"
+            inst_val.opcode = if inst_word == "add"
             {
                 0x40
             }
@@ -166,10 +159,10 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             let loc_b = match_err!(words[2].parse::<Location>(), l);
             let loc_c = match_err!(words[3].parse::<Location>(), l);
 
-            arg0 = match_err!(loc_a.to_arg(), l);
-            arg1 = match_err!(loc_b.to_arg(), l);
+            inst_val.arg0 = match_err!(loc_a.to_arg(), l);
+            inst_val.arg1 = match_err!(loc_b.to_arg(), l);
 
-            arg2 = match loc_c
+            inst_val.arg2 = match loc_c
             {
                 Location::Value(_) => return Err(format!("Line {0:} error: destination may not be immediate", l)),
                 loc => match_err!(loc.to_arg(), l)
@@ -219,37 +212,30 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             // Set the operand values
             match op_a
             {
-                Some(v) => arg0 = match_err!(v.to_arg(), l),
+                Some(v) => inst_val.arg0 = match_err!(v.to_arg(), l),
                 None => ()
             };
 
             match op_b
             {
-                Some(v) => arg1 = match_err!(v.to_arg(), l),
+                Some(v) => inst_val.arg1 = match_err!(v.to_arg(), l),
                 None => ()
             }
 
             // Determine the last word/location to jump to
             match words[current_ind].parse::<Location>()
             {
-                Ok(v) => arg2 = match_err!(v.to_arg(), l),
+                Ok(v) => inst_val.arg2 = match_err!(v.to_arg(), l),
                 Err(e) => return Err(format!("Line {0:} error: {1:}", l, e))
             }
 
             // Save the opcode
-            opcode = inst.opcode;
+            inst_val.opcode = inst.opcode;
         }
         else
         {
             return Err(format!("unknown instruction line \"{0:}\" provided", l));
         }
-
-        // Combine into an overall word
-        let instruction: MemoryWord =
-            opcode as MemoryWord |
-                (arg0 as MemoryWord) << 8 |
-                (arg1 as MemoryWord) << 16 |
-                (arg2 as MemoryWord) << 24;
 
         // Add to the instruction to the assembled parameters
         if address_dict.contains_key(&offset_address)
@@ -261,7 +247,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<MemoryWord>, String>
             // Add the instruction
             address_dict.insert(
                 offset_address,
-                instruction);
+                inst_val.to_word());
 
             // Increment the offset address
             offset_address += 1;
