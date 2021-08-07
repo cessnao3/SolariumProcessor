@@ -90,4 +90,3 @@ impl AsmInstruction
                 (self.arg2 as MemoryWord) << 24;
     }
 }
-
