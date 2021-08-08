@@ -1,17 +1,17 @@
 use super::*;
 
-pub struct DefaultMemorySegment<const READ_ONLY: bool>
+pub struct DefaultMemorySegment<const WRITEABLE: bool>
 {
     base_address: MemoryWord,
     top_address: MemoryWord,
     data: Vec<MemoryWord>,
 }
 
-impl<const READ_ONLY: bool> DefaultMemorySegment::<READ_ONLY>
+impl<const WRITEABLE: bool> DefaultMemorySegment::<WRITEABLE>
 {
     pub fn new(
         base_address: MemoryWord,
-        size: MemoryWord) -> DefaultMemorySegment::<READ_ONLY>
+        size: MemoryWord) -> DefaultMemorySegment::<WRITEABLE>
     {
         let top_address = (base_address + size) as MemoryWord;
 
@@ -19,7 +19,7 @@ impl<const READ_ONLY: bool> DefaultMemorySegment::<READ_ONLY>
 
         let data: Vec::<MemoryWord> = (0..size).map(|_| 0 as MemoryWord).collect();
 
-        return DefaultMemorySegment::<READ_ONLY>
+        return DefaultMemorySegment::<WRITEABLE>
         {
             base_address,
             top_address,
@@ -30,9 +30,9 @@ impl<const READ_ONLY: bool> DefaultMemorySegment::<READ_ONLY>
     pub fn new_with_data(
         base_address: MemoryWord,
         size: MemoryWord,
-        data: &[MemoryWord]) -> DefaultMemorySegment::<READ_ONLY>
+        data: &[MemoryWord]) -> DefaultMemorySegment::<WRITEABLE>
     {
-        let mut mem_val = DefaultMemorySegment::<READ_ONLY>::new(
+        let mut mem_val = DefaultMemorySegment::<WRITEABLE>::new(
             base_address,
             size);
 
@@ -116,7 +116,7 @@ mod tests {
     #[test]
     fn test_init()
     {
-        let base = 0;
+        let base = 16;
         let size = 1024;
 
         let mem = DefaultMemorySegment::<false>::new(base, size);
@@ -124,11 +124,220 @@ mod tests {
         assert_eq!(mem.start_address(), base);
         assert_eq!(mem.address_len(), size);
 
+        for i in 0..base
+        {
+            assert_eq!(mem.within(i), false);
+        }
+
         for i in base..(base + size as u32)
         {
             assert_eq!(mem.within(i), true);
+            assert_eq!(mem.get(i), 0);
         }
-        assert_eq!(mem.within(1024), false);
+        assert_eq!(mem.within(base + size), false);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_init_invalid_values()
+    {
+        let base = MemoryWord::MAX - 100;
+        let size = 1024;
+        DefaultMemorySegment::<false>::new(base, size);
+    }
+
+    #[test]
+    fn test_init_data_ro()
+    {
+        let base = 0;
+        let size = 1024;
+        let data_size = 512;
+
+        let expected_data: Vec<MemoryWord> = (0..data_size)
+            .map(|v| v + 1)
+            .collect();
+
+        let mut mem = DefaultMemorySegment::<false>::new_with_data(
+            base,
+            size,
+            &expected_data);
+
+        for i in 0..size
+        {
+            assert_eq!(mem.within(base + i), true);
+            if i < data_size
+            {
+                assert_eq!(mem.get(i), expected_data[i as usize]);
+            }
+            else
+            {
+                assert_eq!(mem.get(i), 0);
+            }
+        }
+
+        mem.reset();
+
+        for i in 0..size
+        {
+            assert_eq!(mem.within(base + i), true);
+            if i < data_size
+            {
+                assert_eq!(mem.get(i), expected_data[i as usize]);
+            }
+            else
+            {
+                assert_eq!(mem.get(i), 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_init_data_rw()
+    {
+        let base = 0;
+        let size = 1024;
+        let data_size = 512;
+
+        let expected_data: Vec<MemoryWord> = (0..data_size)
+            .map(|v| v + 1)
+            .collect();
+
+        let mut mem = DefaultMemorySegment::<true>::new_with_data(
+            base,
+            size,
+            &expected_data);
+
+        for i in 0..size
+        {
+            assert_eq!(mem.within(base + i), true);
+            let val = mem.get(base + i);
+            if i < data_size
+            {
+                assert_eq!(val, expected_data[i as usize]);
+            }
+            else
+            {
+                assert_eq!(val, 0);
+            }
+        }
+
+        mem.reset();
+
+        for i in 0..size
+        {
+            assert_eq!(mem.within(base + i), true);
+            assert_eq!(mem.get(base + i), 0);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_init_data_overflow()
+    {
+        let base = 0;
+        let size = 1024;
+
+        let expected_data: Vec<MemoryWord> = (0..size*2)
+            .map(|v| v)
+            .collect();
+
+        let mut mem = DefaultMemorySegment::<false>::new_with_data(
+            base,
+            size,
+            &expected_data);
+        mem.reset();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_panic_set_above_ro()
+    {
+        let base = 0;
+        let size = 1024;
+
+        let mut mem = DefaultMemorySegment::<false>::new(base, size);
+
+        mem.set(size, 32);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_panic_get_above_ro()
+    {
+        let base = 0;
+        let size = 1024;
+
+        let mem = DefaultMemorySegment::<false>::new(base, size);
+        mem.get(size);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_panic_set_below_ro()
+    {
+        let base = 1024;
+        let size = 1024;
+
+        let mut mem = DefaultMemorySegment::<false>::new(base, size);
+
+        mem.set(base - 1, 32);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_panic_get_below_ro()
+    {
+        let base = 1024;
+        let size = 1024;
+
+        let mem = DefaultMemorySegment::<false>::new(base, size);
+        mem.get(base - 1);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_panic_set_above_rw()
+    {
+        let base = 0;
+        let size = 1024;
+
+        let mut mem = DefaultMemorySegment::<true>::new(base, size);
+
+        mem.set(size, 32);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_panic_get_above_rw()
+    {
+        let base = 0;
+        let size = 1024;
+
+        let mem = DefaultMemorySegment::<true>::new(base, size);
+        mem.get(size);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_panic_set_below_rw()
+    {
+        let base = 1024;
+        let size = 1024;
+
+        let mut mem = DefaultMemorySegment::<true>::new(base, size);
+
+        mem.set(base - 1, 32);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_panic_get_below_rw()
+    {
+        let base = 1024;
+        let size = 1024;
+
+        let mem = DefaultMemorySegment::<true>::new(base, size);
+        mem.get(base - 1);
     }
 
     #[test]
