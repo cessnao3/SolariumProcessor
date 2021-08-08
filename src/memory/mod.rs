@@ -1,6 +1,5 @@
 pub mod memory_map;
-pub mod read_write_memory;
-pub mod read_only_memory;
+pub mod default_segment;
 
 /// Provides the data type to use for a word in memory
 pub type MemoryWord = u32;

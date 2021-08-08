@@ -1,15 +1,17 @@
 use super::*;
 
-pub struct ReadWriteMemory
+pub struct DefaultMemorySegment<const READ_ONLY: bool>
 {
     base_address: MemoryWord,
     top_address: MemoryWord,
-    data: Vec<MemoryWord>
+    data: Vec<MemoryWord>,
 }
 
-impl ReadWriteMemory
+impl<const READ_ONLY: bool> DefaultMemorySegment::<READ_ONLY>
 {
-    pub fn new(base_address: MemoryWord, size: MemoryWord) -> ReadWriteMemory
+    pub fn new(
+        base_address: MemoryWord,
+        size: MemoryWord) -> DefaultMemorySegment::<READ_ONLY>
     {
         let top_address = (base_address + size) as MemoryWord;
 
@@ -17,16 +19,34 @@ impl ReadWriteMemory
 
         let data: Vec::<MemoryWord> = (0..size).map(|_| 0 as MemoryWord).collect();
 
-        return ReadWriteMemory
+        return DefaultMemorySegment::<READ_ONLY>
         {
             base_address,
             top_address,
             data
         };
     }
+
+    pub fn new_with_data(
+        base_address: MemoryWord,
+        size: MemoryWord,
+        data: &[MemoryWord]) -> DefaultMemorySegment::<READ_ONLY>
+    {
+        let mut mem_val = DefaultMemorySegment::<READ_ONLY>::new(
+            base_address,
+            size);
+
+        assert!(data.len() <= size as usize);
+
+        mem_val.data = (0..size as usize)
+            .map(|i| if i < data.len() { data[i] } else { 0 })
+            .collect();
+
+        return mem_val
+    }
 }
 
-impl MemorySegment for ReadWriteMemory
+impl<const WRITEABLE: bool> MemorySegment for DefaultMemorySegment::<WRITEABLE>
 {
     fn get(&self, ind: MemoryWord) -> MemoryWord
     {
@@ -44,8 +64,15 @@ impl MemorySegment for ReadWriteMemory
     {
         if self.within(ind)
         {
-            self.data[(ind - self.base_address) as usize] = data;
-            return true;
+            if WRITEABLE
+            {
+                self.data[(ind - self.base_address) as usize] = data;
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
         else
         {
@@ -55,10 +82,13 @@ impl MemorySegment for ReadWriteMemory
 
     fn reset(&mut self)
     {
-        // Reset all data values to 0
-        for val in self.data.iter_mut()
+        // Reset all data values to 0 if not read only
+        if WRITEABLE
         {
-            *val = 0;
+            for val in self.data.iter_mut()
+            {
+                *val = 0;
+            }
         }
     }
 
@@ -89,7 +119,7 @@ mod tests {
         let base = 0;
         let size = 1024;
 
-        let mem = ReadWriteMemory::new(base, size);
+        let mem = DefaultMemorySegment::<false>::new(base, size);
 
         assert_eq!(mem.start_address(), base);
         assert_eq!(mem.address_len(), size);
@@ -107,7 +137,7 @@ mod tests {
         let base = 256;
         let size = 1024;
 
-        let mem = ReadWriteMemory::new(base, size);
+        let mem = DefaultMemorySegment::<false>::new(base, size);
 
         for i in 0..2048
         {
