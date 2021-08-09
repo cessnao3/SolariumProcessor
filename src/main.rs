@@ -2,14 +2,14 @@ mod cpu;
 mod memory;
 mod assembler;
 
-use memory::default_segment::DefaultMemorySegment;
+use memory::segment_rw::ReadWriteSegment;
 
 use crate::memory::MemorySegment;
 
 fn main()
 {
     // Setup a memory test
-    let mut mem_val = DefaultMemorySegment::<true>::new(0, 1024);
+    let mut mem_val = ReadWriteSegment::new(0, 1024);
     mem_val.set(5, 32);
 
     let box_val: Box<dyn memory::MemorySegment> = Box::new(mem_val);
