@@ -38,7 +38,7 @@ There are 16 total registers present on the SCPU. These are defined generally as
 
 \subsection{Overall Instruction Syntax}
 
-Since the architecture of the SCPU is 16-bit, this means that each word that may be addressed is 16-bits.
+Since the architecture of the SCPU is 16-bit, this means that each word that may be addressed is 16-bits. The general instruction format is listed  in Table \ref{table:instruction-formatting}.
 
 \begin{table}[h!]
 	\centering
@@ -53,9 +53,19 @@ Since the architecture of the SCPU is 16-bit, this means that each word that may
 	\label{table:instruction-formatting}
 \end{table}
 
+This is contrasted with the typical assembly language formatting, which is provided as
+
+\begin{center}
+	\texttt{instruction <arg2> <arg1> <arg0>},
+\end{center}
+
+where the number of arguments depends on the required number of arguments for the instruction.
+
 \pagebreak
 
 \section{Available Instructions}
+
+All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor.
 
 \begin{table}[h!]
 	\centering
@@ -65,39 +75,40 @@ Since the architecture of the SCPU is 16-bit, this means that each word that may
 			opcode & arg0 & arg1 & arg2 & Assembly & Description \\
 			\hline
 			0 & 0 & 0 & 0 & \texttt{noop} & No Operation \\
-			0 & 0 & 0 & 1 & \texttt{inton} & Interrupts On \\
-			0 & 0 & 0 & 2 & \texttt{intoff} & Interrupts Off \\
-			0 & 0 & 0 & 3 & \texttt{int} & Call An Interrupt \\
-			0 & 0 & 0 & 4 & \texttt{reset} & Resets the Processor \\
-			0 & 0 & 0 & 5 & \texttt{pop} & \texttt{SP--} \\
-			0 & 0 & 0 & 6 & \texttt{ret} & Returns from a previous function call \\
-			0 & 0 & 1 & R[a] & \texttt{jmp R[a]} & \texttt{PC = R[a]} \\
-			0 & 0 & 2 & R[a] & \texttt{jmpr R[a]} & \texttt{PC += R[a]} \\
-			0 & 0 & 3 & R[a] & \texttt{push R[a]} & \texttt{mem[SP++] = R[a]} \\
-			0 & 0 & 4 & R[a] & \texttt{call R[a]} & Calls the function/routine at the location Ra \\
+			0 & 0 & 0 & 1 & \texttt{inton} & Turn Interrupts On \\
+			0 & 0 & 0 & 2 & \texttt{intoff} & Turn Interrupts Off \\
+			0 & 0 & 0 & 3 & \texttt{int} & Trigger a Software Interrupt \\
+			0 & 0 & 0 & 4 & \texttt{reset} & \texttt{PC = Reset Vector}, \texttt{R[0-15] = 0} \\
+			0 & 0 & 0 & 5 & \texttt{pop} & \texttt{--SP} \\
+			0 & 0 & 0 & 6 & \texttt{ret} & \texttt{$\forall_{i \in \{15:0\}}$ R[i] = mem[--SP]}, \texttt{PC += 1} \\
+			0 & 0 & 1 & R[a] & \texttt{jmp [a]} & \texttt{PC = R[a]} \\
+			0 & 0 & 2 & R[a] & \texttt{jmpr [a]} & \texttt{PC += R[a]} \\
+			0 & 0 & 3 & R[a] & \texttt{push [a]} & \texttt{mem[SP++] = R[a]} \\
+			0 & 0 & 4 & R[a] & \texttt{popr [a]} & \texttt{R[a] = mem[--SP]} \\
 			0 & 1 & 0xI0 & 0x0I & \texttt{jmpri 0xII} & \texttt{PC += Im} \\
-			0 & 2 & R[src] & R[dst] & \texttt{ld Rdst, Rsrc} & \texttt{R[dst] = mem[R[src]]} \\
-			0 & 3 & R[src] & R[dst] & \texttt{sav Rdst, Rsrc} & \texttt{mem[R[dst]] = R[src]} \\
-			0 & 4 & R[src] & R[dst] & \texttt{ldr Rds, Rsrc} & \texttt{R[dst] = mem[PC + R[src]]} \\
-			0 & 5 & R[src] & R[dst] & \texttt{svr Rds, Rdst} & \texttt{mem[PC + R[dst]] = R[src]} \\
-			0 & 6 & R[cmp] & R[a] & \texttt{jz Rcmp, Ra} & \texttt{PC = R[a] IF R[cmp] == 0} \\
-			0 & 7 & R[cmp] & R[a] & \texttt{jzr Rcmp, Ra} & \texttt{PC += R[a] IF R[cmp] == 0} \\
-			0 & 8 & R[cmp] & R[a] & \texttt{jgz Rcmp, Ra} & \texttt{PC = R[a] IF R[cmp] > 0} \\
-			0 & 9 & R[cmp] & R[a] & \texttt{jgzr Rcmp, Ra} & \texttt{PC += R[a] IF R[cmp] > 0} \\
+			0 & 2 & R[src] & R[dst] & \texttt{ld [dst], [src]} & \texttt{R[dst] = mem[R[src]]} \\
+			0 & 3 & R[src] & R[dst] & \texttt{sav [dst], [src]} & \texttt{mem[R[dst]] = R[src]} \\
+			0 & 4 & R[src] & R[dst] & \texttt{ldr [dst], [src]} & \texttt{R[dst] = mem[PC + R[src]]} \\
+			0 & 5 & R[src] & R[dst] & \texttt{svr [dst], [src]} & \texttt{mem[PC + R[dst]] = R[src]} \\
+			0 & 6 & R[cmp] & R[a] & \texttt{jz [cmp], [a]} & \texttt{PC = R[a] IF R[cmp] == 0} \\
+			0 & 7 & R[cmp] & R[a] & \texttt{jzr [cmp], [a]} & \texttt{PC += R[a] IF R[cmp] == 0} \\
+			0 & 8 & R[cmp] & R[a] & \texttt{jgz [cmp], [a]} & \texttt{PC = R[a] IF R[cmp] > 0} \\
+			0 & 9 & R[cmp] & R[a] & \texttt{jgzr [cmp], [a]} & \texttt{PC += R[a] IF R[cmp] > 0} \\
+			0 & 10 & R[args] & R[loc] & \texttt{call [loc], [args]} & \texttt{$\forall_{i \in \{0:15\}}$ mem[SP++] = R[i]}, \texttt{mem[SP++] = R[args]}, \texttt{PC = R[loc]} \\
 			1 & 0xI0 & 0x0I & R[dst] & \texttt{ldi 0xII} & \texttt{R[dst] = 0xII} \\
-			2 & R[a] & R[b] & R[dst] & \texttt{add Rdst, Ra, Rb} & \texttt{R[dst] = R[a] + R[b]} \\
-			3 & R[a] & R[b] & R[dst] & \texttt{sub Rdst, Ra, Rb} & \texttt{R[dst] = R[a] - R[b]} \\
-			4 & R[a] & R[b] & R[dst] & \texttt{mul Rdst, Ra, Rb} & \texttt{R[dst] = R[a] * R[b]} \\
-			5 & R[a] & R[b] & R[dst] & \texttt{div Rdst, Ra, Rb} & \texttt{R[dst] = R[a] / R[b]} \\
-			6 & R[a] & R[b] & R[dst] & \texttt{mod Rdst, Ra, Rb} & \texttt{R[dst] = R[a] \% R[b]} \\
-			7 & R[a] & R[b] & R[dst] & \texttt{band Rdst, Ra, Rb} & \texttt{R[dst] = R[a] \& R[b]} \\
-			8 & R[a] & R[b] & R[dst] & \texttt{bor Rdst, Ra, Rb} & \texttt{R[dst] = R[a] - R[b]} \\
-			9 & R[a] & R[b] & R[dst] & \texttt{bsft Rdst, Ra, Rb} & \texttt{R[dst] = R[a] << R[b]} \\
+			2 & R[b] & R[a] & R[dst] & \texttt{add [dst], [a], [b]} & \texttt{R[dst] = R[a] + R[b]} \\
+			3 & R[b] & R[a] & R[dst] & \texttt{sub [dst], [a], [b]} & \texttt{R[dst] = R[a] - R[b]} \\
+			4 & R[b] & R[a] & R[dst] & \texttt{mul [dst], [a], [b]} & \texttt{R[dst] = R[a] * R[b]} \\
+			5 & R[b] & R[a] & R[dst] & \texttt{div [dst], [a], [b]} & \texttt{R[dst] = R[a] / R[b]} \\
+			6 & R[b] & R[a] & R[dst] & \texttt{mod [dst], [a], [b]} & \texttt{R[dst] = R[a] \% R[b]} \\
+			7 & R[b] & R[a] & R[dst] & \texttt{band [dst], [a], [b]} & \texttt{R[dst] = R[a] \& R[b]} \\
+			8 & R[b] & R[a] & R[dst] & \texttt{bor [dst], [a], [b]} & \texttt{R[dst] = R[a] - R[b]} \\
+			9 & R[b] & R[a] & R[dst] & \texttt{bsft [dst], [a], [b]} & \texttt{R[dst] = R[a] << R[b]} \\
 			\hline
 		\end{tabular}
 	\end{footnotesize}
-	\label{table:instruction-table}
 	\caption{Available instruction list for the SCPU provides a variety of commands.}
+	\label{table:instruction-table}
 \end{table}
 
 \end{document}
