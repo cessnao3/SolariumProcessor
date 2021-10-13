@@ -1,5 +1,4 @@
-use crate::memory::{MemoryWord, MemoryWordSigned};
-use crate::memory::memory_map::MemoryMap;
+use crate::memory::{MemoryMap, MemoryWord, MemoryWordSigned};
 
 use super::registers::{Register, RegisterManager};
 
@@ -7,8 +6,8 @@ use super::registers::{Register, RegisterManager};
 const VECTOR_RESET: MemoryWord = 0x0;
 
 /// Defines the IRQ reset vector location
-const VECTOR_IRQ_SW: MemoryWord = 0x1;
-const VECTOR_HW_HJW: MemoryWord = 0x2;
+//const VECTOR_IRQ_SW: MemoryWord = 0x1;
+//const VECTOR_HW_HJW: MemoryWord = 0x2;
 
 /// Creates the Solarium CPU parameters
 pub struct SolariumCPU

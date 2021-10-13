@@ -1,4 +1,4 @@
-use super::memory::{MemoryWord, MemoryWordSigned};
+use libscpu::memory::{MemoryWord, MemoryWordSigned};
 
 pub fn assemble(input: Vec<&str>) -> Result<Vec<MemoryWord>, String>
 {

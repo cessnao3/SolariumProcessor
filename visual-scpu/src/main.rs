@@ -1,10 +1,9 @@
-mod cpu;
-mod memory;
 mod assembler;
 
-use memory::segment_rw::ReadWriteSegment;
+use libscpu::cpu::SolariumCPU;
 
-use crate::memory::MemorySegment;
+use libscpu::memory::ReadWriteSegment;
+use libscpu::memory::MemorySegment;
 
 fn main()
 {
@@ -12,7 +11,7 @@ fn main()
     let mut mem_val = ReadWriteSegment::new(0, 1024);
     mem_val.set(5, 32);
 
-    let box_val: Box<dyn memory::MemorySegment> = Box::new(mem_val);
+    let box_val: Box<dyn MemorySegment> = Box::new(mem_val);
 
     println!("Memory Test: {0}", box_val.get(5));
 
@@ -31,7 +30,7 @@ fn main()
     };
 
     println!("Initializing CPU");
-    let mut cpu = cpu::processor::SolariumCPU::new();
+    let mut cpu = SolariumCPU::new();
     for i in 0..100
     {
         println!("Step {0:}", i + 1);

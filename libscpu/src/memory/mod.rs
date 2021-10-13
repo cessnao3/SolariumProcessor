@@ -1,5 +1,8 @@
-pub mod memory_map;
-pub mod segment_rw;
+mod memory_map;
+mod segment_rw;
+
+pub use self::memory_map::MemoryMap as MemoryMap;
+pub use self::segment_rw::ReadWriteSegment as ReadWriteSegment;
 
 /// Provides the data type to use for a word in memory
 pub type MemoryWord = u16;
