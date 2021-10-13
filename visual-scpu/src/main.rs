@@ -1,47 +1,15 @@
-mod assembler;
-
-use libscpu::cpu::SolariumCPU;
-
-use libscpu::memory::ReadWriteSegment;
-use libscpu::memory::MemorySegment;
+use fltk::prelude::*;
+use fltk::{app, button::Button, frame::Frame, window::Window};
 
 fn main()
 {
-    // Setup a memory test
-    let mut mem_val = ReadWriteSegment::new(0, 1024);
-    mem_val.set(5, 32);
-
-    let box_val: Box<dyn MemorySegment> = Box::new(mem_val);
-
-    println!("Memory Test: {0}", box_val.get(5));
-
-    println!("Assembly Test");
-    let line_test = vec!{
-        "copy r5 $6",
-        "jmp 63",
-        "jmp -64",
-        "jg r4 r5 r8", // TODO - Allow address-based registers here?
-    };
-
-    match assembler::assemble(line_test)
-    {
-        Ok(_) => println!("Assembled Successfully"),
-        Err(e) => println!(" Error assembling: {0:}", e)
-    };
-
-    println!("Initializing CPU");
-    let mut cpu = SolariumCPU::new();
-    for i in 0..100
-    {
-        println!("Step {0:}", i + 1);
-        match cpu.step()
-        {
-            Ok(()) => (),
-            Err(e) =>
-            {
-                eprintln!("Step Error: {0:}", e);
-                break;
-            }
-        }
-    }
+    // Define the window values
+    let app = app::App::default();
+    let mut wind = Window::new(100, 100, 400, 300, "Hello from rust");
+    let mut frame = Frame::new(0, 0, 400, 200, "");
+    let mut but = Button::new(160, 210, 80, 40, "Click me!");
+    wind.end();
+    wind.show();
+    but.set_callback(move |_| frame.set_label("Hello World!")); // the closure capture is mutable borrow to our button
+    app.run().unwrap();
 }
