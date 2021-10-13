@@ -1,13 +1,11 @@
 use crate::memory::MemoryWord;
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 /// Defines the enumeration for available registers
 pub enum Register
 {
     ProgramCounter,
     StackPointer,
-    Return,
-    Zero,
     GP(usize)
 }
 
@@ -37,8 +35,6 @@ impl Register
         {
             Register::ProgramCounter => 0,
             Register::StackPointer => 1,
-            Register::Return => 2,
-            Register::Zero => 3,
             Register::GP(ind) => *ind
         };
 
@@ -81,16 +77,16 @@ impl RegisterManager
     }
 
     /// Gets the selected register value
-    pub fn get(&self, register: &Register) -> MemoryWord
+    pub fn get(&self, register: Register) -> MemoryWord
     {
         return self.registers[register.to_index()];
     }
 
     /// Sets the selecteed register value
-    pub fn set(&mut self, register: &Register, value: MemoryWord) -> bool
+    pub fn set(&mut self, register: Register, value: MemoryWord) -> bool
     {
         let reg_ind = register.to_index();
-        self.registers[reg_ind] = if reg_ind == Register::Zero.to_index() { 0 } else { value };
+        self.registers[reg_ind] = value;
         return true;
     }
 }
@@ -104,10 +100,8 @@ mod tests {
     {
         // Define the list of named registers
         let mut registers: Vec<Register> = vec!{
-            Register::Zero,
             Register::ProgramCounter,
             Register::StackPointer,
-            Register::Return
         };
 
         // Add the register indices
@@ -127,28 +121,17 @@ mod tests {
         // Create a register manager to test register values
         let mut register_manager = RegisterManager::new();
 
-        // Determine the register index
-        let zero_ind = Register::Zero.to_index();
-
         // Iterate over available registers
         for register in get_registers().iter()
         {
             // Determine values ot iterate over
             for v in 0..1000
             {
-                // Define the expected value, ensuring that the zero register is always 0
-                let expected_value: MemoryWord = if register.to_index() == zero_ind
-                {
-                    0
-                }
-                else
-                {
-                    v
-                };
-
                 // Set the register manager, and then ensure that the output result matches
-                register_manager.set(&register, v);
-                assert_eq!(register_manager.get(&register), expected_value);
+                register_manager.set(
+                    *register,
+                    v);
+                assert_eq!(register_manager.get(*register), v as MemoryWord);
             }
         }
     }
@@ -163,17 +146,14 @@ mod tests {
         // Add a value to each register
         for i in 0..Register::NUM_REGISTERS
         {
-            register_manager.set(&Register::GP(i), i as MemoryWord);
+            register_manager.set(Register::GP(i), i as MemoryWord);
         }
 
         // Ensure that we can get the resulting value out
         for i in 0..Register::NUM_REGISTERS
         {
-            let val = register_manager.get(&Register::GP(i));
-
-            let expected = if i == Register::Zero.to_index() { 0 } else { i as MemoryWord };
-
-            assert_eq!(val, expected);
+            let val = register_manager.get(Register::GP(i));
+            assert_eq!(val, i as MemoryWord);
         }
     }
 }

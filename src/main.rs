@@ -35,6 +35,14 @@ fn main()
     for i in 0..100
     {
         println!("Step {0:}", i + 1);
-        cpu.step();
+        match cpu.step()
+        {
+            Ok(()) => (),
+            Err(e) =>
+            {
+                eprintln!("Step Error: {0:}", e);
+                break;
+            }
+        }
     }
 }

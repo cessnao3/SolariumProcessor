@@ -113,7 +113,7 @@ mod tests {
         assert_eq!(mem.address_len(), size);
 
         // Iterate over memory items to check that the correct values are set
-        for i in 0..(u16::MAX as u32)
+        for i in 0..MemoryWord::MAX
         {
             let is_within = i >= base && i < base + size;
             assert_eq!(mem.within(i), is_within);

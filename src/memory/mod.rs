@@ -2,10 +2,10 @@ pub mod memory_map;
 pub mod segment_rw;
 
 /// Provides the data type to use for a word in memory
-pub type MemoryWord = u32;
+pub type MemoryWord = u16;
 
 /// Provides the corresponding signed type for the type used for [MemoryWord]
-pub type MemoryWordSigned = i32;
+pub type MemoryWordSigned = i16;
 
 /// Provides a trait for memory segments to implement
 pub trait MemorySegment

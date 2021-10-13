@@ -80,7 +80,6 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			0 & 0 & 0 & 3 & \texttt{int} & Trigger a Software Interrupt \\
 			0 & 0 & 0 & 4 & \texttt{reset} & \texttt{PC = Reset Vector}, \texttt{R[0-15] = 0} \\
 			0 & 0 & 0 & 5 & \texttt{pop} & \texttt{--SP} \\
-			0 & 0 & 0 & 6 & \texttt{ret} & \texttt{$\forall_{i \in \{15:0\}}$ R[i] = mem[--SP]}, \texttt{PC += 1} \\
 			0 & 0 & 1 & R[a] & \texttt{jmp [a]} & \texttt{PC = R[a]} \\
 			0 & 0 & 2 & R[a] & \texttt{jmpr [a]} & \texttt{PC += R[a]} \\
 			0 & 0 & 3 & R[a] & \texttt{push [a]} & \texttt{mem[SP++] = R[a]} \\
@@ -90,11 +89,10 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			0 & 3 & R[src] & R[dst] & \texttt{sav [dst], [src]} & \texttt{mem[R[dst]] = R[src]} \\
 			0 & 4 & R[src] & R[dst] & \texttt{ldr [dst], [src]} & \texttt{R[dst] = mem[PC + R[src]]} \\
 			0 & 5 & R[src] & R[dst] & \texttt{svr [dst], [src]} & \texttt{mem[PC + R[dst]] = R[src]} \\
-			0 & 6 & R[cmp] & R[a] & \texttt{jz [cmp], [a]} & \texttt{PC = R[a] IF R[cmp] == 0} \\
-			0 & 7 & R[cmp] & R[a] & \texttt{jzr [cmp], [a]} & \texttt{PC += R[a] IF R[cmp] == 0} \\
-			0 & 8 & R[cmp] & R[a] & \texttt{jgz [cmp], [a]} & \texttt{PC = R[a] IF R[cmp] > 0} \\
-			0 & 9 & R[cmp] & R[a] & \texttt{jgzr [cmp], [a]} & \texttt{PC += R[a] IF R[cmp] > 0} \\
-			0 & 10 & R[args] & R[loc] & \texttt{call [loc], [args]} & \texttt{$\forall_{i \in \{0:15\}}$ mem[SP++] = R[i]}, \texttt{mem[SP++] = R[args]}, \texttt{PC = R[loc]} \\
+			0 & 6 & R[cmp] & R[a] & \texttt{jz [a], [cmp]} & \texttt{PC = R[a] IF R[cmp] == 0} \\
+			0 & 7 & R[cmp] & R[a] & \texttt{jzr [a], [cmp]} & \texttt{PC += R[a] IF R[cmp] == 0} \\
+			0 & 8 & R[cmp] & R[a] & \texttt{jgz [a], [cmp]} & \texttt{PC = R[a] IF R[cmp] > 0} \\
+			0 & 9 & R[cmp] & R[a] & \texttt{jgzr [a], [cmp]} & \texttt{PC += R[a] IF R[cmp] > 0} \\
 			1 & 0xI0 & 0x0I & R[dst] & \texttt{ldi 0xII} & \texttt{R[dst] = 0xII} \\
 			2 & R[b] & R[a] & R[dst] & \texttt{add [dst], [a], [b]} & \texttt{R[dst] = R[a] + R[b]} \\
 			3 & R[b] & R[a] & R[dst] & \texttt{sub [dst], [a], [b]} & \texttt{R[dst] = R[a] - R[b]} \\
@@ -102,8 +100,10 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			5 & R[b] & R[a] & R[dst] & \texttt{div [dst], [a], [b]} & \texttt{R[dst] = R[a] / R[b]} \\
 			6 & R[b] & R[a] & R[dst] & \texttt{mod [dst], [a], [b]} & \texttt{R[dst] = R[a] \% R[b]} \\
 			7 & R[b] & R[a] & R[dst] & \texttt{band [dst], [a], [b]} & \texttt{R[dst] = R[a] \& R[b]} \\
-			8 & R[b] & R[a] & R[dst] & \texttt{bor [dst], [a], [b]} & \texttt{R[dst] = R[a] - R[b]} \\
-			9 & R[b] & R[a] & R[dst] & \texttt{bsft [dst], [a], [b]} & \texttt{R[dst] = R[a] << R[b]} \\
+			8 & R[b] & R[a] & R[dst] & \texttt{bor [dst], [a], [b]} & \texttt{R[dst] = R[a] | R[b]} \\
+			9 & R[b] & R[a] & R[dst] & \texttt{bxor [dst], [a], [b]} & \texttt{R[dst] = R[a] $\wedge$ R[b]} \\
+			10 & R[b] & R[a] & R[dst] & \texttt{bsftl [dst], [a], [b]} & \texttt{R[dst] = R[a] << R[b]} \\
+			11 & R[b] & R[a] & R[dst] & \texttt{bsftr [dst], [a], [b]} & \texttt{R[dst] = R[a] >> R[b]} \\
 			\hline
 		\end{tabular}
 	\end{footnotesize}
