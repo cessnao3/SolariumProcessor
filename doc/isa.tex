@@ -88,12 +88,12 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			0 & 2 & R[src] & R[dst] & \texttt{ld [dst], [src]} & \texttt{R[dst] = mem[R[src]]} \\
 			0 & 3 & R[src] & R[dst] & \texttt{sav [dst], [src]} & \texttt{mem[R[dst]] = R[src]} \\
 			0 & 4 & R[src] & R[dst] & \texttt{ldr [dst], [src]} & \texttt{R[dst] = mem[PC + R[src]]} \\
-			0 & 5 & R[src] & R[dst] & \texttt{svr [dst], [src]} & \texttt{mem[PC + R[dst]] = R[src]} \\
+			0 & 5 & R[src] & R[dst] & \texttt{savr [dst], [src]} & \texttt{mem[PC + R[dst]] = R[src]} \\
 			0 & 6 & R[cmp] & R[a] & \texttt{jz [a], [cmp]} & \texttt{PC = R[a] IF R[cmp] == 0} \\
 			0 & 7 & R[cmp] & R[a] & \texttt{jzr [a], [cmp]} & \texttt{PC += R[a] IF R[cmp] == 0} \\
 			0 & 8 & R[cmp] & R[a] & \texttt{jgz [a], [cmp]} & \texttt{PC = R[a] IF R[cmp] > 0} \\
 			0 & 9 & R[cmp] & R[a] & \texttt{jgzr [a], [cmp]} & \texttt{PC += R[a] IF R[cmp] > 0} \\
-			1 & 0xI0 & 0x0I & R[dst] & \texttt{ldi 0xII} & \texttt{R[dst] = 0xII} \\
+			1 & 0xI0 & 0x0I & R[dst] & \texttt{ldi [dst], 0xII} & \texttt{R[dst] = 0xII} \\
 			2 & R[b] & R[a] & R[dst] & \texttt{add [dst], [a], [b]} & \texttt{R[dst] = R[a] + R[b]} \\
 			3 & R[b] & R[a] & R[dst] & \texttt{sub [dst], [a], [b]} & \texttt{R[dst] = R[a] - R[b]} \\
 			4 & R[b] & R[a] & R[dst] & \texttt{mul [dst], [a], [b]} & \texttt{R[dst] = R[a] * R[b]} \\
