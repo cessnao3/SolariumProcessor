@@ -8,5 +8,10 @@ edition = "2018"
 
 [dependencies]
 libscpu = { path = "../libscpu", version = "*" }
+libscpu-assemble = { path = "../libscpu-assemble", version = "*" }
+
+[target.'cfg(unix)'.dependencies]
+fltk = { version = "1.2.8" }
+
+[target.'cfg(windows)'.dependencies]
 fltk = { version = "1.2.8", features = ["fltk-bundled"] }
-# byteorder = "1.4.3"
