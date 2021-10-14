@@ -2,6 +2,8 @@ mod instructions;
 
 use instructions::get_instruction_map;
 
+use std::collections::HashMap;
+
 use regex::Regex;
 
 pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
@@ -9,7 +11,8 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
     let line_regex = Regex::new(r"^(?P<instruction>[\w]+)(?P<rest>\s+[\w\d]+(,\s*[\w\d]+)*)*$").unwrap();
     let args_split_regex = Regex::new(r",\s*").unwrap();
 
-    let mut data_values = Vec::<u16>::new();
+    let mut data_values = HashMap::<u16, u16>::new();
+    let mut data_offset = 0u16;
 
     let instruction_map = get_instruction_map();
 
@@ -58,10 +61,26 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
         };
 
         // Add the resulting instruction value
-        data_values.push(inst_data.combine());
+        if data_values.contains_key(&data_offset)
+        {
+            return Err(format!("line {0:} offset {1:} already filled", i, data_offset))
+        }
+
+
+        data_values.insert(
+            data_offset,
+            inst_data.combine());
+        data_offset += 1;
     }
 
-    return Ok(data_values);
+    let max_index = data_values.keys().max().unwrap();
+    let default_val = 0u16;
+
+    let data_vec: Vec<u16> = (0..(max_index + 1))
+        .map(|v| *data_values.get(&v).unwrap_or(&default_val))
+        .collect();
+
+    return Ok(data_vec);
 }
 
 #[cfg(test)]
