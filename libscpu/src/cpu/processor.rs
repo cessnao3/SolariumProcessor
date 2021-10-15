@@ -12,13 +12,16 @@ const VECTOR_RESET: MemoryWord = 0x0;
 /// Creates the Solarium CPU parameters
 pub struct SolariumCPU
 {
-    memory_map: MemoryMap,
-    registers: RegisterManager,
+    pub memory_map: MemoryMap,
+    pub registers: RegisterManager,
     allow_interrupts: bool
 }
 
 impl SolariumCPU
 {
+    /// Provide the number of registers
+    pub const NUM_REGISTERS: usize = Register::NUM_REGISTERS;
+
     /// Creates a new CPU parameter
     pub fn new() -> SolariumCPU
     {
@@ -51,6 +54,11 @@ impl SolariumCPU
         self.registers.set(
             Register::ProgramCounter,
             VECTOR_RESET);
+    }
+
+    pub fn get_register_value(&self, index: usize) -> MemoryWord
+    {
+        return self.registers.get(Register::from_index(index));
     }
 
     fn get_pc_offset(&self, reg: Register) -> MemoryWord
@@ -110,8 +118,8 @@ impl SolariumCPU
             {
                 assert!(opcode == 0);
 
-                let reg_a = Register::GP(arg2 as usize);
-                let reg_b = Register::GP(arg1 as usize);
+                let reg_a = Register::from_index(arg2 as usize);
+                let reg_b = Register::from_index(arg1 as usize);
 
                 match arg0
                 {
@@ -178,7 +186,7 @@ impl SolariumCPU
                 assert!(opcode == 0);
                 assert!(arg0 == 0);
 
-                let dest_register = Register::GP(arg2 as usize);
+                let dest_register = Register::from_index(arg2 as usize);
 
                 match arg1
                 {
@@ -271,13 +279,13 @@ impl SolariumCPU
                 arg1) as MemoryWord;
 
             self.registers.set(
-                Register::GP(arg2 as usize),
+                Register::from_index(arg2 as usize),
                 immediate);
         }
         else if opcode <= 11 // arithmetic
         {
-            let val_a = self.registers.get(Register::GP(arg1 as usize));
-            let val_b = self.registers.get(Register::GP(arg0 as usize));
+            let val_a = self.registers.get(Register::from_index(arg1 as usize));
+            let val_b = self.registers.get(Register::from_index(arg0 as usize));
 
             let result: MemoryWord;
 
@@ -337,7 +345,7 @@ impl SolariumCPU
                 }
             }
 
-            let reg_dest = Register::GP(arg2 as usize);
+            let reg_dest = Register::from_index(arg2 as usize);
             self.registers.set(
                 reg_dest,
                 result);

@@ -105,10 +105,13 @@ mod tests {
         };
 
         // Add the register indices
-        for i in 0..Register::NUM_REGISTERS
+        for i in registers.len()..Register::NUM_REGISTERS
         {
             registers.push(Register::GP(i));
         }
+
+        // Ensure the resulting value is correct
+        assert!(registers.len() == Register::NUM_REGISTERS);
 
         // Return the register vector
         return registers;
