@@ -104,35 +104,38 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
         "ldi".to_string(),
         Box::new(ImmediateRegisterInstruction::new(1)));
     instructions.insert(
-        "add".to_string(),
-        Box::new(RegisterInstruction::new(2, 3)));
+        "ldui".to_string(),
+        Box::new(ImmediateRegisterInstruction::new(2)));
     instructions.insert(
-        "sub".to_string(),
+        "add".to_string(),
         Box::new(RegisterInstruction::new(3, 3)));
     instructions.insert(
-        "mul".to_string(),
+        "sub".to_string(),
         Box::new(RegisterInstruction::new(4, 3)));
     instructions.insert(
-        "div".to_string(),
+        "mul".to_string(),
         Box::new(RegisterInstruction::new(5, 3)));
     instructions.insert(
-        "mod".to_string(),
+        "div".to_string(),
         Box::new(RegisterInstruction::new(6, 3)));
     instructions.insert(
-        "band".to_string(),
+        "mod".to_string(),
         Box::new(RegisterInstruction::new(7, 3)));
     instructions.insert(
-        "bor".to_string(),
+        "band".to_string(),
         Box::new(RegisterInstruction::new(8, 3)));
     instructions.insert(
-        "bxor".to_string(),
+        "bor".to_string(),
         Box::new(RegisterInstruction::new(9, 3)));
     instructions.insert(
-        "bsftl".to_string(),
+        "bxor".to_string(),
         Box::new(RegisterInstruction::new(10, 3)));
     instructions.insert(
-        "bsftr".to_string(),
+        "bsftl".to_string(),
         Box::new(RegisterInstruction::new(11, 3)));
+    instructions.insert(
+        "bsftr".to_string(),
+        Box::new(RegisterInstruction::new(12, 3)));
 
     return instructions;
 }

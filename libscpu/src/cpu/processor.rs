@@ -101,13 +101,22 @@ impl SolariumCPU
         assert!(arg2 & 0xF == arg2);
 
         // Define a function to combine two arguments into an item
-        fn get_immediate_value(
+        fn get_immediate_value_signed(
             arg_high: u8,
             arg_low: u8) -> MemoryWordSigned
         {
             assert!(arg_low & 0xF == arg_low);
             assert!(arg_high & 0xF == arg_high);
             return (((arg_high << 4) | arg_low) as i8) as MemoryWordSigned;
+        }
+
+        fn get_immediate_value_unsigned(
+            arg_high: u8,
+            arg_low: u8) -> MemoryWord
+        {
+            assert!(arg_low & 0xF == arg_low);
+            assert!(arg_high & 0xF == arg_high);
+            return (((arg_high << 4) | arg_low)) as MemoryWord;
         }
 
         // Switch based on opcode
@@ -125,7 +134,7 @@ impl SolariumCPU
                 {
                     1 => // jmpri
                     {
-                        pc_incr = get_immediate_value(
+                        pc_incr = get_immediate_value_signed(
                             arg1,
                             arg2);
                     },
@@ -273,17 +282,20 @@ impl SolariumCPU
                 };
             }
         }
-        else if opcode == 1 // ldi
+        else if opcode == 1 || opcode == 2 // ldi
         {
-            let immediate = get_immediate_value(
-                arg0,
-                arg1);
+            let immediate = match opcode
+            {
+                1 =>  get_immediate_value_signed(arg0, arg1) as MemoryWord,
+                2 => get_immediate_value_unsigned(arg0, arg1),
+                _ => return Err(format!("invalid load instruction provided"))
+            };
 
             self.registers.set(
                 Register::from_index(arg2 as usize),
-                immediate as MemoryWord);
+                immediate);
         }
-        else if opcode <= 11 // arithmetic
+        else if opcode <= 12 // arithmetic
         {
             let val_a = self.registers.get(Register::from_index(arg1 as usize));
             let val_b = self.registers.get(Register::from_index(arg0 as usize));
@@ -292,19 +304,19 @@ impl SolariumCPU
 
             match opcode
             {
-                2 => // add
+                3 => // add
                 {
                     result = val_a + val_b;
                 },
-                3 => //sub
+                4 => //sub
                 {
                     result = val_a - val_b;
                 },
-                4 => // mul
+                5 => // mul
                 {
                     result = (val_a as MemoryWordSigned * val_b as MemoryWordSigned) as MemoryWord;
                 },
-                5 => // div
+                6 => // div
                 {
                     if val_b == 0
                     {
@@ -312,7 +324,7 @@ impl SolariumCPU
                     }
                     result = (val_a as MemoryWordSigned / val_b as MemoryWordSigned) as MemoryWord;
                 },
-                6 => // mod
+                7 => // mod
                 {
                     if val_b == 0
                     {
@@ -320,23 +332,23 @@ impl SolariumCPU
                     }
                     result = (val_a as MemoryWordSigned % val_b as MemoryWordSigned) as MemoryWord;
                 },
-                7 => // band
+                8 => // band
                 {
                     result = val_a & val_b;
                 }
-                8 => // bor
+                9 => // bor
                 {
                     result = val_a | val_b;
                 }
-                9 => //bxor
+                10 => //bxor
                 {
                     result = val_a ^ val_b;
                 }
-                10 => // bsftl
+                11 => // bsftl
                 {
                     result = val_a << val_b;
                 },
-                11 => // bsftr
+                12 => // bsftr
                 {
                     result = val_a >> val_b;
                 },
