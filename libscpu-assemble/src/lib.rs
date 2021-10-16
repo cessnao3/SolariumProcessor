@@ -73,7 +73,12 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
         data_offset += 1;
     }
 
-    let max_index = data_values.keys().max().unwrap();
+    let max_index = match data_values.keys().max()
+    {
+        Some(v) => v,
+        None => return Ok(Vec::new())
+    };
+
     let default_val = 0u16;
 
     let data_vec: Vec<u16> = (0..(max_index + 1))
