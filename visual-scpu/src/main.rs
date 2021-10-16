@@ -251,6 +251,7 @@ fn main()
             Err(mpsc::TryRecvError::Disconnected) =>
             {
                 alert_default("thread exit error!");
+                break;
             }
         }
 
