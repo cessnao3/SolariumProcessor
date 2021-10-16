@@ -52,8 +52,9 @@ impl FromStr for ImmedateByteValues
 
     fn from_str(s: &str) -> Result<Self, Self::Err>
     {
-        let args_immediate_hex_regex = Regex::new(r"^0x(?P<digit>[\d][\d])$").unwrap();
-        let args_immediate_num_regex = Regex::new(r"^[-+]?[\d]+$").unwrap();
+        let args_immediate_hex_regex = Regex::new(r"^0x(?P<digit>[0-9a-fA-F][0-9a-fA-F]?)$").unwrap();
+        let args_immediate_num_neg_regex = Regex::new(r"^\-[\d]+$").unwrap();
+        let args_immediate_num_pos_regex = Regex::new(r"^+?[\d]+$").unwrap();
 
         let immediate: u8;
 
@@ -64,16 +65,24 @@ impl FromStr for ImmedateByteValues
                 16)
             {
                 Ok(x) => x,
-                Err(_) => return Err(format!("unable to convert {0:} to immediate value", s))
+                Err(_) => return Err(format!("unable to convert {0:} to immediate hex value", s))
             };
         }
-        else if args_immediate_num_regex.is_match(s)
+        else if args_immediate_num_neg_regex.is_match(s)
         {
             immediate = match s.parse::<i8>()
             {
                 Ok(x) => x as u8,
-                Err(_) => return Err(format!("unable to convert {0:} to immediate value", s))
-            };
+                Err(_) => return Err(format!("unable to convert {0:} to immediate signed value", s))
+            }
+        }
+        else if args_immediate_num_pos_regex.is_match(s)
+        {
+            immediate = match s.parse::<u8>()
+            {
+                Ok(x) => x,
+                Err(_) => return Err(format!("unable to convert {0:} to immediate unsigned value", s))
+            }
         }
         else
         {
