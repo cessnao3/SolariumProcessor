@@ -3,7 +3,9 @@ use fltk::{app::*, button::*, dialog::*, enums::*, window::*, text::*, group::*,
 use fltk::text::TextEditor;
 
 use libscpu::cpu::SolariumCPU;
-use libscpu::memory::ReadWriteSegment;
+use libscpu::memory::{ReadWriteSegment, MemoryWord};
+
+use libscpu_assemble::assemble;
 
 use std::thread;
 use std::time;
@@ -14,29 +16,33 @@ use std::sync::mpsc;
 enum Message
 {
     Step,
-    UpdateRegisters,
     Start,
     Stop,
     Reset,
-    Tick,
     Assemble,
-    Log
+    Tick
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum ThreadMessage
 {
+    SetMemory(Vec<MemoryWord>),
     Start,
     Stop,
-    Exit
+    Reset,
+    Exit,
+    Step
+}
+
+#[derive(Clone)]
+enum GuiMessage
+{
+    UpdateRegisters([u16; SolariumCPU::NUM_REGISTERS]),
+    Error(String)
 }
 
 fn main()
 {
-    // Define the processor
-    let mut cpu = SolariumCPU::new();
-    cpu.memory_map.add_segment(Box::new(ReadWriteSegment::new(0, 10000)));
-
     // Define the window values
     let app = App::default();
 
@@ -48,9 +54,10 @@ fn main()
         .with_label("VisualSCPU");
 
     let mut main_group = Flex::default_fill().row();
-    let mut assembly_editor;
 
+    // Define the editor
     let mut editor_group = Flex::default_fill().column();
+    let mut assembly_editor;
     {
         let mut assembly_label = Frame::default().with_label("Assembly Editor");
         assembly_editor = TextEditor::default();
@@ -62,11 +69,11 @@ fn main()
         assemble_button.emit(sender, Message::Assemble);
 
         editor_group.set_size(&mut assemble_button, 50);
+        editor_group.set_margin(10);
     }
     editor_group.end();
 
-    //column_group.set_size(&mut text_editor, 100);
-
+    // Define Registers
     let mut register_group = Flex::default_fill().column();
     let register_labels;
     {
@@ -98,6 +105,7 @@ fn main()
     }
     // End the register group
     register_group.end();
+    register_group.set_margin(10);
 
     main_group.set_size(&mut register_group, 350);
 
@@ -106,84 +114,218 @@ fn main()
     // Finish Window Setup
     wind.end();
 
-    // Init Parameters
-    sender.send(Message::UpdateRegisters);
-
-    let (thread_tx, thread_rx) = mpsc::channel();
-
-    //thread_tx.send(ThreadMessage::Start);
+    // Initialize thread communication channels
+    let (gui_to_thread_tx, gui_to_thread_rx) = mpsc::channel();
+    let (thread_to_gui_tx, thread_to_gui_rx) = mpsc::channel();
 
     // Setup the start/stop timer
-    thread::spawn(move || {
+    let cpu_thread = thread::spawn(move || {
         let mut step_cpu = false;
-        loop {
-            match thread_rx.try_recv()
+
+        let mut cpu = SolariumCPU::new();
+        cpu.memory_map.add_segment(Box::new(ReadWriteSegment::new(0, 10000)));
+
+        let mut regs = [0u16; SolariumCPU::NUM_REGISTERS];
+
+        let mut reset = true;
+
+        loop
+        {
+            let mut single_step = false;
+            let mut msg_to_send = None;
+
+            match gui_to_thread_rx.try_recv()
             {
                 Ok(v) => match v
                 {
-                    ThreadMessage::Exit => break,
-                    ThreadMessage::Start => step_cpu = true,
-                    ThreadMessage::Stop => step_cpu = false
+                    ThreadMessage::Exit =>
+                    {
+                        break;
+                    },
+                    ThreadMessage::Start =>
+                    {
+                        step_cpu = true;
+                    },
+                    ThreadMessage::Stop =>
+                    {
+                        step_cpu = false;
+                    },
+                    ThreadMessage::Reset =>
+                    {
+                        cpu.reset();
+                        step_cpu = false;
+                        reset = true;
+                    },
+                    ThreadMessage::SetMemory(mem_vals) =>
+                    {
+                        cpu.reset();
+                        step_cpu = false;
+                        reset = true;
+                        for (i, val) in mem_vals.iter().enumerate()
+                        {
+                            cpu.memory_map.set(i as u16, *val);
+                        }
+                    },
+                    ThreadMessage::Step =>
+                    {
+                        single_step = true;
+                    }
                 },
                 Err(mpsc::TryRecvError::Disconnected) => break,
                 Err(mpsc::TryRecvError::Empty) => ()
             };
 
-            if step_cpu
+            if step_cpu || single_step
             {
-                thread::sleep(time::Duration::from_millis(10));
-                sender.send(Message::Tick);
+                match cpu.step()
+                {
+                    Ok(()) => (),
+                    Err(err) => msg_to_send = Some(GuiMessage::Error(err))
+                };
             }
-    }});
+
+            if (step_cpu || single_step || reset) && msg_to_send.is_none()
+            {
+                reset = false;
+
+                for i in 0..SolariumCPU::NUM_REGISTERS
+                {
+                    regs[i] = cpu.get_register_value(i);
+                }
+
+                msg_to_send = Some(GuiMessage::UpdateRegisters(regs));
+            }
+
+            if msg_to_send.is_some()
+            {
+                match thread_to_gui_tx.send(msg_to_send.unwrap())
+                {
+                    Ok(()) => (),
+                    Err(_) =>
+                    {
+                        break;
+                    }
+                }
+            }
+
+            thread::sleep(time::Duration::from_millis(10));
+        }
+    });
 
     // Show the window and run the application
     wind.show();
     while app.wait()
     {
-        if let Some(msg) = receiver.recv() {
-            match msg {
-                Message::Step | Message::Tick =>
+        match thread_to_gui_rx.try_recv()
+        {
+            Ok(msg) =>
+            {
+                match msg
                 {
-                    match cpu.step()
+                    GuiMessage::UpdateRegisters(regs) =>
                     {
-                        Ok(_) =>
+                        for i in 0..SolariumCPU::NUM_REGISTERS
                         {
-                            println!("Step Success");
+                            register_labels[i].buffer().unwrap().set_text(&format!("{0:}", regs[i]));
                         }
-                        Err(e) =>
-                        {
-                            alert_default(&format!("Step Error: {0:}", e));
-                            println!("Step Error: {0:}", e)
-                        }
+                    },
+                    GuiMessage::Error(err) =>
+                    {
+                        alert_default(&err);
                     }
+                }
 
-                    sender.send(Message::UpdateRegisters);
-                },
-                Message::UpdateRegisters =>
+                sender.send(Message::Tick);
+            },
+            Err(mpsc::TryRecvError::Empty) => (),
+            Err(mpsc::TryRecvError::Disconnected) =>
+            {
+                alert_default("thread exit error!");
+            }
+        }
+
+        let mut msg_to_send = None;
+
+        if let Some(msg) = receiver.recv()
+        {
+            match msg
+            {
+                Message::Step =>
                 {
-                    for i in 0..SolariumCPU::NUM_REGISTERS
-                    {
-                        register_labels[i].buffer().unwrap().set_text(&format!("{0:}", cpu.get_register_value(i)));
-                    }
+                    msg_to_send = Some(ThreadMessage::Step);
                 },
                 Message::Start =>
                 {
-                    thread_tx.send(ThreadMessage::Start);
+                    msg_to_send = Some(ThreadMessage::Start);
                 },
                 Message::Stop =>
                 {
-                    thread_tx.send(ThreadMessage::Stop);
+                    msg_to_send = Some(ThreadMessage::Stop);
                 },
                 Message::Reset =>
                 {
-                    thread_tx.send(ThreadMessage::Stop);
-                    cpu.reset();
+                    msg_to_send = Some(ThreadMessage::Reset);
                 },
-                Message::Assemble => (),
-                Message::Log => ()
+                Message::Assemble =>
+                {
+                    match assembly_editor.buffer()
+                    {
+                        Some(v) =>
+                        {
+                            let lines = v.text().split('\n').map(|v| v.to_string()).collect();
+                            let assembled_binary = assemble(lines);
+
+                            match assembled_binary
+                            {
+                                Ok(v) =>
+                                {
+                                    msg_to_send = Some(ThreadMessage::SetMemory(v));
+                                },
+                                Err(e) => alert_default(&e)
+                            };
+                        },
+                        None => alert_default("Unable to get assembly text buffer")
+                    };
+                },
+                Message::Tick => ()
             }
         }
+
+        match msg_to_send
+        {
+            Some(msg) =>
+            {
+                match gui_to_thread_tx.send(msg)
+                {
+                    Ok(()) => (),
+                    Err(e) =>
+                    {
+                        alert_default(&format!("unable to send message to thread - {0:}", e));
+                    }
+                }
+            },
+            None => ()
+        }
     }
+
+    // Request closing the thread
+    match gui_to_thread_tx.send(ThreadMessage::Exit)
+    {
+        Ok(()) =>
+        {
+            match cpu_thread.join()
+            {
+                Ok(()) => (),
+                Err(_) => eprintln!("error closing thread")
+            }
+        },
+        Err(_) =>
+        {
+            eprintln!("thread already marked as closed!");
+        }
+    }
+
+
 }
 
 fn define_registers(parent: &mut Flex) -> Vec<TextDisplay>
