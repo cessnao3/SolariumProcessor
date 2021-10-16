@@ -129,6 +129,8 @@ fn main()
 
         let mut reset = true;
 
+        let mut last_assembly = Vec::<MemoryWord>::new();
+
         loop
         {
             let mut single_step = false;
@@ -161,10 +163,7 @@ fn main()
                         cpu.reset();
                         step_cpu = false;
                         reset = true;
-                        for (i, val) in mem_vals.iter().enumerate()
-                        {
-                            cpu.memory_map.set(i as u16, *val);
-                        }
+                        last_assembly = mem_vals;
                     },
                     ThreadMessage::Step =>
                     {
@@ -186,14 +185,22 @@ fn main()
 
             if (step_cpu || single_step || reset) && msg_to_send.is_none()
             {
-                reset = false;
-
                 for i in 0..SolariumCPU::NUM_REGISTERS
                 {
                     regs[i] = cpu.get_register_value(i);
                 }
 
                 msg_to_send = Some(GuiMessage::UpdateRegisters(regs));
+            }
+
+            if reset
+            {
+                reset = false;
+
+                for (i, val) in last_assembly.iter().enumerate()
+                {
+                    cpu.memory_map.set(i as u16, *val);
+                }
             }
 
             if msg_to_send.is_some()
