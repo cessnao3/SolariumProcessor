@@ -1,6 +1,8 @@
 \documentclass{article}
 \usepackage[paper=a4paper,margin=1in]{geometry}
 
+\usepackage{listings}
+
 \usepackage{comment}
 
 %opening
@@ -110,5 +112,38 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 	\caption{Available instruction list for the SCPU provides a variety of commands.}
 	\label{table:instruction-table}
 \end{table}
+
+\pagebreak
+
+\section{Examples}
+
+The following list some simple example programs that can be run on the SCPU.
+
+\subsection{Counter}
+
+The program listed in Listing \ref{listing:example-counter} provides a basic counter. A target value is placed in register four, and the value in register three is incremented from 0 to the target value in register four by adding one to the register each loop. Once the target value has been reached and register three is equal to register four, the program halts by entering an infinite loop.
+
+\begin{lstlisting}[caption={Counter Program Example}, label={listing:example-counter}]
+	// Setup the counter variables
+	ldi 2, 1
+	ldi 3, 0
+	
+	// Set the target value
+	ldi 4, 100
+	
+	// Load the jump command
+	ldi 14, -2
+	
+	// Perform the addition and check for reaching the target
+	add 3, 2, 3
+	sub 5, 4, 3
+	
+	// Jump back to the add instruction if the
+	// target minus current is greater than zero
+	jgzr 14, 5
+	
+	// Otherwise, enter an infinite loop as program completion
+	jmpri 0
+\end{lstlisting}
 
 \end{document}
