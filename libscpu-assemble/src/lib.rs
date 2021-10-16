@@ -6,6 +6,27 @@ use std::collections::HashMap;
 
 use regex::Regex;
 
+fn cleanup_lines(lines: Vec<String>) -> Vec<String>
+{
+    let mut new_lines = Vec::new();
+
+    for line in lines.iter()
+    {
+        let result_string: &str = match line.find("//")
+        {
+            Some(len) => &line[..len],
+            None => line
+        }.trim();
+
+        if result_string.len() > 0
+        {
+            new_lines.push(result_string.to_string());
+        }
+    }
+
+    return new_lines;
+}
+
 pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
 {
     let line_regex = Regex::new(r"^(?P<instruction>[\w]+)(?P<rest>\s+\-?[\w\d]+(,\s*\-?[\w\d]+)*)*$").unwrap();
@@ -16,7 +37,7 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
 
     let instruction_map = get_instruction_map();
 
-    for (i, l) in lines.iter().map(|v| v.trim()).enumerate()
+    for (i, l) in cleanup_lines(lines).iter().enumerate()
     {
         // Check for line validity
         if l.is_empty()
