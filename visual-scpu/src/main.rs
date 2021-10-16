@@ -200,7 +200,10 @@ fn main()
             {
                 match thread_to_gui_tx.send(msg_to_send.unwrap())
                 {
-                    Ok(()) => (),
+                    Ok(()) =>
+                    {
+                        sender.send(Message::Tick);
+                    },
                     Err(_) =>
                     {
                         break;
