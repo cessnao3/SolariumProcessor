@@ -1,8 +1,24 @@
+// Setup the counter variables
 ldi 2, 1
 ldi 3, 0
-ldi 4, 100
+
+// Setup the target value (maximum positive signed value possible)
+ldi 4, 8
+ldui 5, 0x7F
+bsftl 6, 5, 4
+ldui 5, 0xFF
+bor 4, 5, 6
+
+// Load the default jump command
 ldi 14, -2
+
+// Perform the addition and check for reaching the target
 add 3, 2, 3
 sub 5, 4, 3
+
+// Jump back to the add instruction if the
+// target minus current is greater than zero
 jgzr 14, 5
+
+// Otherwise, enter an infinite loop as program completion
 jmpri 0
