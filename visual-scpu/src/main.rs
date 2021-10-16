@@ -327,12 +327,12 @@ fn main()
             match cpu_thread.join()
             {
                 Ok(()) => (),
-                Err(_) => eprintln!("error closing thread")
+                Err(_) => eprintln!("error joining to thread")
             }
         },
-        Err(_) =>
+        Err(err) =>
         {
-            eprintln!("thread already marked as closed!");
+            eprintln!("thread already disconnected: {0:}", err.to_string());
         }
     }
 
