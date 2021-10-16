@@ -1,0 +1,10 @@
+ldi 2, 1
+ldi 3, 0
+ldi 4, 100
+ldi 14, -2
+add 3, 2, 3
+sub 5, 4, 3
+jgzr 14, 5
+noop
+noop
+jmpri -1
