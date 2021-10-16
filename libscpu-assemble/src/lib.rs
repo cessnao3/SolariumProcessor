@@ -8,7 +8,7 @@ use regex::Regex;
 
 pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
 {
-    let line_regex = Regex::new(r"^(?P<instruction>[\w]+)(?P<rest>\s+[\w\d]+(,\s*[\w\d]+)*)*$").unwrap();
+    let line_regex = Regex::new(r"^(?P<instruction>[\w]+)(?P<rest>\s+\-?[\w\d]+(,\s*\-?[\w\d]+)*)*$").unwrap();
     let args_split_regex = Regex::new(r",\s*").unwrap();
 
     let mut data_values = HashMap::<u16, u16>::new();
@@ -16,7 +16,7 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
 
     let instruction_map = get_instruction_map();
 
-    for (i, l) in lines.iter().enumerate()
+    for (i, l) in lines.iter().map(|v| v.trim()).enumerate()
     {
         // Check for line validity
         if l.is_empty()
