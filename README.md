@@ -13,3 +13,5 @@ Two basic libraries are provided:
 Programs included are listed below:
 * scpu-assemble provides an executable version of the assembler that can read an input file and provide a binary output file
 * virtual-scpu provides a visual test-bench to compile and run SolariumCPU programs
+
+<img src="doc/images/visual-scpu.png" alt="VisualSCPU Program" width="700"/>

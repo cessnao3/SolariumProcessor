@@ -2,12 +2,13 @@
 \usepackage[paper=a4paper,margin=1in]{geometry}
 
 \usepackage{listings}
+\usepackage{graphicx}
 
 \usepackage{comment}
 
 %opening
 \title{SCPU Instruction Set Architecture}
-\author{Ian}
+\author{Ian O'Rourke}
 \date{\today}
 
 \begin{document}
@@ -145,5 +146,23 @@ The program listed in Listing \ref{listing:example-counter} provides a basic cou
 	// Otherwise, enter an infinite loop as program completion
 	jmpri 0
 \end{lstlisting}
+
+\pagebreak
+
+\section{Tools}
+
+Several tools can help in the development of SCPU programs.
+
+\subsection{VisualSCPU}
+
+One useful tool is VisualSCPU, which is a program that combines together a basic assembler, CPU emulator, and memory inspector into a single program. The main window can be seen in Figure \ref{fig:visual-scpu-main-page}.
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=5in]{images/visual-scpu.png}
+	\caption{Main window of VisualSCPU provides common tools for program writing}
+	\label{fig:visual-scpu-main-page}
+\end{figure}
+	
 
 \end{document}
