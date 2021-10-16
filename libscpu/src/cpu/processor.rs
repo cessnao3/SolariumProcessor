@@ -103,11 +103,11 @@ impl SolariumCPU
         // Define a function to combine two arguments into an item
         fn get_immediate_value(
             arg_high: u8,
-            arg_low: u8) -> u8
+            arg_low: u8) -> MemoryWordSigned
         {
             assert!(arg_low & 0xF == arg_low);
             assert!(arg_high & 0xF == arg_high);
-            return (arg_high << 4) | arg_low;
+            return (((arg_high << 4) | arg_low) as i8) as MemoryWordSigned;
         }
 
         // Switch based on opcode
@@ -125,8 +125,9 @@ impl SolariumCPU
                 {
                     1 => // jmpri
                     {
-                        let immediate_val = ((arg1 as u8) << 4) | arg0 as u8;
-                        pc_incr = (immediate_val as i8) as MemoryWordSigned;
+                        pc_incr = get_immediate_value(
+                            arg1,
+                            arg2);
                     },
                     2 => // ld
                     {
@@ -276,11 +277,11 @@ impl SolariumCPU
         {
             let immediate = get_immediate_value(
                 arg0,
-                arg1) as MemoryWord;
+                arg1);
 
             self.registers.set(
                 Register::from_index(arg2 as usize),
-                immediate);
+                immediate as MemoryWord);
         }
         else if opcode <= 11 // arithmetic
         {
