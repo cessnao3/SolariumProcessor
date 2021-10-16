@@ -108,4 +108,10 @@ impl MemoryMap
             seg.reset();
         }
     }
+
+    /// clears all data from the memory map
+    pub fn clear(&mut self)
+    {
+        self.memory_map.clear();
+    }
 }
