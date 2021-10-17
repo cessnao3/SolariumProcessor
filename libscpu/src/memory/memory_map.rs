@@ -52,32 +52,32 @@ impl MemoryMap
     }
 
     /// Gets the value in memory for a particular location
-    pub fn get(&self, ind: MemoryWord) -> MemoryWord
+    pub fn get(&self, ind: usize) -> MemoryWord
     {
         return match self.segment_for_index(ind)
         {
-            Some(seg) => seg.get(ind as usize),
+            Some(seg) => seg.get(ind),
             None => 0
         };
     }
 
     /// Sets the value in memory for a particular memory location
     /// Returns true if the value was able to be set; otherwise returns false
-    pub fn set(&mut self, ind: MemoryWord, data: MemoryWord) -> bool
+    pub fn set(&mut self, ind: usize, data: MemoryWord) -> bool
     {
         return match self.segment_for_index_mut(ind)
         {
-            Some(seg) => seg.set(ind as usize, data),
+            Some(seg) => seg.set(ind, data),
             None => false
         };
     }
 
     /// Provides the memory segment that contains the given memory location
-    fn segment_for_index(&self, ind: MemoryWord) -> Option<&Box<dyn MemorySegment>>
+    fn segment_for_index(&self, ind: usize) -> Option<&Box<dyn MemorySegment>>
     {
         for seg in self.memory_map.iter()
         {
-            if seg.within(ind as usize)
+            if seg.within(ind)
             {
                 return Some(seg);
             }
@@ -87,11 +87,11 @@ impl MemoryMap
     }
 
     /// Provides the mutable memory segment that contains the given memory location
-    fn segment_for_index_mut(&mut self, ind: MemoryWord) -> Option<&mut Box<dyn MemorySegment>>
+    fn segment_for_index_mut(&mut self, ind: usize) -> Option<&mut Box<dyn MemorySegment>>
     {
         for seg in self.memory_map.iter_mut()
         {
-            if seg.within(ind as usize)
+            if seg.within(ind)
             {
                 return Some(seg);
             }

@@ -2,11 +2,63 @@ mod instructions;
 
 use instructions::get_instruction_map;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, num::ParseIntError};
 
 use regex::Regex;
 
 const MAX_ADDRESSABLE_VALUE: usize = (2usize).pow(16);
+
+enum LineValue
+{
+    Assembly(LineInformation),
+    Load(u16)
+}
+
+struct LineInformation
+{
+    pub instruction: String,
+    pub arguments: Vec<String>,
+    pub line_number: usize
+}
+
+impl LineInformation
+{
+    pub fn new(instruction: String, arguments: Vec<String>, line_number: usize) -> LineInformation
+    {
+        return Self
+        {
+            instruction,
+            arguments,
+            line_number
+        };
+    }
+}
+
+fn read_load_value(input: &str) -> Result<u16, ParseIntError>
+{
+    let num_hex_regex = Regex::new(r"^0x(?P<digit>[0-9a-f]+)$").unwrap();
+    let num_neg_regex = Regex::new(r"^\-[\d]+$").unwrap();
+    //let num_pos_regex = Regex::new(r"^+?[\d]+$").unwrap();
+
+    let immediate;
+
+    if num_hex_regex.is_match(input)
+    {
+        immediate = u16::from_str_radix(
+            &input[2..],
+            16)?;
+    }
+    else if num_neg_regex.is_match(input)
+    {
+        immediate = input.parse::<i16>()? as u16;
+    }
+    else
+    {
+        immediate = input.parse::<u16>()?;
+    }
+
+    return Ok(immediate);
+}
 
 
 pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
@@ -15,7 +67,7 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
     let command_regex = Regex::new(r"^\.(?P<command>[\w]+)\s+(?P<args>[\w\d\s]*)$").unwrap();
     let args_split_regex = Regex::new(r",\s*").unwrap();
 
-    let mut data_values = HashMap::<usize, u16>::new();
+    let mut data_values = HashMap::<usize, LineValue>::new();
     let mut data_offset = 0usize;
 
     let instruction_map = get_instruction_map();
@@ -77,6 +129,28 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
                     data_offset = new_offset;
                 }
             }
+            else if cmd == "load"
+            {
+                if args.len() != 1
+                {
+                    return Err(format!("line {0:} command {1:} only takes 1 argument", i, cmd));
+                }
+
+                let value_to_load = match read_load_value(&args[0])
+                {
+                    Ok(v) => v,
+                    Err(e) => return Err(format!(
+                        "line {0:} unable to parse \"{1:}\" as memory value: {2:}",
+                        i,
+                        args[0],
+                        e.to_string()))
+                };
+
+                data_values.insert(
+                    data_offset,
+                    LineValue::Load(value_to_load));
+                data_offset += 1;
+            }
             else
             {
                 return Err(format!("line {0:} invalid command \"{1:}\" found", i, cmd));
@@ -102,38 +176,25 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
                 None => Vec::new()
             };
 
-            // Extract the expected output value
-            let inst_val = match instruction_map.get(&inst)
-            {
-                Some(v) => v,
-                None => return Err(format!("line {0:} no instruction {1:} found", i, inst))
-            };
-
-            // Attempt to create the resulting data
-            let inst_data = match inst_val.to_instruction_data(&args)
-            {
-                Ok(v) => v,
-                Err(e) => return Err(format!("line {0:} {1:} -> {2:}", i, inst, e))
-            };
-
-            // Add the resulting instruction value
+            // Add the data values
             if data_values.contains_key(&data_offset)
             {
                 return Err(format!("line {0:} offset {1:} already filled", i, data_offset))
             }
-
-            // Check the current address value
-            if data_offset < MAX_ADDRESSABLE_VALUE
+            else if data_offset < MAX_ADDRESSABLE_VALUE
             {
-                // Add the resulting data value
                 data_values.insert(
                     data_offset,
-                    inst_data.combine());
+                    LineValue::Assembly(
+                        LineInformation::new(
+                            inst,
+                            args,
+                            i)));
                 data_offset += 1;
             }
             else
             {
-                return Err(format!("line {0:} offset {1:} is greater than the size {2:} allows", i, data_offset, MAX_ADDRESSABLE_VALUE));
+                return Err(format!("line {0:} \"{1:}\" does not match expected syntax", i, l));
             }
         }
         else
@@ -150,9 +211,55 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
 
     let default_val = 0u16;
 
-    let data_vec: Vec<u16> = (0..(max_index + 1))
-        .map(|v| *data_values.get(&v).unwrap_or(&default_val))
+    let data_vec_results: Vec<Result<u16, String>> = (0..(max_index + 1))
+        .map(|v|
+            {
+                let val: u16 = match data_values.get(&v)
+                {
+                    Some(line_value) =>
+                    {
+                        match line_value
+                        {
+                            LineValue::Assembly(assembly) =>
+                            {
+                                // Extract the expected output value
+                                let inst_val = match instruction_map.get(&assembly.instruction)
+                                {
+                                    Some(v) => v,
+                                    None => return Err(format!("line {0:} no instruction {1:} found", assembly.line_number, assembly.instruction))
+                                };
+
+                                // Attempt to create the resulting data
+                                let inst_data = match inst_val.to_instruction_data(&assembly.arguments)
+                                {
+                                    Ok(v) => v,
+                                    Err(e) => return Err(format!("line {0:} {1:} -> {2:}", assembly.line_number, assembly.instruction, e))
+                                };
+
+                                inst_data.combine()
+                            },
+                            LineValue::Load(data) =>
+                            {
+                                *data
+                            }
+                        }
+                    },
+                    None => default_val
+                };
+
+                return Ok(val);
+            })
         .collect();
+
+    let mut data_vec = Vec::new();
+    for v in data_vec_results
+    {
+        match v
+        {
+            Ok(val) => data_vec.push(val),
+            Err(e) => return Err(e)
+        };
+    }
 
     return Ok(data_vec);
 }

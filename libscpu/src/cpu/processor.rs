@@ -81,7 +81,7 @@ impl SolariumCPU
     {
         // Define the current memory word
         let pc = self.registers.get(Register::ProgramCounter);
-        let inst = self.memory_map.get(pc);
+        let inst = self.memory_map.get(pc as usize);
 
         // Define the PC increment
         let mut pc_incr = 1 as MemoryWordSigned;
@@ -141,7 +141,7 @@ impl SolariumCPU
                     2 => // ld
                     {
                         let reg_val = self.registers.get(reg_b);
-                        let mem_val = self.memory_map.get(reg_val);
+                        let mem_val = self.memory_map.get(reg_val as usize);
                         self.registers.set(
                             reg_a,
                             mem_val);
@@ -149,19 +149,19 @@ impl SolariumCPU
                     3 => // sav
                     {
                         self.memory_map.set(
-                            self.registers.get(reg_a),
+                            self.registers.get(reg_a) as usize,
                             self.registers.get(reg_b));
                     },
                     4 => // ldr
                     {
                         self.memory_map.set(
-                            self.registers.get(reg_a),
+                            self.registers.get(reg_a) as usize,
                             self.get_pc_offset(reg_b));
                     },
                     5 => // savr
                     {
                         self.memory_map.set(
-                            self.get_pc_offset(reg_a),
+                            self.get_pc_offset(reg_a) as usize,
                             self.registers.get(reg_b));
                     },
                     6..=9 => // jz, jzr, jgz, jgzr
@@ -215,7 +215,7 @@ impl SolariumCPU
                     {
                         let sp = self.registers.get(Register::StackPointer);
                         self.memory_map.set(
-                            sp,
+                            sp as usize,
                             self.registers.get(dest_register));
                         self.registers.set(
                             Register::StackPointer,
@@ -227,7 +227,7 @@ impl SolariumCPU
 
                         self.registers.set(
                             dest_register,
-                            self.memory_map.get(sp));
+                            self.memory_map.get(sp as usize));
 
                         self.registers.set(
                             Register::StackPointer,
@@ -282,7 +282,7 @@ impl SolariumCPU
                 };
             }
         }
-        else if opcode == 1 || opcode == 2 // ldi
+        else if opcode == 1 || opcode == 2 // ldi, ldui
         {
             let immediate = match opcode
             {
@@ -295,7 +295,17 @@ impl SolariumCPU
                 Register::from_index(arg2 as usize),
                 immediate);
         }
-        else if opcode <= 12 // arithmetic
+        else if opcode == 3 // ldir
+        {
+            let immediate = get_immediate_value_signed(arg0, arg1);
+
+            assert!(pc as i32 + immediate as i32 >= 0);
+
+            self.registers.set(
+                Register::from_index(arg2 as usize),
+                self.memory_map.get((pc as i32 + immediate as i32) as usize));
+        }
+        else if opcode <= 13 // arithmetic
         {
             let val_a = self.registers.get(Register::from_index(arg1 as usize));
             let val_b = self.registers.get(Register::from_index(arg0 as usize));
@@ -304,19 +314,19 @@ impl SolariumCPU
 
             match opcode
             {
-                3 => // add
+                4 => // add
                 {
                     result = val_a + val_b;
                 },
-                4 => //sub
+                5 => //sub
                 {
                     result = val_a - val_b;
                 },
-                5 => // mul
+                6 => // mul
                 {
                     result = (val_a as MemoryWordSigned * val_b as MemoryWordSigned) as MemoryWord;
                 },
-                6 => // div
+                7 => // div
                 {
                     if val_b == 0
                     {
@@ -324,7 +334,7 @@ impl SolariumCPU
                     }
                     result = (val_a as MemoryWordSigned / val_b as MemoryWordSigned) as MemoryWord;
                 },
-                7 => // mod
+                8 => // mod
                 {
                     if val_b == 0
                     {
@@ -332,23 +342,23 @@ impl SolariumCPU
                     }
                     result = (val_a as MemoryWordSigned % val_b as MemoryWordSigned) as MemoryWord;
                 },
-                8 => // band
+                9 => // band
                 {
                     result = val_a & val_b;
                 }
-                9 => // bor
+                10 => // bor
                 {
                     result = val_a | val_b;
                 }
-                10 => //bxor
+                11 => //bxor
                 {
                     result = val_a ^ val_b;
                 }
-                11 => // bsftl
+                12 => // bsftl
                 {
                     result = val_a << val_b;
                 },
-                12 => // bsftr
+                13 => // bsftr
                 {
                     result = val_a >> val_b;
                 },

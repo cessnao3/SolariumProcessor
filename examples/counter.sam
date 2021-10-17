@@ -2,12 +2,10 @@
 ldi 2, 1
 ldi 3, 0
 
-// Setup the target value (maximum positive signed value possible)
-ldi 4, 8
-ldui 5, 0x7F
-bsftl 6, 5, 4
-ldui 5, 0xFF
-bor 4, 5, 6
+// Setup the target value
+jmpri 2
+.load 32767 // 0x7FFF
+ldir 4, -1
 
 // Load the default jump command
 ldi 14, -2
