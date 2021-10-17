@@ -11,7 +11,7 @@ pub enum FltkMessage
     Reset,
     Assemble,
     Tick,
-    SetSpeed
+    SetSpeed(f64)
 }
 
 #[derive(Clone)]

@@ -56,7 +56,6 @@ fn main()
 
     // Define Registers
     let mut register_group = Flex::default_fill().column();
-    let mut speed_slider;
     let register_labels;
     {
         // Add a simple step initiation button
@@ -82,14 +81,16 @@ fn main()
         button_group.end();
         register_group.set_size(&mut button_group, 50);
 
-        // Define teh speed slider
-        speed_slider = HorValueSlider::default().with_label("Speed");
-        speed_slider.set_maximum(6.0);
+        // Define the speed slider
+        let mut speed_slider = HorValueSlider::default().with_label("Speed");
+        speed_slider.set_maximum(5.0);
         speed_slider.set_minimum(2.0);
         speed_slider.set_value(2.0);
-
-        speed_slider.emit(fltk_sender, FltkMessage::SetSpeed);
         speed_slider.set_precision(1);
+        speed_slider.set_callback(move |v|
+        {
+            fltk_sender.send(FltkMessage::SetSpeed((10.0f64).powf(v.value())));
+        });
 
         register_group.set_size(&mut speed_slider, 25);
 
@@ -323,9 +324,9 @@ fn main()
                         }
                     };
                 },
-                FltkMessage::SetSpeed =>
+                FltkMessage::SetSpeed(new_speed) =>
                 {
-                    msg_to_send = Some(ThreadMessage::SetSpeed((10.0f64).powf(speed_slider.value())));
+                    msg_to_send = Some(ThreadMessage::SetSpeed(new_speed));
                 },
                 FltkMessage::Tick => ()
             }
