@@ -56,7 +56,7 @@ impl MemoryMap
     {
         return match self.segment_for_index(ind)
         {
-            Some(seg) => seg.get(ind),
+            Some(seg) => seg.get(ind as usize),
             None => 0
         };
     }
@@ -67,7 +67,7 @@ impl MemoryMap
     {
         return match self.segment_for_index_mut(ind)
         {
-            Some(seg) => seg.set(ind, data),
+            Some(seg) => seg.set(ind as usize, data),
             None => false
         };
     }
@@ -77,7 +77,7 @@ impl MemoryMap
     {
         for seg in self.memory_map.iter()
         {
-            if seg.within(ind)
+            if seg.within(ind as usize)
             {
                 return Some(seg);
             }
@@ -91,7 +91,7 @@ impl MemoryMap
     {
         for seg in self.memory_map.iter_mut()
         {
-            if seg.within(ind)
+            if seg.within(ind as usize)
             {
                 return Some(seg);
             }

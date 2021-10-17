@@ -3,8 +3,8 @@ use super::*;
 /// Provides a read-write memory segment type
 pub struct ReadWriteSegment
 {
-    base_address: MemoryWord,
-    top_address: MemoryWord,
+    base_address: usize,
+    top_address: usize,
     data: Vec<MemoryWord>,
 }
 
@@ -12,13 +12,14 @@ impl ReadWriteSegment
 {
     /// Defines a new memory segmetn with empty data, zero, in each memory location
     pub fn new(
-        base_address: MemoryWord,
-        size: MemoryWord) -> ReadWriteSegment
+        base_address: usize,
+        size: usize) -> ReadWriteSegment
     {
         // Define the top address and ensure that the memory address is valid
-        let top_address = (base_address + size) as MemoryWord;
+        let top_address = base_address + size;
 
         assert!(top_address >= base_address);
+        assert!(top_address <= (2usize).pow(16));
 
         // Define the initial data array
         let data: Vec::<MemoryWord> = (0..size).map(|_| 0 as MemoryWord).collect();
@@ -36,11 +37,11 @@ impl ReadWriteSegment
 impl MemorySegment for ReadWriteSegment
 {
     /// Provides the word at the requested memory location
-    fn get(&self, ind: MemoryWord) -> MemoryWord
+    fn get(&self, ind: usize) -> MemoryWord
     {
         return if self.within(ind)
         {
-            self.data[(ind - self.base_address) as usize]
+            self.data[ind - self.base_address]
         }
         else
         {
@@ -50,11 +51,11 @@ impl MemorySegment for ReadWriteSegment
 
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
-    fn set(&mut self, ind: MemoryWord, data: MemoryWord) -> bool
+    fn set(&mut self, ind: usize, data: MemoryWord) -> bool
     {
         if self.within(ind)
         {
-            self.data[(ind - self.base_address) as usize] = data;
+            self.data[ind - self.base_address] = data;
             return true;
         }
         else
@@ -74,19 +75,19 @@ impl MemorySegment for ReadWriteSegment
     }
 
     /// Provides the starting address of the memory segment
-    fn start_address(&self) -> MemoryWord
+    fn start_address(&self) -> usize
     {
         return self.base_address;
     }
 
     /// Provides the length of the memory segment
-    fn address_len(&self) -> MemoryWord
+    fn address_len(&self) -> usize
     {
-        return self.data.len() as MemoryWord;
+        return self.data.len();
     }
 
     /// Determines if the given memory index is within the memory segment
-    fn within(&self, ind: MemoryWord) -> bool
+    fn within(&self, ind: usize) -> bool
     {
         return ind >= self.base_address && ind < self.top_address;
     }
@@ -113,7 +114,7 @@ mod tests {
         assert_eq!(mem.address_len(), size);
 
         // Iterate over memory items to check that the correct values are set
-        for i in 0..MemoryWord::MAX
+        for i in 0..MAX_SEGMENT_SIZE
         {
             let is_within = i >= base && i < base + size;
             assert_eq!(mem.within(i), is_within);
@@ -130,7 +131,7 @@ mod tests {
     /// Test initialization with an invalid base and range values
     fn test_init_invalid_range()
     {
-        let base = MemoryWord::MAX - 100;
+        let base = MAX_SEGMENT_SIZE - 100;
         let size = 1024;
         ReadWriteSegment::new(base, size);
     }
@@ -197,7 +198,7 @@ mod tests {
 
         for i in base..(base + size)
         {
-            let success = mem.set(i, i - base + 1);
+            let success = mem.set(i, (i - base + 1) as MemoryWord);
             assert_eq!(success, true);
         }
 

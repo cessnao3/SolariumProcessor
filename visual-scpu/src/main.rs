@@ -3,7 +3,7 @@ use fltk::{app::*, button::*, dialog::*, enums::*, window::*, text::*, group::*,
 use fltk::text::TextEditor;
 
 use libscpu::cpu::SolariumCPU;
-use libscpu::memory::{ReadWriteSegment, MemoryWord};
+use libscpu::memory::{MemoryWord, ReadWriteSegment};
 
 use libscpu_assemble::assemble;
 
@@ -40,7 +40,7 @@ enum ThreadMessage
 enum GuiMessage
 {
     UpdateRegisters([u16; SolariumCPU::NUM_REGISTERS]),
-    Error(String)
+    LogMessage(String)
 }
 
 fn main()
@@ -70,11 +70,15 @@ fn main()
 
         let mut assemble_button = Button::default().with_label("Assemble");
         assemble_button.emit(sender, Message::Assemble);
+        assembly_editor.set_linenumber_width(32);
 
         editor_group.set_size(&mut assemble_button, 50);
         editor_group.set_margin(10);
     }
     editor_group.end();
+
+    // Define a logging text display
+    let mut log_text_display;
 
     // Define Registers
     let mut register_group = Flex::default_fill().column();
@@ -123,6 +127,10 @@ fn main()
         register_group.set_size(&mut register_frame_label, 30);
 
         register_labels = define_registers(&mut register_group);
+
+        // Add the log window
+        log_text_display = TextDisplay::default();
+        log_text_display.set_buffer(TextBuffer::default());
     }
     // End the register group
     register_group.end();
@@ -141,126 +149,187 @@ fn main()
 
     // Setup the start/stop timer
     let cpu_thread = thread::spawn(move || {
-        let mut step_cpu = false;
-
-        let mut cpu = SolariumCPU::new();
-        cpu.memory_map.add_segment(Box::new(ReadWriteSegment::new(0, 10000)));
-
-        let mut regs = [0u16; SolariumCPU::NUM_REGISTERS];
-
-        let mut reset = true;
-
-        let mut last_assembly = Vec::<MemoryWord>::new();
-
         const THREAD_LOOP_MS: u64 = 10;
         const THREAD_LOOP_HZ: u64 = 1000 / 10;
 
         let mut step_repeat_count = 1;
 
-        loop
+        struct ProcessorStatusStruct
         {
-            let mut single_step = false;
-            let mut msg_to_send = None;
+            cpu: SolariumCPU,
+            regs: [u16; SolariumCPU::NUM_REGISTERS],
+            regs_updated: bool,
+            step_error: bool,
+            last_assembly: Vec::<MemoryWord>,
+            msg_queue: Vec<GuiMessage>
+        }
 
-            match gui_to_thread_rx.try_recv()
+        impl ProcessorStatusStruct
+        {
+            fn new() -> ProcessorStatusStruct
             {
-                Ok(v) => match v
+                let mut stat = ProcessorStatusStruct
                 {
-                    ThreadMessage::Exit =>
-                    {
-                        break;
-                    },
-                    ThreadMessage::Start =>
-                    {
-                        step_cpu = true;
-                    },
-                    ThreadMessage::Stop =>
-                    {
-                        step_cpu = false;
-                    },
-                    ThreadMessage::Reset =>
-                    {
-                        cpu.reset();
-                        step_cpu = false;
-                        reset = true;
-                        single_step = false;
-                    },
-                    ThreadMessage::SetMemory(mem_vals) =>
-                    {
-                        cpu.reset();
-                        step_cpu = false;
-                        reset = true;
-                        single_step = false;
-                        last_assembly = mem_vals;
-                    },
-                    ThreadMessage::Step =>
-                    {
-                        single_step = true;
-                    },
-                    ThreadMessage::SetSpeed(v) =>
-                    {
-                        step_repeat_count = (v / THREAD_LOOP_HZ as f64) as u64;
-                    }
-                },
-                Err(mpsc::TryRecvError::Disconnected) => break,
-                Err(mpsc::TryRecvError::Empty) => ()
-            };
+                    cpu: SolariumCPU::new(),
+                    regs: [0u16; SolariumCPU::NUM_REGISTERS],
+                    regs_updated: false,
+                    step_error: false,
+                    last_assembly: Vec::new(),
+                    msg_queue: Vec::new()
+                };
 
-            if step_cpu || single_step
+                stat.cpu.memory_map.add_segment(Box::new(ReadWriteSegment::new(
+                    0,
+                    (2usize).pow(16))));
+
+                stat.reset();
+
+                return stat;
+            }
+
+            fn reset(&mut self)
             {
-                let inner_repeat_count;
-                if single_step
-                {
-                    inner_repeat_count = 1;
-                }
-                else
-                {
-                    inner_repeat_count = step_repeat_count;
-                }
+                self.cpu.reset();
+                self.update_regs();
 
-                for _ in 0..inner_repeat_count
+                for (i, val) in self.last_assembly.iter().enumerate()
                 {
-                    match cpu.step()
-                    {
-                        Ok(()) => (),
-                        Err(err) => msg_to_send = Some(GuiMessage::Error(err))
-                    };
+                    self.cpu.memory_map.set(i as u16, *val);
                 }
             }
 
-            if (step_cpu || single_step || reset) && msg_to_send.is_none()
+            fn step(&mut self)
+            {
+                match self.cpu.step()
+                {
+                    Ok(()) => (),
+                    Err(e) =>
+                    {
+                        self.msg_queue.push(GuiMessage::LogMessage(e));
+                        self.step_error = true;
+                    }
+                }
+                self.update_regs();
+            }
+
+            fn update_regs(&mut self)
             {
                 for i in 0..SolariumCPU::NUM_REGISTERS
                 {
-                    regs[i] = cpu.get_register_value(i);
+                    self.regs[i] = self.cpu.get_register_value(i);
                 }
-
-                msg_to_send = Some(GuiMessage::UpdateRegisters(regs));
+                self.regs_updated = true;
             }
 
-            if reset
+            fn load_data(&mut self, data: Vec::<MemoryWord>)
             {
-                reset = false;
+                self.last_assembly = data;
+                self.reset();
 
-                for (i, val) in last_assembly.iter().enumerate()
-                {
-                    cpu.memory_map.set(i as u16, *val);
-                }
+                self.msg_queue.push(GuiMessage::LogMessage(format!(
+                    "loaded assembly code with length {0:}",
+                    self.last_assembly.len())));
             }
 
-            if msg_to_send.is_some()
+            fn update_msg_queue(&mut self)
             {
-                match thread_to_gui_tx.send(msg_to_send.unwrap())
+                if self.regs_updated
                 {
-                    Ok(()) =>
+                    self.msg_queue.push(GuiMessage::UpdateRegisters(self.regs));
+                    self.regs_updated = false;
+                }
+            }
+        }
+
+        let mut step_cpu = false;
+
+        let mut cpu_stat = ProcessorStatusStruct::new();
+
+        loop
+        {
+            let mut thread_error = false;
+
+            for _ in 0..1000
+            {
+                match gui_to_thread_rx.try_recv()
+                {
+                    Ok(v) => match v
                     {
-                        sender.send(Message::Tick);
+                        ThreadMessage::Exit =>
+                        {
+                            break;
+                        },
+                        ThreadMessage::Start =>
+                        {
+                            step_cpu = true;
+                        },
+                        ThreadMessage::Stop =>
+                        {
+                            step_cpu = false;
+                        },
+                        ThreadMessage::Reset =>
+                        {
+                            step_cpu = false;
+                            cpu_stat.reset();
+                        },
+                        ThreadMessage::SetMemory(mem_vals) =>
+                        {
+                            step_cpu = false;
+                            cpu_stat.load_data(mem_vals);
+
+                        },
+                        ThreadMessage::Step =>
+                        {
+                            cpu_stat.step();
+                        },
+                        ThreadMessage::SetSpeed(v) =>
+                        {
+                            step_repeat_count = (v / THREAD_LOOP_HZ as f64) as u64;
+                        }
                     },
+                    Err(mpsc::TryRecvError::Disconnected) => thread_error = true,
+                    Err(mpsc::TryRecvError::Empty) => break
+                };
+            }
+
+            if thread_error
+            {
+                break;
+            }
+
+            if step_cpu
+            {
+                let inner_repeat_count = step_repeat_count;
+
+                for _ in 0..inner_repeat_count
+                {
+                    cpu_stat.step();
+                }
+            }
+
+            cpu_stat.update_msg_queue();
+
+            for msg in cpu_stat.msg_queue.iter()
+            {
+                match thread_to_gui_tx.send(msg.clone())
+                {
+                    Ok(()) => (),
                     Err(_) =>
                     {
                         break;
                     }
                 }
+            }
+
+            if cpu_stat.msg_queue.len() > 0
+            {
+                cpu_stat.msg_queue.clear();
+                sender.send(Message::Tick);
+            }
+
+            if cpu_stat.step_error
+            {
+                break;
             }
 
             thread::sleep(time::Duration::from_millis(THREAD_LOOP_MS));
@@ -271,6 +340,8 @@ fn main()
     wind.show();
     while app.wait()
     {
+        let mut message_queue: Vec<String> = Vec::new();
+
         match thread_to_gui_rx.try_recv()
         {
             Ok(msg) =>
@@ -284,9 +355,9 @@ fn main()
                             register_labels[i].buffer().unwrap().set_text(&format!("{0:}", regs[i]));
                         }
                     },
-                    GuiMessage::Error(err) =>
+                    GuiMessage::LogMessage(err) =>
                     {
-                        alert_default(&err);
+                        message_queue.push(err);
                     }
                 }
 
@@ -337,10 +408,17 @@ fn main()
                                 {
                                     msg_to_send = Some(ThreadMessage::SetMemory(v));
                                 },
-                                Err(e) => alert_default(&e)
+                                Err(e) =>
+                                {
+                                    message_queue.push(e);
+                                }
                             };
                         },
-                        None => alert_default("Unable to get assembly text buffer")
+                        None =>
+                        {
+                            alert_default("Unable to get assembly text buffer");
+                            break;
+                        }
                     };
                 },
                 Message::SetSpeed(v) =>
@@ -348,6 +426,19 @@ fn main()
                     msg_to_send = Some(ThreadMessage::SetSpeed(v));
                 },
                 Message::Tick => ()
+            }
+        }
+
+        // Add all log message values
+        {
+            for msg in message_queue.iter()
+            {
+                // Add the text
+                log_text_display.buffer().unwrap().append(&format!("{0:}\n", msg));
+
+                // Scroll to end
+                let num_lines = log_text_display.buffer().unwrap().text().split("\n").count();
+                log_text_display.scroll(num_lines as i32, 0);
             }
         }
 
@@ -392,7 +483,9 @@ fn define_registers(parent: &mut Flex) -> Vec<TextDisplay>
 
     let mut displays = Vec::new();
 
-    for i in 0..8usize
+    assert!(SolariumCPU::NUM_REGISTERS % 2 == 0);
+
+    for i in 0..SolariumCPU::NUM_REGISTERS / 2
     {
         let v = add_register_row(&mut column_group, i*2, i*2 + 1);
         for disp in v
@@ -403,7 +496,7 @@ fn define_registers(parent: &mut Flex) -> Vec<TextDisplay>
 
     column_group.end();
 
-    parent.set_size(&mut column_group, 100);
+    parent.set_size(&mut column_group, 280);
 
     return displays;
 }
