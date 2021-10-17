@@ -1,5 +1,5 @@
 use fltk::prelude::*;
-use fltk::{app::*, button::*, dialog::*, enums::*, window::*, text::*, group::*, frame::*,};
+use fltk::{app::*, button::*, dialog::*, enums::*, window::*, text::*, group::*, frame::*, valuator::*};
 use fltk::text::TextEditor;
 
 use libscpu::cpu::SolariumCPU;
@@ -20,7 +20,8 @@ enum Message
     Stop,
     Reset,
     Assemble,
-    Tick
+    Tick,
+    SetSpeed(f64)
 }
 
 #[derive(Clone)]
@@ -31,7 +32,8 @@ enum ThreadMessage
     Stop,
     Reset,
     Exit,
-    Step
+    Step,
+    SetSpeed(f64)
 }
 
 #[derive(Clone)]
@@ -46,6 +48,7 @@ fn main()
     // Define the window values
     let app = App::default();
 
+    // Initialize FLTK Sliders
     let (sender, receiver) = channel::<Message>();
 
     //let mut wind = Window::new(100, 100, 400, 300, "Hello from rust");
@@ -100,7 +103,25 @@ fn main()
         button_group.end();
         register_group.set_size(&mut button_group, 50);
 
+        // Define teh speed slider
+        let mut slider = HorValueSlider::default().with_label("Speed");
+        slider.set_maximum(6.0);
+        slider.set_minimum(2.0);
+        slider.set_value(2.0);
+
+        slider.set_callback(move |s| {
+            sender.send(Message::SetSpeed((10.0f64).powf(s.value())));
+        });
+
+        register_group.set_size(&mut slider, 25);
+
+        let mut slider_frame = Frame::default();
+        register_group.set_size(&mut slider_frame, 25);
+
         // Define the registers and perform the initial update values
+        let mut register_frame_label = Frame::default().with_label("Registers");
+        register_group.set_size(&mut register_frame_label, 30);
+
         register_labels = define_registers(&mut register_group);
     }
     // End the register group
@@ -131,6 +152,11 @@ fn main()
 
         let mut last_assembly = Vec::<MemoryWord>::new();
 
+        const THREAD_LOOP_MS: u64 = 10;
+        const THREAD_LOOP_HZ: u64 = 1000 / 10;
+
+        let mut step_repeat_count = 1;
+
         loop
         {
             let mut single_step = false;
@@ -157,17 +183,23 @@ fn main()
                         cpu.reset();
                         step_cpu = false;
                         reset = true;
+                        single_step = false;
                     },
                     ThreadMessage::SetMemory(mem_vals) =>
                     {
                         cpu.reset();
                         step_cpu = false;
                         reset = true;
+                        single_step = false;
                         last_assembly = mem_vals;
                     },
                     ThreadMessage::Step =>
                     {
                         single_step = true;
+                    },
+                    ThreadMessage::SetSpeed(v) =>
+                    {
+                        step_repeat_count = (v / THREAD_LOOP_HZ as f64) as u64;
                     }
                 },
                 Err(mpsc::TryRecvError::Disconnected) => break,
@@ -176,11 +208,24 @@ fn main()
 
             if step_cpu || single_step
             {
-                match cpu.step()
+                let inner_repeat_count;
+                if single_step
                 {
-                    Ok(()) => (),
-                    Err(err) => msg_to_send = Some(GuiMessage::Error(err))
-                };
+                    inner_repeat_count = 1;
+                }
+                else
+                {
+                    inner_repeat_count = step_repeat_count;
+                }
+
+                for _ in 0..inner_repeat_count
+                {
+                    match cpu.step()
+                    {
+                        Ok(()) => (),
+                        Err(err) => msg_to_send = Some(GuiMessage::Error(err))
+                    };
+                }
             }
 
             if (step_cpu || single_step || reset) && msg_to_send.is_none()
@@ -218,7 +263,7 @@ fn main()
                 }
             }
 
-            thread::sleep(time::Duration::from_millis(10));
+            thread::sleep(time::Duration::from_millis(THREAD_LOOP_MS));
         }
     });
 
@@ -298,6 +343,10 @@ fn main()
                         None => alert_default("Unable to get assembly text buffer")
                     };
                 },
+                Message::SetSpeed(v) =>
+                {
+                    msg_to_send = Some(ThreadMessage::SetSpeed(v));
+                },
                 Message::Tick => ()
             }
         }
@@ -335,8 +384,6 @@ fn main()
             eprintln!("thread already disconnected: {0:}", err.to_string());
         }
     }
-
-
 }
 
 fn define_registers(parent: &mut Flex) -> Vec<TextDisplay>
