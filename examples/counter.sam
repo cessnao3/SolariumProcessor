@@ -3,9 +3,13 @@ ldi 2, 1
 ldi 3, 0
 
 // Setup the target value
-jmpri 2
+jmpri load_data
+
+:target_value
 .load 32767 // 0x7FFF
-ldir 4, -1
+
+:load_data
+ldir 4, target_value
 
 // Load the default jump command
 ldi 14, -2

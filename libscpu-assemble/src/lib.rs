@@ -18,19 +18,40 @@ struct LineInformation
 {
     pub instruction: String,
     pub arguments: Vec<String>,
-    pub line_number: usize
+    pub line_number: usize,
+    pub data_index: usize
 }
 
 impl LineInformation
 {
-    pub fn new(instruction: String, arguments: Vec<String>, line_number: usize) -> LineInformation
+    pub fn new(instruction: String, arguments: Vec<String>, line_number: usize, data_index: usize) -> LineInformation
     {
         return Self
         {
             instruction,
             arguments,
-            line_number
+            line_number,
+            data_index
         };
+    }
+
+    pub fn arguments_for_labels(&self, label_map: &HashMap<String, usize>) -> Vec<String>
+    {
+        return self.arguments
+            .iter()
+            .map(|v|
+            {
+                return match label_map.get(v)
+                {
+                    Some(data_index) =>
+                    {
+                        let delta_index = *data_index as i32 - self.data_index as i32;
+                        delta_index.to_string()
+                    },
+                    None => v.to_string()
+                };
+            })
+            .collect();
     }
 }
 
@@ -65,10 +86,13 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
 {
     let line_regex = Regex::new(r"^(?P<instruction>[\w]+)(?P<rest>\s+\-?[\w\d]+(,\s*\-?[\w\d]+)*)*$").unwrap();
     let command_regex = Regex::new(r"^\.(?P<command>[\w]+)\s+(?P<args>[\w\d\s]*)$").unwrap();
+    let label_regex = Regex::new(r"^:(?P<tag>[a-z][a-z0-9_]+)").unwrap();
     let args_split_regex = Regex::new(r",\s*").unwrap();
 
-    let mut data_values = HashMap::<usize, LineValue>::new();
-    let mut data_offset = 0usize;
+    let mut data_map = HashMap::<usize, LineValue>::new();
+    let mut current_data_index = 0usize;
+
+    let mut label_map = HashMap::<String, usize>::new();
 
     let instruction_map = get_instruction_map();
 
@@ -120,13 +144,13 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
                     Err(_) => return Err(format!("line {0:} command {1:} unable to parse {2:} as address", i, cmd, args[0]))
                 };
 
-                if new_offset < data_offset
+                if new_offset < current_data_index
                 {
-                    return Err(format!("line {0:} command {1:} new offset {2:} must be greater or equal to current offset {3:}", i, cmd, new_offset, data_offset));
+                    return Err(format!("line {0:} command {1:} new offset {2:} must be greater or equal to current offset {3:}", i, cmd, new_offset, current_data_index));
                 }
                 else
                 {
-                    data_offset = new_offset;
+                    current_data_index = new_offset;
                 }
             }
             else if cmd == "load"
@@ -146,14 +170,35 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
                         e.to_string()))
                 };
 
-                data_values.insert(
-                    data_offset,
+                data_map.insert(
+                    current_data_index,
                     LineValue::Load(value_to_load));
-                data_offset += 1;
+                current_data_index += 1;
             }
             else
             {
                 return Err(format!("line {0:} invalid command \"{1:}\" found", i, cmd));
+            }
+        }
+        else if label_regex.is_match(l)
+        {
+            let label = label_regex
+                .captures(l)
+                .unwrap()
+                .name("tag")
+                .unwrap()
+                .as_str()
+                .to_ascii_lowercase();
+
+            if label_map.contains_key(&label)
+            {
+                return Err(format!("line {0:} label \"{1:}\" already exists", i, label));
+            }
+            else
+            {
+                label_map.insert(
+                    label,
+                    current_data_index);
             }
         }
         else if line_regex.is_match(l)
@@ -177,20 +222,21 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
             };
 
             // Add the data values
-            if data_values.contains_key(&data_offset)
+            if data_map.contains_key(&current_data_index)
             {
-                return Err(format!("line {0:} offset {1:} already filled", i, data_offset))
+                return Err(format!("line {0:} offset {1:} already filled", i, current_data_index))
             }
-            else if data_offset < MAX_ADDRESSABLE_VALUE
+            else if current_data_index < MAX_ADDRESSABLE_VALUE
             {
-                data_values.insert(
-                    data_offset,
+                data_map.insert(
+                    current_data_index,
                     LineValue::Assembly(
                         LineInformation::new(
                             inst,
                             args,
-                            i)));
-                data_offset += 1;
+                            i,
+                            current_data_index)));
+                current_data_index += 1;
             }
             else
             {
@@ -203,7 +249,7 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
         }
     }
 
-    let max_index = match data_values.keys().max()
+    let max_index = match data_map.keys().max()
     {
         Some(v) => v,
         None => return Ok(Vec::new())
@@ -212,9 +258,9 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
     let default_val = 0u16;
 
     let data_vec_results: Vec<Result<u16, String>> = (0..(max_index + 1))
-        .map(|v|
+        .map(|data_index|
             {
-                let val: u16 = match data_values.get(&v)
+                let val: u16 = match data_map.get(&data_index)
                 {
                     Some(line_value) =>
                     {
@@ -229,8 +275,11 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
                                     None => return Err(format!("line {0:} no instruction {1:} found", assembly.line_number, assembly.instruction))
                                 };
 
+                                // Define the new arguments to include labels values
+                                let new_args = assembly.arguments_for_labels(&label_map);
+
                                 // Attempt to create the resulting data
-                                let inst_data = match inst_val.to_instruction_data(&assembly.arguments)
+                                let inst_data = match inst_val.to_instruction_data(&new_args)
                                 {
                                     Ok(v) => v,
                                     Err(e) => return Err(format!("line {0:} {1:} -> {2:}", assembly.line_number, assembly.instruction, e))
