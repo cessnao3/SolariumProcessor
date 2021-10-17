@@ -1,58 +1,32 @@
-use fltk::prelude::*;
-use fltk::{app::*, button::*, dialog::*, enums::*, window::*, text::*, group::*, frame::*, valuator::*};
-use fltk::text::TextEditor;
+mod processor_state;
+mod messages;
 
-use libscpu::cpu::SolariumCPU;
-use libscpu::memory::{MemoryWord, ReadWriteSegment};
+mod fltk_registers;
+
+use fltk::prelude::*;
+use fltk::{app::*, button::*, dialog::*, window::*, text::*, group::*, frame::*, valuator::*};
+
+use processor_state::ProcessorStatusStruct;
+use messages::*;
+
+use fltk_registers::setup_register_group;
 
 use libscpu_assemble::assemble;
 
 use std::thread;
 use std::time;
 
-use std::sync::mpsc;
-
-#[derive(Clone, Copy)]
-enum Message
-{
-    Step,
-    Start,
-    Stop,
-    Reset,
-    Assemble,
-    Tick,
-    SetSpeed(f64)
-}
-
-#[derive(Clone)]
-enum ThreadMessage
-{
-    SetMemory(Vec<MemoryWord>),
-    Start,
-    Stop,
-    Reset,
-    Exit,
-    Step,
-    SetSpeed(f64)
-}
-
-#[derive(Clone)]
-enum GuiMessage
-{
-    UpdateRegisters([u16; SolariumCPU::NUM_REGISTERS]),
-    LogMessage(String)
-}
+use std::sync::{Arc, Mutex, mpsc};
 
 fn main()
 {
     // Define the window values
     let app = App::default();
 
-    // Initialize FLTK Sliders
-    let (sender, receiver) = channel::<Message>();
+    // Initialize FLTK Senders
+    let (fltk_sender, fltk_receiver) = channel::<FltkMessage>();
 
-    //let mut wind = Window::new(100, 100, 400, 300, "Hello from rust");
-    let mut wind = Window::default()
+    let mut main_window = Window::default()
         .with_size(1100, 600)
         .with_label("VisualSCPU");
 
@@ -69,7 +43,7 @@ fn main()
         editor_group.set_size(&mut assembly_label, 50);
 
         let mut assemble_button = Button::default().with_label("Assemble");
-        assemble_button.emit(sender, Message::Assemble);
+        assemble_button.emit(fltk_sender, FltkMessage::Assemble);
         assembly_editor.set_linenumber_width(32);
 
         editor_group.set_size(&mut assemble_button, 50);
@@ -82,22 +56,23 @@ fn main()
 
     // Define Registers
     let mut register_group = Flex::default_fill().column();
+    let mut speed_slider;
     let register_labels;
     {
         // Add a simple step initiation button
         let mut button_group = Flex::default_fill().row();
 
         let mut step_button = Button::default().with_label("STEP");
-        step_button.emit(sender, Message::Step);
+        step_button.emit(fltk_sender, FltkMessage::Step);
 
         let mut start_button = Button::default().with_label("START");
-        start_button.emit(sender, Message::Start);
+        start_button.emit(fltk_sender, FltkMessage::Start);
 
         let mut stop_button = Button::default().with_label("STOP");
-        stop_button.emit(sender, Message::Stop);
+        stop_button.emit(fltk_sender, FltkMessage::Stop);
 
         let mut reset_button = Button::default().with_label("RESET");
-        reset_button.emit(sender, Message::Reset);
+        reset_button.emit(fltk_sender, FltkMessage::Reset);
 
         button_group.set_size(&mut step_button, 70);
         button_group.set_size(&mut start_button, 70);
@@ -108,16 +83,15 @@ fn main()
         register_group.set_size(&mut button_group, 50);
 
         // Define teh speed slider
-        let mut slider = HorValueSlider::default().with_label("Speed");
-        slider.set_maximum(6.0);
-        slider.set_minimum(2.0);
-        slider.set_value(2.0);
+        speed_slider = HorValueSlider::default().with_label("Speed");
+        speed_slider.set_maximum(6.0);
+        speed_slider.set_minimum(2.0);
+        speed_slider.set_value(2.0);
 
-        slider.set_callback(move |s| {
-            sender.send(Message::SetSpeed((10.0f64).powf(s.value())));
-        });
+        speed_slider.emit(fltk_sender, FltkMessage::SetSpeed);
+        speed_slider.set_precision(1);
 
-        register_group.set_size(&mut slider, 25);
+        register_group.set_size(&mut speed_slider, 25);
 
         let mut slider_frame = Frame::default();
         register_group.set_size(&mut slider_frame, 25);
@@ -126,12 +100,13 @@ fn main()
         let mut register_frame_label = Frame::default().with_label("Registers");
         register_group.set_size(&mut register_frame_label, 30);
 
-        register_labels = define_registers(&mut register_group);
+        register_labels = setup_register_group(&mut register_group);
 
         // Add the log window
         log_text_display = TextDisplay::default();
         log_text_display.set_buffer(TextBuffer::default());
     }
+
     // End the register group
     register_group.end();
     register_group.set_margin(10);
@@ -141,7 +116,7 @@ fn main()
     main_group.end();
 
     // Finish Window Setup
-    wind.end();
+    main_window.end();
 
     // Initialize thread communication channels
     let (gui_to_thread_tx, gui_to_thread_rx) = mpsc::channel();
@@ -153,93 +128,6 @@ fn main()
         const THREAD_LOOP_HZ: u64 = 1000 / 10;
 
         let mut step_repeat_count = 1;
-
-        struct ProcessorStatusStruct
-        {
-            cpu: SolariumCPU,
-            regs: [u16; SolariumCPU::NUM_REGISTERS],
-            regs_updated: bool,
-            step_error: bool,
-            last_assembly: Vec::<MemoryWord>,
-            msg_queue: Vec<GuiMessage>
-        }
-
-        impl ProcessorStatusStruct
-        {
-            fn new() -> ProcessorStatusStruct
-            {
-                let mut stat = ProcessorStatusStruct
-                {
-                    cpu: SolariumCPU::new(),
-                    regs: [0u16; SolariumCPU::NUM_REGISTERS],
-                    regs_updated: false,
-                    step_error: false,
-                    last_assembly: Vec::new(),
-                    msg_queue: Vec::new()
-                };
-
-                stat.cpu.memory_map.add_segment(Box::new(ReadWriteSegment::new(
-                    0,
-                    (2usize).pow(16))));
-
-                stat.reset();
-
-                return stat;
-            }
-
-            fn reset(&mut self)
-            {
-                self.cpu.reset();
-                self.update_regs();
-
-                for (i, val) in self.last_assembly.iter().enumerate()
-                {
-                    self.cpu.memory_map.set(i as u16, *val);
-                }
-            }
-
-            fn step(&mut self)
-            {
-                match self.cpu.step()
-                {
-                    Ok(()) => (),
-                    Err(e) =>
-                    {
-                        self.msg_queue.push(GuiMessage::LogMessage(e));
-                        self.step_error = true;
-                    }
-                }
-                self.update_regs();
-            }
-
-            fn update_regs(&mut self)
-            {
-                for i in 0..SolariumCPU::NUM_REGISTERS
-                {
-                    self.regs[i] = self.cpu.get_register_value(i);
-                }
-                self.regs_updated = true;
-            }
-
-            fn load_data(&mut self, data: Vec::<MemoryWord>)
-            {
-                self.last_assembly = data;
-                self.reset();
-
-                self.msg_queue.push(GuiMessage::LogMessage(format!(
-                    "loaded assembly code with length {0:}",
-                    self.last_assembly.len())));
-            }
-
-            fn update_msg_queue(&mut self)
-            {
-                if self.regs_updated
-                {
-                    self.msg_queue.push(GuiMessage::UpdateRegisters(self.regs));
-                    self.regs_updated = false;
-                }
-            }
-        }
 
         let mut step_cpu = false;
 
@@ -257,6 +145,7 @@ fn main()
                     {
                         ThreadMessage::Exit =>
                         {
+                            thread_error = true;
                             break;
                         },
                         ThreadMessage::Start =>
@@ -287,7 +176,11 @@ fn main()
                             step_repeat_count = (v / THREAD_LOOP_HZ as f64) as u64;
                         }
                     },
-                    Err(mpsc::TryRecvError::Disconnected) => thread_error = true,
+                    Err(mpsc::TryRecvError::Disconnected) =>
+                    {
+                        thread_error = true;
+                        break;
+                    },
                     Err(mpsc::TryRecvError::Empty) => break
                 };
             }
@@ -324,10 +217,9 @@ fn main()
             if cpu_stat.msg_queue.len() > 0
             {
                 cpu_stat.msg_queue.clear();
-                sender.send(Message::Tick);
             }
 
-            if cpu_stat.step_error
+            if cpu_stat.has_step_error()
             {
                 break;
             }
@@ -336,64 +228,75 @@ fn main()
         }
     });
 
+    // Define whether the callback has been triggered
+    let callback_finished = Arc::new(Mutex::new(true));
+
     // Show the window and run the application
-    wind.show();
+    main_window.show();
     while app.wait()
     {
         let mut message_queue: Vec<String> = Vec::new();
 
-        match thread_to_gui_rx.try_recv()
-        {
-            Ok(msg) =>
-            {
-                match msg
-                {
-                    GuiMessage::UpdateRegisters(regs) =>
-                    {
-                        for i in 0..SolariumCPU::NUM_REGISTERS
-                        {
-                            register_labels[i].buffer().unwrap().set_text(&format!("{0:}", regs[i]));
-                        }
-                    },
-                    GuiMessage::LogMessage(err) =>
-                    {
-                        message_queue.push(err);
-                    }
-                }
+        let mut thread_exit = false;
 
-                sender.send(Message::Tick);
-            },
-            Err(mpsc::TryRecvError::Empty) => (),
-            Err(mpsc::TryRecvError::Disconnected) =>
+        for _ in 0..10000
+        {
+            match thread_to_gui_rx.try_recv()
             {
-                alert_default("thread exit error!");
-                break;
+                Ok(msg) =>
+                {
+                    match msg
+                    {
+                        GuiMessage::UpdateRegisters(regs) =>
+                        {
+                            for i in 0..regs.len()
+                            {
+                                register_labels[i].buffer().unwrap().set_text(&format!("{0:}", regs[i]));
+                            }
+                        },
+                        GuiMessage::LogMessage(err) =>
+                        {
+                            message_queue.push(err);
+                        }
+                    }
+                },
+                Err(mpsc::TryRecvError::Empty) => break,
+                Err(mpsc::TryRecvError::Disconnected) =>
+                {
+                    alert_default("thread exit error!");
+                    thread_exit = true;
+                }
             }
+        }
+
+        if thread_exit
+        {
+            break;
         }
 
         let mut msg_to_send = None;
 
-        if let Some(msg) = receiver.recv()
+        if let Some(msg) = fltk_receiver.recv()
         {
             match msg
             {
-                Message::Step =>
+                FltkMessage::Step =>
                 {
                     msg_to_send = Some(ThreadMessage::Step);
                 },
-                Message::Start =>
+                FltkMessage::Start =>
                 {
                     msg_to_send = Some(ThreadMessage::Start);
                 },
-                Message::Stop =>
+                FltkMessage::Stop =>
                 {
                     msg_to_send = Some(ThreadMessage::Stop);
                 },
-                Message::Reset =>
+                FltkMessage::Reset =>
                 {
                     msg_to_send = Some(ThreadMessage::Reset);
                 },
-                Message::Assemble =>
+                FltkMessage::Assemble =>
                 {
                     match assembly_editor.buffer()
                     {
@@ -417,16 +320,29 @@ fn main()
                         None =>
                         {
                             alert_default("Unable to get assembly text buffer");
-                            break;
                         }
                     };
                 },
-                Message::SetSpeed(v) =>
+                FltkMessage::SetSpeed =>
                 {
-                    msg_to_send = Some(ThreadMessage::SetSpeed(v));
+                    msg_to_send = Some(ThreadMessage::SetSpeed((10.0f64).powf(speed_slider.value())));
                 },
-                Message::Tick => ()
+                FltkMessage::Tick => ()
             }
+        }
+
+        // Setup a new callback value
+        let mut callback_val = callback_finished.lock().unwrap();
+        if *callback_val
+        {
+            *callback_val = false;
+            let callback_finished_cb = Arc::clone(&callback_finished);
+            add_timeout(0.01, move ||
+            {
+                fltk_sender.send(FltkMessage::Tick);
+                let mut data = callback_finished_cb.lock().unwrap();
+                *data = true;
+            });
         }
 
         // Add all log message values
@@ -442,6 +358,7 @@ fn main()
             }
         }
 
+        // Send messages
         match msg_to_send
         {
             Some(msg) =>
@@ -459,73 +376,17 @@ fn main()
         }
     }
 
-    // Request closing the thread
+    // Send the thread exit message
     match gui_to_thread_tx.send(ThreadMessage::Exit)
     {
-        Ok(()) =>
-        {
-            match cpu_thread.join()
-            {
-                Ok(()) => (),
-                Err(_) => eprintln!("error joining to thread")
-            }
-        },
-        Err(err) =>
-        {
-            eprintln!("thread already disconnected: {0:}", err.to_string());
-        }
-    }
-}
+        Ok(()) => (),
+        Err(_) => eprintln!("unable to send exit message to thread")
+    };
 
-fn define_registers(parent: &mut Flex) -> Vec<TextDisplay>
-{
-    let mut column_group = Flex::default_fill().column();
-
-    let mut displays = Vec::new();
-
-    assert!(SolariumCPU::NUM_REGISTERS % 2 == 0);
-
-    for i in 0..SolariumCPU::NUM_REGISTERS / 2
+    // Wait for thread to exit
+    match cpu_thread.join()
     {
-        let v = add_register_row(&mut column_group, i*2, i*2 + 1);
-        for disp in v
-        {
-            displays.push(disp);
-        }
+        Ok(()) => (),
+        Err(_) => eprintln!("error joining to thread")
     }
-
-    column_group.end();
-
-    parent.set_size(&mut column_group, 280);
-
-    return displays;
-}
-
-fn add_register_row(parent: &mut Flex, reg0_ind: usize, reg1_ind: usize) -> Vec<TextDisplay>
-{
-    let mut displays = Vec::new();
-    let mut row_group = Flex::default_fill().row();
-
-    displays.push(setup_register(&mut row_group, reg0_ind));
-    displays.push(setup_register(&mut row_group, reg1_ind));
-
-    row_group.end();
-
-    parent.set_size(&mut row_group, 30);
-
-    return displays;
-}
-
-fn setup_register(parent: &mut Flex, index: usize) -> TextDisplay
-{
-    let mut label = Frame::default().with_label(&format!("R{0:}", index));
-    let mut text_display = TextDisplay::default().with_align(Align::BottomRight);
-
-    let buffer = TextBuffer::default();
-    text_display.set_buffer(buffer);
-
-    parent.set_size(&mut label, 50);
-    parent.set_size(&mut text_display, 100);
-
-    return text_display;
 }
