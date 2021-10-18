@@ -54,7 +54,7 @@ fn main()
 
         let mut assemble_button = Button::default().with_label("Assemble");
         assemble_button.emit(fltk_sender, FltkMessage::Assemble);
-        assembly_editor.set_linenumber_width(32);
+        assembly_editor.set_linenumber_width(48);
 
         editor_group.set_size(&mut assemble_button, 50);
         editor_group.set_margin(10);
