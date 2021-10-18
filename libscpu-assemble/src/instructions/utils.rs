@@ -2,6 +2,8 @@ use std::str::FromStr;
 
 use regex::Regex;
 
+use lazy_static::lazy_static;
+
 pub fn read_register_value(reg: &str) -> Result<u8, String>
 {
     let reg_val = match reg.parse::<u8>()
@@ -52,13 +54,15 @@ impl FromStr for ImmedateByteValues
 
     fn from_str(s: &str) -> Result<Self, Self::Err>
     {
-        let args_immediate_hex_regex = Regex::new(r"^0x(?P<digit>[0-9a-fA-F][0-9a-fA-F]?)$").unwrap();
-        let args_immediate_num_neg_regex = Regex::new(r"^\-[\d]+$").unwrap();
-        let args_immediate_num_pos_regex = Regex::new(r"^+?[\d]+$").unwrap();
+        lazy_static! {
+            static ref ARGS_IMMEDIATE_HEX_REGEX: Regex = Regex::new(r"^0x(?P<digit>[0-9a-fA-F][0-9a-fA-F]?)$").unwrap();
+            static ref ARGS_IMMEDIATE_NUM_NEG_REGEX: Regex = Regex::new(r"^\-[\d]+$").unwrap();
+            static ref ARGS_IMMEDIATE_NUM_POS_REGEX: Regex = Regex::new(r"^+?[\d]+$").unwrap();
+        }
 
         let immediate: u8;
 
-        if args_immediate_hex_regex.is_match(s)
+        if ARGS_IMMEDIATE_HEX_REGEX.is_match(s)
         {
             immediate = match u8::from_str_radix(
                 &s[2..],
@@ -68,7 +72,7 @@ impl FromStr for ImmedateByteValues
                 Err(_) => return Err(format!("unable to convert {0:} to immediate hex value", s))
             };
         }
-        else if args_immediate_num_neg_regex.is_match(s)
+        else if ARGS_IMMEDIATE_NUM_NEG_REGEX.is_match(s)
         {
             immediate = match s.parse::<i8>()
             {
@@ -76,7 +80,7 @@ impl FromStr for ImmedateByteValues
                 Err(_) => return Err(format!("unable to convert {0:} to immediate signed value", s))
             }
         }
-        else if args_immediate_num_pos_regex.is_match(s)
+        else if ARGS_IMMEDIATE_NUM_POS_REGEX.is_match(s)
         {
             immediate = match s.parse::<u8>()
             {

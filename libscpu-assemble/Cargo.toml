@@ -8,3 +8,4 @@ edition = "2018"
 [dependencies]
 #libscpu = { path = "../libscpu", version = "*" }
 regex = "1.5.4"
+lazy_static = "1.4.0"
