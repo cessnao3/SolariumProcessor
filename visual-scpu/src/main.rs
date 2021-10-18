@@ -93,7 +93,7 @@ fn main()
 
         // Define the speed slider
         let mut speed_slider = HorValueSlider::default().with_label("Speed");
-        speed_slider.set_maximum(5.0);
+        speed_slider.set_maximum(6.0);
         speed_slider.set_minimum(2.0);
         speed_slider.set_value(2.0);
         speed_slider.set_precision(1);
