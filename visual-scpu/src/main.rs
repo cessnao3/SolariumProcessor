@@ -3,6 +3,7 @@ mod messages;
 
 mod fltk_registers;
 
+use fltk::enums::Event;
 use fltk::prelude::*;
 use fltk::{app::*, button::*, dialog::*, window::*, text::*, group::*, frame::*, valuator::*};
 
@@ -29,6 +30,15 @@ fn main()
     let mut main_window = Window::default()
         .with_size(1100, 600)
         .with_label("VisualSCPU");
+
+    main_window.set_callback(move |_|
+    {
+        // Handle the close app event
+        if fltk::app::event() == Event::Close
+        {
+            app.quit();
+        }
+    });
 
     let mut main_group = Flex::default_fill().row();
 
