@@ -225,7 +225,7 @@ pub fn setup_and_run_app(
             }
         }
 
-        // Setup a new callback value
+        // Setup a new callback value to ensure that the event counter is updated at 30 Hzs
         let mut callback_val = callback_finished.lock().unwrap();
         if *callback_val && main_window.visible()
         {
