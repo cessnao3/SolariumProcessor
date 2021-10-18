@@ -21,7 +21,6 @@ pub enum ThreadMessage
     Start,
     Stop,
     Reset,
-    Exit,
     Step,
     SetSpeed(f64)
 }

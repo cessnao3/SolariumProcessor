@@ -1,0 +1,111 @@
+use super::processor_state::ProcessorStatusStruct;
+use super::messages::{GuiMessage, ThreadMessage};
+
+use std::thread;
+
+use std::sync::mpsc;
+use std::time;
+
+
+pub fn run_scpu_thread(
+    gui_to_thread_rx: mpsc::Receiver<ThreadMessage>,
+    thread_to_gui_tx: mpsc::Sender<GuiMessage>)
+{
+    const THREAD_LOOP_MS: u64 = 10;
+    const THREAD_LOOP_HZ: u64 = 1000 / 10;
+
+    let mut step_repeat_count = 1;
+
+    let mut step_cpu = false;
+
+    let mut cpu_stat = ProcessorStatusStruct::new();
+
+    loop
+    {
+        let mut thread_error = false;
+
+        for _ in 0..1000
+        {
+            match gui_to_thread_rx.try_recv()
+            {
+                Ok(v) => match v
+                {
+                    ThreadMessage::Start =>
+                    {
+                        step_cpu = true;
+                    },
+                    ThreadMessage::Stop =>
+                    {
+                        step_cpu = false;
+                    },
+                    ThreadMessage::Reset =>
+                    {
+                        step_cpu = false;
+                        cpu_stat.reset();
+                    },
+                    ThreadMessage::SetMemory(mem_vals) =>
+                    {
+                        step_cpu = false;
+                        cpu_stat.load_data(mem_vals);
+
+                    },
+                    ThreadMessage::Step =>
+                    {
+                        cpu_stat.step();
+                    },
+                    ThreadMessage::SetSpeed(v) =>
+                    {
+                        step_repeat_count = (v / THREAD_LOOP_HZ as f64) as u64;
+                    }
+                },
+                Err(mpsc::TryRecvError::Disconnected) =>
+                {
+                    thread_error = true;
+                    break;
+                },
+                Err(mpsc::TryRecvError::Empty) => break
+            };
+        }
+
+        if thread_error
+        {
+            break;
+        }
+
+        if step_cpu
+        {
+            let inner_repeat_count = step_repeat_count;
+
+            for _ in 0..inner_repeat_count
+            {
+                cpu_stat.step();
+            }
+        }
+
+        cpu_stat.update_msg_queue();
+
+        for msg in cpu_stat.msg_queue.iter()
+        {
+            match thread_to_gui_tx.send(msg.clone())
+            {
+                Ok(()) => (),
+                Err(_) =>
+                {
+                    break;
+                }
+            }
+        }
+
+        if cpu_stat.msg_queue.len() > 0
+        {
+            cpu_stat.msg_queue.clear();
+        }
+
+        if cpu_stat.has_step_error()
+        {
+            break;
+        }
+
+        thread::sleep(time::Duration::from_millis(THREAD_LOOP_MS));
+    }
+}

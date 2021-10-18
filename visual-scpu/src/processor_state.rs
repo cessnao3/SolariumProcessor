@@ -3,6 +3,7 @@ use super::messages::GuiMessage;
 use libscpu::cpu::SolariumCPU;
 use libscpu::memory::{MemoryWord, ReadWriteSegment};
 
+
 pub type RegisterArray = [u16; SolariumCPU::NUM_REGISTERS];
 
 pub struct ProcessorStatusStruct
