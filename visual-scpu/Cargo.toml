@@ -10,7 +10,7 @@ edition = "2018"
 libscpu = { path = "../libscpu", version = "*" }
 libscpu-assemble = { path = "../libscpu-assemble", version = "*" }
 
-[target.'cfg(unix)'.dependencies]
+[target.'cfg(not(windows))'.dependencies]
 fltk = { version = "1.2.8" }
 
 [target.'cfg(windows)'.dependencies]
