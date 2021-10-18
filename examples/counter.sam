@@ -23,4 +23,5 @@ sub 5, 4, 3
 jgzr 14, 5
 
 // Otherwise, enter an infinite loop as program completion
-jmpri 0
+:endloc
+jmpri endloc
