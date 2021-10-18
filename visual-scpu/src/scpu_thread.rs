@@ -11,8 +11,8 @@ pub fn run_scpu_thread(
     gui_to_thread_rx: mpsc::Receiver<ThreadMessage>,
     thread_to_gui_tx: mpsc::Sender<GuiMessage>)
 {
-    const THREAD_LOOP_MS: u64 = 10;
-    const THREAD_LOOP_HZ: u64 = 1000 / 10;
+    const THREAD_LOOP_MS: u64 = 25;
+    const THREAD_LOOP_HZ: u64 = 1000 / THREAD_LOOP_MS;
 
     let mut step_repeat_count = 1;
 
