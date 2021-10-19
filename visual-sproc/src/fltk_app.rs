@@ -20,33 +20,12 @@ fn get_app_icon() -> PngImage
 
 fn get_default_text() -> String
 {
-    return "// Setup the counter variables\n\
-        ldi 2, 1\n\
-        ldi 3, 0\n\
-        \n\
-        // Setup the target value\n\
-        jmpri load_data\n\
-        \n\
-        :target_value\n\
-        .load 32767 // 0x7FFF\n\
-        \n\
-        :load_data\n\
-        ldir 4, target_value\n\
-        \n\
-        // Load the default jump command\n\
-        ldi 14, -2\n\
-        \n\
-        // Perform the addition and check for reaching the target\n\
-        add 3, 2, 3\n\
-        sub 5, 4, 3\n\
-        \n\
-        // Jump back to the add instruction if the\n\
-        // target minus current is greater than zero\n\
-        jgzr 14, 5\n\
-        \n\
-        // Otherwise, enter an infinite loop as program completion\n\
-        :endloc\n\
-        jmpri endloc\n".to_string();
+    let text_bytes = include_bytes!("../../examples/counter.sam");
+    return match std::str::from_utf8(text_bytes)
+    {
+        Ok(v) => v.to_string(),
+        Err(e) => panic!("UTF-8 Error: {0:}", e.to_string())
+    };
 }
 
 pub fn setup_and_run_app(
