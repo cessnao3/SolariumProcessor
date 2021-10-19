@@ -76,7 +76,7 @@ impl ProcessorStatusStruct
     {
         for i in 0..SolariumProcessor::NUM_REGISTERS
         {
-            self.regs[i] = self.cpu.get_register_value(i);
+            self.regs[i] = self.cpu.get_register_value(i).get();
         }
         self.regs_updated = true;
     }

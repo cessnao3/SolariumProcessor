@@ -1,14 +1,14 @@
-use crate::common::{MemoryWord, MemoryWordSigned, SolariumError};
+use crate::common::{MemoryWord, SolariumError};
 use crate::memory::MemoryMap;
 
 use super::registers::{Register, RegisterManager};
 
 /// Defines the reset vector location
-const VECTOR_RESET: MemoryWord = 0x0;
+const VECTOR_RESET: usize = 0x0;
 
 /// Defines the IRQ reset vector location
-//const VECTOR_IRQ_SW: MemoryWord = 0x1;
-//const VECTOR_HW_HJW: MemoryWord = 0x2;
+//const VECTOR_IRQ_SW: usize = 0x1;
+//const VECTOR_HW_HJW: usize = 0x2;
 
 // Define the stack pointer offset and allowed size
 const STACK_POINTER_OFFSET: usize = 0x800;
@@ -60,7 +60,7 @@ impl SolariumProcessor
         self.registers.reset();
         self.registers.set(
             Register::ProgramCounter,
-            VECTOR_RESET);
+            MemoryWord::new(VECTOR_RESET as u16));
     }
 
     /// Obtains the current value of a register
@@ -72,18 +72,18 @@ impl SolariumProcessor
     /// Obtains the current program counter offset
     fn get_pc_offset(&self, reg: Register) -> MemoryWord
     {
-        let pc = self.registers.get(Register::ProgramCounter);
-        return (pc as i32 + self.registers.get(reg) as i32) as MemoryWord;
+        let pc = self.registers.get(Register::ProgramCounter).get();
+        return MemoryWord::new((pc as i32 + self.registers.get(reg).get() as i32) as u16);
     }
 
     /// Increments the program counter by the specified amount
-    fn increment_pc(&mut self, pc_incr: MemoryWordSigned)
+    fn increment_pc(&mut self, pc_incr: i32)
     {
-        let pc = self.registers.get(Register::ProgramCounter);
-        let new_pc = (pc as i32 + pc_incr as i32) as MemoryWord;
+        let pc = self.registers.get(Register::ProgramCounter).get();
+        let new_pc = (pc as i32 + pc_incr) as u16;
         self.registers.set(
             Register::ProgramCounter,
-            new_pc);
+            MemoryWord::new(new_pc));
     }
 
     /// Obtains the current value of the stack pointer offset from the initial stack location
@@ -95,7 +95,7 @@ impl SolariumProcessor
     /// Pushes a value onto the stack
     fn push_sp(&mut self, value: MemoryWord) -> Result<(), SolariumError>
     {
-        let new_sp = self.get_sp_offset() + 1;
+        let new_sp = self.get_sp_offset().get() + 1;
         if new_sp as usize > STACK_POINTER_OFFSET + STACK_POINTER_MAX_SIZE
         {
             return Err(SolariumError::StackOverflow);
@@ -104,7 +104,7 @@ impl SolariumProcessor
         {
             self.registers.set(
                 Register::StackPointer,
-                new_sp);
+                MemoryWord::new(new_sp));
 
             return self.memory_map.set(
                 self.get_sp_address() - 1,
@@ -115,7 +115,7 @@ impl SolariumProcessor
     /// Gets the current address just off the end of the stack
     fn get_sp_address(&self) -> usize
     {
-        return STACK_POINTER_OFFSET + self.get_sp_offset() as usize;
+        return STACK_POINTER_OFFSET + self.get_sp_offset().get() as usize;
     }
 
     /// Pops a value off of the stack and returns the result
@@ -131,7 +131,7 @@ impl SolariumProcessor
         // Subtract one from the stack pointer
         self.registers.set(
             Register::StackPointer,
-            self.get_sp_offset() - 1);
+            MemoryWord::new(self.get_sp_offset().get() - 1));
 
         // Return the result
         return Ok(ret_val);
@@ -140,7 +140,7 @@ impl SolariumProcessor
     /// Peeks at the value currently on the top of the stack
     fn peek_sp(&self) -> Result<MemoryWord, SolariumError>
     {
-        if self.get_sp_offset() == 0
+        if self.get_sp_offset().get() == 0
         {
             return Err(SolariumError::StackOverflow);
         }
@@ -155,23 +155,23 @@ impl SolariumProcessor
     {
         // Define the current memory word
         let pc = self.registers.get(Register::ProgramCounter);
-        let inst = match self.memory_map.get(pc as usize)
+        let inst = match self.memory_map.get(pc.get() as usize)
         {
             Ok(v) => v,
             Err(e) => return Err(e)
         };
 
         // Define the PC increment
-        let mut pc_incr = 1 as MemoryWordSigned;
+        let mut pc_incr = 1i32;
 
         // Increment the PC
         self.registers.set(Register::ProgramCounter, pc);
 
         // Extract the different argument types
-        let opcode = ((inst & 0xF000) >> 12) as u8;
-        let arg0 = ((inst & 0x0F00) >> 8) as u8;
-        let arg1 = ((inst & 0x00F0) >> 4) as u8;
-        let arg2 = ((inst & 0x000F) >> 0) as u8;
+        let opcode = ((inst.get() & 0xF000) >> 12) as u8;
+        let arg0 = ((inst.get() & 0x0F00) >> 8) as u8;
+        let arg1 = ((inst.get() & 0x00F0) >> 4) as u8;
+        let arg2 = ((inst.get() & 0x000F) >> 0) as u8;
 
         assert!(opcode & 0xF == opcode);
         assert!(arg0 & 0xF == arg0);
@@ -181,11 +181,11 @@ impl SolariumProcessor
         // Define a function to combine two arguments into an item
         fn get_immediate_value_signed(
             arg_high: u8,
-            arg_low: u8) -> MemoryWordSigned
+            arg_low: u8) -> MemoryWord
         {
             assert!(arg_low & 0xF == arg_low);
             assert!(arg_high & 0xF == arg_high);
-            return (((arg_high << 4) | arg_low) as i8) as MemoryWordSigned;
+            return MemoryWord::new(((((arg_high << 4) | arg_low) as i8) as i16) as u16);
         }
 
         fn get_immediate_value_unsigned(
@@ -194,7 +194,7 @@ impl SolariumProcessor
         {
             assert!(arg_low & 0xF == arg_low);
             assert!(arg_high & 0xF == arg_high);
-            return (((arg_high << 4) | arg_low)) as MemoryWord;
+            return MemoryWord::new(((arg_high << 4) | arg_low) as u16);
         }
 
         // Switch based on opcode
@@ -214,12 +214,12 @@ impl SolariumProcessor
                     {
                         pc_incr = get_immediate_value_signed(
                             arg1,
-                            arg2);
+                            arg2).get_signed() as i32;
                     },
                     2 => // ld
                     {
                         let reg_val = self.registers.get(reg_b);
-                        let mem_val = match self.memory_map.get(reg_val as usize)
+                        let mem_val = match self.memory_map.get(reg_val.get() as usize)
                         {
                             Ok(v) => v,
                             Err(e) => return Err(e)
@@ -232,7 +232,7 @@ impl SolariumProcessor
                     3 => // sav
                     {
                         match self.memory_map.set(
-                            self.registers.get(reg_a) as usize,
+                            self.registers.get(reg_a).get() as usize,
                             self.registers.get(reg_b))
                         {
                             Ok(()) => (),
@@ -242,7 +242,7 @@ impl SolariumProcessor
                     4 => // ldr
                     {
                         match self.memory_map.set(
-                            self.registers.get(reg_a) as usize,
+                            self.registers.get(reg_a).get() as usize,
                             self.get_pc_offset(reg_b))
                         {
                             Ok(()) => (),
@@ -252,7 +252,7 @@ impl SolariumProcessor
                     5 => // savr
                     {
                         match self.memory_map.set(
-                            self.get_pc_offset(reg_a) as usize,
+                            self.get_pc_offset(reg_a).get() as usize,
                             self.registers.get(reg_b))
                         {
                             Ok(()) => (),
@@ -261,7 +261,7 @@ impl SolariumProcessor
                     },
                     6..=9 => // jz, jzr, jgz, jgzr
                     {
-                        let cmp = self.registers.get(reg_b) as MemoryWordSigned;
+                        let cmp = self.registers.get(reg_b).get_signed();
 
                         let should_jump = ((arg0 == 6 || arg0 == 7) && cmp == 0) || ((arg0 == 8 || arg0 == 9) && cmp > 0);
                         let jump_relative = arg0 == 7 || arg0 == 9;
@@ -270,7 +270,7 @@ impl SolariumProcessor
                         {
                             if jump_relative
                             {
-                                pc_incr = self.registers.get(reg_a) as MemoryWordSigned;
+                                pc_incr = self.registers.get(reg_a).get_signed() as i32;
                             }
                             else
                             {
@@ -304,7 +304,7 @@ impl SolariumProcessor
                     },
                     2 => // jmpr
                     {
-                        pc_incr = self.registers.get(dest_register) as MemoryWordSigned;
+                        pc_incr = self.registers.get(dest_register).get_signed() as i32;
                     },
                     3 => // push
                     {
@@ -431,9 +431,11 @@ impl SolariumProcessor
         {
             let immediate = get_immediate_value_signed(arg0, arg1);
 
-            assert!(pc as i32 + immediate as i32 >= 0);
+            let load_loc = pc.get() as i32 + immediate.get_signed() as i32;
 
-            let mem_val = match self.memory_map.get((pc as i32 + immediate as i32) as usize)
+            assert!(load_loc >= 0);
+
+            let mem_val = match self.memory_map.get(load_loc as usize)
             {
                 Ok(v) => v,
                 Err(e) => return Err(e)
@@ -448,57 +450,59 @@ impl SolariumProcessor
             let val_a = self.registers.get(Register::from_index(arg1 as usize));
             let val_b = self.registers.get(Register::from_index(arg0 as usize));
 
-            let result: MemoryWord;
+            let result: u16;
 
             match opcode
             {
                 4 => // add
                 {
-                    result = val_a + val_b;
+                    result = val_a.get() + val_b.get();
                 },
                 5 => //sub
                 {
-                    result = val_a - val_b;
+                    result = val_a.get() - val_b.get();
                 },
                 6 => // mul
                 {
-                    result = (val_a as MemoryWordSigned * val_b as MemoryWordSigned) as MemoryWord;
+                    result = (val_a.get_signed() * val_b.get_signed()) as u16;
                 },
                 7 => // div
                 {
-                    if val_b == 0
+                    if val_b.get() == 0
                     {
                         return Err(SolariumError::DivideByZero);
                     }
-                    result = (val_a as MemoryWordSigned / val_b as MemoryWordSigned) as MemoryWord;
+                    result = (val_a.get_signed() / val_b.get_signed()) as u16;
                 },
                 8 => // mod
                 {
-                    if val_b == 0
+                    if val_b.get() == 0
                     {
                         return Err(SolariumError::ModByZero);
                     }
-                    result = (val_a as MemoryWordSigned % val_b as MemoryWordSigned) as MemoryWord;
+                    result = (val_a.get_signed() % val_b.get_signed()) as u16;
                 },
                 9 => // band
                 {
-                    result = val_a & val_b;
+                    result = val_a.get() & val_b.get();
                 }
                 10 => // bor
                 {
-                    result = val_a | val_b;
+                    result = val_a.get() | val_b.get();
                 }
                 11 => //bxor
                 {
-                    result = val_a ^ val_b;
+                    result = val_a.get() ^ val_b.get();
                 }
                 12 => // bsftl
                 {
-                    result = val_a << val_b;
+                    // TODO - SHIFT ERROR!
+                    result = val_a.get() << val_b.get();
                 },
                 13 => // bsftr
                 {
-                    result = val_a >> val_b;
+                    // TODO - SHIFT ERROR!
+                    result = val_a.get() >> val_b.get();
                 },
                 _ => // ERROR
                 {
@@ -509,7 +513,7 @@ impl SolariumProcessor
             let reg_dest = Register::from_index(arg2 as usize);
             self.registers.set(
                 reg_dest,
-                result);
+                MemoryWord::new(result));
         }
 
         // Increment the program counter

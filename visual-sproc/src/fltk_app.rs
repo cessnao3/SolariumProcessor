@@ -7,6 +7,7 @@ use super::messages::{ThreadMessage, GuiMessage, FltkMessage};
 
 use super::fltk_registers::setup_register_group;
 
+use libsproc::common::MemoryWord;
 use libsproc_assemble::assemble;
 
 use std::sync::{Arc, Mutex, mpsc};
@@ -246,7 +247,7 @@ pub fn setup_and_run_app(
                             {
                                 Ok(v) =>
                                 {
-                                    msg_to_send = Some(ThreadMessage::SetMemory(v));
+                                    msg_to_send = Some(ThreadMessage::SetMemory(v.iter().map(|v| MemoryWord::new(*v)).collect()));
                                 },
                                 Err(e) =>
                                 {

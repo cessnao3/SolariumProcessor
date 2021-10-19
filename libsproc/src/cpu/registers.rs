@@ -6,6 +6,7 @@ pub enum Register
 {
     ProgramCounter,
     StackPointer,
+    ReturnValue,
     GP(usize)
 }
 
@@ -35,6 +36,7 @@ impl Register
         {
             Register::ProgramCounter => 0,
             Register::StackPointer => 1,
+            Register::ReturnValue => 2,
             Register::GP(ind) => *ind
         };
 
@@ -63,7 +65,7 @@ impl RegisterManager
     {
         return RegisterManager
         {
-            registers: [0; Register::NUM_REGISTERS]
+            registers: [MemoryWord::new(0); Register::NUM_REGISTERS]
         };
     }
 
@@ -72,7 +74,7 @@ impl RegisterManager
     {
         for v in self.registers.iter_mut()
         {
-            *v = 0;
+            v.set(0);
         }
     }
 
@@ -133,8 +135,8 @@ mod tests {
                 // Set the register manager, and then ensure that the output result matches
                 register_manager.set(
                     *register,
-                    v);
-                assert_eq!(register_manager.get(*register), v as MemoryWord);
+                    MemoryWord::new(v));
+                assert_eq!(register_manager.get(*register), MemoryWord::new(v));
             }
         }
     }
@@ -149,14 +151,14 @@ mod tests {
         // Add a value to each register
         for i in 0..Register::NUM_REGISTERS
         {
-            register_manager.set(Register::GP(i), i as MemoryWord);
+            register_manager.set(Register::GP(i), MemoryWord::new(i as u16));
         }
 
         // Ensure that we can get the resulting value out
         for i in 0..Register::NUM_REGISTERS
         {
             let val = register_manager.get(Register::GP(i));
-            assert_eq!(val, i as MemoryWord);
+            assert_eq!(val, MemoryWord::new(i as u16));
         }
     }
 }

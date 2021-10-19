@@ -24,7 +24,7 @@ impl ReadWriteSegment
         assert!(top_address <= (2usize).pow(16));
 
         // Define the initial data array
-        let data: Vec::<MemoryWord> = (0..size).map(|_| 0 as MemoryWord).collect();
+        let data: Vec::<MemoryWord> = (0..size).map(|_| MemoryWord::new(0)).collect();
 
         // Create the memory segment
         return ReadWriteSegment
@@ -72,7 +72,7 @@ impl MemorySegment for ReadWriteSegment
         // Reset all data values to 0 if not read only
         for val in self.data.iter_mut()
         {
-            *val = 0;
+            val.set(0);
         }
     }
 
@@ -158,7 +158,7 @@ mod tests {
         let mut mem = get_default_test_segment();
         let result = mem.set(
             mem.top_address,
-            32);
+            MemoryWord::new(32));
         assert!(result.is_err());
     }
 
@@ -178,7 +178,7 @@ mod tests {
         let mut mem = get_default_test_segment();
         let result = mem.set(
             mem.base_address - 1,
-            32);
+            MemoryWord::new(32));
         assert!(result.is_err());
     }
 
@@ -202,7 +202,7 @@ mod tests {
 
         for i in base..(base + size)
         {
-            let success = mem.set(i, (i - base + 1) as MemoryWord);
+            let success = mem.set(i, MemoryWord::new((i - base + 1) as u16));
             assert_eq!(success.is_ok(), true);
         }
 
