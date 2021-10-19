@@ -393,6 +393,9 @@ impl SolariumProcessor
                     },
                     5 => // ret
                     {
+                        // Save the return register
+                        let ret_register = self.registers.get(Register::ReturnValue);
+
                         // Pop all register values
                         for i in 0..Self::NUM_REGISTERS
                         {
@@ -406,6 +409,11 @@ impl SolariumProcessor
                                 Register::GP(Self::NUM_REGISTERS - 1 - i),
                                 mem_val);
                         }
+
+                        // Copy the new return register value
+                        self.registers.set(
+                            Register::ReturnValue,
+                            ret_register);
                     }
                     _ => // ERROR
                     {
