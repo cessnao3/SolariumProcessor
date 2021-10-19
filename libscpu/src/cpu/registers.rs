@@ -1,4 +1,4 @@
-use crate::memory::MemoryWord;
+use crate::common::MemoryWord;
 
 #[derive(Clone, Copy)]
 /// Defines the enumeration for available registers

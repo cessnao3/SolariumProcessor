@@ -1,7 +1,8 @@
 use super::messages::GuiMessage;
 
 use libscpu::cpu::SolariumCPU;
-use libscpu::memory::{MemoryWord, ReadWriteSegment};
+use libscpu::memory::ReadWriteSegment;
+use libscpu::common::MemoryWord;
 
 
 pub type RegisterArray = [u16; SolariumCPU::NUM_REGISTERS];
@@ -46,7 +47,11 @@ impl ProcessorStatusStruct
 
         for (i, val) in self.last_assembly.iter().enumerate()
         {
-            self.cpu.memory_map.set(i, *val);
+            match self.cpu.memory_map.set(i, *val)
+            {
+                Ok(()) => (),
+                Err(_) => panic!("memory not large enough for provided assembly")
+            };
         }
     }
 
@@ -59,7 +64,7 @@ impl ProcessorStatusStruct
                 Ok(()) => (),
                 Err(e) =>
                 {
-                    self.msg_queue.push(GuiMessage::LogMessage(e));
+                    self.msg_queue.push(GuiMessage::LogMessage(e.to_string()));
                     self.step_error = true;
                 }
             }

@@ -1,4 +1,6 @@
-use super::*;
+use crate::common::{MemoryWord, SolariumError};
+
+use super::MemorySegment;
 
 /// Provides a read-write memory segment type
 pub struct ReadWriteSegment
@@ -37,30 +39,30 @@ impl ReadWriteSegment
 impl MemorySegment for ReadWriteSegment
 {
     /// Provides the word at the requested memory location
-    fn get(&self, ind: usize) -> MemoryWord
+    fn get(&self, ind: usize) -> Result<MemoryWord, SolariumError>
     {
         return if self.within(ind)
         {
-            self.data[ind - self.base_address]
+            Ok(self.data[ind - self.base_address])
         }
         else
         {
-            panic!();
+            Err(SolariumError::InvalidMemoryAccess(ind))
         };
     }
 
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
-    fn set(&mut self, ind: usize, data: MemoryWord) -> bool
+    fn set(&mut self, ind: usize, data: MemoryWord) -> Result<(), SolariumError>
     {
         if self.within(ind)
         {
             self.data[ind - self.base_address] = data;
-            return true;
+            return Ok(());
         }
         else
         {
-            panic!();
+            return Err(SolariumError::InvalidMemoryAccess(ind));
         }
     }
 
@@ -97,6 +99,7 @@ impl MemorySegment for ReadWriteSegment
 mod tests {
     // Pull in the super instance
     use super::*;
+    use super::super::MAX_SEGMENT_SIZE;
 
     #[test]
     /// Test the initialization of the memory segment
@@ -119,10 +122,11 @@ mod tests {
             let is_within = i >= base && i < base + size;
             assert_eq!(mem.within(i), is_within);
 
-            if is_within
+            match mem.get(i)
             {
-                assert_eq!(mem.get(i), 0);
-            }
+                Ok(_) => assert!(is_within),
+                Err(_) => assert!(!is_within)
+            };
         }
     }
 
@@ -148,43 +152,43 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     /// Test setting a memory location above the top address
     fn test_panic_set_above()
     {
         let mut mem = get_default_test_segment();
-        mem.set(
+        let result = mem.set(
             mem.top_address,
             32);
+        assert!(result.is_err());
     }
 
     #[test]
-    #[should_panic]
     /// Test getting a memory location above the top address
     fn test_panic_get_above()
     {
         let mem = get_default_test_segment();
-        mem.get(mem.top_address);
+        let result = mem.get(mem.top_address);
+        assert!(result.is_err());
     }
 
     #[test]
-    #[should_panic]
     /// Test setting a memory location below the base address
     fn test_panic_set_below()
     {
         let mut mem = get_default_test_segment();
-        mem.set(
+        let result = mem.set(
             mem.base_address - 1,
             32);
+        assert!(result.is_err());
     }
 
     #[test]
-    #[should_panic]
     /// Test getting a memory location below the base address
     fn test_panic_get_below()
     {
         let mem = get_default_test_segment();
-        mem.get(mem.base_address - 1);
+        let result = mem.get(mem.base_address - 1);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -199,7 +203,7 @@ mod tests {
         for i in base..(base + size)
         {
             let success = mem.set(i, (i - base + 1) as MemoryWord);
-            assert_eq!(success, true);
+            assert_eq!(success.is_ok(), true);
         }
 
         for i in 0..2048

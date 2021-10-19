@@ -1,4 +1,4 @@
-use libscpu::memory::MemoryWord;
+use libscpu::common::MemoryWord;
 
 use super::processor_state::RegisterArray;
 

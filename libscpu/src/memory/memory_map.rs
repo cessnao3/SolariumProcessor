@@ -1,4 +1,6 @@
-use super::*;
+use crate::common::{MemoryWord, SolariumError};
+
+use super::MemorySegment;
 
 /// Defines the overarching memory mapping structure
 pub struct MemoryMap
@@ -52,23 +54,23 @@ impl MemoryMap
     }
 
     /// Gets the value in memory for a particular location
-    pub fn get(&self, ind: usize) -> MemoryWord
+    pub fn get(&self, ind: usize) -> Result<MemoryWord, SolariumError>
     {
         return match self.segment_for_index(ind)
         {
             Some(seg) => seg.get(ind),
-            None => 0
+            None => Err(SolariumError::InvalidMemoryAccess(ind))
         };
     }
 
     /// Sets the value in memory for a particular memory location
     /// Returns true if the value was able to be set; otherwise returns false
-    pub fn set(&mut self, ind: usize, data: MemoryWord) -> bool
+    pub fn set(&mut self, ind: usize, data: MemoryWord) -> Result<(), SolariumError>
     {
         return match self.segment_for_index_mut(ind)
         {
             Some(seg) => seg.set(ind, data),
-            None => false
+            None => Err(SolariumError::InvalidMemoryAccess(ind))
         };
     }
 

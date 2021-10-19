@@ -1,14 +1,10 @@
 mod memory_map;
 mod segment_rw;
 
+use crate::common::{MemoryWord, SolariumError};
+
 pub use self::memory_map::MemoryMap as MemoryMap;
 pub use self::segment_rw::ReadWriteSegment as ReadWriteSegment;
-
-/// Provides the data type to use for a word in memory
-pub type MemoryWord = u16;
-
-/// Provides the corresponding signed type for the type used for [MemoryWord]
-pub type MemoryWordSigned = i16;
 
 /// Define the maximum possible size
 pub const MAX_SEGMENT_SIZE: usize = (2usize).pow(16);
@@ -17,11 +13,11 @@ pub const MAX_SEGMENT_SIZE: usize = (2usize).pow(16);
 pub trait MemorySegment
 {
     /// Provides the word at the requested memory location
-    fn get(&self, ind: usize) -> MemoryWord;
+    fn get(&self, ind: usize) -> Result<MemoryWord, SolariumError>;
 
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
-    fn set(&mut self, ind: usize, data: MemoryWord) -> bool;
+    fn set(&mut self, ind: usize, data: MemoryWord) -> Result<(), SolariumError>;
 
     /// Resets the memory segment
     fn reset(&mut self);
