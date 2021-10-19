@@ -5,7 +5,7 @@ use fltk::text::{TextDisplay, TextBuffer};
 use fltk::group::Flex;
 use fltk::frame::Frame;
 
-use libscpu::cpu::SolariumCPU;
+use libsproc::cpu::SolariumProcessor;
 
 pub fn setup_register_group(parent: &mut Flex) -> Vec<TextDisplay>
 {
@@ -13,9 +13,9 @@ pub fn setup_register_group(parent: &mut Flex) -> Vec<TextDisplay>
 
     let mut displays = Vec::new();
 
-    assert!(SolariumCPU::NUM_REGISTERS % 2 == 0);
+    assert!(SolariumProcessor::NUM_REGISTERS % 2 == 0);
 
-    for i in 0..SolariumCPU::NUM_REGISTERS / 2
+    for i in 0..SolariumProcessor::NUM_REGISTERS / 2
     {
         let v = add_register_row(&mut column_group, i*2, i*2 + 1);
         for disp in v

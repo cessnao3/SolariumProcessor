@@ -1,15 +1,15 @@
 use super::messages::GuiMessage;
 
-use libscpu::cpu::SolariumCPU;
-use libscpu::memory::ReadWriteSegment;
-use libscpu::common::MemoryWord;
+use libsproc::cpu::SolariumProcessor;
+use libsproc::memory::ReadWriteSegment;
+use libsproc::common::MemoryWord;
 
 
-pub type RegisterArray = [u16; SolariumCPU::NUM_REGISTERS];
+pub type RegisterArray = [u16; SolariumProcessor::NUM_REGISTERS];
 
 pub struct ProcessorStatusStruct
 {
-    cpu: SolariumCPU,
+    cpu: SolariumProcessor,
     regs: RegisterArray,
     regs_updated: bool,
     step_error: bool,
@@ -23,8 +23,8 @@ impl ProcessorStatusStruct
     {
         let mut stat = ProcessorStatusStruct
         {
-            cpu: SolariumCPU::new(),
-            regs: [0u16; SolariumCPU::NUM_REGISTERS],
+            cpu: SolariumProcessor::new(),
+            regs: [0u16; SolariumProcessor::NUM_REGISTERS],
             regs_updated: false,
             step_error: false,
             last_assembly: Vec::new(),
@@ -74,7 +74,7 @@ impl ProcessorStatusStruct
 
     pub fn update_regs(&mut self)
     {
-        for i in 0..SolariumCPU::NUM_REGISTERS
+        for i in 0..SolariumProcessor::NUM_REGISTERS
         {
             self.regs[i] = self.cpu.get_register_value(i);
         }

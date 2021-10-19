@@ -16,23 +16,23 @@ const STACK_POINTER_MAX_SIZE: usize = 0x800;
 
 
 /// Creates the Solarium CPU parameters
-pub struct SolariumCPU
+pub struct SolariumProcessor
 {
     pub memory_map: MemoryMap,
     pub registers: RegisterManager,
     allow_interrupts: bool
 }
 
-impl SolariumCPU
+impl SolariumProcessor
 {
     /// Provide the number of registers
     pub const NUM_REGISTERS: usize = Register::NUM_REGISTERS;
 
     /// Creates a new CPU parameter
-    pub fn new() -> SolariumCPU
+    pub fn new() -> SolariumProcessor
     {
         // Create the CPU
-        let mut cpu = SolariumCPU
+        let mut cpu = SolariumProcessor
         {
             memory_map: MemoryMap::new(),
             registers: RegisterManager::new(),

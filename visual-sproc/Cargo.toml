@@ -1,5 +1,5 @@
 [package]
-name = "visual-scpu"
+name = "visual-sproc"
 version = "0.1.0"
 authors = ["Ian O'Rourke <cessna.ian@gmail.com>"]
 edition = "2018"
@@ -7,8 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libscpu = { path = "../libscpu", version = "*" }
-libscpu-assemble = { path = "../libscpu-assemble", version = "*" }
+libsproc = { path = "../libsproc", version = "*" }
+libsproc-assemble = { path = "../libsproc-assemble", version = "*" }
 
 [target.'cfg(not(windows))'.dependencies]
 fltk = { version = "1.2.8" }

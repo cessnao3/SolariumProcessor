@@ -1,4 +1,5 @@
 use fltk::enums::Event;
+use fltk::image::PngImage;
 use fltk::prelude::*;
 use fltk::{app::*, button::*, dialog::*, window::*, text::*, group::*, frame::*, valuator::*};
 
@@ -6,9 +7,46 @@ use super::messages::{ThreadMessage, GuiMessage, FltkMessage};
 
 use super::fltk_registers::setup_register_group;
 
-use libscpu_assemble::assemble;
+use libsproc_assemble::assemble;
 
 use std::sync::{Arc, Mutex, mpsc};
+
+fn get_app_icon() -> PngImage
+{
+    let logo_bytes = include_bytes!("../../doc/images/logo.png");
+    return PngImage::from_data(logo_bytes).unwrap();
+}
+
+fn get_default_text() -> String
+{
+    return "// Setup the counter variables\n\
+        ldi 2, 1\n\
+        ldi 3, 0\n\
+        \n\
+        // Setup the target value\n\
+        jmpri load_data\n\
+        \n\
+        :target_value\n\
+        .load 32767 // 0x7FFF\n\
+        \n\
+        :load_data\n\
+        ldir 4, target_value\n\
+        \n\
+        // Load the default jump command\n\
+        ldi 14, -2\n\
+        \n\
+        // Perform the addition and check for reaching the target\n\
+        add 3, 2, 3\n\
+        sub 5, 4, 3\n\
+        \n\
+        // Jump back to the add instruction if the\n\
+        // target minus current is greater than zero\n\
+        jgzr 14, 5\n\
+        \n\
+        // Otherwise, enter an infinite loop as program completion\n\
+        :endloc\n\
+        jmpri endloc\n".to_string();
+}
 
 pub fn setup_and_run_app(
     gui_to_thread_tx: mpsc::Sender<ThreadMessage>,
@@ -22,7 +60,7 @@ pub fn setup_and_run_app(
 
     let mut main_window = Window::default()
         .with_size(1100, 600)
-        .with_label("VisualSCPU");
+        .with_label("VisualSProc");
 
     main_window.set_callback(move |_|
     {
@@ -32,6 +70,8 @@ pub fn setup_and_run_app(
             app.quit();
         }
     });
+
+    main_window.set_icon(Some(get_app_icon()));
 
     let mut main_group = Flex::default_fill().row();
 
@@ -53,6 +93,9 @@ pub fn setup_and_run_app(
         editor_group.set_margin(10);
     }
     editor_group.end();
+
+    // Set initial text
+    assembly_editor.buffer().unwrap().set_text(&get_default_text());
 
     // Define a logging text display
     let mut log_text_display;

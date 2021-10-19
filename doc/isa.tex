@@ -7,7 +7,7 @@
 \usepackage{comment}
 
 %opening
-\title{SCPU Instruction Set Architecture}
+\title{SProc Instruction Set Architecture}
 \author{Ian O'Rourke}
 \date{\today}
 
@@ -18,11 +18,11 @@
 \section{Overview}
 
 
-The SCPU is a general-purpose Reduced Instruction Count (RISC) Instruction Set Architecture (ISA). Each program instruction is designed to take up exactly one word of memory. In this case, each word is 16-bits.
+SProc is a general-purpose Reduced Instruction Count (RISC) Instruction Set Architecture (ISA). Each program instruction is designed to take up exactly one word of memory. In this case, each word is 16-bits.
 
 \subsection{Registers}
 
-There are 16 total registers present on the SCPU. These are defined generally as follows in Table \ref{table:register-setup}. Note that, as SCPU is a 16-bit architecture, this means that each register is 16 bits wide.
+There are 16 total registers present on the SProc. These are defined generally as follows in Table \ref{table:register-setup}. Note that, as SProc is a 16-bit architecture, this means that each register is 16 bits wide.
 
 \begin{table}[h!]
 	\centering
@@ -35,13 +35,13 @@ There are 16 total registers present on the SCPU. These are defined generally as
 		R2-R15 & General Purpose Register \\
 		\hline
 	\end{tabular}
-	\caption{Outside of the program counter and global stack pointer, the registers within the SCPU are all general-purpose.}
+	\caption{Outside of the program counter and global stack pointer, the registers within the SProc are all general-purpose.}
 	\label{table:register-setup}
 \end{table}
 
 \subsection{Overall Instruction Syntax}
 
-Since the architecture of the SCPU is 16-bit, this means that each word that may be addressed is 16-bits. The general instruction format is listed  in Table \ref{table:instruction-formatting}.
+Since the architecture of the SProc is 16-bit, this means that each word that may be addressed is 16-bits. The general instruction format is listed  in Table \ref{table:instruction-formatting}.
 
 \begin{table}[h!]
 	\centering
@@ -52,7 +52,7 @@ Since the architecture of the SCPU is 16-bit, this means that each word that may
 		Usage & opcode & arg0 & arg1 & arg2 \\
 		\hline
 	\end{tabular}
-	\caption{The SCPU instruction format typically has one opcode and three possible arguments associated with a particular opcode}
+	\caption{The SProc instruction format typically has one opcode and three possible arguments associated with a particular opcode}
 	\label{table:instruction-formatting}
 \end{table}
 
@@ -115,7 +115,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			\hline
 		\end{tabular}
 	\end{footnotesize}
-	\caption{Available instruction list for the SCPU provides a variety of commands.}
+	\caption{Available instruction list for the SProc provides a variety of commands.}
 	\label{table:instruction-table}
 \end{table}
 
@@ -123,7 +123,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 
 \section{Examples}
 
-The following list some simple example programs that can be run on the SCPU.
+The following list some simple example programs that can be run on the SProc.
 
 \subsection{Counter}
 
@@ -135,17 +135,17 @@ The program listed in Listing \ref{listing:example-counter} provides a basic cou
 
 \section{Tools}
 
-Several tools can help in the development of SCPU programs.
+Several tools can help in the development of SProc programs.
 
-\subsection{VisualSCPU}
+\subsection{VisualSProc}
 
-One useful tool is VisualSCPU, which is a program that combines together a basic assembler, CPU emulator, and memory inspector into a single program. The main window can be seen in Figure \ref{fig:visual-scpu-main-page}.
+One useful tool is VisualSProc, which is a program that combines together a basic assembler, CPU emulator, and memory inspector into a single program. The main window can be seen in Figure \ref{fig:visual-sproc-main-page}.
 
 \begin{figure}[h!]
 	\centering
-	\includegraphics[width=5in]{images/visual-scpu.png}
-	\caption{Main window of VisualSCPU provides common tools for program writing}
-	\label{fig:visual-scpu-main-page}
+	\includegraphics[width=5in]{images/visual-sproc.png}
+	\caption{Main window of VisualSProc provides common tools for program writing}
+	\label{fig:visual-sproc-main-page}
 \end{figure}
 	
 
