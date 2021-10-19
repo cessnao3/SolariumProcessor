@@ -94,7 +94,7 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
     {
         static ref LINE_REGEX: Regex = Regex::new(r"^(?P<instruction>[\w]+)(?P<rest>\s+\-?[\w\d]+(,\s*\-?[\w\d]+)*)*$").unwrap();
         static ref COMMAND_REGEX: Regex = Regex::new(r"^\.(?P<command>[\w]+)\s+(?P<args>[\w\d\s]*)$").unwrap();
-        static ref LABEL_REGEX: Regex = Regex::new(r"^:(?P<tag>[a-z][a-z0-9_]+)").unwrap();
+        static ref LABEL_REGEX: Regex = Regex::new(r"^:(?P<tag>[a-z][a-z0-9_]+)$").unwrap();
         static ref ARGS_SPLIT_REGEX: Regex = Regex::new(r",\s*").unwrap();
     }
 
