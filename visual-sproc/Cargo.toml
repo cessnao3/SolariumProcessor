@@ -9,9 +9,4 @@ edition = "2018"
 [dependencies]
 libsproc = { path = "../libsproc", version = "*" }
 libsproc-assemble = { path = "../libsproc-assemble", version = "*" }
-
-[target.'cfg(windows)'.dependencies]
-fltk = { version = "1.2.9", features = ["fltk-bundled"] }
-
-[target.'cfg(unix)'.dependencies]
 fltk = { version = "1.2.9" }
