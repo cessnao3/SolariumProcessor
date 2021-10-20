@@ -182,6 +182,7 @@ pub fn setup_and_run_app(
                 {
                     alert_default("thread exit error!");
                     thread_exit = true;
+                    break;
                 }
             }
         }
