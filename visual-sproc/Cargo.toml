@@ -11,7 +11,7 @@ libsproc = { path = "../libsproc", version = "*" }
 libsproc-assemble = { path = "../libsproc-assemble", version = "*" }
 
 [target.'cfg(not(windows))'.dependencies]
-fltk = { version = "1.2.8" }
+fltk = { version = "1.2.9" }
 
 [target.'cfg(windows)'.dependencies]
-fltk = { version = "1.2.8", features = ["fltk-bundled"] }
+fltk = { version = "1.2.9", features = ["fltk-bundled"] }
