@@ -8,13 +8,13 @@
             "type": "lldb",
             "request": "launch",
             "name": "Cargo launch",
-            "cwd": "${workspaceFolder}/visual-scpu",
+            "cwd": "${workspaceFolder}/visual-sproc",
             //"lldb.launch.cwd": "${workspaceFolder}/visual-scpu",
             //"lldb.launch.relativePathBase": "${workspaceFolder}/visual-scpu",
             "cargo": {
                 "args": [
                     "build",
-                    "--manifest-path=visual-scpu/Cargo.toml"
+                    "--manifest-path=visual-sproc/Cargo.toml"
                 ]
             },
             //"program": "${cargo:program}",
