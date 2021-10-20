@@ -92,10 +92,29 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
 {
     lazy_static!
     {
-        static ref LINE_REGEX: Regex = Regex::new(r"^(?P<instruction>[\w]+)(?P<rest>\s+\-?[\w\d]+(,\s*\-?[\w\d]+)*)*$").unwrap();
+        static ref REGISTER_VALID_STR: String = r"(\$[\w]+)".to_string();
+        static ref LABEL_VALID_STR: String = r"([a-z][a-z0-9_]+)".to_string();
+        static ref NUMBER_VALID_STR: String = r"([\-|+]?[\d]+)".to_string();
+        static ref HEX_VALID_STR: String = r"(0x[a-f0-9]{1,4})".to_string();
+        static ref ARGUMENT_REGEX_STR: String = format!(
+            "({0:}|{1:}|{2:}|{3:})",
+            REGISTER_VALID_STR.to_string(),
+            LABEL_VALID_STR.to_string(),
+            NUMBER_VALID_STR.to_string(),
+            HEX_VALID_STR.to_string());
+        static ref ARGUMENT_SPLIT_STR: String = r"(,\s*)".to_string();
+
+        static ref ARG_LIST_STRING: String = format!(
+            "(({0:}({1:}{0:})*)?)",
+            ARGUMENT_REGEX_STR.to_string(),
+            ARGUMENT_SPLIT_STR.to_string());
+
+        static ref LINE_REGEX: Regex = Regex::new(&format!(
+            "^(?P<instruction>[\\w]+)(\\s+(?P<args>{0:}))?$",
+            ARG_LIST_STRING.to_string())).unwrap();
         static ref COMMAND_REGEX: Regex = Regex::new(r"^\.(?P<command>[\w]+)\s+(?P<args>[\w\d\s]*)$").unwrap();
-        static ref LABEL_REGEX: Regex = Regex::new(r"^:(?P<tag>[a-z][a-z0-9_]+)$").unwrap();
-        static ref ARGS_SPLIT_REGEX: Regex = Regex::new(r",\s*").unwrap();
+        static ref LABEL_REGEX: Regex = Regex::new(&format!("^:(?P<tag>{0:})$", LABEL_VALID_STR.to_string())).unwrap();
+        static ref ARGS_SPLIT_REGEX: Regex = Regex::new(&ARGUMENT_SPLIT_STR).unwrap();
     }
 
     let mut data_map = HashMap::<usize, LineValue>::new();
@@ -221,10 +240,10 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
 
             // Extract the instruction string and the argument string
             let inst = caps.name("instruction").unwrap().as_str().to_ascii_lowercase();
-            let args = match caps.name("rest")
+            let args = match caps.name("args")
             {
                 Some(v) => ARGS_SPLIT_REGEX
-                    .split(&v.as_str().trim().to_ascii_lowercase())
+                    .split(&v.as_str().to_ascii_lowercase())
                     .map(|v| v.to_string())
                     .collect(),
                 None => Vec::new()
