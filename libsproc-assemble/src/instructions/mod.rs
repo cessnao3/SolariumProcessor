@@ -3,11 +3,12 @@ use std::collections::HashMap;
 mod immediate;
 mod register;
 mod single;
-mod utils;
 
 use immediate::{ImmediateSingleInstruction, ImmediateRegisterInstruction};
 use register::RegisterInstruction;
 use single::SingleInstruction;
+
+use crate::assembly::argument::Argument;
 
 pub struct InstructionData
 {
@@ -36,7 +37,7 @@ impl InstructionData
 
 pub trait ToInstructionData
 {
-    fn to_instruction_data(&self, args: &Vec<String>) -> Result<InstructionData, String>;
+    fn to_instruction_data(&self, args: &Vec<Argument>) -> Result<InstructionData, String>;
 }
 
 pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>

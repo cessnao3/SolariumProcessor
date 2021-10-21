@@ -1,5 +1,7 @@
 use super::{InstructionData, ToInstructionData};
 
+use crate::assembly::argument::Argument;
+
 #[derive(Clone, Copy)]
 pub struct SingleInstruction
 {
@@ -19,7 +21,7 @@ impl SingleInstruction
 
 impl ToInstructionData for SingleInstruction
 {
-    fn to_instruction_data(&self, args: &Vec<String>) -> Result<InstructionData, String>
+    fn to_instruction_data(&self, args: &Vec<Argument>) -> Result<InstructionData, String>
     {
         if args.len() != 0
         {

@@ -1,12 +1,13 @@
 mod instructions;
+mod assembly;
 
 use instructions::get_instruction_map;
 
-use std::{collections::HashMap, num::ParseIntError};
+use std::collections::HashMap;
 
-use regex::Regex;
+use assembly::asm_regex::{VALID_LINE_REGEX, ARGUMENT_SPLIT_REGEX};
 
-use lazy_static::lazy_static;
+use assembly::argument::Argument;
 
 
 const MAX_ADDRESSABLE_VALUE: usize = (2usize).pow(16);
@@ -20,14 +21,18 @@ enum LineValue
 struct LineInformation
 {
     pub instruction: String,
-    pub arguments: Vec<String>,
+    pub arguments: Vec<Argument>,
     pub line_number: usize,
     pub data_index: usize
 }
 
 impl LineInformation
 {
-    pub fn new(instruction: String, arguments: Vec<String>, line_number: usize, data_index: usize) -> LineInformation
+    pub fn new(
+        instruction: String,
+        arguments: Vec<Argument>,
+        line_number: usize,
+        data_index: usize) -> LineInformation
     {
         return Self
         {
@@ -38,85 +43,38 @@ impl LineInformation
         };
     }
 
-    pub fn arguments_for_labels(&self, label_map: &HashMap<String, usize>) -> Vec<String>
+    pub fn update_arguments_for_labels(&self, label_map: &HashMap<String, usize>) -> Result<Vec<Argument>, String>
     {
         return self.arguments
             .iter()
-            .map(|v|
+            .map(|arg|
             {
-                return match label_map.get(v)
+                let new_arg = match arg
                 {
-                    Some(data_index) =>
+                    Argument::Label(s) =>
                     {
-                        let delta_index = *data_index as i32 - self.data_index as i32;
-                        delta_index.to_string()
+                        match label_map.get(s)
+                        {
+                            Some(data_index) =>
+                            {
+                                let delta_index = *data_index as i32 - self.data_index as i32;
+                                Argument::SignedNumber(delta_index)
+                            },
+                            None => return Err(format!("unable to find value for label {0:}", s))
+                        }
                     },
-                    None => v.to_string()
+                    a => a.clone()
                 };
+
+                return Ok(new_arg);
             })
             .collect();
     }
 }
 
-fn read_load_value(input: &str) -> Result<u16, ParseIntError>
-{
-    lazy_static!
-    {
-        static ref NUM_HEX_REGEX: Regex = Regex::new(r"^0x(?P<digit>[0-9a-f]+)$").unwrap();
-        static ref NUM_NEG_REGEX: Regex = Regex::new(r"^\-[\d]+$").unwrap();
-        //static ref NUM_POS_REGEX: Regex = Regex::new(r"^+?[\d]+$").unwrap();
-    }
-
-    let immediate;
-
-    if NUM_HEX_REGEX.is_match(input)
-    {
-        immediate = u16::from_str_radix(
-            &input[2..],
-            16)?;
-    }
-    else if NUM_NEG_REGEX.is_match(input)
-    {
-        immediate = input.parse::<i16>()? as u16;
-    }
-    else
-    {
-        immediate = input.parse::<u16>()?;
-    }
-
-    return Ok(immediate);
-}
-
 
 pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
 {
-    lazy_static!
-    {
-        static ref REGISTER_VALID_STR: String = r"(\$[\w]+)".to_string();
-        static ref LABEL_VALID_STR: String = r"([a-z][a-z0-9_]+)".to_string();
-        static ref NUMBER_VALID_STR: String = r"([\-|+]?[\d]+)".to_string();
-        static ref HEX_VALID_STR: String = r"(0x[a-f0-9]{1,4})".to_string();
-        static ref ARGUMENT_REGEX_STR: String = format!(
-            "({0:}|{1:}|{2:}|{3:})",
-            REGISTER_VALID_STR.to_string(),
-            LABEL_VALID_STR.to_string(),
-            NUMBER_VALID_STR.to_string(),
-            HEX_VALID_STR.to_string());
-        static ref ARGUMENT_SPLIT_STR: String = r"(,\s*)".to_string();
-
-        static ref ARG_LIST_STRING: String = format!(
-            "(({0:}({1:}{0:})*)?)",
-            ARGUMENT_REGEX_STR.to_string(),
-            ARGUMENT_SPLIT_STR.to_string());
-
-        static ref LINE_REGEX: Regex = Regex::new(&format!(
-            "^(?P<instruction>[\\w]+)(\\s+(?P<args>{0:}))?$",
-            ARG_LIST_STRING.to_string())).unwrap();
-        static ref COMMAND_REGEX: Regex = Regex::new(r"^\.(?P<command>[\w]+)\s+(?P<args>[\w\d\s]*)$").unwrap();
-        static ref LABEL_REGEX: Regex = Regex::new(&format!("^:(?P<tag>{0:})$", LABEL_VALID_STR.to_string())).unwrap();
-        static ref ARGS_SPLIT_REGEX: Regex = Regex::new(&ARGUMENT_SPLIT_STR).unwrap();
-    }
-
     let mut data_map = HashMap::<usize, LineValue>::new();
     let mut current_data_index = 0usize;
 
@@ -133,69 +91,92 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
             None => l_in
         }.trim();
 
-        // Check for line validity
+        // Skip if empty
         if l.is_empty()
         {
             continue;
         }
-        else if COMMAND_REGEX.is_match(l)
+
+        // Check that the line matches the expected values
+        if !VALID_LINE_REGEX.is_match(l)
         {
-            // Extract the command captures
-            let caps = match COMMAND_REGEX.captures(l)
-            {
-                Some(v) => v,
-                None => return Err(format!("line {0:} no command captures found for \"{1:}\"", i, l))
-            };
+            return Err(format!("line {0:} does not match the expected line format \"{1:}\"", i, l));
+        }
 
-            // Extract the resulting instruction values
-            let cmd = caps.name("command").unwrap().as_str().to_ascii_lowercase();
-            let args = match caps.name("args")
-            {
-                Some(v) => ARGS_SPLIT_REGEX
-                    .split(&v.as_str().trim().to_ascii_lowercase())
-                    .map(|v| v.to_string())
-                    .collect(),
-                None => Vec::new()
-            };
+        // Extract capture groups
+        let capture_groups = match VALID_LINE_REGEX.captures(l)
+        {
+            Some(v) => v,
+            None => return Err(format!("line {0:} no command captures found for \"{1:}\"", i, l))
+        };
 
-            // Check argument value
-            if cmd == "oper"
+        // Extract parameters
+        let command = capture_groups.name("command").unwrap().as_str().to_ascii_lowercase();
+        let args = match capture_groups.name("args")
+        {
+            Some(v) => match ARGUMENT_SPLIT_REGEX
+                .split(&v.as_str().to_ascii_lowercase())
+                .map(|v| v.parse::<Argument>())
+                .collect()
+            {
+                Ok(v) => v,
+                Err(e) => return Err(format!("line {0:} {1:}", i, e.to_string()))
+            }
+            None => Vec::new()
+        };
+
+        // Check the first character of the command to determine how to handle
+        let first_char = command.chars().next().unwrap();
+
+        if first_char == '.'
+        {
+            let command_type = &command[1..];
+
+            if command_type == "oper"
             {
                 if args.len() != 1
                 {
-                    return Err(format!("line {0:} command {1:} only takes 1 argument", i, cmd));
+                    return Err(format!(
+                        "line {0:} command {1:} only takes 1 argument",
+                        i,
+                        command_type));
                 }
 
-                let new_offset = match args[0].parse::<usize>()
+                let new_offset = match &args[0]
                 {
-                    Ok(v) => v,
-                    Err(_) => return Err(format!("line {0:} command {1:} unable to parse {2:} as address", i, cmd, args[0]))
+                    Argument::UnsignedNumber(v) => *v as usize,
+                    arg => return Err(format!(
+                        "line {0:} command {1:} unable to parse {2:} as address",
+                        i,
+                        command_type,
+                        arg.to_string()))
                 };
 
                 if new_offset < current_data_index
                 {
-                    return Err(format!("line {0:} command {1:} new offset {2:} must be greater or equal to current offset {3:}", i, cmd, new_offset, current_data_index));
+                    return Err(format!(
+                        "line {0:} command {1:} new offset {2:} must be greater or equal to current offset {3:}",
+                        i,
+                        command_type,
+                        new_offset,
+                        current_data_index));
                 }
                 else
                 {
                     current_data_index = new_offset;
                 }
             }
-            else if cmd == "load"
+            else if command_type == "load"
             {
                 if args.len() != 1
                 {
-                    return Err(format!("line {0:} command {1:} only takes 1 argument", i, cmd));
+                    return Err(format!("line {0:} command {1:} only takes 1 argument", i, command_type));
                 }
 
-                let value_to_load = match read_load_value(&args[0])
+                let value_to_load = match args[0].to_u16()
                 {
                     Ok(v) => v,
-                    Err(e) => return Err(format!(
-                        "line {0:} unable to parse \"{1:}\" as memory value: {2:}",
-                        i,
-                        args[0],
-                        e.to_string()))
+                    Err(e) => return Err(format!("line {0:} {1:}", i, e))
                 };
 
                 data_map.insert(
@@ -205,50 +186,31 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
             }
             else
             {
-                return Err(format!("line {0:} invalid command \"{1:}\" found", i, cmd));
+                return Err(format!("line {0:} invalid command \"{1:}\" found", i, command_type));
             }
         }
-        else if LABEL_REGEX.is_match(l)
+        else if first_char == ':'
         {
-            let label = LABEL_REGEX
-                .captures(l)
-                .unwrap()
-                .name("tag")
-                .unwrap()
-                .as_str()
-                .to_ascii_lowercase();
+            if args.len() > 0
+            {
+                return Err(format!("line {0:} label types cannot have any arguments", i));
+            }
 
-            if label_map.contains_key(&label)
+            let label = &command[1..];
+
+            if label_map.contains_key(label)
             {
                 return Err(format!("line {0:} label \"{1:}\" already exists", i, label));
             }
             else
             {
                 label_map.insert(
-                    label,
+                    label.to_string(),
                     current_data_index);
             }
         }
-        else if LINE_REGEX.is_match(l)
+        else
         {
-            // Extract the captures
-            let caps = match LINE_REGEX.captures(l)
-            {
-                Some(v) => v,
-                None => return Err(format!("line {0:} no captures found for \"{1:}\"", i, l))
-            };
-
-            // Extract the instruction string and the argument string
-            let inst = caps.name("instruction").unwrap().as_str().to_ascii_lowercase();
-            let args = match caps.name("args")
-            {
-                Some(v) => ARGS_SPLIT_REGEX
-                    .split(&v.as_str().to_ascii_lowercase())
-                    .map(|v| v.to_string())
-                    .collect(),
-                None => Vec::new()
-            };
-
             // Add the data values
             if data_map.contains_key(&current_data_index)
             {
@@ -260,7 +222,7 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
                     current_data_index,
                     LineValue::Assembly(
                         LineInformation::new(
-                            inst,
+                            command,
                             args,
                             i,
                             current_data_index)));
@@ -270,10 +232,6 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
             {
                 return Err(format!("line {0:} \"{1:}\" does not match expected syntax", i, l));
             }
-        }
-        else
-        {
-            return Err(format!("line {0:} \"{1:}\" does not match expected syntax", i, l));
         }
     }
 
@@ -300,7 +258,11 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
                 };
 
                 // Define the new arguments to include labels values
-                let new_args = assembly.arguments_for_labels(&label_map);
+                let new_args = match assembly.update_arguments_for_labels(&label_map)
+                {
+                    Ok(v) => v,
+                    Err(e) => return Err(format!("line {0:} {1:}", assembly.line_number, e))
+                };
 
                 // Attempt to create the resulting data
                 let inst_data = match inst_val.to_instruction_data(&new_args)

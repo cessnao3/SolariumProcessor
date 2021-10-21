@@ -1,5 +1,6 @@
 use super::{InstructionData, ToInstructionData};
-use super::utils::read_register_value;
+
+use crate::assembly::argument::Argument;
 
 const NUM_DATA_VALS: usize = 4;
 
@@ -25,7 +26,7 @@ impl RegisterInstruction
 
 impl ToInstructionData for RegisterInstruction
 {
-    fn to_instruction_data(&self, args: &Vec<String>) -> Result<InstructionData, String>
+    fn to_instruction_data(&self, args: &Vec<Argument>) -> Result<InstructionData, String>
     {
         if args.len() != self.num_regs
         {
@@ -49,7 +50,7 @@ impl ToInstructionData for RegisterInstruction
             }
             else if i < args.len()
             {
-                nybbles[i] = match read_register_value(&args[i])
+                nybbles[i] = match args[i].to_register_val()
                 {
                     Ok(v) => v,
                     Err(s) => return Err(s)
