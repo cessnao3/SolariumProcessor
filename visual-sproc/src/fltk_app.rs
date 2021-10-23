@@ -63,7 +63,7 @@ pub fn setup_and_run_app(
         assembly_editor = TextEditor::default();
         assembly_editor.set_buffer(TextBuffer::default());
 
-        editor_group.set_size(&mut assembly_label, 50);
+        editor_group.set_size(&mut assembly_label, 20);
 
         let mut assemble_button = Button::default().with_label("Assemble");
         assemble_button.emit(fltk_sender, FltkMessage::Assemble);
