@@ -65,6 +65,16 @@ This is contrasted with the typical assembly language formatting, which is provi
 
 where the number of arguments depends on the required number of arguments for the instruction.
 
+\subsection{Resetting}
+
+On reset, the program counter will be assigned the value contained in the reset vector, which is stored at memory location 0. All of the other registers are reset to their default value of 0. Program execution is then started.
+
+\subsection{The Stack}
+
+The stack pointer provides an offset from the stack pointer starting location. By default, this is at memory location 0x400. The stack pointer may grow up to a size of 0xC00, or 3072 items. If the stack pointer is ever popped such that its value would underflow 0 or would reach greater than the maximum allowed size, the processor will error and halt.
+
+%TODO - Interrupt Items
+
 \pagebreak
 
 \section{Available Instructions}
