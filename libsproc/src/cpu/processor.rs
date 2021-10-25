@@ -11,8 +11,8 @@ const VECTOR_RESET: usize = 0x0;
 //const VECTOR_HW_HJW: usize = 0x2;
 
 // Define the stack pointer offset and allowed size
-const STACK_POINTER_OFFSET: usize = 0x800;
-const STACK_POINTER_MAX_SIZE: usize = 0x800;
+const STACK_POINTER_OFFSET: usize = 0x400;
+const STACK_POINTER_MAX_SIZE: usize = 0xC00;
 
 
 /// Creates the Solarium CPU parameters
