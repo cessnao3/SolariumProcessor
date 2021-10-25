@@ -20,10 +20,8 @@ pub fn run_scpu_thread(
 
     let mut cpu_stat = ProcessorStatusStruct::new();
 
-    loop
+    'main_loop: loop
     {
-        let mut thread_error = false;
-
         for _ in 0..1000
         {
             match gui_to_thread_rx.try_recv()
@@ -60,16 +58,10 @@ pub fn run_scpu_thread(
                 },
                 Err(mpsc::TryRecvError::Disconnected) =>
                 {
-                    thread_error = true;
-                    break;
+                    break 'main_loop;
                 },
                 Err(mpsc::TryRecvError::Empty) => break
             };
-        }
-
-        if thread_error
-        {
-            break;
         }
 
         if step_cpu
