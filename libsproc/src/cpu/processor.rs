@@ -57,10 +57,16 @@ impl SolariumProcessor
     /// Sofr-resets only the registers, but leaves the memory values intact
     pub fn soft_reset(&mut self)
     {
+        let reset_loc = match self.memory_map.get(VECTOR_RESET)
+        {
+            Ok(v) => v,
+            Err(_) => MemoryWord::new(0)
+        };
+
         self.registers.reset();
         self.registers.set(
             Register::ProgramCounter,
-            MemoryWord::new(VECTOR_RESET as u16));
+            reset_loc);
     }
 
     /// Obtains the current value of a register

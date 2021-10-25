@@ -60,7 +60,7 @@ impl FromStr for MemoryWord
 }
 
 /// Provides a CPU error code
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum SolariumError
 {
     None,

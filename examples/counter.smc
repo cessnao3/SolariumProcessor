@@ -1,3 +1,10 @@
+// Define the reset vector location
+.loadloc start
+
+// Define the starting location
+.oper 0x4000
+:start
+
 // Setup the counter variables
 ldi 2, 1
 ldi 3, 0

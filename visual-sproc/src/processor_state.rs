@@ -33,7 +33,7 @@ impl ProcessorStatusStruct
 
         stat.cpu.memory_map.add_segment(Box::new(ReadWriteSegment::new(
             0,
-            (2usize).pow(16))));
+            (2usize).pow(u16::BITS))));
 
         stat.reset();
 
@@ -43,7 +43,6 @@ impl ProcessorStatusStruct
     pub fn reset(&mut self)
     {
         self.cpu.reset();
-        self.update_regs();
 
         for (i, val) in self.last_assembly.iter().enumerate()
         {
@@ -53,6 +52,9 @@ impl ProcessorStatusStruct
                 Err(_) => panic!("memory not large enough for provided assembly")
             };
         }
+
+        self.cpu.soft_reset();
+        self.update_regs();
     }
 
     pub fn step(&mut self)
@@ -89,11 +91,12 @@ impl ProcessorStatusStruct
     pub fn load_data(&mut self, data: Vec::<MemoryWord>)
     {
         self.last_assembly = data;
-        self.reset();
 
         self.msg_queue.push(GuiMessage::LogMessage(format!(
             "loaded assembly code with length {0:}",
             self.last_assembly.len())));
+
+        self.reset();
     }
 
     pub fn update_msg_queue(&mut self)

@@ -15,7 +15,8 @@ const MAX_ADDRESSABLE_VALUE: usize = (2usize).pow(16);
 enum LineValue
 {
     Assembly(LineInformation),
-    Load(u16)
+    Load(u16),
+    LoadLabelLoc(usize, String)
 }
 
 struct LineInformation
@@ -184,6 +185,24 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
                     LineValue::Load(value_to_load));
                 current_data_index += 1;
             }
+            else if command_type == "loadloc"
+            {
+                if args.len() != 1
+                {
+                    return Err(format!("line {0:} command {1:} only takes 1 argument", i, command_type));
+                }
+
+                let arg_label = match &args[0]
+                {
+                    Argument::Label(label) => label.clone(),
+                    _ => return Err(format!("line {0:} command {1:} may only take a label input", i, command))
+                };
+
+                data_map.insert(
+                    current_data_index,
+                    LineValue::LoadLabelLoc(i, arg_label));
+                current_data_index += 1;
+            }
             else
             {
                 return Err(format!("line {0:} invalid command \"{1:}\" found", i, command_type));
@@ -272,6 +291,14 @@ pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
                 };
 
                 inst_data.combine()
+            },
+            LineValue::LoadLabelLoc(line_number, label) =>
+            {
+                match label_map.get(&label)
+                {
+                    Some(v) => *v as u16,
+                    None => return Err(format!("line {0:} no label {1:} provided", line_number, label))
+                }
             },
             LineValue::Load(data) =>
             {
