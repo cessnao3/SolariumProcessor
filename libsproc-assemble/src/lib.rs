@@ -74,7 +74,7 @@ impl LineInformation
 }
 
 
-pub fn assemble(lines: Vec<String>) -> Result<Vec<u16>, String>
+pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
 {
     let mut data_map = HashMap::<usize, LineValue>::new();
     let mut current_data_index = 0usize;
@@ -315,10 +315,11 @@ mod tests {
     use super::assemble;
 
     #[test]
-    fn basic_test() {
-        let line_test: Vec<String> = vec![
-            "ld 0, 0".to_string(),
-            "popr 3".to_string()
+    fn basic_test()
+    {
+        let line_test = vec![
+            "ld 0, 0",
+            "popr 3"
         ];
 
         let assemble_result = assemble(line_test);
@@ -330,5 +331,212 @@ mod tests {
         assert!(assemble_ok.len() == 2);
         assert!(assemble_ok[0] == 0x200);
         assert!(assemble_ok[1] == 0x43);
+    }
+
+    #[test]
+    fn test_noop()
+    {
+        let line_test = vec![
+            "noop",
+            "noop"
+        ];
+
+        let binary_result = assemble(line_test);
+
+        assert!(binary_result.is_ok());
+
+        let binary = binary_result.unwrap();
+
+        assert!(binary.len() == 2);
+        assert!(binary[0] == 0);
+        assert!(binary[1] == 0);
+    }
+
+    #[test]
+    fn test_inton()
+    {
+        let line_test = vec![
+            "inton",
+        ];
+
+        let binary_result = assemble(line_test);
+
+        assert!(binary_result.is_ok());
+
+        let binary = binary_result.unwrap();
+
+        assert!(binary.len() == 1);
+        assert!(binary[0] == 1);
+    }
+
+    #[test]
+    fn test_intoff()
+    {
+        let line_test = vec![
+            "intoff",
+        ];
+
+        let binary_result = assemble(line_test);
+
+        assert!(binary_result.is_ok());
+
+        let binary = binary_result.unwrap();
+
+        assert!(binary.len() == 1);
+        assert!(binary[0] == 2);
+    }
+
+    #[test]
+    fn test_reset()
+    {
+        let line_test = vec![
+            "reset",
+        ];
+
+        let binary_result = assemble(line_test);
+
+        assert!(binary_result.is_ok());
+
+        let binary = binary_result.unwrap();
+
+        assert!(binary.len() == 1);
+        assert!(binary[0] == 3);
+    }
+
+    #[test]
+    fn test_pop()
+    {
+        let line_test = vec![
+            "pop",
+        ];
+
+        let binary_result = assemble(line_test);
+
+        assert!(binary_result.is_ok());
+
+        let binary = binary_result.unwrap();
+
+        assert!(binary.len() == 1);
+        assert!(binary[0] == 4);
+    }
+
+    #[test]
+    fn test_ret()
+    {
+        let line_test = vec![
+            "ret",
+        ];
+
+        let binary_result = assemble(line_test);
+
+        assert!(binary_result.is_ok());
+
+        let binary = binary_result.unwrap();
+
+        assert!(binary.len() == 1);
+        assert!(binary[0] == 5);
+    }
+
+    #[test]
+    fn test_all_no_args()
+    {
+        let line_test = vec![
+            "noop",
+            "inton",
+            "intoff",
+            "reset",
+            "pop",
+            "ret"
+        ];
+
+        let binary_result = assemble(line_test);
+
+        assert!(binary_result.is_ok());
+
+        let binary = binary_result.unwrap();
+
+        assert!(binary.len() == 6);
+        assert!(binary[0] == 0);
+        assert!(binary[1] == 1);
+        assert!(binary[2] == 2);
+        assert!(binary[3] == 3);
+        assert!(binary[4] == 4);
+        assert!(binary[5] == 5);
+    }
+
+    #[test]
+    fn test_single_arg_register_val()
+    {
+        // Define the arguments to test
+        let args_to_test = vec![
+            ("jmp", 1),
+            ("jmpr", 2),
+            ("push", 3),
+            ("popr", 4),
+            ("call", 5),
+            ("int", 6)
+        ];
+
+        for (arg, opcode) in args_to_test
+        {
+            assert!(opcode & 0xF == opcode);
+
+            for reg in 0..16
+            {
+                assert!(reg & 0xF == reg);
+
+                let assembly_text = vec![
+                    format!("{0:} {1:}", arg, reg),
+                    format!("{0:} {1:#X}", arg, reg),
+                    format!("{0:} {1:#x}", arg, reg)
+                ];
+
+                let expected_result = ((opcode << 4) | reg) as u16;
+
+                let binary_result = assemble(assembly_text.iter().map(|s| s.as_ref()).collect());
+
+                assert!(binary_result.is_ok());
+
+                let binary = binary_result.unwrap();
+
+                assert!(binary.len() == 3);
+                for bin_val in binary
+                {
+                    assert!(bin_val == expected_result);
+                }
+            }
+        }
+
+        assert!(true);
+    }
+
+    #[test]
+    fn test_jmpri()
+    {
+        let opcode = 1u16;
+
+        for i in 0..=u8::MAX
+        {
+            let expected_result = (opcode << 8) | i as u16;
+
+            let code = vec![
+                format!("jmpri {0:}", i),
+                format!("jmpri {0:#X}", i),
+                format!("jmpri {0:#x}", i),
+                format!("jmpri {0:}", i as i8)
+            ];
+
+            let binary_result = assemble(code.iter().map(|v| v.as_ref()).collect());
+
+            assert!(binary_result.is_ok());
+
+            let binary = binary_result.unwrap();
+
+            assert!(binary.len() == 4);
+            for bin_val in binary
+            {
+                assert!(bin_val == expected_result);
+            }
+        }
     }
 }

@@ -220,7 +220,8 @@ pub fn setup_and_run_app(
                     {
                         Some(v) =>
                         {
-                            let lines = v.text().split('\n').map(|v| v.to_string()).collect();
+                            let assembly_text = v.text();
+                            let lines = assembly_text.split('\n').map(|v| v).collect();
                             let assembled_binary = assemble(lines);
 
                             match assembled_binary

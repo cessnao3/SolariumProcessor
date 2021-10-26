@@ -5,9 +5,9 @@ use lazy_static::lazy_static;
 
 // Argument type static values
 static REGISTER_ARG_RESTR: &str = r"(\$[\w]+)";
-static LABEL_ARG_RESTR: &str = r"([a-z][a-z0-9_]+)";
+static LABEL_ARG_RESTR: &str = r"([a-z][a-z0-9_A-Z]+)";
 static NUMBER_ARG_RESTR: &str = r"([\-|+]?[\d]+)";
-static HEX_ARG_RESTR: &str = r"(0x[a-f0-9]{1,4})";
+static HEX_ARG_RESTR: &str = r"(0x[a-f0-9A-Z]{1,4})";
 
 // Define argument splitting values
 static ARGUMENT_SPLIT_STR: &str = r"(,\s*)";
