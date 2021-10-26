@@ -100,7 +100,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			0 & 0 & 4 & R[a] & \texttt{popr [a]} & \texttt{R[a] = mem[--SP]} \\
 			0 & 0 & 5 & R[a] & \texttt{call [a]} & $\forall_{i \in [0 \rightarrow 15]}$
 			 \texttt{mem[SP++] = R[i]}, \texttt{PC = R[a]} \\
- 			0 & 0 & 6 & [a] & \texttt{int R[a]} & Trigger the Software Interrupt within \texttt{R[a]} \\
+ 			0 & 0 & 6 & R[a] & \texttt{int [a]} & Trigger the Software Interrupt within \texttt{R[a]} \\
 			0 & 1 & 0xI0 & 0x0I & \texttt{jmpri <imm>} & \texttt{PC += Im} \\
 			0 & 2 & R[src] & R[dst] & \texttt{ld [dst], [src]} & \texttt{R[dst] = mem[R[src]]} \\
 			0 & 3 & R[src] & R[dst] & \texttt{sav [dst], [src]} & \texttt{mem[R[dst]] = R[src]} \\
