@@ -71,7 +71,7 @@ On reset, the program counter will be assigned the value contained in the reset 
 
 \subsection{The Stack}
 
-The stack pointer provides an offset from the stack pointer starting location. By default, this is at memory location 0x400. The stack pointer may grow up to a size of 0xC00, or 3072 items. If the stack pointer is ever popped such that its value would underflow 0 or would reach greater than the maximum allowed size, the processor will error and halt.
+The stack pointer provides an offset from the stack pointer starting location. By default, this is at memory location 0x400. The stack pointer may grow up to a size of 0xC00, or 3072, items. If the stack pointer is ever popped such that its value would underflow 0 or would reach greater than the maximum allowed size, the processor will error and halt.
 
 %TODO - Interrupt Items
 
@@ -86,7 +86,8 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 	\begin{footnotesize}
 		\begin{tabular}{cccc|c|l}
 			\hline
-			opcode & arg0 & arg1 & arg2 & Assembly & Description \\
+			\multicolumn{4}{c|}{Instruction Word} & Assembly & Description \\
+			opcode & arg0 & arg1 & arg2 & & \\
 			\hline
 			0 & 0 & 0 & 0 & \texttt{noop} & No Operation \\
 			0 & 0 & 0 & 1 & \texttt{inton} & Turn Interrupts On \\
@@ -128,6 +129,26 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 	\end{footnotesize}
 	\caption{Available instruction list for the SProc provides a variety of commands.}
 	\label{table:instruction-table}
+\end{table}
+
+The assembler also has several commands available, detailed in Table \ref{table:assembler-commands}.
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{l|l}
+		\hline
+		Command & Description \\
+		\hline
+		\texttt{:[label]} & Defines a new label associated with the current memory location \\
+		\texttt{.oper [offset]} & Changes the current assembly offset to the value provided \\
+		\texttt{.load [num]} & Loads the data value as either an unsigned word (if in hex or positive)\\
+		& or as a signed word (if negative) in the current memory location \\
+		\texttt{.loadloc [label]} & Loads the data index associated with the provided label into \\
+		& the current memory location \\
+		\hline
+	\end{tabular}
+	\caption{Available assembler commands}
+	\label{table:assembler-commands}
 \end{table}
 
 \pagebreak
