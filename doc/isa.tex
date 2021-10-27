@@ -77,7 +77,7 @@ The stack pointer provides an offset from the stack pointer starting location. B
 
 \pagebreak
 
-\section{Available Instructions}
+\section{Instructions and Assembly Code}
 
 All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor.
 
@@ -151,6 +151,23 @@ The assembler also has several commands available, detailed in Table \ref{table:
 	\label{table:assembler-commands}
 \end{table}
 
+Reference names are available to link to the special register values, as listed in Table \ref{table:assembler-register-references}.
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{l|cl}
+		\hline
+		Reference Name & Register & Description \\
+		\hline
+		\texttt{\$pc} & 0 & Program Counter \\
+		\texttt{\$sp} & 1 & Stack Pointer \\
+		\texttt{\$ret} & 2 & Return Value \\
+		\hline
+	\end{tabular}
+	\caption{Assembler provides shortcuts for commonly-referenced register indices}
+	\label{table:assembler-register-references}
+\end{table}
+
 \pagebreak
 
 \section{Examples}
@@ -161,7 +178,11 @@ The following list some simple example programs that can be run on the SProc.
 
 The program listed in Listing \ref{listing:example-counter} provides a basic counter. A target value is placed in register four, and the value in register three is incremented from 0 to the target value in register four by adding one to the register each loop. Once the target value has been reached and register three is equal to register four, the program halts by entering an infinite loop.
 
-\lstinputlisting[caption={Counter Program Example}, label={listing:example-counter}]{../examples/counter.smc}
+\lstinputlisting[caption={Limited counter program}, label={listing:example-counter}]{../examples/counter.smc}
+
+Another simple program is provided in Listing \ref{listing:example-infinite-counter}. This program makes use of some additional functionality, including the use of the register reference names, to test register reset functionality. It also modifies the program counter outside of the standard jump command.
+
+\lstinputlisting[caption={Infinite counter program with register reference names}, label={listing:example-infinite-counter}]{../examples/infinite_counter.smc}
 
 \pagebreak
 
