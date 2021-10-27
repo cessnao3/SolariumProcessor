@@ -314,6 +314,8 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
 mod tests {
     use super::assemble;
 
+    const NUM_REGISTERS: usize = 16;
+
     #[test]
     fn basic_test()
     {
@@ -353,115 +355,28 @@ mod tests {
     }
 
     #[test]
-    fn test_inton()
-    {
-        let line_test = vec![
-            "inton",
-        ];
-
-        let binary_result = assemble(line_test);
-
-        assert!(binary_result.is_ok());
-
-        let binary = binary_result.unwrap();
-
-        assert!(binary.len() == 1);
-        assert!(binary[0] == 1);
-    }
-
-    #[test]
-    fn test_intoff()
-    {
-        let line_test = vec![
-            "intoff",
-        ];
-
-        let binary_result = assemble(line_test);
-
-        assert!(binary_result.is_ok());
-
-        let binary = binary_result.unwrap();
-
-        assert!(binary.len() == 1);
-        assert!(binary[0] == 2);
-    }
-
-    #[test]
-    fn test_reset()
-    {
-        let line_test = vec![
-            "reset",
-        ];
-
-        let binary_result = assemble(line_test);
-
-        assert!(binary_result.is_ok());
-
-        let binary = binary_result.unwrap();
-
-        assert!(binary.len() == 1);
-        assert!(binary[0] == 3);
-    }
-
-    #[test]
-    fn test_pop()
-    {
-        let line_test = vec![
-            "pop",
-        ];
-
-        let binary_result = assemble(line_test);
-
-        assert!(binary_result.is_ok());
-
-        let binary = binary_result.unwrap();
-
-        assert!(binary.len() == 1);
-        assert!(binary[0] == 4);
-    }
-
-    #[test]
-    fn test_ret()
-    {
-        let line_test = vec![
-            "ret",
-        ];
-
-        let binary_result = assemble(line_test);
-
-        assert!(binary_result.is_ok());
-
-        let binary = binary_result.unwrap();
-
-        assert!(binary.len() == 1);
-        assert!(binary[0] == 5);
-    }
-
-    #[test]
     fn test_all_no_args()
     {
         let line_test = vec![
-            "noop",
-            "inton",
-            "intoff",
-            "reset",
-            "pop",
-            "ret"
+            ("noop", 0),
+            ("inton", 1),
+            ("intoff", 2),
+            ("reset", 3),
+            ("pop", 4),
+            ("ret", 5)
         ];
 
-        let binary_result = assemble(line_test);
+        let binary_result = assemble(line_test.iter().map(|v| v.0).collect());
 
         assert!(binary_result.is_ok());
 
         let binary = binary_result.unwrap();
 
-        assert!(binary.len() == 6);
-        assert!(binary[0] == 0);
-        assert!(binary[1] == 1);
-        assert!(binary[2] == 2);
-        assert!(binary[3] == 3);
-        assert!(binary[4] == 4);
-        assert!(binary[5] == 5);
+        assert!(binary.len() == line_test.len());
+        for (i, (_, opcode)) in line_test.iter().enumerate()
+        {
+            assert!(binary[i] == *opcode);
+        }
     }
 
     #[test]
@@ -481,7 +396,7 @@ mod tests {
         {
             assert!(opcode & 0xF == opcode);
 
-            for reg in 0..16
+            for reg in 0..NUM_REGISTERS
             {
                 assert!(reg & 0xF == reg);
 
@@ -499,15 +414,13 @@ mod tests {
 
                 let binary = binary_result.unwrap();
 
-                assert!(binary.len() == 3);
+                assert!(binary.len() == assembly_text.len());
                 for bin_val in binary
                 {
                     assert!(bin_val == expected_result);
                 }
             }
         }
-
-        assert!(true);
     }
 
     #[test]
@@ -532,10 +445,159 @@ mod tests {
 
             let binary = binary_result.unwrap();
 
-            assert!(binary.len() == 4);
+            assert!(binary.len() == code.len());
             for bin_val in binary
             {
                 assert!(bin_val == expected_result);
+            }
+        }
+    }
+
+    #[test]
+    fn test_double_arg_register_val()
+    {
+        // Define the arguments to test
+        let args_to_test = vec![
+            ("ld", 2),
+            ("sav", 3),
+            ("ldr", 4),
+            ("savr", 5),
+            ("jz", 6),
+            ("jzr", 7),
+            ("jgz", 8),
+            ("jgzr", 9)
+        ];
+
+        for (arg, opcode) in args_to_test
+        {
+            assert!(opcode & 0xF == opcode);
+
+            for reg1 in 0..NUM_REGISTERS
+            {
+                assert!(reg1 & 0xF == reg1);
+
+                for reg2 in 0..NUM_REGISTERS
+                {
+                    assert!(reg2 & 0xF == reg2);
+
+                    let assembly_text = vec![
+                        format!("{0:} {1:}, {2:}", arg, reg1, reg2),
+                        format!("{0:} {1:#x}, {2:#X}", arg, reg1, reg2)
+                    ];
+
+                    let expected_result = (opcode << 8) | ((reg2 as u16) << 4) | (reg1 as u16);
+
+                    let binary_result = assemble(assembly_text.iter().map(|s| s.as_ref()).collect());
+
+                    assert!(binary_result.is_ok());
+
+                    let binary = binary_result.unwrap();
+
+                    assert!(binary.len() == assembly_text.len());
+                    for bin_val in binary
+                    {
+                        assert!(bin_val == expected_result);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_triple_arg_register_val()
+    {
+        // Define the arguments to test
+        let args_to_test = vec![
+            ("add", 4),
+            ("sub", 5),
+            ("mul", 6),
+            ("div", 7),
+            ("mod", 8),
+            ("band", 9),
+            ("bor", 10),
+            ("bxor", 11),
+            ("bsftl", 12),
+            ("bsftr", 13)
+        ];
+
+        for (arg, opcode) in args_to_test
+        {
+            assert!(opcode & 0xF == opcode);
+
+            for reg1 in 0..NUM_REGISTERS
+            {
+                assert!(reg1 & 0xF == reg1);
+
+                for reg2 in 0..NUM_REGISTERS
+                {
+                    assert!(reg2 & 0xF == reg2);
+
+                    for reg3 in 0..NUM_REGISTERS
+                    {
+                        let assembly_text = vec![
+                            format!("{0:} {1:}, {2:}, {3:}", arg, reg1, reg2, reg3),
+                            format!("{0:} {1:#x}, {2:#X}, {3:}", arg, reg1, reg2, reg3)
+                        ];
+
+                        let expected_result = (opcode << 12) | ((reg3 as u16) << 8) | ((reg2 as u16) << 4) | (reg1 as u16);
+
+                        let binary_result = assemble(assembly_text.iter().map(|s| s.as_ref()).collect());
+
+                        assert!(binary_result.is_ok());
+
+                        let binary = binary_result.unwrap();
+
+                        assert!(binary.len() == assembly_text.len());
+                        for bin_val in binary
+                        {
+                            assert!(bin_val == expected_result);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_ld_immediate()
+    {
+        let instruction_vals = vec![
+            ("ldi", 1),
+            ("ldui", 2),
+            ("ldir", 3)
+        ];
+
+        for (instruction, opcode) in instruction_vals
+        {
+            assert!(opcode & 0xF == opcode);
+
+            for reg in 0..NUM_REGISTERS
+            {
+                assert!(reg & 0xF == reg);
+
+                for immediate_val in 0..=u8::MAX
+                {
+                    let expected_result = (opcode << 12) | ((immediate_val as u16) << 4) | (reg as u16);
+
+                    let code = vec![
+                        format!("{0:} {1:}, {2:}", instruction, reg, immediate_val),
+                        format!("{0:} {1:#X}, {2:#X}", instruction, reg, immediate_val),
+                        format!("{0:} {1:#x}, {2:#x}", instruction, reg, immediate_val),
+                        format!("{0:} {1:}, {2:}", instruction, reg, immediate_val as i8)
+                    ];
+
+                    let binary_result = assemble(code.iter().map(|v| v.as_ref()).collect());
+
+                    assert!(binary_result.is_ok());
+
+                    let binary = binary_result.unwrap();
+
+                    assert!(binary.len() == code.len());
+                    for bin_val in binary
+                    {
+                        assert!(bin_val == expected_result);
+                    }
+                }
             }
         }
     }
