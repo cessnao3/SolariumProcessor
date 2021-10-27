@@ -1,0 +1,25 @@
+; Define the starting location
+.loadloc start
+
+; Move to the starting location
+.oper 0x20
+:start
+
+:register_reset
+ldir 5, addloc
+add $pc, $pc, 5
+reset
+ldi $sp, 22
+ldi $ret, 33
+
+; Load initial values
+ldi 6, 1
+ldi 7, 0
+
+:loop ; define the main loop
+add 7, 7, 6
+jmpri loop
+
+; define the addition value
+:addloc
+.load 1
