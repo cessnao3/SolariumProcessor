@@ -312,6 +312,8 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::assemble;
 
     const NUM_REGISTERS: usize = 16;
@@ -599,6 +601,79 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_infinite_counter_program()
+    {
+        // Define the assembly code
+        let assembly_lines = vec![
+            "; Define the starting location",
+            ".loadloc start",
+            "",
+            "; Move to the starting location",
+            ".oper 0x20",
+            ":start",
+            "",
+            ":register_reset",
+            "ldir 5, addloc",
+            "add $pc, $pc, 5",
+            "reset",
+            "ldi $sp, 22",
+            "ldi $ret, 33",
+            "",
+            "; Load initial values",
+            "ldi 6, 1",
+            "ldi 7, 0",
+            "",
+            ":loop ; define the main loop",
+            "add 7, 7, 6",
+            "jmpri loop",
+            "",
+            "; define the addition value",
+            ":addloc",
+            ".load 1"
+        ];
+
+        // Determine the expected values
+        let mut expected_result = HashMap::<usize, u16>::new();
+        expected_result.insert(0, 0x20);
+        expected_result.insert(0x20, 0x3095);
+        expected_result.insert(0x21, 0x4500);
+        expected_result.insert(0x22, 0x3);
+        expected_result.insert(0x23, 0x1161);
+        expected_result.insert(0x24, 0x1212);
+        expected_result.insert(0x25, 0x1016);
+        expected_result.insert(0x26, 0x1007);
+        expected_result.insert(0x27, 0x4677);
+        expected_result.insert(0x28, 0x1FF);
+        expected_result.insert(0x29, 1);
+
+        // Assemble the program
+        let binary_result = assemble(assembly_lines);
+        assert!(binary_result.is_ok());
+        let binary = binary_result.unwrap();
+
+        // Check assembled size
+        let expected_size = match expected_result.keys().max()
+        {
+            Some(v) => *v + 1,
+            None => 0
+        };
+
+        assert!(binary.len() == expected_size);
+
+        // Check assembled values
+        for (index, word) in binary.iter().enumerate()
+        {
+            let resulting_val = match expected_result.get(&index)
+            {
+                Some(v) => *v,
+                None => 0
+            };
+
+            assert!(resulting_val == *word)
         }
     }
 }
