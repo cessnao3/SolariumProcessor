@@ -1,34 +1,34 @@
-// Define the reset vector location
+; Define the reset vector location
 .loadloc start
 
-// Define the starting location
+; Define the starting location
 .oper 0x4000
 :start
 
-// Setup the counter variables
+; Setup the counter variables
 ldi 2, 1
 ldi 3, 0
 
-// Setup the target value
+; Setup the target value
 jmpri load_data
 
 :target_value
-.load 32767 // 0x7FFF
+.load 32767 ; 0x7FFF
 
 :load_data
 ldir 4, target_value
 
-// Load the default jump command
+; Load the default jump command
 ldi 14, -2
 
-// Perform the addition and check for reaching the target
+; Perform the addition and check for reaching the target
 add 3, 2, 3
 sub 5, 4, 3
 
-// Jump back to the add instruction if the
-// target minus current is greater than zero
+; Jump back to the add instruction if the
+; target minus current is greater than zero
 jgzr 14, 5
 
-// Otherwise, enter an infinite loop as program completion
+; Otherwise, enter an infinite loop as program completion
 :endloc
 jmpri endloc

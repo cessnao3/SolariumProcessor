@@ -85,8 +85,8 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
 
     for (i, l_in) in lines.iter().enumerate()
     {
-        // Cleanup the resulting string value
-        let l: &str = match l_in.find("//")
+        // Cleanup the resulting string value and remove comments
+        let l: &str = match l_in.find(";")
         {
             Some(len) => &l_in[..len],
             None => l_in
