@@ -676,4 +676,49 @@ mod tests {
             assert!(resulting_val == *word)
         }
     }
+
+    #[test]
+    fn test_register_shortcuts()
+    {
+        // Define the arguments to test
+        let args_to_test = vec![
+            ("push", 3)
+        ];
+
+        // Define the shortcuts to test
+        let reg_shortcuts = vec![
+            ("$pc", 0),
+            ("$sp", 1),
+            ("$ret", 2)
+        ];
+
+        // Iterate over selected values
+        for (arg, opcode) in args_to_test
+        {
+            assert!(opcode & 0xF == opcode);
+
+            for (shortcut, reg) in &reg_shortcuts
+            {
+                assert!(*reg & 0xF == *reg);
+
+                let assembly_text = vec![
+                    format!("{0:} {1:}", arg, shortcut),
+                ];
+
+                let expected_result = ((opcode as u16) << 4) | *reg;
+
+                let binary_result = assemble(assembly_text.iter().map(|s| s.as_ref()).collect());
+
+                assert!(binary_result.is_ok());
+
+                let binary = binary_result.unwrap();
+
+                assert!(binary.len() == assembly_text.len());
+                for bin_val in binary
+                {
+                    assert!(bin_val == expected_result);
+                }
+            }
+        }
+    }
 }
