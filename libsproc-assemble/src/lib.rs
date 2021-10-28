@@ -721,4 +721,73 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_invalid_arg_count()
+    {
+        let instructions_to_test = vec![
+            ("reset", 0),
+            ("jmp", 1),
+            ("jmpri", 1),
+            ("ldr", 2),
+            ("ldi", 2),
+            ("ldir", 2),
+            ("add", 3),
+            (".load", 1),
+            (".oper", 1)
+        ];
+
+        for (inst, arg_num) in instructions_to_test
+        {
+            for i in 0..5
+            {
+                let arg_vals = (0..i).map(|_| "0".to_string()).collect::<Vec<String>>().join(", ");
+                let line_val = format!("{0:} {1:}", inst.to_string(), arg_vals);
+
+                let lines = vec![
+                    line_val.trim()
+                ];
+
+                let assembly_result = assemble(lines);
+
+                if i == arg_num
+                {
+                    assert!(assembly_result.is_ok());
+                }
+                else
+                {
+                    assert!(assembly_result.is_err());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_invalid_lines()
+    {
+        let bad_lines = vec![
+            "asdf 45",
+            "ld 1",
+            "ld 1 2",
+            "sav 1 2",
+            "ld 0, 17",
+            "sav 20, 34",
+            "sav x1, 1",
+            "sav 0x11, 1",
+            ".super 1",
+            ".oper 0x11111",
+            ".loadloc asdf"
+        ];
+
+        for line in bad_lines
+        {
+            let new_lines = vec![
+                line
+            ];
+
+            let assembly_result = assemble(new_lines);
+
+            assert!(assembly_result.is_err());
+        }
+    }
 }
