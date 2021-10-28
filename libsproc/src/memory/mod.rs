@@ -1,13 +1,15 @@
 mod memory_map;
 mod segment_rw;
+mod segment_ro;
 
 use crate::common::{MemoryWord, SolariumError};
 
 pub use self::memory_map::MemoryMap as MemoryMap;
 pub use self::segment_rw::ReadWriteSegment as ReadWriteSegment;
+pub use self::segment_ro::ReadOnlySegment as ReadOnlySegment;
 
 /// Define the maximum possible size
-pub const MAX_SEGMENT_SIZE: usize = (2usize).pow(16);
+pub const MAX_SEGMENT_INDEX: usize = (2usize).pow(16);
 
 /// Provides a trait for memory segments to implement
 pub trait MemorySegment

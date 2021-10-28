@@ -3,31 +3,28 @@ use crate::common::{MemoryWord, SolariumError};
 use super::{MemorySegment, MAX_SEGMENT_INDEX};
 
 /// Provides a read-write memory segment type
-pub struct ReadWriteSegment
+pub struct ReadOnlySegment
 {
     base_address: usize,
-    top_address: usize,
+    top_address:usize,
     data: Vec<MemoryWord>,
 }
 
-impl ReadWriteSegment
+impl ReadOnlySegment
 {
     /// Defines a new memory segment with empty data, zero, in each memory location
     pub fn new(
         base_address: usize,
-        size: usize) -> ReadWriteSegment
+        data: Vec<MemoryWord>) -> ReadOnlySegment
     {
         // Define the top address and ensure that the memory address is valid
-        let top_address = base_address + size;
+        let top_address = base_address + data.len();
 
         assert!(top_address >= base_address);
         assert!(top_address <= MAX_SEGMENT_INDEX);
 
-        // Define the initial data array
-        let data: Vec::<MemoryWord> = (0..size).map(|_| MemoryWord::new(0)).collect();
-
         // Create the memory segment
-        return ReadWriteSegment
+        return ReadOnlySegment
         {
             base_address,
             top_address,
@@ -36,7 +33,7 @@ impl ReadWriteSegment
     }
 }
 
-impl MemorySegment for ReadWriteSegment
+impl MemorySegment for ReadOnlySegment
 {
     /// Provides the word at the requested memory location
     fn get(&self, ind: usize) -> Result<MemoryWord, SolariumError>
@@ -53,27 +50,15 @@ impl MemorySegment for ReadWriteSegment
 
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
-    fn set(&mut self, ind: usize, data: MemoryWord) -> Result<(), SolariumError>
+    fn set(&mut self, ind: usize, _: MemoryWord) -> Result<(), SolariumError>
     {
-        if self.within(ind)
-        {
-            self.data[ind - self.base_address] = data;
-            return Ok(());
-        }
-        else
-        {
-            return Err(SolariumError::InvalidMemoryAccess(ind));
-        }
+        return Err(SolariumError::InvalidMemoryWrite(ind));
     }
 
     /// Resets the memory segment
     fn reset(&mut self)
     {
-        // Reset all data values to 0 if not read only
-        for val in self.data.iter_mut()
-        {
-            val.set(0);
-        }
+        // Do Nothing
     }
 
     /// Provides the starting address of the memory segment
@@ -95,6 +80,7 @@ impl MemorySegment for ReadWriteSegment
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     // Pull in the super instance
@@ -117,7 +103,7 @@ mod tests {
         assert_eq!(mem.address_len(), size);
 
         // Iterate over memory items to check that the correct values are set
-        for i in 0..MAX_SEGMENT_INDEX
+        for i in 0..MAX_SEGMENT_SIZE
         {
             let is_within = i >= base && i < base + size;
             assert_eq!(mem.within(i), is_within);
@@ -135,7 +121,7 @@ mod tests {
     /// Test initialization with an invalid base and range values
     fn test_init_invalid_range()
     {
-        let base = MAX_SEGMENT_INDEX - 100;
+        let base = MAX_SEGMENT_SIZE - 100;
         let size = 1024;
         ReadWriteSegment::new(base, size);
     }
@@ -213,3 +199,4 @@ mod tests {
         }
     }
 }
+*/
