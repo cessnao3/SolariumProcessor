@@ -4,7 +4,8 @@ use crate::memory::MemoryMap;
 use super::registers::{Register, RegisterManager};
 
 /// Defines the reset vector location
-const VECTOR_RESET: usize = 0x0;
+const VECTOR_HARD_RESET: usize = 0x0;
+const VECTOR_SOFT_RESET: usize = 0x0;
 
 /// Defines the IRQ reset vector location
 //const VECTOR_IRQ_SW: usize = 0x1;
@@ -40,24 +41,18 @@ impl SolariumProcessor
         };
 
         // Initiate the reset
-        cpu.reset();
+        cpu.hard_reset();
 
         // Return the CPU
         return cpu;
     }
 
-    /// Resets the CPU to a known state as a hard-reset
-    pub fn reset(&mut self)
+    /// Provides common functionality between soft and hard reset vectors, while providing
+    /// the reset vector as an input to distinguish between the two. Additionally,
+    /// the interrupts will be set to allowed
+    fn inner_reset(&mut self, reset_vector: usize)
     {
-        self.soft_reset();
-        self.memory_map.reset();
-        self.allow_interrupts = true;
-    }
-
-    /// Sofr-resets only the registers, but leaves the memory values intact
-    pub fn soft_reset(&mut self)
-    {
-        let reset_loc = match self.memory_map.get(VECTOR_RESET)
+        let reset_loc = match self.memory_map.get(reset_vector)
         {
             Ok(v) => v,
             Err(_) => MemoryWord::new(0)
@@ -67,6 +62,21 @@ impl SolariumProcessor
         self.registers.set(
             Register::ProgramCounter,
             reset_loc);
+
+        self.allow_interrupts = true;
+    }
+
+    /// Resets the CPU and memory to a known state as a hard-reset
+    pub fn hard_reset(&mut self)
+    {
+        self.inner_reset(VECTOR_HARD_RESET);
+        self.memory_map.reset();
+    }
+
+    /// Sofr-resets only the registers, but leaves the memory values intact
+    pub fn soft_reset(&mut self)
+    {
+        self.inner_reset(VECTOR_SOFT_RESET);
     }
 
     /// Obtains the current value of a register
