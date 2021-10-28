@@ -96,8 +96,8 @@ impl MemorySegment for ReadWriteSegment
 }
 
 #[cfg(test)]
-mod tests {
-    // Pull in the super instance
+mod tests
+{
     use super::*;
     use super::super::MAX_SEGMENT_INDEX;
 

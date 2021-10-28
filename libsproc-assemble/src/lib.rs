@@ -311,7 +311,8 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
 }
 
 #[cfg(test)]
-mod tests {
+mod tests
+{
     use std::collections::HashMap;
 
     use super::assemble;
@@ -370,7 +371,7 @@ mod tests {
 
         let binary_result = assemble(line_test.iter().map(|v| v.0).collect());
 
-        assert!(binary_result.is_ok());
+        assert    !(binary_result.is_ok());
 
         let binary = binary_result.unwrap();
 

@@ -94,7 +94,8 @@ impl RegisterManager
 }
 
 #[cfg(test)]
-mod tests {
+mod tests
+{
     use super::*;
 
     /// Provide the register vector for available registers
