@@ -206,10 +206,20 @@ mod tests {
             assert_eq!(success.is_ok(), true);
         }
 
-        for i in 0..2048
+        for i in 0..MAX_SEGMENT_INDEX
         {
             let should_be_within = i >= base && i < (base + size);
             assert_eq!(mem.within(i), should_be_within);
+
+            let val = mem.get(i);
+            assert_eq!(val.is_ok(), should_be_within);
+            assert_eq!(val.is_err(), !should_be_within);
+
+            if val.is_ok()
+            {
+                let mem_val = val.unwrap();
+                assert_eq!(mem_val.get() as usize, i - base + 1);
+            }
         }
     }
 }

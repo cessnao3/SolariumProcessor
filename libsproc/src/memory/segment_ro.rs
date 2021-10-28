@@ -80,7 +80,6 @@ impl MemorySegment for ReadOnlySegment
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     // Pull in the super instance
@@ -96,14 +95,16 @@ mod tests {
         let size = 1024;
 
         // Create the segment
-        let mem = ReadWriteSegment::new(base, size);
+        let mem = ReadOnlySegment::new(
+            base,
+            (0..size).map(|_| MemoryWord::new(0)).collect());
 
         // Ensure that the expected values match
         assert_eq!(mem.start_address(), base);
         assert_eq!(mem.address_len(), size);
 
         // Iterate over memory items to check that the correct values are set
-        for i in 0..MAX_SEGMENT_SIZE
+        for i in 0..MAX_SEGMENT_INDEX
         {
             let is_within = i >= base && i < base + size;
             assert_eq!(mem.within(i), is_within);
@@ -121,20 +122,22 @@ mod tests {
     /// Test initialization with an invalid base and range values
     fn test_init_invalid_range()
     {
-        let base = MAX_SEGMENT_SIZE - 100;
+        let base = MAX_SEGMENT_INDEX - 100;
         let size = 1024;
-        ReadWriteSegment::new(base, size);
+        ReadOnlySegment::new(
+            base,
+            (0..size).map(|_| MemoryWord::new(0)).collect());
     }
 
     /// Provide a default memory segment for testing
-    fn get_default_test_segment() -> ReadWriteSegment
+    fn get_default_test_segment() -> ReadOnlySegment
     {
         let base = 256;
         let size = 1024;
 
-        return ReadWriteSegment::new(
+        return ReadOnlySegment::new(
             base,
-            size);
+            (0..size).map(|_| MemoryWord::new(0)).collect());
     }
 
     #[test]
@@ -184,19 +187,30 @@ mod tests {
         let base = 256;
         let size = 1024;
 
-        let mut mem = ReadWriteSegment::new(base, size);
+        let mut mem = ReadOnlySegment::new(
+            base,
+            (0..size).map(|i| MemoryWord::new((i + 1) as u16)).collect());
 
         for i in base..(base + size)
         {
             let success = mem.set(i, MemoryWord::new((i - base + 1) as u16));
-            assert_eq!(success.is_ok(), true);
+            assert_eq!(success.is_err(), true);
         }
 
-        for i in 0..2048
+        for i in 0..MAX_SEGMENT_INDEX
         {
             let should_be_within = i >= base && i < (base + size);
             assert_eq!(mem.within(i), should_be_within);
+
+            let val = mem.get(i);
+            assert_eq!(val.is_ok(), should_be_within);
+            assert_eq!(val.is_err(), !should_be_within);
+
+            if val.is_ok()
+            {
+                let mem_val = val.unwrap();
+                assert_eq!(mem_val.get() as usize, i - base + 1);
+            }
         }
     }
 }
-*/
