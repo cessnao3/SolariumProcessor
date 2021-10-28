@@ -40,10 +40,12 @@ impl ProcessorStatusStruct
     {
         self.cpu.memory_map.clear();
 
-        let reset_vec_data: Vec<MemoryWord> = (0..2)
+        const INIT_RO_LEN: usize = 2;
+
+        let reset_vec_data: Vec<MemoryWord> = (0..INIT_RO_LEN)
             .map(|i| if i < self.last_assembly.len() { self.last_assembly[i] } else { MemoryWord::new(0) })
             .collect();
-        assert!(reset_vec_data.len() == 2);
+        assert!(reset_vec_data.len() == INIT_RO_LEN);
 
         match self.cpu.memory_map.add_segment(Box::new(ReadOnlySegment::new(0, reset_vec_data)))
         {
@@ -60,7 +62,7 @@ impl ProcessorStatusStruct
 
         for (i, val) in self.last_assembly.iter().enumerate()
         {
-            if i < 2
+            if i < INIT_RO_LEN
             {
                 continue;
             }
