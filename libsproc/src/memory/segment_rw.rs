@@ -101,8 +101,8 @@ mod tests {
     use super::*;
     use super::super::MAX_SEGMENT_INDEX;
 
-    #[test]
     /// Test the initialization of the memory segment
+    #[test]
     fn test_init()
     {
         // Define the base and the size
@@ -130,9 +130,9 @@ mod tests {
         }
     }
 
+    /// Test initialization with an invalid base and range values
     #[test]
     #[should_panic]
-    /// Test initialization with an invalid base and range values
     fn test_init_invalid_range()
     {
         let base = MAX_SEGMENT_INDEX - 100;
@@ -151,8 +151,8 @@ mod tests {
             size);
     }
 
-    #[test]
     /// Test setting a memory location above the top address
+    #[test]
     fn test_panic_set_above()
     {
         let mut mem = get_default_test_segment();
@@ -162,8 +162,8 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
     /// Test getting a memory location above the top address
+    #[test]
     fn test_panic_get_above()
     {
         let mem = get_default_test_segment();
@@ -171,8 +171,8 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
     /// Test setting a memory location below the base address
+    #[test]
     fn test_panic_set_below()
     {
         let mut mem = get_default_test_segment();
@@ -182,8 +182,8 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
     /// Test getting a memory location below the base address
+    #[test]
     fn test_panic_get_below()
     {
         let mem = get_default_test_segment();
@@ -191,8 +191,8 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
     /// Test the initial base offset value
+    #[test]
     fn test_offset_base()
     {
         let base = 256;
