@@ -19,9 +19,9 @@ impl MemoryMap
         };
     }
 
-    /// Adds a new memory segment to the memory map
-    /// Returns true if the segment is able to be added
-    pub fn add_segment(&mut self, segment: Box<dyn MemorySegment>) -> bool
+    /// Adds a new memory segment to the memory map, returning an error
+    /// if it could not be added
+    pub fn add_segment(&mut self, segment: Box<dyn MemorySegment>) -> Result<(), String>
     {
         // Extract the start and ending indices
         let start_ind = segment.start_address();
@@ -30,7 +30,7 @@ impl MemoryMap
         // Ensure that the segment is valid
         if start_ind >= end_ind
         {
-            return false;
+            return Err(format!("segment starting index {0:} is >= ending index {1:}", start_ind, end_ind));
         }
 
         // Check that the new segment will fit within the provided other segments
@@ -39,18 +39,18 @@ impl MemoryMap
             let seg_start = seg.start_address();
             let seg_end = seg_start + seg.address_len();
 
-            let all_below = seg_start < start_ind && seg_end < start_ind;
-            let all_above = seg_start >= end_ind && seg_end >= end_ind;
+            let all_below = seg_start < start_ind && seg_end <= start_ind;
+            let all_above = seg_start >= end_ind && seg_end > end_ind;
 
-            if !all_below || !all_above
+            if !(all_above || all_below)
             {
-                return false;
+                return Err(format!("segment from [{0:}, {1:}) intersects with other segments", start_ind, end_ind));
             }
         }
 
         // Add the segment if all else passes
         self.memory_map.push(segment);
-        return true;
+        return Ok(());
     }
 
     /// Gets the value in memory for a particular location
