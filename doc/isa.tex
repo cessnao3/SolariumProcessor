@@ -67,11 +67,17 @@ where the number of arguments depends on the required number of arguments for th
 
 \subsection{Resetting}
 
-On reset, the program counter will be assigned the value contained in the reset vector, which is stored at memory location 0. All of the other registers are reset to their default value of 0. Program execution is then started.
+On a hard-reset, all registers will be reset to 0 and memory values will be reset to their default values. The data parameter in memory at the hard-reset vector, stored at memory location 0, will be used as the reset vector.
+
+On soft-reset, as called by the reset the program counter will be assigned the value contained in the soft-reset vector, which is stored at memory location 1. All of the other registers are reset to their default value of 0. Processor memory will be left unchanged and processor execution is then started.
+
+On any reset, interrupts will be allowed by default.
 
 \subsection{The Stack}
 
 The stack pointer provides an offset from the stack pointer starting location. By default, this is at memory location 0x400. The stack pointer may grow up to a size of 0xC00, or 3072, items. If the stack pointer is ever popped such that its value would underflow 0 or would reach greater than the maximum allowed size, the processor will error and halt.
+
+\subsection{Interrupts}
 
 %TODO - Interrupt Items
 
@@ -101,7 +107,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			0 & 0 & 4 & R[a] & \texttt{popr [a]} & \texttt{R[a] = mem[--SP]} \\
 			0 & 0 & 5 & R[a] & \texttt{call [a]} & $\forall_{i \in [0 \rightarrow 15]}$
 			 \texttt{mem[SP++] = R[i]}, \texttt{PC = R[a]} \\
- 			0 & 0 & 6 & R[a] & \texttt{int [a]} & Trigger the Software Interrupt within \texttt{R[a]} \\
+ 			0 & 0 & 6 & R[a] & \texttt{int <imm>} & Trigger the Software Interrupt within vector <imm> \\
 			0 & 1 & 0xI0 & 0x0I & \texttt{jmpri <imm>} & \texttt{PC += Im} \\
 			0 & 2 & R[src] & R[dst] & \texttt{ld [dst], [src]} & \texttt{R[dst] = mem[R[src]]} \\
 			0 & 3 & R[src] & R[dst] & \texttt{sav [dst], [src]} & \texttt{mem[R[dst]] = R[src]} \\
