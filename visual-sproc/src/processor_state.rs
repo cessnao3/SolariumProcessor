@@ -1,7 +1,7 @@
 use super::messages::GuiMessage;
 
 use libsproc::cpu::SolariumProcessor;
-use libsproc::memory::ReadWriteSegment;
+use libsproc::memory::{ReadWriteSegment, ReadOnlySegment, MAX_SEGMENT_INDEX};
 use libsproc::common::MemoryWord;
 
 
@@ -31,10 +31,6 @@ impl ProcessorStatusStruct
             msg_queue: Vec::new()
         };
 
-        stat.cpu.memory_map.add_segment(Box::new(ReadWriteSegment::new(
-            0,
-            (2usize).pow(u16::BITS))));
-
         stat.reset();
 
         return stat;
@@ -42,18 +38,41 @@ impl ProcessorStatusStruct
 
     pub fn reset(&mut self)
     {
-        self.cpu.reset();
+        self.cpu.memory_map.clear();
+
+        let reset_vec_data: Vec<MemoryWord> = (0..2)
+            .map(|i| if i < self.last_assembly.len() { self.last_assembly[i] } else { MemoryWord::new(0) })
+            .collect();
+        assert!(reset_vec_data.len() == 2);
+
+        match self.cpu.memory_map.add_segment(Box::new(ReadOnlySegment::new(0, reset_vec_data)))
+        {
+            Ok(()) => (),
+            Err(e) => panic!("{0:}", e)
+        };
+        match self.cpu.memory_map.add_segment(Box::new(ReadWriteSegment::new(2, MAX_SEGMENT_INDEX - 2)))
+        {
+            Ok(()) => (),
+            Err(e) => panic!("{0:}", e)
+        }
+
+        self.cpu.hard_reset();
 
         for (i, val) in self.last_assembly.iter().enumerate()
         {
+            if i < 2
+            {
+                continue;
+            }
+
             match self.cpu.memory_map.set(i, *val)
             {
                 Ok(()) => (),
-                Err(_) => panic!("memory not large enough for provided assembly")
+                Err(e) => panic!("error on memory set: {0:}", e.to_string())
             };
         }
 
-        self.cpu.soft_reset();
+        //self.cpu.soft_reset();
         self.update_regs();
     }
 
