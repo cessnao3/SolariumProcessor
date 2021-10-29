@@ -117,3 +117,205 @@ impl MemoryMap
         self.memory_map.clear();
     }
 }
+
+#[cfg(test)]
+mod tests
+{
+    use super::*;
+    use super::super::{ReadOnlySegment, ReadWriteSegment, MAX_SEGMENT_INDEX};
+
+    /// A simple initialization test
+    #[test]
+    fn init_memory_map()
+    {
+        // Initialize the map
+        let map = MemoryMap::new();
+
+        // Ensure that all memory values are invalid
+        for i in 0..MAX_SEGMENT_INDEX
+        {
+            assert!(map.get(i).is_err());
+        }
+    }
+
+    /// A single read-write test
+    #[test]
+    fn single_read_write()
+    {
+        // Define the memory size values
+        let base = 100;
+        let size = 512;
+
+        // Initialize the map
+        let mut map = MemoryMap::new();
+        let add_result = map.add_segment(Box::new(ReadWriteSegment::new(
+            base,
+            size)));
+
+        assert!(add_result.is_ok());
+
+        let set_val = 314;
+
+        // Iterate through and check if values are within the expected results
+        for i in 0..MAX_SEGMENT_INDEX
+        {
+            let segment_val = map.segment_for_index(i);
+
+            let get_result = map.get(i);
+
+            assert_eq!(get_result.is_ok(), segment_val.is_some());
+
+            let within_expected = i >= base && i < base + size;
+            if within_expected
+            {
+                assert!(segment_val.is_some());
+                assert!(get_result.unwrap().get() == 0);
+            }
+            else
+            {
+                assert!(segment_val.is_none());
+            }
+
+            let set_result = map.set(i, MemoryWord::new(set_val));
+
+            if within_expected
+            {
+                assert!(set_result.is_ok());
+            }
+            else
+            {
+                assert!(set_result.is_err());
+            }
+        }
+
+        // Iterate through and check if the set worked as expected
+        for i in 0..MAX_SEGMENT_INDEX
+        {
+            // Check the map value directly
+            let map_val = map.get(i);
+            if i >= base && i < base + size
+            {
+                assert!(map_val.is_ok());
+                assert!(map_val.unwrap().get() == set_val);
+            }
+            else
+            {
+                assert!(map_val.is_err());
+            }
+
+            // Check the immutable segment value
+            {
+                let index_segment = map.segment_for_index(i);
+
+                if index_segment.is_some()
+                {
+                    let seg_val = index_segment.unwrap().get(i);
+
+                    assert!(seg_val.is_ok());
+                    assert_eq!(seg_val.unwrap().get(), set_val);
+                }
+            }
+
+            // Check the mutable segment value
+            {
+                let index_segment = map.segment_for_index_mut(i);
+
+                if index_segment.is_some()
+                {
+                    let seg_val = index_segment.unwrap().get(i);
+
+                    assert!(seg_val.is_ok());
+                    assert_eq!(seg_val.unwrap().get(), set_val);
+                }
+            }
+        }
+    }
+
+    /// A single read-only test
+    #[test]
+    fn single_read_only()
+    {
+        // Define the memory size values
+        let base = 100;
+        let size = 512;
+
+        // Define the base update function
+        let calc_func = |i: usize| (i as u16) * 2;
+
+        // Initialize the map
+        let mut map = MemoryMap::new();
+        let add_result = map.add_segment(Box::new(ReadOnlySegment::new(
+            base,
+            (0..size).map(|i| MemoryWord::new(calc_func(i))).collect())));
+
+        assert!(add_result.is_ok());
+
+        let set_val = 314;
+
+        // Iterate through and check if values are within the expected results
+        for i in 0..MAX_SEGMENT_INDEX
+        {
+            let segment_val = map.segment_for_index(i);
+            let get_result = map.get(i);
+
+            assert_eq!(get_result.is_ok(), segment_val.is_some());
+
+            let within_expected = i >= base && i < base + size;
+            if within_expected
+            {
+                assert!(segment_val.is_some());
+                assert!(get_result.unwrap().get() == calc_func(i - base));
+            }
+            else
+            {
+                assert!(segment_val.is_none());
+            }
+
+            let set_result = map.set(i, MemoryWord::new(set_val));
+
+            assert!(set_result.is_err());
+        }
+
+        // Iterate through and check if the set worked as expected
+        for i in 0..MAX_SEGMENT_INDEX
+        {
+            // Check the map value directly
+            let map_val = map.get(i);
+            if i >= base && i < base + size
+            {
+                assert!(map_val.is_ok());
+                assert!(map_val.unwrap().get() == calc_func(i - base));
+            }
+            else
+            {
+                assert!(map_val.is_err());
+            }
+
+            // Check the immutable segment value
+            {
+                let index_segment = map.segment_for_index(i);
+
+                if index_segment.is_some()
+                {
+                    let seg_val = index_segment.unwrap().get(i);
+
+                    assert!(seg_val.is_ok());
+                    assert_eq!(seg_val.unwrap().get(), calc_func(i - base));
+                }
+            }
+
+            // Check the mutable segment value
+            {
+                let index_segment = map.segment_for_index_mut(i);
+
+                if index_segment.is_some()
+                {
+                    let seg_val = index_segment.unwrap().get(i);
+
+                    assert!(seg_val.is_ok());
+                    assert_eq!(seg_val.unwrap().get(), calc_func(i - base));
+                }
+            }
+        }
+    }
+}
