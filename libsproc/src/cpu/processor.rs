@@ -368,6 +368,10 @@ impl SolariumProcessor
                     {
                         return Err(SolariumError::InterruptsNotSupported);
                     },
+                    7 => // inti
+                    {
+                        return Err(SolariumError::InterruptsNotSupported);
+                    },
                     _ => // ERROR
                     {
                         return Err(SolariumError::InvalidInstruction(inst));

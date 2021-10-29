@@ -392,7 +392,8 @@ mod tests
             ("push", 3),
             ("popr", 4),
             ("call", 5),
-            ("int", 6)
+            ("int", 6),
+            ("inti", 7)
         ];
 
         for (arg, opcode) in args_to_test
