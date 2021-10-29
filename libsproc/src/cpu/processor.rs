@@ -5,7 +5,7 @@ use super::registers::{Register, RegisterManager};
 
 /// Defines the reset vector location
 const VECTOR_HARD_RESET: usize = 0x0;
-const VECTOR_SOFT_RESET: usize = 0x0;
+const VECTOR_SOFT_RESET: usize = 0x1;
 
 /// Defines the IRQ reset vector location
 //const VECTOR_IRQ_SW: usize = 0x1;
