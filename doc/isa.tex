@@ -6,17 +6,22 @@
 
 \usepackage{comment}
 
+\newcommand{\titlelogoimage}{
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=1in]{images/logo.eps}
+\end{figure}}
+
 %opening
 \title{SProc Instruction Set Architecture}
 \author{Ian O'Rourke}
-\date{\today}
+\date{\today \\ \titlelogoimage}
 
 \begin{document}
 
 \maketitle
 
 \section{Overview}
-
 
 SProc is a general-purpose Reduced Instruction Count (RISC) Instruction Set Architecture (ISA). Each program instruction is designed to take up exactly one word of memory. In this case, each word is 16-bits.
 
