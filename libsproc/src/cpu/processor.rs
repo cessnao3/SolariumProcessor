@@ -166,6 +166,16 @@ impl SolariumProcessor
         }
     }
 
+    /// Calls the interrupt at the provided interrupt vector if interrupts are enabled
+    fn call_interrupt(&self, interrupt_vector: usize)
+    {
+        if (self.allow_interrupts)
+        {
+            // Do something here1
+        }
+        panic!("Not Implemented!");
+    }
+
     /// Step the CPU
     pub fn step(&mut self) -> Result<(), SolariumError>
     {
