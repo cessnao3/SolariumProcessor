@@ -8,8 +8,10 @@ const VECTOR_HARD_RESET: usize = 0x0;
 const VECTOR_SOFT_RESET: usize = 0x1;
 
 /// Defines the IRQ reset vector location
-//const VECTOR_IRQ_SW: usize = 0x1;
-//const VECTOR_HW_HJW: usize = 0x2;
+const VECTOR_IRQ_SW_OFFSET: usize = 0x2;
+const VECTOR_IRQ_SW_NUM: usize = 16;
+//const VECTOR_HW_HJW_OFFSET: usize = 0x2 + VECTOR_IRQ_SW_NUM;
+//const VECTOR_HW_HJW_OFFSET: usize = 16;
 
 // Define the stack pointer offset and allowed size
 const STACK_POINTER_OFFSET: usize = 0x400;
@@ -167,13 +169,72 @@ impl SolariumProcessor
     }
 
     /// Calls the interrupt at the provided interrupt vector if interrupts are enabled
-    fn call_interrupt(&self, interrupt_vector: usize)
+    fn call_interrupt(&mut self, interrupt_vector: usize) -> Result<bool, SolariumError>
     {
-        if (self.allow_interrupts)
+        if self.allow_interrupts
         {
-            // Do something here1
+            // Push all register values to the stack
+            match self.push_all_registers()
+            {
+                Ok(()) => (),
+                Err(e) => return Err(e)
+            };
+
+            // Obtain the desired value from the program counter
+            let new_pc = match self.memory_map.get(interrupt_vector)
+            {
+                Ok(v) => v,
+                Err(e) => return Err(e)
+            };
+
+            // Update the program counter to the value in the interrupt vector
+            self.registers.set(
+                Register::ProgramCounter,
+                new_pc);
+
+            // Return true if the interrupt was called
+            return Ok(true);
         }
-        panic!("Not Implemented!");
+        else
+        {
+            // Return false if no interrupt was called
+            return Ok(false);
+        }
+    }
+
+    /// Pushes all register values onto the stack
+    fn push_all_registers(&mut self) -> Result<(), SolariumError>
+    {
+        // Push all the existing register values
+        for i in 0..Self::NUM_REGISTERS
+        {
+            match self.push_sp(self.registers.get(Register::GP(i)))
+            {
+                Ok(()) => (),
+                Err(e) => return Err(e)
+            };
+        }
+
+        return Ok(());
+    }
+
+    /// Pops all register values from the stack back into the register values
+    fn pop_all_registers(&mut self) -> Result<(), SolariumError>
+    {
+        for i in 0..Self::NUM_REGISTERS
+        {
+            let mem_val = match self.pop_sp()
+            {
+                Ok(v) => v,
+                Err(e) => return Err(e)
+            };
+
+            self.registers.set(
+                Register::GP(Self::NUM_REGISTERS - 1 - i),
+                mem_val);
+        }
+
+        return Ok(());
     }
 
     /// Step the CPU
@@ -355,15 +416,12 @@ impl SolariumProcessor
                     },
                     5 => // call
                     {
-                        // Push all the existing register values
-                        for i in 0..Self::NUM_REGISTERS
+                        // Push all registers to the stack
+                        match self.push_all_registers()
                         {
-                            match self.push_sp(self.registers.get(Register::GP(i)))
-                            {
-                                Ok(()) => (),
-                                Err(e) => return Err(e)
-                            };
-                        }
+                            Ok(()) => (),
+                            Err(e) => return Err(e)
+                        };
 
                         // Move to the new location
                         let new_loc = self.registers.get(dest_register);
@@ -374,13 +432,37 @@ impl SolariumProcessor
                         // Ensure that we run the first instruction at the new location
                         pc_incr = 0;
                     },
-                    6 => // int
+                    6 | 7 => // int, intr
                     {
-                        return Err(SolariumError::InterruptsNotSupported);
-                    },
-                    7 => // inti
-                    {
-                        return Err(SolariumError::InterruptsNotSupported);
+                        // Determine the interrupt vector value
+                        let int_offset = if arg1 == 6
+                        {
+                            dest_register.to_index()
+                        }
+                        else
+                        {
+                            self.registers.get(dest_register).get() as usize
+                        };
+
+                        // Return error if the interrupt offset is invalid
+                        if int_offset >= VECTOR_IRQ_SW_NUM
+                        {
+                            return Err(SolariumError::InvalidSoftwareInterrupt(int_offset))
+                        }
+
+                        // Obtain the interrupt vector value
+                        let interrupt_vector = match self.memory_map.get(int_offset + VECTOR_IRQ_SW_OFFSET)
+                        {
+                            Ok(v) => v.get() as usize,
+                            Err(e) => return Err(e)
+                        };
+
+                        // Otherwise, trigger interrupt
+                        match self.call_interrupt(interrupt_vector)
+                        {
+                            Ok(called) => if called { pc_incr = 0; },
+                            Err(e) => return Err(e)
+                        };
                     },
                     _ => // ERROR
                     {
@@ -427,24 +509,26 @@ impl SolariumProcessor
                         let ret_register = self.registers.get(Register::ReturnValue);
 
                         // Pop all register values
-                        for i in 0..Self::NUM_REGISTERS
+                        match self.pop_all_registers()
                         {
-                            let mem_val = match self.pop_sp()
-                            {
-                                Ok(v) => v,
-                                Err(e) => return Err(e)
-                            };
-
-                            self.registers.set(
-                                Register::GP(Self::NUM_REGISTERS - 1 - i),
-                                mem_val);
-                        }
+                            Ok(()) => (),
+                            Err(e) => return Err(e)
+                        };
 
                         // Copy the new return register value
                         self.registers.set(
                             Register::ReturnValue,
                             ret_register);
-                    }
+                    },
+                    6 => // retint
+                    {
+                        // Pop all register values
+                        match self.pop_all_registers()
+                        {
+                            Ok(()) => (),
+                            Err(e) => return Err(e)
+                        };
+                    },
                     _ => // ERROR
                     {
                         return Err(SolariumError::InvalidInstruction(inst));

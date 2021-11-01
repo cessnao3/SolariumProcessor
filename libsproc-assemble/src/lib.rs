@@ -366,7 +366,8 @@ mod tests
             ("intoff", 2),
             ("reset", 3),
             ("pop", 4),
-            ("ret", 5)
+            ("ret", 5),
+            ("retint", 6)
         ];
 
         let binary_result = assemble(line_test.iter().map(|v| v.0).collect());
@@ -393,7 +394,7 @@ mod tests
             ("popr", 4),
             ("call", 5),
             ("int", 6),
-            ("inti", 7)
+            ("intr", 7)
         ];
 
         for (arg, opcode) in args_to_test

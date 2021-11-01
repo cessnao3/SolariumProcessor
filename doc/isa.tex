@@ -105,7 +105,10 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			0 & 0 & 0 & 2 & \texttt{intoff} & Turn Interrupts Off \\
 			0 & 0 & 0 & 3 & \texttt{reset} & \texttt{PC = Reset Vector}, \texttt{R[0-15] = 0} \\
 			0 & 0 & 0 & 4 & \texttt{pop} & \texttt{--SP} \\
-			0 & 0 & 0 & 5 & \texttt{ret} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
+			0 & 0 & 0 & 5 & \texttt{ret} & \texttt{x = R[ret]} \\
+			{} & {} & {} & {} & {} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
+			{} & {} & {} & {} & {} & \texttt{R[ret] = x} \\
+			0 & 0 & 0 & 6 & \texttt{retint} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
 			0 & 0 & 1 & R[a] & \texttt{jmp [a]} & \texttt{PC = R[a]} \\
 			0 & 0 & 2 & R[a] & \texttt{jmpr [a]} & \texttt{PC += R[a]} \\
 			0 & 0 & 3 & R[a] & \texttt{push [a]} & \texttt{mem[SP++] = R[a]} \\
@@ -113,7 +116,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			0 & 0 & 5 & R[a] & \texttt{call [a]} & $\forall_{i \in [0 \rightarrow 15]}$
 			 \texttt{mem[SP++] = R[i]}, \texttt{PC = R[a]} \\
  			0 & 0 & 6 & 0xI & \texttt{int <imm>} & Trigger software interrupt number \texttt{imm} \\
- 			0 & 0 & 7 & R[a] & \texttt{inti [a]} & Trigger software interrupt number in \texttt{R[a]} \\
+ 			0 & 0 & 7 & R[a] & \texttt{intr [a]} & Trigger software interrupt number in \texttt{R[a]} \\
 			0 & 1 & 0xI0 & 0x0I & \texttt{jmpri <imm>} & \texttt{PC += Im} \\
 			0 & 2 & R[src] & R[dst] & \texttt{ld [dst], [src]} & \texttt{R[dst] = mem[R[src]]} \\
 			0 & 3 & R[src] & R[dst] & \texttt{sav [dst], [src]} & \texttt{mem[R[dst]] = R[src]} \\
