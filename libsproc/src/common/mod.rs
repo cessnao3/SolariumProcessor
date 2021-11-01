@@ -67,6 +67,7 @@ pub enum SolariumError
     InvalidMemoryAccess(usize),
     InvalidMemoryWrite(usize),
     InvalidSoftwareInterrupt(usize),
+    InvalidHardwareInterrupt(usize),
     StackOverflow,
     InvalidInstruction(MemoryWord),
     DivideByZero,
@@ -85,6 +86,7 @@ impl ToString for SolariumError
             SolariumError::InvalidMemoryAccess(loc) => format!("invalid memory access at location \"{0:}\"", loc),
             SolariumError::InvalidMemoryWrite(loc) => format!("invalid memory write at location \"{0:}\"", loc),
             SolariumError::InvalidSoftwareInterrupt(intnum) => format!("invalid sw interrupt {0:} provided", intnum),
+            SolariumError::InvalidHardwareInterrupt(intnum) => format!("invalid hw interrupt {0:} provided", intnum),
             SolariumError::ModByZero => "mod-by-zero".to_string(),
             SolariumError::StackOverflow => "stack overflow".to_string()
         }

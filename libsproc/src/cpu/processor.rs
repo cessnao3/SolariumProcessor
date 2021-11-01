@@ -9,9 +9,9 @@ const VECTOR_SOFT_RESET: usize = 0x1;
 
 /// Defines the IRQ reset vector location
 const VECTOR_IRQ_SW_OFFSET: usize = 0x2;
-const VECTOR_IRQ_SW_NUM: usize = 16;
-//const VECTOR_HW_HJW_OFFSET: usize = 0x2 + VECTOR_IRQ_SW_NUM;
-//const VECTOR_HW_HJW_OFFSET: usize = 16;
+const VECTOR_IRQ_SW_SIZE: usize = 16;
+const VECTOR_HW_HJW_OFFSET: usize = 0x2 + VECTOR_IRQ_SW_SIZE;
+const VECTOR_HW_HJW_SIZE: usize = 16;
 
 // Define the stack pointer offset and allowed size
 const STACK_POINTER_OFFSET: usize = 0x400;
@@ -166,6 +166,21 @@ impl SolariumProcessor
         {
             return self.memory_map.get(self.get_sp_address() - 1);
         }
+    }
+
+    pub fn trigger_hardware_interrupt(&mut self, hw_irq_num: usize) -> Result<bool, SolariumError>
+    {
+        // Ensure that the hardware IRQ number is valid
+        if hw_irq_num >= VECTOR_HW_HJW_SIZE
+        {
+            return Err(SolariumError::InvalidHardwareInterrupt(hw_irq_num));
+        }
+
+        // Get the correct vector offset
+        let irq_vec = VECTOR_HW_HJW_OFFSET + hw_irq_num;
+
+        // Call the interrupt and return the result
+        return self.call_interrupt(irq_vec);
     }
 
     /// Calls the interrupt at the provided interrupt vector if interrupts are enabled
@@ -445,7 +460,7 @@ impl SolariumProcessor
                         };
 
                         // Return error if the interrupt offset is invalid
-                        if int_offset >= VECTOR_IRQ_SW_NUM
+                        if int_offset >= VECTOR_IRQ_SW_SIZE
                         {
                             return Err(SolariumError::InvalidSoftwareInterrupt(int_offset))
                         }
