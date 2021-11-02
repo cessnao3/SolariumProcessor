@@ -31,6 +31,9 @@ impl SolariumProcessor
     /// Provide the number of registers
     pub const NUM_REGISTERS: usize = Register::NUM_REGISTERS;
 
+    /// Define the public overall initial data size
+    pub const INIT_DATA_SIZE: usize = VECTOR_HW_HJW_OFFSET + VECTOR_HW_HJW_SIZE;
+
     /// Creates a new CPU parameter
     pub fn new() -> SolariumProcessor
     {

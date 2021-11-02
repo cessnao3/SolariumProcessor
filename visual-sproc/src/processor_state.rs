@@ -40,7 +40,7 @@ impl ProcessorStatusStruct
     {
         self.cpu.memory_map.clear();
 
-        const INIT_RO_LEN: usize = 2;
+        const INIT_RO_LEN: usize = SolariumProcessor::INIT_DATA_SIZE;
 
         let reset_vec_data: Vec<MemoryWord> = (0..INIT_RO_LEN)
             .map(|i| if i < self.last_assembly.len() { self.last_assembly[i] } else { MemoryWord::new(0) })
@@ -52,7 +52,7 @@ impl ProcessorStatusStruct
             Ok(()) => (),
             Err(e) => panic!("{0:}", e)
         };
-        match self.cpu.memory_map.add_segment(Box::new(ReadWriteSegment::new(2, MAX_SEGMENT_INDEX - 2)))
+        match self.cpu.memory_map.add_segment(Box::new(ReadWriteSegment::new(INIT_RO_LEN, MAX_SEGMENT_INDEX - INIT_RO_LEN)))
         {
             Ok(()) => (),
             Err(e) => panic!("{0:}", e)
