@@ -11,7 +11,8 @@ pub enum FltkMessage
     Reset,
     Assemble,
     Tick,
-    SetSpeed(f64)
+    SetSpeed(f64),
+    HardwareInterrupt(usize)
 }
 
 #[derive(Clone)]
@@ -22,7 +23,8 @@ pub enum ThreadMessage
     Stop,
     Reset,
     Step,
-    SetSpeed(f64)
+    SetSpeed(f64),
+    HardwareInterrupt(usize)
 }
 
 #[derive(Clone)]

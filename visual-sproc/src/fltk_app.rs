@@ -99,13 +99,11 @@ pub fn setup_and_run_app(
         let mut reset_button = Button::default().with_label("RESET");
         reset_button.emit(fltk_sender, FltkMessage::Reset);
 
-        button_group.set_size(&mut step_button, 70);
-        button_group.set_size(&mut start_button, 70);
-        button_group.set_size(&mut stop_button, 70);
-        button_group.set_size(&mut reset_button, 70);
+        let mut hardware_int_button = Button::default().with_label("HWINT");
+        hardware_int_button.emit(fltk_sender, FltkMessage::HardwareInterrupt(0));
 
         button_group.end();
-        register_group.set_size(&mut button_group, 50);
+        register_group.set_size(&mut button_group, 40);
 
         // Define the speed slider
         let mut speed_slider = HorValueSlider::default().with_label("Speed");
@@ -213,6 +211,10 @@ pub fn setup_and_run_app(
                 FltkMessage::Reset =>
                 {
                     msg_to_send = Some(ThreadMessage::Reset);
+                },
+                FltkMessage::HardwareInterrupt(intval) =>
+                {
+                    msg_to_send = Some(ThreadMessage::HardwareInterrupt(intval));
                 },
                 FltkMessage::Assemble =>
                 {

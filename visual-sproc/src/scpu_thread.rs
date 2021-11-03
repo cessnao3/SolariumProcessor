@@ -39,13 +39,16 @@ pub fn run_scpu_thread(
                     ThreadMessage::Reset =>
                     {
                         step_cpu = false;
-                        cpu_stat.reset();
+                        cpu_stat.soft_reset();
                     },
                     ThreadMessage::SetMemory(mem_vals) =>
                     {
                         step_cpu = false;
                         cpu_stat.load_data(mem_vals);
-
+                    },
+                    ThreadMessage::HardwareInterrupt(hw_irq_num) =>
+                    {
+                        cpu_stat.hardware_interrupt(hw_irq_num);
                     },
                     ThreadMessage::Step =>
                     {

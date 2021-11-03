@@ -171,7 +171,7 @@ impl SolariumProcessor
         }
     }
 
-    pub fn trigger_hardware_interrupt(&mut self, hw_irq_num: usize) -> Result<bool, SolariumError>
+    pub fn hardware_interrupt(&mut self, hw_irq_num: usize) -> Result<bool, SolariumError>
     {
         // Ensure that the hardware IRQ number is valid
         if hw_irq_num >= VECTOR_HW_HJW_SIZE
@@ -179,11 +179,8 @@ impl SolariumProcessor
             return Err(SolariumError::InvalidHardwareInterrupt(hw_irq_num));
         }
 
-        // Get the correct vector offset
-        let irq_vec = VECTOR_HW_HJW_OFFSET + hw_irq_num;
-
         // Call the interrupt and return the result
-        return self.call_interrupt(irq_vec);
+        return self.call_interrupt(VECTOR_HW_HJW_OFFSET + hw_irq_num);
     }
 
     /// Calls the interrupt at the provided interrupt vector if interrupts are enabled
@@ -239,6 +236,13 @@ impl SolariumProcessor
     /// Pops all register values from the stack back into the register values
     fn pop_all_registers(&mut self) -> Result<(), SolariumError>
     {
+        let sp_old = self.registers.get(Register::StackPointer).get();
+
+        if (sp_old as usize) < Self::NUM_REGISTERS
+        {
+            return Err(SolariumError::StackUnderflow);
+        }
+
         for i in 0..Self::NUM_REGISTERS
         {
             let mem_val = match self.pop_sp()
@@ -251,6 +255,10 @@ impl SolariumProcessor
                 Register::GP(Self::NUM_REGISTERS - 1 - i),
                 mem_val);
         }
+
+        self.registers.set(
+            Register::StackPointer,
+            MemoryWord::new(sp_old - 16));
 
         return Ok(());
     }
@@ -434,6 +442,9 @@ impl SolariumProcessor
                     },
                     5 => // call
                     {
+                        // Increment the PC so that the new value is pushed onto the stack
+                        self.increment_pc(1);
+
                         // Push all registers to the stack
                         match self.push_all_registers()
                         {
@@ -468,19 +479,18 @@ impl SolariumProcessor
                             return Err(SolariumError::InvalidSoftwareInterrupt(int_offset))
                         }
 
-                        // Obtain the interrupt vector value
-                        let interrupt_vector = match self.memory_map.get(int_offset + VECTOR_IRQ_SW_OFFSET)
+                        // Increment the program counter
+                        self.increment_pc(1);
+
+                        // Otherwise, trigger interrupt
+                        match self.call_interrupt(int_offset + VECTOR_IRQ_SW_OFFSET)
                         {
-                            Ok(v) => v.get() as usize,
+                            Ok(_) => (),
                             Err(e) => return Err(e)
                         };
 
-                        // Otherwise, trigger interrupt
-                        match self.call_interrupt(interrupt_vector)
-                        {
-                            Ok(called) => if called { pc_incr = 0; },
-                            Err(e) => return Err(e)
-                        };
+                        // Disable the PC increment
+                        pc_incr = 0;
                     },
                     _ => // ERROR
                     {
@@ -537,6 +547,9 @@ impl SolariumProcessor
                         self.registers.set(
                             Register::ReturnValue,
                             ret_register);
+
+                        // Set no PC increment so that we start at the first instruction value
+                        pc_incr = 0;
                     },
                     6 => // retint
                     {
@@ -546,6 +559,9 @@ impl SolariumProcessor
                             Ok(()) => (),
                             Err(e) => return Err(e)
                         };
+
+                        // Set no PC increment to ensure that we don't loose track of the current value
+                        pc_incr = 0;
                     },
                     _ => // ERROR
                     {

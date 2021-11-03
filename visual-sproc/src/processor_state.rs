@@ -74,8 +74,36 @@ impl ProcessorStatusStruct
             };
         }
 
-        //self.cpu.soft_reset();
         self.update_regs();
+    }
+
+    pub fn soft_reset(&mut self)
+    {
+        self.cpu.soft_reset();
+        self.update_regs();
+    }
+
+    pub fn hardware_interrupt(&mut self, hw_irq_num: usize)
+    {
+        match self.cpu.hardware_interrupt(hw_irq_num)
+        {
+            Ok(interrupt_ran) =>
+            {
+                if !interrupt_ran
+                {
+                    self.msg_queue.push(GuiMessage::LogMessage("hardware interrupt did not run".to_string()));
+                }
+                else
+                {
+                    self.update_regs();
+                }
+            },
+            Err(e) =>
+            {
+                self.msg_queue.push(GuiMessage::LogMessage(e.to_string()));
+                self.step_error = true;
+            }
+        }
     }
 
     pub fn step(&mut self)

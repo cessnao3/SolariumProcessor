@@ -1,13 +1,37 @@
 ; Define the reset vector location
 .loadloc start
+.load 0
+
+.oper 0x2
+.loadloc sw_int_0
+
+.oper 0x12
+.loadloc hw_int_0
+
+; Define interrupt instructions
+.oper 0x1000
+:sw_int_0
+ldi 8, 30
+ldi 9, 54
+retint
+
+.oper 0x1100
+:hw_int_0
+ldi 3, 61
+ldi 2, 16
+ldi 4, 234
+ldi 5, 65
+retint
 
 ; Define the starting location
 .oper 0x4000
 :start
 
 ; Setup the counter variables
-ldi 2, 1
+ldi 6, 1
 ldi 3, 0
+ldi 15, 100
+int 0
 
 ; Setup the target value
 jmpri load_data
@@ -18,16 +42,20 @@ jmpri load_data
 :load_data
 ldir 4, target_value
 
-; Load the default jump command
-ldi 14, -2
+; Load the default jump instruction
+ldi 14, 2
 
 ; Perform the addition and check for reaching the target
-add 3, 2, 3
+:loop
+add 3, 6, 3
+int 0
 sub 5, 4, 3
 
 ; Jump back to the add instruction if the
 ; target minus current is greater than zero
 jgzr 14, 5
+jmpri endloc
+jmpri loop
 
 ; Otherwise, enter an infinite loop as program completion
 :endloc

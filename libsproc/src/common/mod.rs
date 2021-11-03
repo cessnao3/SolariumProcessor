@@ -69,6 +69,7 @@ pub enum SolariumError
     InvalidSoftwareInterrupt(usize),
     InvalidHardwareInterrupt(usize),
     StackOverflow,
+    StackUnderflow,
     InvalidInstruction(MemoryWord),
     DivideByZero,
     ModByZero
@@ -88,7 +89,8 @@ impl ToString for SolariumError
             SolariumError::InvalidSoftwareInterrupt(intnum) => format!("invalid sw interrupt {0:} provided", intnum),
             SolariumError::InvalidHardwareInterrupt(intnum) => format!("invalid hw interrupt {0:} provided", intnum),
             SolariumError::ModByZero => "mod-by-zero".to_string(),
-            SolariumError::StackOverflow => "stack overflow".to_string()
+            SolariumError::StackOverflow => "stack overflow".to_string(),
+            SolariumError::StackUnderflow => "stack underflow".to_string()
         }
     }
 }
