@@ -108,16 +108,18 @@ impl SolariumProcessor
     }
 
     /// Obtains the current value of the stack pointer offset from the initial stack location
-    fn get_sp_offset(&self) -> MemoryWord
+    fn get_sp_offset(&self) -> usize
     {
-        return self.registers.get(Register::StackPointer);
+        return self.registers.get(Register::StackPointer).get() as usize;
     }
 
     /// Pushes a value onto the stack
     fn push_sp(&mut self, value: MemoryWord) -> Result<(), SolariumError>
     {
-        let new_sp = self.get_sp_offset().get() + 1;
-        if new_sp as usize > STACK_POINTER_OFFSET + STACK_POINTER_MAX_SIZE
+        let current_sp = self.get_sp_offset();
+        let new_sp = current_sp + 1;
+
+        if new_sp > STACK_POINTER_MAX_SIZE
         {
             return Err(SolariumError::StackOverflow);
         }
@@ -125,18 +127,18 @@ impl SolariumProcessor
         {
             self.registers.set(
                 Register::StackPointer,
-                MemoryWord::new(new_sp));
+                MemoryWord::new(new_sp as u16));
 
             return self.memory_map.set(
-                self.get_sp_address() - 1,
+                self.get_sp_address_for_offset(current_sp),
                 value);
         }
     }
 
-    /// Gets the current address just off the end of the stack
-    fn get_sp_address(&self) -> usize
+    /// Provide the resulting stack pointer address for the given offset
+    fn get_sp_address_for_offset(&self, offset: usize) -> usize
     {
-        return STACK_POINTER_OFFSET + self.get_sp_offset().get() as usize;
+        return STACK_POINTER_OFFSET + offset;
     }
 
     /// Pops a value off of the stack and returns the result
@@ -152,7 +154,7 @@ impl SolariumProcessor
         // Subtract one from the stack pointer
         self.registers.set(
             Register::StackPointer,
-            MemoryWord::new(self.get_sp_offset().get() - 1));
+            MemoryWord::new(self.get_sp_offset() as u16 - 1));
 
         // Return the result
         return Ok(ret_val);
@@ -161,13 +163,13 @@ impl SolariumProcessor
     /// Peeks at the value currently on the top of the stack
     fn peek_sp(&self) -> Result<MemoryWord, SolariumError>
     {
-        if self.get_sp_offset().get() == 0
+        if self.get_sp_offset() == 0
         {
-            return Err(SolariumError::StackOverflow);
+            return Err(SolariumError::StackUnderflow);
         }
         else
         {
-            return self.memory_map.get(self.get_sp_address() - 1);
+            return self.memory_map.get(self.get_sp_address_for_offset(self.get_sp_offset() - 1));
         }
     }
 
@@ -236,13 +238,6 @@ impl SolariumProcessor
     /// Pops all register values from the stack back into the register values
     fn pop_all_registers(&mut self) -> Result<(), SolariumError>
     {
-        let sp_old = self.registers.get(Register::StackPointer).get();
-
-        if (sp_old as usize) < Self::NUM_REGISTERS
-        {
-            return Err(SolariumError::StackUnderflow);
-        }
-
         for i in 0..Self::NUM_REGISTERS
         {
             let mem_val = match self.pop_sp()
@@ -255,10 +250,6 @@ impl SolariumProcessor
                 Register::GP(Self::NUM_REGISTERS - 1 - i),
                 mem_val);
         }
-
-        self.registers.set(
-            Register::StackPointer,
-            MemoryWord::new(sp_old - 16));
 
         return Ok(());
     }
