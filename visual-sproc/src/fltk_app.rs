@@ -99,8 +99,8 @@ pub fn setup_and_run_app(
         let mut reset_button = Button::default().with_label("RESET");
         reset_button.emit(fltk_sender, FltkMessage::Reset);
 
-        let mut hardware_int_button = Button::default().with_label("HWINT");
-        hardware_int_button.emit(fltk_sender, FltkMessage::HardwareInterrupt(0));
+        let mut hardware_irq_button = Button::default().with_label("IRQ 0");
+        hardware_irq_button.emit(fltk_sender, FltkMessage::HardwareInterrupt(0));
 
         button_group.end();
         register_group.set_size(&mut button_group, 40);
