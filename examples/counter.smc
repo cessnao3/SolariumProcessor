@@ -1,10 +1,14 @@
-; Define the reset vector location
+; Define the hard-reset vector location
 .loadloc start
-.load 0
 
+; Define the soft-reset vector location
+.loadloc start
+
+; Start software interrupt vectors
 .oper 0x2
 .loadloc sw_int_0
 
+; Start hardware interrupt vectors
 .oper 0x12
 .loadloc hw_int_0
 
