@@ -470,7 +470,8 @@ mod tests
             ("jz", 6),
             ("jzr", 7),
             ("jgz", 8),
-            ("jgzr", 9)
+            ("jgzr", 9),
+            ("copy", 10)
         ];
 
         for (arg, opcode) in args_to_test

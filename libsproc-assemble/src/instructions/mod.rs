@@ -114,6 +114,9 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
         "jgzr".to_string(),
         Box::new(RegisterInstruction::new(9, 2)));
     instructions.insert(
+        "copy".to_string(),
+        Box::new(RegisterInstruction::new(10, 2)));
+    instructions.insert(
         "ldi".to_string(),
         Box::new(ImmediateRegisterInstruction::new(1)));
     instructions.insert(

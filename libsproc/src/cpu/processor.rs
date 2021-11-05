@@ -384,6 +384,12 @@ impl SolariumProcessor
                             }
                         }
                     },
+                    10 => // copy
+                    {
+                        self.registers.set(
+                            reg_a,
+                            self.registers.get(reg_b));
+                    }
                     _ => // ERROR
                     {
                         return Err(SolariumError::InvalidInstruction(inst));
