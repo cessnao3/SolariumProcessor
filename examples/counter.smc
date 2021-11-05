@@ -27,6 +27,11 @@ ldi 4, 234
 ldi 5, 65
 retint
 
+.oper 0x2000
+:functest
+ldi $ret, 97
+ret
+
 ; Define the starting location
 .oper 0x4000
 :start
@@ -48,6 +53,13 @@ ldir 4, target_value
 
 ; Load the default jump instruction
 ldi 14, 2
+
+; Load the function call test
+ldir 15, 2
+jmpri 2
+.loadloc functest
+call 15
+copy $ret, 12
 
 ; Perform the addition and check for reaching the target
 :loop
