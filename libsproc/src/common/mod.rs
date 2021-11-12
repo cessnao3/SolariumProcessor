@@ -72,7 +72,8 @@ pub enum SolariumError
     StackUnderflow,
     InvalidInstruction(MemoryWord),
     DivideByZero,
-    ModByZero
+    ModByZero,
+    ShiftError(usize)
 }
 
 impl ToString for SolariumError
@@ -89,6 +90,7 @@ impl ToString for SolariumError
             SolariumError::InvalidSoftwareInterrupt(intnum) => format!("invalid sw interrupt {0:} provided", intnum),
             SolariumError::InvalidHardwareInterrupt(intnum) => format!("invalid hw interrupt {0:} provided", intnum),
             SolariumError::ModByZero => "mod-by-zero".to_string(),
+            SolariumError::ShiftError(shift_count) => format!("invalid attempt to shift by {0:}", shift_count),
             SolariumError::StackOverflow => "stack overflow".to_string(),
             SolariumError::StackUnderflow => "stack underflow".to_string()
         }

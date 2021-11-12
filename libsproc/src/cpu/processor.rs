@@ -3,6 +3,8 @@ use crate::memory::MemoryMap;
 
 use super::registers::{Register, RegisterManager};
 
+use super::instructions::InstructionGroup;
+
 /// Defines the reset vector location
 const VECTOR_HARD_RESET: usize = 0x0;
 const VECTOR_SOFT_RESET: usize = 0x1;
@@ -259,7 +261,7 @@ impl SolariumProcessor
     {
         // Define the current memory word
         let pc = self.registers.get(Register::ProgramCounter);
-        let inst = match self.memory_map.get(pc.get() as usize)
+        let inst_word = match self.memory_map.get(pc.get() as usize)
         {
             Ok(v) => v,
             Err(e) => return Err(e)
@@ -272,15 +274,7 @@ impl SolariumProcessor
         self.registers.set(Register::ProgramCounter, pc);
 
         // Extract the different argument types
-        let opcode = ((inst.get() & 0xF000) >> 12) as u8;
-        let arg0 = ((inst.get() & 0x0F00) >> 8) as u8;
-        let arg1 = ((inst.get() & 0x00F0) >> 4) as u8;
-        let arg2 = ((inst.get() & 0x000F) >> 0) as u8;
-
-        assert!(opcode & 0xF == opcode);
-        assert!(arg0 & 0xF == arg0);
-        assert!(arg1 & 0xF == arg1);
-        assert!(arg2 & 0xF == arg2);
+        let inst = InstructionGroup::new(inst_word.get());
 
         // Define a function to combine two arguments into an item
         fn get_immediate_value_signed(
@@ -302,206 +296,11 @@ impl SolariumProcessor
         }
 
         // Switch based on opcode
-        if opcode == 0x0
+        match inst
         {
-            // Determine the number of arguments for the given opcode
-            if arg0 != 0
+            InstructionGroup { opcode: 0, arg0: 0, arg1: 0, arg2: opcode } =>
             {
-                assert!(opcode == 0);
-
-                let reg_a = Register::from_index(arg2 as usize);
-                let reg_b = Register::from_index(arg1 as usize);
-
-                match arg0
-                {
-                    1 => // jmpri
-                    {
-                        pc_incr = get_immediate_value_signed(
-                            arg1,
-                            arg2).get_signed() as i32;
-                    },
-                    2 => // ld
-                    {
-                        let reg_val = self.registers.get(reg_b);
-                        let mem_val = match self.memory_map.get(reg_val.get() as usize)
-                        {
-                            Ok(v) => v,
-                            Err(e) => return Err(e)
-                        };
-
-                        self.registers.set(
-                            reg_a,
-                            mem_val);
-                    },
-                    3 => // sav
-                    {
-                        match self.memory_map.set(
-                            self.registers.get(reg_a).get() as usize,
-                            self.registers.get(reg_b))
-                        {
-                            Ok(()) => (),
-                            Err(e) => return Err(e)
-                        };
-                    },
-                    4 => // ldr
-                    {
-                        match self.memory_map.set(
-                            self.registers.get(reg_a).get() as usize,
-                            self.get_pc_offset(reg_b))
-                        {
-                            Ok(()) => (),
-                            Err(e) => return Err(e)
-                        };
-                    },
-                    5 => // savr
-                    {
-                        match self.memory_map.set(
-                            self.get_pc_offset(reg_a).get() as usize,
-                            self.registers.get(reg_b))
-                        {
-                            Ok(()) => (),
-                            Err(e) => return Err(e)
-                        };
-                    },
-                    6..=9 => // jz, jzr, jgz, jgzr
-                    {
-                        let cmp = self.registers.get(reg_b).get_signed();
-
-                        let should_jump = ((arg0 == 6 || arg0 == 7) && cmp == 0) || ((arg0 == 8 || arg0 == 9) && cmp > 0);
-                        let jump_relative = arg0 == 7 || arg0 == 9;
-
-                        if should_jump
-                        {
-                            if jump_relative
-                            {
-                                pc_incr = self.registers.get(reg_a).get_signed() as i32;
-                            }
-                            else
-                            {
-                                self.registers.set(
-                                    Register::ProgramCounter,
-                                    self.registers.get(reg_a));
-                            }
-                        }
-                    },
-                    10 => // copy
-                    {
-                        self.registers.set(
-                            reg_a,
-                            self.registers.get(reg_b));
-                    }
-                    _ => // ERROR
-                    {
-                        return Err(SolariumError::InvalidInstruction(inst));
-                    }
-                }
-            }
-            else if arg1 != 0
-            {
-                assert!(opcode == 0);
-                assert!(arg0 == 0);
-
-                let dest_register = Register::from_index(arg2 as usize);
-
-                match arg1
-                {
-                    1 => // jmp
-                    {
-                        self.registers.set(
-                            Register::ProgramCounter,
-                            self.registers.get(dest_register));
-                        pc_incr = 0;
-                    },
-                    2 => // jmpr
-                    {
-                        pc_incr = self.registers.get(dest_register).get_signed() as i32;
-                    },
-                    3 => // push
-                    {
-                        match self.push_sp(self.registers.get(dest_register))
-                        {
-                            Ok(()) => (),
-                            Err(e) => return Err(e)
-                        };
-                    },
-                    4 => // popr
-                    {
-                        match self.pop_sp()
-                        {
-                            Ok(val) =>
-                            {
-                                self.registers.set(
-                                    dest_register,
-                                    val);
-                            },
-                            Err(e) => return Err(e)
-                        };
-                    },
-                    5 => // call
-                    {
-                        // Increment the PC so that the new value is pushed onto the stack
-                        self.increment_pc(1);
-
-                        // Push all registers to the stack
-                        match self.push_all_registers()
-                        {
-                            Ok(()) => (),
-                            Err(e) => return Err(e)
-                        };
-
-                        // Move to the new location
-                        let new_loc = self.registers.get(dest_register);
-                        self.registers.set(
-                            Register::ProgramCounter,
-                            new_loc);
-
-                        // Ensure that we run the first instruction at the new location
-                        pc_incr = 0;
-                    },
-                    6 | 7 => // int, intr
-                    {
-                        // Determine the interrupt vector value
-                        let int_offset = if arg1 == 6
-                        {
-                            dest_register.to_index()
-                        }
-                        else
-                        {
-                            self.registers.get(dest_register).get() as usize
-                        };
-
-                        // Return error if the interrupt offset is invalid
-                        if int_offset >= VECTOR_IRQ_SW_SIZE
-                        {
-                            return Err(SolariumError::InvalidSoftwareInterrupt(int_offset))
-                        }
-
-                        // Increment the program counter
-                        self.increment_pc(1);
-
-                        // Otherwise, trigger interrupt
-                        match self.call_interrupt(int_offset + VECTOR_IRQ_SW_OFFSET)
-                        {
-                            Ok(_) => (),
-                            Err(e) => return Err(e)
-                        };
-
-                        // Disable the PC increment
-                        pc_incr = 0;
-                    },
-                    _ => // ERROR
-                    {
-                        return Err(SolariumError::InvalidInstruction(inst));
-                    }
-                };
-            }
-            else
-            {
-                assert!(opcode == 0);
-                assert!(arg0 == 0);
-                assert!(arg1 == 0);
-
-                match arg2
+                match opcode
                 {
                     0 => // noop
                     {
@@ -562,112 +361,321 @@ impl SolariumProcessor
                     },
                     _ => // ERROR
                     {
-                        return Err(SolariumError::InvalidInstruction(inst));
+                        return Err(SolariumError::InvalidInstruction(inst_word));
                     }
                 };
-            }
-        }
-        else if opcode == 1 || opcode == 2 // ldi, ldui
-        {
-            let immediate = match opcode
+            },
+            InstructionGroup { opcode: 0, arg0: 0, arg1: opcode, arg2: arg0 } =>
             {
-                1 =>  get_immediate_value_signed(arg0, arg1) as MemoryWord,
-                2 => get_immediate_value_unsigned(arg0, arg1),
-                _ => return Err(SolariumError::InvalidInstruction(inst))
-            };
+                let dest_register = Register::from_index(arg0 as usize);
 
-            self.registers.set(
-                Register::from_index(arg2 as usize),
-                immediate);
-        }
-        else if opcode == 3 // ldir
-        {
-            let immediate = get_immediate_value_signed(arg0, arg1);
-
-            let load_loc = pc.get() as i32 + immediate.get_signed() as i32;
-
-            assert!(load_loc >= 0);
-
-            let mem_val = match self.memory_map.get(load_loc as usize)
-            {
-                Ok(v) => v,
-                Err(e) => return Err(e)
-            };
-
-            self.registers.set(
-                Register::from_index(arg2 as usize),
-                mem_val);
-        }
-        else if opcode <= 13 // arithmetic
-        {
-            let val_a = self.registers.get(Register::from_index(arg1 as usize));
-            let val_b = self.registers.get(Register::from_index(arg0 as usize));
-
-            let result: u16;
-
-            match opcode
-            {
-                4 => // add
+                match opcode
                 {
-                    result = val_a.get() + val_b.get();
-                },
-                5 => //sub
-                {
-                    result = val_a.get() - val_b.get();
-                },
-                6 => // mul
-                {
-                    result = (val_a.get_signed() * val_b.get_signed()) as u16;
-                },
-                7 => // div
-                {
-                    if val_b.get() == 0
+                    1 => // jmp
                     {
-                        return Err(SolariumError::DivideByZero);
-                    }
-                    result = (val_a.get_signed() / val_b.get_signed()) as u16;
-                },
-                8 => // mod
-                {
-                    if val_b.get() == 0
+                        self.registers.set(
+                            Register::ProgramCounter,
+                            self.registers.get(dest_register));
+                        pc_incr = 0;
+                    },
+                    2 => // jmpr
                     {
-                        return Err(SolariumError::ModByZero);
+                        pc_incr = self.registers.get(dest_register).get_signed() as i32;
+                    },
+                    3 => // push
+                    {
+                        match self.push_sp(self.registers.get(dest_register))
+                        {
+                            Ok(()) => (),
+                            Err(e) => return Err(e)
+                        };
+                    },
+                    4 => // popr
+                    {
+                        match self.pop_sp()
+                        {
+                            Ok(val) =>
+                            {
+                                self.registers.set(
+                                    dest_register,
+                                    val);
+                            },
+                            Err(e) => return Err(e)
+                        };
+                    },
+                    5 => // call
+                    {
+                        // Increment the PC so that the new value is pushed onto the stack
+                        self.increment_pc(1);
+
+                        // Push all registers to the stack
+                        match self.push_all_registers()
+                        {
+                            Ok(()) => (),
+                            Err(e) => return Err(e)
+                        };
+
+                        // Move to the new location
+                        let new_loc = self.registers.get(dest_register);
+                        self.registers.set(
+                            Register::ProgramCounter,
+                            new_loc);
+
+                        // Ensure that we run the first instruction at the new location
+                        pc_incr = 0;
+                    },
+                    6 | 7 => // int, intr
+                    {
+                        // Determine the interrupt vector value
+                        let int_offset = if opcode == 6
+                        {
+                            dest_register.to_index()
+                        }
+                        else if opcode == 7
+                        {
+                            self.registers.get(dest_register).get() as usize
+                        }
+                        else
+                        {
+                            panic!();
+                        };
+
+                        // Return error if the interrupt offset is invalid
+                        if int_offset >= VECTOR_IRQ_SW_SIZE
+                        {
+                            return Err(SolariumError::InvalidSoftwareInterrupt(int_offset))
+                        }
+
+                        // Increment the program counter
+                        self.increment_pc(1);
+
+                        // Otherwise, trigger interrupt
+                        match self.call_interrupt(int_offset + VECTOR_IRQ_SW_OFFSET)
+                        {
+                            Ok(_) => (),
+                            Err(e) => return Err(e)
+                        };
+
+                        // Disable the PC increment
+                        pc_incr = 0;
+                    },
+                    _ => // ERROR
+                    {
+                        return Err(SolariumError::InvalidInstruction(inst_word));
                     }
-                    result = (val_a.get_signed() % val_b.get_signed()) as u16;
-                },
-                9 => // band
+                };
+            },
+            InstructionGroup { opcode: 0, arg0: opcode, arg1: arg0, arg2: arg1 } =>
+            {
+                let reg_a = Register::from_index(arg1 as usize);
+                let reg_b = Register::from_index(arg0 as usize);
+
+                match opcode
                 {
-                    result = val_a.get() & val_b.get();
+                    1 => // jmpri
+                    {
+                        pc_incr = get_immediate_value_signed(
+                            arg0,
+                            arg1).get_signed() as i32;
+                    },
+                    2 => // ld
+                    {
+                        let reg_val = self.registers.get(reg_b);
+                        let mem_val = match self.memory_map.get(reg_val.get() as usize)
+                        {
+                            Ok(v) => v,
+                            Err(e) => return Err(e)
+                        };
+
+                        self.registers.set(
+                            reg_a,
+                            mem_val);
+                    },
+                    3 => // sav
+                    {
+                        match self.memory_map.set(
+                            self.registers.get(reg_a).get() as usize,
+                            self.registers.get(reg_b))
+                        {
+                            Ok(()) => (),
+                            Err(e) => return Err(e)
+                        };
+                    },
+                    4 => // ldr
+                    {
+                        match self.memory_map.set(
+                            self.registers.get(reg_a).get() as usize,
+                            self.get_pc_offset(reg_b))
+                        {
+                            Ok(()) => (),
+                            Err(e) => return Err(e)
+                        };
+                    },
+                    5 => // savr
+                    {
+                        match self.memory_map.set(
+                            self.get_pc_offset(reg_a).get() as usize,
+                            self.registers.get(reg_b))
+                        {
+                            Ok(()) => (),
+                            Err(e) => return Err(e)
+                        };
+                    },
+                    6..=9 => // jz, jzr, jgz, jgzr
+                    {
+                        let cmp = self.registers.get(reg_b).get_signed();
+
+                        let should_jump = (
+                            (opcode == 6 || opcode == 7) && cmp == 0) ||
+                            ((opcode == 8 || opcode == 9) && cmp > 0);
+                        let jump_relative = opcode == 7 || opcode == 9;
+
+                        if should_jump
+                        {
+                            if jump_relative
+                            {
+                                pc_incr = self.registers.get(reg_a).get_signed() as i32;
+                            }
+                            else
+                            {
+                                self.registers.set(
+                                    Register::ProgramCounter,
+                                    self.registers.get(reg_a));
+                            }
+                        }
+                    },
+                    10 => // copy
+                    {
+                        self.registers.set(
+                            reg_a,
+                            self.registers.get(reg_b));
+                    }
+                    _ => // ERROR
+                    {
+                        return Err(SolariumError::InvalidInstruction(inst_word));
+                    }
                 }
-                10 => // bor
+            },
+            InstructionGroup { opcode, arg0, arg1, arg2 } =>
+            {
+                match opcode
                 {
-                    result = val_a.get() | val_b.get();
-                }
-                11 => //bxor
-                {
-                    result = val_a.get() ^ val_b.get();
-                }
-                12 => // bsftl
-                {
-                    // TODO - SHIFT ERROR!
-                    result = val_a.get() << val_b.get();
-                },
-                13 => // bsftr
-                {
-                    // TODO - SHIFT ERROR!
-                    result = val_a.get() >> val_b.get();
-                },
-                _ => // ERROR
-                {
-                    return Err(SolariumError::InvalidInstruction(inst));
+                    1 | 2 => // ldi, ldui
+                    {
+                        let immediate = match opcode
+                        {
+                            1 =>  get_immediate_value_signed(arg0, arg1) as MemoryWord,
+                            2 => get_immediate_value_unsigned(arg0, arg1),
+                            _ => return Err(SolariumError::InvalidInstruction(inst_word))
+                        };
+
+                        self.registers.set(
+                            Register::from_index(arg2 as usize),
+                            immediate);
+                    },
+                    3 => // ldir
+                    {
+                        let immediate = get_immediate_value_signed(arg0, arg1);
+
+                        let load_loc = pc.get() as i32 + immediate.get_signed() as i32;
+
+                        assert!(load_loc >= 0);
+
+                        let mem_val = match self.memory_map.get(load_loc as usize)
+                        {
+                            Ok(v) => v,
+                            Err(e) => return Err(e)
+                        };
+
+                        self.registers.set(
+                            Register::from_index(arg2 as usize),
+                            mem_val);
+                    },
+                    opcode if opcode <= 13 =>
+                    {
+                        let val_a = self.registers.get(Register::from_index(arg1 as usize));
+                        let val_b = self.registers.get(Register::from_index(arg0 as usize));
+
+                        let result: u16;
+
+                        match opcode
+                        {
+                            4 => // add
+                            {
+                                result = val_a.get() + val_b.get();
+                            },
+                            5 => //sub
+                            {
+                                result = val_a.get() - val_b.get();
+                            },
+                            6 => // mul
+                            {
+                                result = (val_a.get_signed() * val_b.get_signed()) as u16;
+                            },
+                            7 => // div
+                            {
+                                if val_b.get() == 0
+                                {
+                                    return Err(SolariumError::DivideByZero);
+                                }
+                                result = (val_a.get_signed() / val_b.get_signed()) as u16;
+                            },
+                            8 => // mod
+                            {
+                                if val_b.get() == 0
+                                {
+                                    return Err(SolariumError::ModByZero);
+                                }
+                                result = (val_a.get_signed() % val_b.get_signed()) as u16;
+                            },
+                            9 => // band
+                            {
+                                result = val_a.get() & val_b.get();
+                            }
+                            10 => // bor
+                            {
+                                result = val_a.get() | val_b.get();
+                            }
+                            11 => //bxor
+                            {
+                                result = val_a.get() ^ val_b.get();
+                            }
+                            12 => // bsftl
+                            {
+                                let shift_count = val_b.get();
+                                if shift_count >= 16
+                                {
+                                    return Err(SolariumError::ShiftError(shift_count as usize));
+                                }
+                                result = val_a.get() << shift_count;
+                            },
+                            13 => // bsftr
+                            {
+                                let shift_count = val_b.get();
+                                if shift_count >= 16
+                                {
+                                    return Err(SolariumError::ShiftError(shift_count as usize));
+                                }
+                                result = val_a.get() >> shift_count;
+                            },
+                            _ => // ERROR
+                            {
+                                panic!();
+                            }
+                        }
+
+                        let reg_dest = Register::from_index(arg2 as usize);
+                        self.registers.set(
+                            reg_dest,
+                            MemoryWord::new(result));
+                    },
+                    _ =>
+                    {
+                        return Err(SolariumError::InvalidInstruction(inst_word))
+                    }
                 }
             }
-
-            let reg_dest = Register::from_index(arg2 as usize);
-            self.registers.set(
-                reg_dest,
-                MemoryWord::new(result));
-        }
+        };
 
         // Increment the program counter
         self.increment_pc(pc_incr);
