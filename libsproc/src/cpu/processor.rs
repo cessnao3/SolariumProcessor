@@ -1,9 +1,8 @@
-use crate::common::{MemoryWord, SolariumError};
+use crate::common::{MemoryWord, SolariumError, InstructionGroup};
 use crate::memory::MemoryMap;
 
 use super::registers::{Register, RegisterManager};
 
-use super::instructions::InstructionGroup;
 
 /// Defines the reset vector location
 const VECTOR_HARD_RESET: usize = 0x0;
@@ -274,7 +273,7 @@ impl SolariumProcessor
         self.registers.set(Register::ProgramCounter, pc);
 
         // Extract the different argument types
-        let inst = InstructionGroup::new(inst_word.get());
+        let inst = InstructionGroup::new(inst_word);
 
         // Define a function to combine two arguments into an item
         fn get_immediate_value_signed(
