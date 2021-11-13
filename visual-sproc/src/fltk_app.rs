@@ -56,14 +56,15 @@ pub fn setup_and_run_app(
     let mut main_group = Flex::default_fill().row();
 
     // Define the editor
-    let mut editor_group = Flex::default_fill().column();
     let mut assembly_editor;
     {
+        let mut editor_group = Flex::default_fill().column();
+
         let mut assembly_label = Frame::default().with_label("Assembly Editor");
+        editor_group.set_size(&mut assembly_label, 20);
+
         assembly_editor = TextEditor::default();
         assembly_editor.set_buffer(TextBuffer::default());
-
-        editor_group.set_size(&mut assembly_label, 20);
 
         let mut assemble_button = Button::default().with_label("Assemble");
         assemble_button.emit(fltk_sender, FltkMessage::Assemble);
@@ -71,8 +72,23 @@ pub fn setup_and_run_app(
 
         editor_group.set_size(&mut assemble_button, 50);
         editor_group.set_margin(10);
+
+        editor_group.end();
     }
-    editor_group.end();
+
+    // Define the memory group values
+    {
+        let mut memory_group = Flex::default_fill().column();
+
+        let mut memory_label = Frame::default().with_label("Memory");
+        memory_group.set_size(&mut memory_label, 20);
+
+        let mut serial_label = Frame::default().with_label("Serial");
+        memory_group.set_size(&mut serial_label, 20);
+
+        memory_group.set_margin(10);
+        memory_group.end();
+    }
 
     // Set initial text
     assembly_editor.buffer().unwrap().set_text(&get_default_text());
