@@ -31,5 +31,6 @@ pub enum ThreadMessage
 pub enum GuiMessage
 {
     UpdateRegisters(RegisterArray),
+    UpdateMemory(Vec<MemoryWord>),
     LogMessage(String)
 }

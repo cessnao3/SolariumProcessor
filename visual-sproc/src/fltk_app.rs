@@ -10,8 +10,11 @@ use super::messages::{ThreadMessage, GuiMessage, FltkMessage};
 use super::fltk_registers::setup_register_group;
 
 use libsproc::common::MemoryWord;
+use libsproc::memory::MAX_SEGMENT_INDEX;
 use libsproc_assemble::assemble;
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex, mpsc};
 
 fn get_app_icon() -> PngImage
@@ -79,21 +82,35 @@ pub fn setup_and_run_app(
         editor_group.end();
     }
 
+    // Define the memory Values
+    let shared_table_memory = Rc::new(RefCell::new(Vec::<MemoryWord>::new()));
+    shared_table_memory.borrow_mut().resize(MAX_SEGMENT_INDEX, MemoryWord::new(0));
+
     // Define the memory group values
     let mut serial_output;
     let mut serial_input;
+    let mut memory_table;
     {
         let mut memory_group = Flex::default_fill().column();
 
         let mut memory_label = Frame::default().with_label("Memory");
         memory_group.set_size(&mut memory_label, 20);
 
-        let mut memory_table = Table::default_fill();
+        let inner_memory = shared_table_memory.clone();
+
+        let mem_size = inner_memory.borrow().len() as i32;
+        let num_cols = 4;
+        assert!(num_cols > 0);
+        assert_eq!(mem_size % num_cols, 0);
+
+        let num_rows = mem_size / num_cols;
+
+        memory_table = Table::default_fill();
         memory_table.set_row_header(true);
         memory_table.set_col_header(true);
         memory_table.set_type(TableRowSelectMode::None);
-        memory_table.set_rows(100);
-        memory_table.set_cols(1);
+        memory_table.set_rows(num_rows);
+        memory_table.set_cols(num_cols);
         memory_table.set_col_width_all(64);
         memory_table.set_row_height_all(18);
         memory_table.draw_cell(
@@ -104,17 +121,10 @@ pub fn setup_and_run_app(
                     TableContext::StartPage => draw::set_font(Font::Helvetica, 14),
                     TableContext::ColHeader =>
                     {
-                        let header_text = match col
-                        {
-                            0 => "Value",
-                            1 => "Assembly",
-                            _ => panic!()
-                        };
-
                         draw::push_clip(x, y, width, height);
                         draw::draw_box(FrameType::ThinUpBox, x, y, width, height, Color::FrameDefault);
                         draw::set_draw_color(Color::Black);
-                        draw::draw_text2(header_text, x, y, width, height, Align::Center);
+                        draw::draw_text2(&format!("{0:}", col), x, y, width, height, Align::Center);
                         draw::pop_clip();
                     },
                     TableContext::RowHeader =>
@@ -122,17 +132,18 @@ pub fn setup_and_run_app(
                         draw::push_clip(x, y, width, height);
                         draw::draw_box(FrameType::ThinUpBox, x, y, width, height, Color::FrameDefault);
                         draw::set_draw_color(Color::Black);
-                        draw::draw_text2(&format!("{0:04X}", row), x, y, width, height, Align::Center);
+                        draw::draw_text2(&format!("{0:04X}", row * num_cols), x, y, width, height, Align::Center);
                         draw::pop_clip();
                     },
                     TableContext::Cell =>
                     {
-                        let val = (row * 4 + col);
+                        let index_val = (row * num_cols + col) as usize;
+                        let val = inner_memory.borrow()[index_val];
                         draw::push_clip(x, y, width, height);
                         draw::draw_rect_fill(x, y, width, height, Color::White);
                         draw::draw_box(FrameType::ThinDownFrame, x, y, width, height, Color::Black);
                         draw::set_draw_color(Color::Black);
-                        draw::draw_text2(&format!("{0:04X}", val), x, y, width, height, Align::Center);
+                        draw::draw_text2(&format!("{0:04X}", val.get()), x, y, width, height, Align::Center);
                         draw::pop_clip();
                     },
                     _ => ()
@@ -256,6 +267,14 @@ pub fn setup_and_run_app(
                         GuiMessage::LogMessage(err) =>
                         {
                             message_queue.push(err);
+                        },
+                        GuiMessage::UpdateMemory(new_memory_vals) =>
+                        {
+                            for (ind, val) in new_memory_vals.iter().enumerate()
+                            {
+                                shared_table_memory.borrow_mut()[ind].set(val.get());
+                            }
+                            memory_table.redraw();
                         }
                     }
                 },

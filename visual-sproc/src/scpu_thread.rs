@@ -22,6 +22,8 @@ pub fn run_scpu_thread(
 
     'main_loop: loop
     {
+        let mut update_memory = false;
+
         for _ in 0..1000
         {
             match gui_to_thread_rx.try_recv()
@@ -35,16 +37,19 @@ pub fn run_scpu_thread(
                     ThreadMessage::Stop =>
                     {
                         step_cpu = false;
+                        update_memory = true;
                     },
                     ThreadMessage::Reset =>
                     {
                         step_cpu = false;
                         cpu_stat.soft_reset();
+                        update_memory = true;
                     },
                     ThreadMessage::SetMemory(mem_vals) =>
                     {
                         step_cpu = false;
                         cpu_stat.load_data(mem_vals);
+                        update_memory = true;
                     },
                     ThreadMessage::HardwareInterrupt(hw_irq_num) =>
                     {
@@ -53,6 +58,7 @@ pub fn run_scpu_thread(
                     ThreadMessage::Step =>
                     {
                         cpu_stat.step();
+                        update_memory = true;
                     },
                     ThreadMessage::SetSpeed(v) =>
                     {
@@ -75,6 +81,11 @@ pub fn run_scpu_thread(
             {
                 cpu_stat.step();
             }
+        }
+
+        if update_memory
+        {
+            cpu_stat.send_memory_to_queue();
         }
 
         cpu_stat.update_msg_queue();

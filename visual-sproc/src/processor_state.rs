@@ -158,4 +158,17 @@ impl ProcessorStatusStruct
             self.regs_updated = false;
         }
     }
+
+    pub fn send_memory_to_queue(&mut self)
+    {
+        let mem_vec: Vec<MemoryWord> = (0..MAX_SEGMENT_INDEX).map(|i| {
+            return match self.cpu.memory_map.get(i)
+            {
+                Ok(v) => v,
+                Err(_) => MemoryWord::new(0)
+            };
+        }).collect();
+
+        self.msg_queue.push(GuiMessage::UpdateMemory(mem_vec));
+    }
 }
