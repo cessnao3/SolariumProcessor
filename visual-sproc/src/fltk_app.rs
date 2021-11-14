@@ -1,7 +1,9 @@
-use fltk::enums::Event;
+use fltk::enums::{Event, FrameType, Color, Align, Font};
 use fltk::image::PngImage;
+use fltk::input::Input;
 use fltk::prelude::*;
-use fltk::{app::*, button::*, dialog::*, window::*, text::*, group::*, frame::*, valuator::*};
+use fltk::table::{Table, TableRowSelectMode, TableContext};
+use fltk::{app::*, draw, button::*, dialog::*, window::*, text::*, group::*, frame::*, valuator::*};
 
 use super::messages::{ThreadMessage, GuiMessage, FltkMessage};
 
@@ -52,6 +54,7 @@ pub fn setup_and_run_app(
     });
 
     main_window.set_icon(Some(get_app_icon()));
+    main_window.make_resizable(true);
 
     let mut main_group = Flex::default_fill().row();
 
@@ -77,14 +80,79 @@ pub fn setup_and_run_app(
     }
 
     // Define the memory group values
+    let mut serial_output;
+    let mut serial_input;
     {
         let mut memory_group = Flex::default_fill().column();
 
         let mut memory_label = Frame::default().with_label("Memory");
         memory_group.set_size(&mut memory_label, 20);
 
-        let mut serial_label = Frame::default().with_label("Serial");
+        let mut memory_table = Table::default_fill();
+        memory_table.set_row_header(true);
+        memory_table.set_col_header(true);
+        memory_table.set_type(TableRowSelectMode::None);
+        memory_table.set_rows(100);
+        memory_table.set_cols(1);
+        memory_table.set_col_width_all(64);
+        memory_table.set_row_height_all(18);
+        memory_table.draw_cell(
+            move |_, ctx, row, col, x, y, width, height|
+            {
+                match ctx
+                {
+                    TableContext::StartPage => draw::set_font(Font::Helvetica, 14),
+                    TableContext::ColHeader =>
+                    {
+                        let header_text = match col
+                        {
+                            0 => "Value",
+                            1 => "Assembly",
+                            _ => panic!()
+                        };
+
+                        draw::push_clip(x, y, width, height);
+                        draw::draw_box(FrameType::ThinUpBox, x, y, width, height, Color::FrameDefault);
+                        draw::set_draw_color(Color::Black);
+                        draw::draw_text2(header_text, x, y, width, height, Align::Center);
+                        draw::pop_clip();
+                    },
+                    TableContext::RowHeader =>
+                    {
+                        draw::push_clip(x, y, width, height);
+                        draw::draw_box(FrameType::ThinUpBox, x, y, width, height, Color::FrameDefault);
+                        draw::set_draw_color(Color::Black);
+                        draw::draw_text2(&format!("{0:04X}", row), x, y, width, height, Align::Center);
+                        draw::pop_clip();
+                    },
+                    TableContext::Cell =>
+                    {
+                        let val = (row * 4 + col);
+                        draw::push_clip(x, y, width, height);
+                        draw::draw_rect_fill(x, y, width, height, Color::White);
+                        draw::draw_box(FrameType::ThinDownFrame, x, y, width, height, Color::Black);
+                        draw::set_draw_color(Color::Black);
+                        draw::draw_text2(&format!("{0:04X}", val), x, y, width, height, Align::Center);
+                        draw::pop_clip();
+                    },
+                    _ => ()
+                };
+            }
+        );
+        memory_table.end();
+
+        let mut serial_label = Frame::default().with_label("Serial Output");
         memory_group.set_size(&mut serial_label, 20);
+
+        serial_output = TextDisplay::default();
+        serial_output.set_buffer(TextBuffer::default());
+
+        let mut serial_input_label = Frame::default().with_label("Serial Input");
+        memory_group.set_size(&mut serial_input_label, 20);
+
+        serial_input = Input::default();
+        memory_group.set_size(&mut serial_input, 28);
+        //serial_input.set_buffer(TextBuffer::default());
 
         memory_group.set_margin(10);
         memory_group.end();
