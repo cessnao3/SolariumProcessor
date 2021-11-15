@@ -21,10 +21,29 @@ retint
 
 .oper 0x1100
 :hw_int_0
-ldi 3, 61
-ldi 2, 16
-ldi 4, 234
-ldi 5, 65
+.load 0xA000
+ldir 13, -1
+
+; Mark the location to read input values from
+ldi 14, 1
+add 14, 14, 13
+
+; Mark he location to write serial values from
+ldi 15, 3
+add 15, 15, 13
+
+; Define the default jump instruction
+ldi 4, 2
+
+:hw_int_0_main_loop
+ld 6, 13
+jgzr 4, 6
+jmpri hw_int_0_end
+
+ldi 7, 14
+sav 15, 7
+
+:hw_int_0_end
 retint
 
 .oper 0x2000

@@ -1,7 +1,11 @@
+use std::rc::Rc;
+use std::cell::RefCell;
+
 use super::messages::GuiMessage;
 
 use libsproc::cpu::SolariumProcessor;
-use libsproc::memory::{ReadWriteSegment, ReadOnlySegment, MAX_SEGMENT_INDEX};
+use libsproc::devices::SerialInputOutputDevice;
+use libsproc::memory::{ReadWriteSegment, ReadOnlySegment, MEM_MAX_SIZE};
 use libsproc::common::MemoryWord;
 
 
@@ -47,16 +51,24 @@ impl ProcessorStatusStruct
             .collect();
         assert!(reset_vec_data.len() == INIT_RO_LEN);
 
-        match self.cpu.memory_map.add_segment(Box::new(ReadOnlySegment::new(0, reset_vec_data)))
+        const DEVICE_START_IND: usize = 0xA000;
+        assert!(DEVICE_START_IND < MEM_MAX_SIZE);
+
+        match self.cpu.memory_map.add_segment(Rc::new(RefCell::new(ReadOnlySegment::new(0, reset_vec_data))))
         {
             Ok(()) => (),
             Err(e) => panic!("{0:}", e)
         };
-        match self.cpu.memory_map.add_segment(Box::new(ReadWriteSegment::new(INIT_RO_LEN, MAX_SEGMENT_INDEX - INIT_RO_LEN)))
+        match self.cpu.memory_map.add_segment(Rc::new(RefCell::new(ReadWriteSegment::new(INIT_RO_LEN, DEVICE_START_IND - INIT_RO_LEN))))
         {
             Ok(()) => (),
             Err(e) => panic!("{0:}", e)
-        }
+        };
+        match self.cpu.memory_map.add_segment(Rc::new(RefCell::new(SerialInputOutputDevice::new(DEVICE_START_IND))))
+        {
+            Ok(()) => (),
+            Err(e) => panic!("{0:}", e)
+        };
 
         self.cpu.hard_reset();
 
@@ -161,7 +173,7 @@ impl ProcessorStatusStruct
 
     pub fn send_memory_to_queue(&mut self)
     {
-        let mem_vec: Vec<MemoryWord> = (0..MAX_SEGMENT_INDEX).map(|i| {
+        let mem_vec: Vec<MemoryWord> = (0..MEM_MAX_SIZE).map(|i| {
             return match self.cpu.memory_map.get(i)
             {
                 Ok(v) => v,

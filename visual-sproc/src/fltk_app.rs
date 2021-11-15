@@ -10,7 +10,7 @@ use super::messages::{ThreadMessage, GuiMessage, FltkMessage};
 use super::fltk_registers::setup_register_group;
 
 use libsproc::common::MemoryWord;
-use libsproc::memory::MAX_SEGMENT_INDEX;
+use libsproc::memory::MEM_MAX_SIZE;
 use libsproc_assemble::assemble;
 
 use std::cell::RefCell;
@@ -87,7 +87,7 @@ pub fn setup_and_run_app(
 
     // Define the memory Values
     let shared_table_memory = Rc::new(RefCell::new(Vec::<MemoryWord>::new()));
-    shared_table_memory.borrow_mut().resize(MAX_SEGMENT_INDEX, MemoryWord::new(0));
+    shared_table_memory.borrow_mut().resize(MEM_MAX_SIZE, MemoryWord::new(0));
 
     // Define the memory group values
     let mut serial_output;

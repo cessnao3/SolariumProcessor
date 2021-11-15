@@ -1,6 +1,6 @@
 use crate::common::{MemoryWord, SolariumError};
 
-use super::{MemorySegment, MAX_SEGMENT_INDEX};
+use super::{MemorySegment, MEM_MAX_SIZE};
 
 /// Provides a read-write memory segment type
 pub struct ReadWriteSegment
@@ -20,8 +20,8 @@ impl ReadWriteSegment
         // Define the top address and ensure that the memory address is valid
         let top_address = base_address + size;
 
-        assert!(top_address >= base_address);
-        assert!(top_address <= MAX_SEGMENT_INDEX);
+        assert!(top_address > base_address);
+        assert!(top_address <= MEM_MAX_SIZE);
 
         // Define the initial data array
         let data: Vec::<MemoryWord> = (0..size).map(|_| MemoryWord::new(0)).collect();
@@ -99,7 +99,7 @@ impl MemorySegment for ReadWriteSegment
 mod tests
 {
     use super::*;
-    use super::super::MAX_SEGMENT_INDEX;
+    use super::super::MEM_MAX_SIZE;
 
     /// Test the initialization of the memory segment
     #[test]
@@ -117,7 +117,7 @@ mod tests
         assert_eq!(mem.address_len(), size);
 
         // Iterate over memory items to check that the correct values are set
-        for i in 0..MAX_SEGMENT_INDEX
+        for i in 0..MEM_MAX_SIZE
         {
             let is_within = i >= base && i < base + size;
             assert_eq!(mem.within(i), is_within);
@@ -135,7 +135,7 @@ mod tests
     #[should_panic]
     fn test_init_invalid_range()
     {
-        let base = MAX_SEGMENT_INDEX - 100;
+        let base = MEM_MAX_SIZE - 100;
         let size = 1024;
         ReadWriteSegment::new(base, size);
     }
@@ -206,7 +206,7 @@ mod tests
             assert_eq!(success.is_ok(), true);
         }
 
-        for i in 0..MAX_SEGMENT_INDEX
+        for i in 0..MEM_MAX_SIZE
         {
             let should_be_within = i >= base && i < (base + size);
             assert_eq!(mem.within(i), should_be_within);

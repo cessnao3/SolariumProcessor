@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::common::{MemoryWord, SolariumError};
 
 use super::MemorySegment;
@@ -5,7 +8,7 @@ use super::MemorySegment;
 /// Defines the overarching memory mapping structure
 pub struct MemoryMap
 {
-    memory_map: Vec<Box<dyn MemorySegment>>
+    memory_map: Vec<Rc<RefCell<dyn MemorySegment>>>
 }
 
 impl MemoryMap
@@ -21,11 +24,11 @@ impl MemoryMap
 
     /// Adds a new memory segment to the memory map, returning an error
     /// if it could not be added
-    pub fn add_segment(&mut self, segment: Box<dyn MemorySegment>) -> Result<(), String>
+    pub fn add_segment(&mut self, segment: Rc<RefCell<dyn MemorySegment>>) -> Result<(), String>
     {
         // Extract the start and ending indices
-        let start_ind = segment.start_address();
-        let end_ind = start_ind + segment.address_len();
+        let start_ind = segment.borrow().start_address();
+        let end_ind = start_ind + segment.borrow().address_len();
 
         // Ensure that the segment is valid
         if start_ind >= end_ind
@@ -36,8 +39,8 @@ impl MemoryMap
         // Check that the new segment will fit within the provided other segments
         for seg in self.memory_map.iter()
         {
-            let seg_start = seg.start_address();
-            let seg_end = seg_start + seg.address_len();
+            let seg_start = seg.borrow().start_address();
+            let seg_end = seg_start + seg.borrow().address_len();
 
             let all_below = seg_start < start_ind && seg_end <= start_ind;
             let all_above = seg_start >= end_ind && seg_end > end_ind;
@@ -58,7 +61,7 @@ impl MemoryMap
     {
         return match self.segment_for_index(ind)
         {
-            Some(seg) => seg.get(ind),
+            Some(seg) => seg.borrow().get(ind),
             None => Err(SolariumError::InvalidMemoryAccess(ind))
         };
     }
@@ -67,33 +70,19 @@ impl MemoryMap
     /// Returns true if the value was able to be set; otherwise returns false
     pub fn set(&mut self, ind: usize, data: MemoryWord) -> Result<(), SolariumError>
     {
-        return match self.segment_for_index_mut(ind)
+        return match self.segment_for_index(ind)
         {
-            Some(seg) => seg.set(ind, data),
+            Some(seg) => seg.borrow_mut().set(ind, data),
             None => Err(SolariumError::InvalidMemoryAccess(ind))
         };
     }
 
     /// Provides the memory segment that contains the given memory location
-    fn segment_for_index(&self, ind: usize) -> Option<&Box<dyn MemorySegment>>
+    fn segment_for_index(&self, ind: usize) -> Option<&Rc<RefCell<dyn MemorySegment>>>
     {
         for seg in self.memory_map.iter()
         {
-            if seg.within(ind)
-            {
-                return Some(seg);
-            }
-        }
-
-        return None;
-    }
-
-    /// Provides the mutable memory segment that contains the given memory location
-    fn segment_for_index_mut(&mut self, ind: usize) -> Option<&mut Box<dyn MemorySegment>>
-    {
-        for seg in self.memory_map.iter_mut()
-        {
-            if seg.within(ind)
+            if seg.borrow().within(ind)
             {
                 return Some(seg);
             }
@@ -105,9 +94,9 @@ impl MemoryMap
     /// resets all contained memory segments
     pub fn reset(&mut self)
     {
-        for seg in self.memory_map.iter_mut()
+        for seg in self.memory_map.iter()
         {
-            seg.reset();
+            seg.borrow_mut().reset();
         }
     }
 
@@ -122,7 +111,7 @@ impl MemoryMap
 mod tests
 {
     use super::*;
-    use super::super::{ReadOnlySegment, ReadWriteSegment, MAX_SEGMENT_INDEX};
+    use super::super::{ReadOnlySegment, ReadWriteSegment, MEM_MAX_SIZE};
 
     /// A simple initialization test
     #[test]
@@ -132,7 +121,7 @@ mod tests
         let map = MemoryMap::new();
 
         // Ensure that all memory values are invalid
-        for i in 0..MAX_SEGMENT_INDEX
+        for i in 0..MEM_MAX_SIZE
         {
             assert!(map.get(i).is_err());
         }
@@ -148,16 +137,16 @@ mod tests
 
         // Initialize the map
         let mut map = MemoryMap::new();
-        let add_result = map.add_segment(Box::new(ReadWriteSegment::new(
+        let add_result = map.add_segment(Rc::new(RefCell::new(ReadWriteSegment::new(
             base,
-            size)));
+            size))));
 
         assert!(add_result.is_ok());
 
         let set_val = 314;
 
         // Iterate through and check if values are within the expected results
-        for i in 0..MAX_SEGMENT_INDEX
+        for i in 0..MEM_MAX_SIZE
         {
             let segment_val = map.segment_for_index(i);
 
@@ -189,7 +178,7 @@ mod tests
         }
 
         // Iterate through and check if the set worked as expected
-        for i in 0..MAX_SEGMENT_INDEX
+        for i in 0..MEM_MAX_SIZE
         {
             // Check the map value directly
             let map_val = map.get(i);
@@ -209,7 +198,7 @@ mod tests
 
                 if index_segment.is_some()
                 {
-                    let seg_val = index_segment.unwrap().get(i);
+                    let seg_val = index_segment.unwrap().borrow().get(i);
 
                     assert!(seg_val.is_ok());
                     assert_eq!(seg_val.unwrap().get(), set_val);
@@ -218,14 +207,18 @@ mod tests
 
             // Check the mutable segment value
             {
-                let index_segment = map.segment_for_index_mut(i);
+                let index_segment = map.segment_for_index(i);
 
-                if index_segment.is_some()
+                match index_segment
                 {
-                    let seg_val = index_segment.unwrap().get(i);
+                    Some(seg) =>
+                    {
+                        let seg_val = seg.borrow().get(i);
 
-                    assert!(seg_val.is_ok());
-                    assert_eq!(seg_val.unwrap().get(), set_val);
+                        assert!(seg_val.is_ok());
+                        assert_eq!(seg_val.unwrap().get(), set_val);
+                    },
+                    None => ()
                 }
             }
         }
@@ -244,16 +237,16 @@ mod tests
 
         // Initialize the map
         let mut map = MemoryMap::new();
-        let add_result = map.add_segment(Box::new(ReadOnlySegment::new(
+        let add_result = map.add_segment(Rc::new(RefCell::new(ReadOnlySegment::new(
             base,
-            (0..size).map(|i| MemoryWord::new(calc_func(i))).collect())));
+            (0..size).map(|i| MemoryWord::new(calc_func(i))).collect()))));
 
         assert!(add_result.is_ok());
 
         let set_val = 314;
 
         // Iterate through and check if values are within the expected results
-        for i in 0..MAX_SEGMENT_INDEX
+        for i in 0..MEM_MAX_SIZE
         {
             let segment_val = map.segment_for_index(i);
             let get_result = map.get(i);
@@ -277,7 +270,7 @@ mod tests
         }
 
         // Iterate through and check if the set worked as expected
-        for i in 0..MAX_SEGMENT_INDEX
+        for i in 0..MEM_MAX_SIZE
         {
             // Check the map value directly
             let map_val = map.get(i);
@@ -295,25 +288,33 @@ mod tests
             {
                 let index_segment = map.segment_for_index(i);
 
-                if index_segment.is_some()
+                match index_segment
                 {
-                    let seg_val = index_segment.unwrap().get(i);
+                    Ok(seg) =>
+                    {
+                        let seg_val = seg.borrow().get(i);
 
-                    assert!(seg_val.is_ok());
-                    assert_eq!(seg_val.unwrap().get(), calc_func(i - base));
+                        assert!(seg_val.is_ok());
+                        assert_eq!(seg_val.unwrap().get(), calc_func(i - base));
+                    },
+                    None => ()
                 }
             }
 
             // Check the mutable segment value
             {
-                let index_segment = map.segment_for_index_mut(i);
+                let index_segment = map.segment_for_index(i);
 
-                if index_segment.is_some()
+                match index_segment
                 {
-                    let seg_val = index_segment.unwrap().get(i);
+                    Some(seg) =>
+                    {
+                        let seg_val = seg.borrow().get(i);
 
-                    assert!(seg_val.is_ok());
-                    assert_eq!(seg_val.unwrap().get(), calc_func(i - base));
+                        assert!(seg_val.is_ok());
+                        assert_eq!(seg_val.unwrap().get(), calc_func(i - base));
+                    },
+                    None => ()
                 }
             }
         }

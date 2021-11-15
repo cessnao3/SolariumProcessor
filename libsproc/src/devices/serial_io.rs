@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
 
-use crate::memory::MemorySegment;
+use crate::memory::{MemorySegment, MEM_MAX_SIZE};
 use crate::common::{MemoryWord, SolariumError};
 
 /// Provides a memory serial I/O memory-mapped device
@@ -21,6 +21,25 @@ impl SerialInputOutputDevice
     const OFFSET_INPUT_GET: usize = 1;
     const OFFSET_OUTPUT_SIZE: usize = 2;
     const OFFSET_OUTPUT_SET: usize = 3;
+
+    /// Constructs a new serial device
+    pub fn new(base_address: usize) -> SerialInputOutputDevice
+    {
+        // Define the top address
+        let top_address = base_address + Self::DEVICE_MEM_SIZE;
+
+        // Assert that the memory values are okay and within bounds
+        assert!(top_address > base_address);
+        assert!(top_address <= MEM_MAX_SIZE);
+
+        // Construct the serial device output
+        return Self
+        {
+            base_address,
+            input_queue: RefCell::new(VecDeque::new()),
+            output_queue: VecDeque::new()
+        };
+    }
 }
 
 impl MemorySegment for SerialInputOutputDevice

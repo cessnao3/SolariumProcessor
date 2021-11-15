@@ -1,4 +1,5 @@
-use std::{num::ParseIntError, str::FromStr};
+use std::num::ParseIntError;
+use std::str::FromStr;
 
 /// Provides the data type to use for a word in memory
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
