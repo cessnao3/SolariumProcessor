@@ -4,13 +4,16 @@ use std::collections::VecDeque;
 use crate::memory::MemorySegment;
 use crate::common::{MemoryWord, SolariumError};
 
+/// Provides a memory serial I/O memory-mapped device
 pub struct SerialInputOutputDevice
 {
+    /// Provides the base address for the input device
     base_address: usize,
-    input_queue: RefCell<VecDeque<char>>,
-    output_queue: VecDeque<char>
+    input_queue: RefCell<VecDeque<MemoryWord>>,
+    output_queue: VecDeque<MemoryWord>
 }
 
+/// Defines constant values for the memory address offsets
 impl SerialInputOutputDevice
 {
     const DEVICE_MEM_SIZE: usize = 4;
@@ -25,13 +28,16 @@ impl MemorySegment for SerialInputOutputDevice
     /// Provides the word at the requested memory location
     fn get(&self, ind: usize) -> Result<MemoryWord, SolariumError>
     {
+        // Return error if not within the selected index
         if !self.within(ind)
         {
             return Err(SolariumError::InvalidMemoryAccess(ind));
         }
 
+        // Determine the base offset value
         let offset = ind - self.base_address;
 
+        // Use the offset values to determine the action to take
         return match offset
         {
             Self::OFFSET_INPUT_SIZE => Ok(MemoryWord::new(self.input_queue.borrow().len() as u16)),
@@ -39,7 +45,7 @@ impl MemorySegment for SerialInputOutputDevice
             {
                 match self.input_queue.borrow_mut().pop_front()
                 {
-                    Some(v) => Ok(MemoryWord::new(v as u16)),
+                    Some(v) => Ok(v),
                     None => Ok(MemoryWord::new(0))
                 }
             },
@@ -53,18 +59,19 @@ impl MemorySegment for SerialInputOutputDevice
     /// Returns true if the value could be set; otherwise returns false
     fn set(&mut self, ind: usize, data: MemoryWord) -> Result<(), SolariumError>
     {
+        // Return error if not within the given offset value
         if !self.within(ind)
         {
             return Err(SolariumError::InvalidMemoryAccess(ind))
         }
 
+        // Extract the offset and match based on the result
         let offset = ind - self.base_address;
-
         return match offset
         {
             Self::OFFSET_OUTPUT_SET =>
             {
-                self.output_queue.push_back((data.get() as u8) as char);
+                self.output_queue.push_back(data);
                 Ok(())
             },
             _ => Err(SolariumError::InvalidMemoryWrite(ind))
