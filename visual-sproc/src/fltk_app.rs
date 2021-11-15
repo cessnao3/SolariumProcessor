@@ -1,4 +1,4 @@
-use fltk::enums::{Event, FrameType, Color, Align, Font};
+use fltk::enums::{Align, Color, Event, Font, FrameType, Key};
 use fltk::image::PngImage;
 use fltk::input::Input;
 use fltk::prelude::*;
@@ -47,12 +47,15 @@ pub fn setup_and_run_app(
         .with_size(1100, 600)
         .with_label("VisualSProc");
 
-    main_window.set_callback(move |_|
+    main_window.handle(move |_, event|
     {
-        // Handle the close app event
-        if fltk::app::event() == Event::Close
+        if event == Event::KeyDown && fltk::app::event_key() == Key::Escape
         {
-            app.quit();
+            return true;
+        }
+        else
+        {
+            return false;
         }
     });
 
@@ -163,7 +166,18 @@ pub fn setup_and_run_app(
 
         serial_input = Input::default();
         memory_group.set_size(&mut serial_input, 28);
-        //serial_input.set_buffer(TextBuffer::default());
+        serial_input.handle(move |input, event|
+        {
+            if event == Event::KeyDown
+            {
+                if fltk::app::event_key() == Key::Enter
+                {
+                    serial_output.buffer().unwrap().append(&format!("{0:}\n", input.value()));
+                    input.set_value("");
+                }
+            }
+            return false;
+        });
 
         memory_group.set_margin(10);
         memory_group.end();
