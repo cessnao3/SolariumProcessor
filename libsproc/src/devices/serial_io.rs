@@ -16,7 +16,7 @@ pub struct SerialInputOutputDevice
 /// Defines constant values for the memory address offsets
 impl SerialInputOutputDevice
 {
-    const DEVICE_MEM_SIZE: usize = 4;
+    const DEVICE_MEM_SIZE: usize = 16;
     const OFFSET_INPUT_SIZE: usize = 0;
     const OFFSET_INPUT_GET: usize = 1;
     const OFFSET_OUTPUT_SIZE: usize = 2;
