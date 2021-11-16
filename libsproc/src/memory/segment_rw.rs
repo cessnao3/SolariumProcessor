@@ -51,6 +51,12 @@ impl MemorySegment for ReadWriteSegment
         };
     }
 
+    /// Provides the word at the requested memory location without affecting the device state
+    fn get_debug(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    {
+        return self.get(ind);
+    }
+
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
     fn set(&mut self, ind: usize, data: MemoryWord) -> Result<(), SolariumError>

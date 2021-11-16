@@ -66,6 +66,16 @@ impl MemoryMap
         };
     }
 
+    /// Provides the word at the requested memory location without affecting the device state
+    pub fn get_debug(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    {
+        return match self.segment_for_index(ind)
+        {
+            Some(seg) => seg.borrow().get_debug(ind),
+            None => Err(SolariumError::InvalidMemoryAccess(ind))
+        };
+    }
+
     /// Sets the value in memory for a particular memory location
     /// Returns true if the value was able to be set; otherwise returns false
     pub fn set(&mut self, ind: usize, data: MemoryWord) -> Result<(), SolariumError>

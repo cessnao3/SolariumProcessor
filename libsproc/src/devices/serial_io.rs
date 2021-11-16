@@ -40,6 +40,30 @@ impl SerialInputOutputDevice
             output_queue: VecDeque::new()
         };
     }
+
+    /// Determines if there is output in the queue
+    pub fn has_output(&self) -> bool
+    {
+        return !self.output_queue.is_empty();
+    }
+
+    /// Determines if there is input in the queue
+    pub fn has_input(&self) -> bool
+    {
+        return !self.input_queue.borrow().is_empty();
+    }
+
+    /// Pushes the input value into the input queue
+    pub fn push_input(&mut self, val: MemoryWord)
+    {
+        self.input_queue.borrow_mut().push_back(val);
+    }
+
+    /// Pops the output value from the output queue and returns
+    pub fn pop_output(&mut self) -> Option<MemoryWord>
+    {
+        return self.output_queue.pop_front();
+    }
 }
 
 impl MemorySegment for SerialInputOutputDevice
@@ -65,6 +89,36 @@ impl MemorySegment for SerialInputOutputDevice
                 match self.input_queue.borrow_mut().pop_front()
                 {
                     Some(v) => Ok(v),
+                    None => Ok(MemoryWord::new(0))
+                }
+            },
+            Self::OFFSET_OUTPUT_SIZE => Ok(MemoryWord::new(self.output_queue.len() as u16)),
+            Self::OFFSET_OUTPUT_SET => Ok(MemoryWord::new(0)),
+            _ => Err(SolariumError::InvalidMemoryAccess(ind))
+        };
+    }
+
+    /// Provides the word at the requested memory location without affecting the device state
+    fn get_debug(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    {
+        // Return error if not within the selected index
+        if !self.within(ind)
+        {
+            return Err(SolariumError::InvalidMemoryAccess(ind));
+        }
+
+        // Determine the base offset value
+        let offset = ind - self.base_address;
+
+        // Use the offset values to determine the action to take
+        return match offset
+        {
+            Self::OFFSET_INPUT_SIZE => Ok(MemoryWord::new(self.input_queue.borrow().len() as u16)),
+            Self::OFFSET_INPUT_GET =>
+            {
+                match self.input_queue.borrow().front()
+                {
+                    Some(v) => Ok(*v),
                     None => Ok(MemoryWord::new(0))
                 }
             },

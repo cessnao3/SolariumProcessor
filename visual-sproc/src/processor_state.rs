@@ -5,7 +5,7 @@ use super::messages::GuiMessage;
 
 use libsproc::cpu::SolariumProcessor;
 use libsproc::devices::SerialInputOutputDevice;
-use libsproc::memory::{ReadWriteSegment, ReadOnlySegment, MEM_MAX_SIZE};
+use libsproc::memory::{MEM_MAX_SIZE, MemorySegment, ReadOnlySegment, ReadWriteSegment};
 use libsproc::common::MemoryWord;
 
 
@@ -18,11 +18,14 @@ pub struct ProcessorStatusStruct
     regs_updated: bool,
     step_error: bool,
     last_assembly: Vec::<MemoryWord>,
+    serial_io_dev: Rc<RefCell<SerialInputOutputDevice>>,
     pub msg_queue: Vec<GuiMessage>
 }
 
 impl ProcessorStatusStruct
 {
+    const DEVICE_START_IND: usize = 0xA000;
+
     pub fn new() -> ProcessorStatusStruct
     {
         let mut stat = ProcessorStatusStruct
@@ -32,6 +35,7 @@ impl ProcessorStatusStruct
             regs_updated: false,
             step_error: false,
             last_assembly: Vec::new(),
+            serial_io_dev: Rc::new(RefCell::new(SerialInputOutputDevice::new(Self::DEVICE_START_IND))),
             msg_queue: Vec::new()
         };
 
@@ -43,6 +47,7 @@ impl ProcessorStatusStruct
     pub fn reset(&mut self)
     {
         self.cpu.memory_map.clear();
+        self.serial_io_dev.borrow_mut().reset();
 
         const INIT_RO_LEN: usize = SolariumProcessor::INIT_DATA_SIZE;
 
@@ -51,20 +56,19 @@ impl ProcessorStatusStruct
             .collect();
         assert!(reset_vec_data.len() == INIT_RO_LEN);
 
-        const DEVICE_START_IND: usize = 0xA000;
-        assert!(DEVICE_START_IND < MEM_MAX_SIZE);
+        assert!(Self::DEVICE_START_IND < MEM_MAX_SIZE);
 
         match self.cpu.memory_map.add_segment(Rc::new(RefCell::new(ReadOnlySegment::new(0, reset_vec_data))))
         {
             Ok(()) => (),
             Err(e) => panic!("{0:}", e)
         };
-        match self.cpu.memory_map.add_segment(Rc::new(RefCell::new(ReadWriteSegment::new(INIT_RO_LEN, DEVICE_START_IND - INIT_RO_LEN))))
+        match self.cpu.memory_map.add_segment(Rc::new(RefCell::new(ReadWriteSegment::new(INIT_RO_LEN, Self::DEVICE_START_IND - INIT_RO_LEN))))
         {
             Ok(()) => (),
             Err(e) => panic!("{0:}", e)
         };
-        match self.cpu.memory_map.add_segment(Rc::new(RefCell::new(SerialInputOutputDevice::new(DEVICE_START_IND))))
+        match self.cpu.memory_map.add_segment(self.serial_io_dev.clone())
         {
             Ok(()) => (),
             Err(e) => panic!("{0:}", e)
@@ -174,7 +178,7 @@ impl ProcessorStatusStruct
     pub fn send_memory_to_queue(&mut self)
     {
         let mem_vec: Vec<MemoryWord> = (0..MEM_MAX_SIZE).map(|i| {
-            return match self.cpu.memory_map.get(i)
+            return match self.cpu.memory_map.get_debug(i)
             {
                 Ok(v) => v,
                 Err(_) => MemoryWord::new(0)
@@ -182,5 +186,15 @@ impl ProcessorStatusStruct
         }).collect();
 
         self.msg_queue.push(GuiMessage::UpdateMemory(mem_vec));
+    }
+
+    pub fn pop_serial_output(&self) -> Option<MemoryWord>
+    {
+        return self.serial_io_dev.borrow_mut().pop_output();
+    }
+
+    pub fn push_serial_input(&mut self, val: MemoryWord)
+    {
+        self.serial_io_dev.borrow_mut().push_input(val);
     }
 }

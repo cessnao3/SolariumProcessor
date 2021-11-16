@@ -1,6 +1,8 @@
 use super::processor_state::ProcessorStatusStruct;
 use super::messages::{GuiMessage, ThreadMessage};
 
+use libsproc::common::MemoryWord;
+
 use std::thread;
 
 use std::sync::mpsc;
@@ -63,6 +65,10 @@ pub fn run_scpu_thread(
                     ThreadMessage::SetSpeed(v) =>
                     {
                         step_repeat_count = (v / THREAD_LOOP_HZ as f64) as u64;
+                    },
+                    ThreadMessage::SerialInput(c) =>
+                    {
+                        cpu_stat.push_serial_input(MemoryWord::new(c as u16));
                     }
                 },
                 Err(mpsc::TryRecvError::Disconnected) =>
@@ -86,6 +92,21 @@ pub fn run_scpu_thread(
         if update_memory
         {
             cpu_stat.send_memory_to_queue();
+        }
+
+        while let Some(c) = cpu_stat.pop_serial_output()
+        {
+            if c.get() <= u8::MAX as u16
+            {
+                match thread_to_gui_tx.send(GuiMessage::SerialOutput((c.get() as u8) as char))
+                {
+                    Ok(()) => (),
+                    Err(_) =>
+                    {
+                        break;
+                    }
+                }
+            }
         }
 
         cpu_stat.update_msg_queue();

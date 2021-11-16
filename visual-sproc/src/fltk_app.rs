@@ -172,7 +172,10 @@ pub fn setup_and_run_app(
             {
                 if fltk::app::event_key() == Key::Enter
                 {
-                    serial_output.buffer().unwrap().append(&format!("{0:}\n", input.value()));
+                    for c in input.value().chars()
+                    {
+                        fltk_sender.send(FltkMessage::SerialInput(c));
+                    }
                     input.set_value("");
                 }
             }
@@ -260,6 +263,7 @@ pub fn setup_and_run_app(
     while app.wait()
     {
         let mut message_queue: Vec<String> = Vec::new();
+        let mut serial_output_queue: Vec<char> = Vec::new();
 
         let mut thread_exit = false;
 
@@ -289,6 +293,10 @@ pub fn setup_and_run_app(
                                 shared_table_memory.borrow_mut()[ind].set(val.get());
                             }
                             memory_table.redraw();
+                        },
+                        GuiMessage::SerialOutput(c) =>
+                        {
+                            serial_output_queue.push(c);
                         }
                     }
                 },
@@ -332,6 +340,10 @@ pub fn setup_and_run_app(
                 FltkMessage::HardwareInterrupt(intval) =>
                 {
                     msg_to_send = Some(ThreadMessage::HardwareInterrupt(intval));
+                },
+                FltkMessage::SerialInput(c) =>
+                {
+                    msg_to_send = Some(ThreadMessage::SerialInput(c));
                 },
                 FltkMessage::Assemble =>
                 {
@@ -394,6 +406,12 @@ pub fn setup_and_run_app(
                 let num_lines = log_text_display.buffer().unwrap().text().split("\n").count();
                 log_text_display.scroll(num_lines as i32, 0);
             }
+        }
+
+        // Add the serial output values
+        if !serial_output_queue.is_empty()
+        {
+            log_text_display.buffer().unwrap().append(&serial_output_queue.iter().collect::<String>());
         }
 
         // Send messages

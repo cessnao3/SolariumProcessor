@@ -12,6 +12,7 @@ pub enum FltkMessage
     Assemble,
     Tick,
     SetSpeed(f64),
+    SerialInput(char),
     HardwareInterrupt(usize)
 }
 
@@ -24,6 +25,7 @@ pub enum ThreadMessage
     Reset,
     Step,
     SetSpeed(f64),
+    SerialInput(char),
     HardwareInterrupt(usize)
 }
 
@@ -32,5 +34,6 @@ pub enum GuiMessage
 {
     UpdateRegisters(RegisterArray),
     UpdateMemory(Vec<MemoryWord>),
+    SerialOutput(char),
     LogMessage(String)
 }

@@ -17,6 +17,9 @@ pub trait MemorySegment
     /// Provides the word at the requested memory location
     fn get(&self, ind: usize) -> Result<MemoryWord, SolariumError>;
 
+    /// Provides the word at the requested memory location without modifying the device state
+    fn get_debug(&self, ind: usize) -> Result<MemoryWord, SolariumError>;
+
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
     fn set(&mut self, ind: usize, data: MemoryWord) -> Result<(), SolariumError>;
