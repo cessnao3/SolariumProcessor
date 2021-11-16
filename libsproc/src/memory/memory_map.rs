@@ -194,22 +194,22 @@ mod tests
 
             // Check the immutable segment value
             {
-                let index_segment = map.segment_for_index(i);
-
-                if index_segment.is_some()
+                match map.segment_for_index(i)
                 {
-                    let seg_val = index_segment.unwrap().borrow().get(i);
+                    Some(seg) =>
+                    {
+                        let seg_val = seg.borrow().get(i);
 
-                    assert!(seg_val.is_ok());
-                    assert_eq!(seg_val.unwrap().get(), set_val);
+                        assert!(seg_val.is_ok());
+                        assert_eq!(seg_val.unwrap().get(), set_val);
+                    },
+                    None => ()
                 }
             }
 
             // Check the mutable segment value
             {
-                let index_segment = map.segment_for_index(i);
-
-                match index_segment
+                match map.segment_for_index(i)
                 {
                     Some(seg) =>
                     {
@@ -286,11 +286,9 @@ mod tests
 
             // Check the immutable segment value
             {
-                let index_segment = map.segment_for_index(i);
-
-                match index_segment
+                match map.segment_for_index(i)
                 {
-                    Ok(seg) =>
+                    Some(seg) =>
                     {
                         let seg_val = seg.borrow().get(i);
 
@@ -303,9 +301,7 @@ mod tests
 
             // Check the mutable segment value
             {
-                let index_segment = map.segment_for_index(i);
-
-                match index_segment
+                match map.segment_for_index(i)
                 {
                     Some(seg) =>
                     {
