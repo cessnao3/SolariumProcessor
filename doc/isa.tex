@@ -90,7 +90,7 @@ The stack pointer provides an offset from the stack pointer starting location. B
 
 \section{Instructions and Assembly Code}
 
-All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor.
+All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field.
 
 \begin{table}[h!]
 	\centering
@@ -117,16 +117,19 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			 \texttt{mem[SP++] = R[i]}, \texttt{PC = R[a]} \\
  			0 & 0 & 6 & 0xI & \texttt{int <imm>} & Trigger software interrupt number \texttt{imm} \\
  			0 & 0 & 7 & R[a] & \texttt{intr [a]} & Trigger software interrupt number in \texttt{R[a]} \\
+ 			0 & 0 & 8 & R[a] & \texttt{tz [a]} & If \texttt{R[a] == 0} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+ 			0 & 0 & 9 & R[a] & \texttt{tgz [a]} & If \texttt{R[a] > 0} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+ 			0 & 0 & 10 & R[a] & \texttt{tlz [a]} & If \texttt{R[a] < 0} \texttt{PC += 1}, Else \texttt{PC += 2} \\
 			0 & 1 & 0xI0 & 0x0I & \texttt{jmpri <imm>} & \texttt{PC += Im} \\
 			0 & 2 & R[src] & R[dst] & \texttt{ld [dst], [src]} & \texttt{R[dst] = mem[R[src]]} \\
 			0 & 3 & R[src] & R[dst] & \texttt{sav [dst], [src]} & \texttt{mem[R[dst]] = R[src]} \\
 			0 & 4 & R[src] & R[dst] & \texttt{ldr [dst], [src]} & \texttt{R[dst] = mem[PC + R[src]]} \\
 			0 & 5 & R[src] & R[dst] & \texttt{savr [dst], [src]} & \texttt{mem[PC + R[dst]] = R[src]} \\
-			0 & 6 & R[cmp] & R[a] & \texttt{jz [a], [cmp]} & \texttt{PC = R[a] IF R[cmp] == 0} \\
-			0 & 7 & R[cmp] & R[a] & \texttt{jzr [a], [cmp]} & \texttt{PC += R[a] IF R[cmp] == 0} \\
-			0 & 8 & R[cmp] & R[a] & \texttt{jgz [a], [cmp]} & \texttt{PC = R[a] IF R[cmp] > 0} \\
-			0 & 9 & R[cmp] & R[a] & \texttt{jgzr [a], [cmp]} & \texttt{PC += R[a] IF R[cmp] > 0} \\
-			0 & 10 & R[b] & R[a] & \texttt{copy [a], [b]} & \texttt{R[a] = R[b]} \\
+			0 & 6 & R[b] & R[a] & \texttt{copy [a], [b]} & \texttt{R[a] = R[b]} \\
+			0 & 7 & R[b] & R[a] & \texttt{tg [a], [b]} & If \texttt{R[a] > R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+			0 & 8 & R[b] & R[a] & \texttt{tge [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+			0 & 9 & R[b] & R[a] & \texttt{tl [a], [b]} & If \texttt{R[a] < R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+			0 & 10 & R[b] & R[a] & \texttt{tle [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2}\\
 			1 & 0xI0 & 0x0I & R[dst] & \texttt{ldi [dst], <imm>} & \texttt{R[dst] = Im} \\
 			2 & 0xI0 & 0x0I & R[dst] & \texttt{ldui [dst], <imm-unsigned>} & \texttt{R[dst] = Im} \\
 			3 & 0xI0 & 0x0I & R[dst] & \texttt{ldir [dst], <imm>} & \texttt{R[dst] = mem[PC + Im]} \\

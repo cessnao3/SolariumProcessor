@@ -32,12 +32,9 @@ add 14, 14, 13
 ldi 15, 3
 add 15, 15, 13
 
-; Define the default jump instruction
-ldi 4, 2
-
 :hw_int_0_main_loop
 ld 6, 13
-jgzr 4, 6
+tz 6
 jmpri hw_int_0_end
 
 ld 7, 14
@@ -72,9 +69,6 @@ jmpri load_data
 :load_data
 ldir 4, target_value
 
-; Load the default jump instruction
-ldi 14, 2
-
 ; Load the function call test
 ldir 15, 2
 jmpri 2
@@ -90,9 +84,9 @@ sub 5, 4, 3
 
 ; Jump back to the add instruction if the
 ; target minus current is greater than zero
-jgzr 14, 5
-jmpri endloc
+tgz 5
 jmpri loop
+jmpri endloc
 
 ; Otherwise, enter an infinite loop as program completion
 :endloc

@@ -87,6 +87,15 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
         "intr".to_string(),
         Box::new(RegisterInstruction::new(7, 1)));
     instructions.insert(
+        "tz".to_string(),
+        Box::new(RegisterInstruction::new(8, 1)));
+    instructions.insert(
+        "tgz".to_string(),
+        Box::new(RegisterInstruction::new(9, 1)));
+    instructions.insert(
+        "tlz".to_string(),
+        Box::new(RegisterInstruction::new(10, 1)));
+    instructions.insert(
         "jmpri".to_string(),
         Box::new(ImmediateSingleInstruction::new(1)));
     instructions.insert(
@@ -102,19 +111,19 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
         "savr".to_string(),
         Box::new(RegisterInstruction::new(5, 2)));
     instructions.insert(
-        "jz".to_string(),
+        "copy".to_string(),
         Box::new(RegisterInstruction::new(6, 2)));
     instructions.insert(
-        "jzr".to_string(),
+        "tg".to_string(),
         Box::new(RegisterInstruction::new(7, 2)));
     instructions.insert(
-        "jgz".to_string(),
+        "tge".to_string(),
         Box::new(RegisterInstruction::new(8, 2)));
     instructions.insert(
-        "jgzr".to_string(),
+        "tl".to_string(),
         Box::new(RegisterInstruction::new(9, 2)));
     instructions.insert(
-        "copy".to_string(),
+        "tle".to_string(),
         Box::new(RegisterInstruction::new(10, 2)));
     instructions.insert(
         "ldi".to_string(),

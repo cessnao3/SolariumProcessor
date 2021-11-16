@@ -394,7 +394,10 @@ mod tests
             ("popr", 4),
             ("call", 5),
             ("int", 6),
-            ("intr", 7)
+            ("intr", 7),
+            ("tz", 8),
+            ("tgz", 9),
+            ("tlz", 10)
         ];
 
         for (arg, opcode) in args_to_test
@@ -467,11 +470,11 @@ mod tests
             ("sav", 3),
             ("ldr", 4),
             ("savr", 5),
-            ("jz", 6),
-            ("jzr", 7),
-            ("jgz", 8),
-            ("jgzr", 9),
-            ("copy", 10)
+            ("copy", 6),
+            ("tg", 7),
+            ("tge", 8),
+            ("tl", 9),
+            ("tle", 10)
         ];
 
         for (arg, opcode) in args_to_test

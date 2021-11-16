@@ -366,7 +366,7 @@ impl SolariumProcessor
             },
             InstructionGroup { opcode: 0, arg0: 0, arg1: opcode, arg2: arg0 } =>
             {
-                let dest_register = Register::from_index(arg0 as usize);
+                let reg_a = Register::from_index(arg0 as usize);
 
                 match opcode
                 {
@@ -374,16 +374,16 @@ impl SolariumProcessor
                     {
                         self.registers.set(
                             Register::ProgramCounter,
-                            self.registers.get(dest_register));
+                            self.registers.get(reg_a));
                         pc_incr = 0;
                     },
                     2 => // jmpr
                     {
-                        pc_incr = self.registers.get(dest_register).get_signed() as i32;
+                        pc_incr = self.registers.get(reg_a).get_signed() as i32;
                     },
                     3 => // push
                     {
-                        match self.push_sp(self.registers.get(dest_register))
+                        match self.push_sp(self.registers.get(reg_a))
                         {
                             Ok(()) => (),
                             Err(e) => return Err(e)
@@ -396,7 +396,7 @@ impl SolariumProcessor
                             Ok(val) =>
                             {
                                 self.registers.set(
-                                    dest_register,
+                                    reg_a,
                                     val);
                             },
                             Err(e) => return Err(e)
@@ -415,7 +415,7 @@ impl SolariumProcessor
                         };
 
                         // Move to the new location
-                        let new_loc = self.registers.get(dest_register);
+                        let new_loc = self.registers.get(reg_a);
                         self.registers.set(
                             Register::ProgramCounter,
                             new_loc);
@@ -428,11 +428,11 @@ impl SolariumProcessor
                         // Determine the interrupt vector value
                         let int_offset = if opcode == 6
                         {
-                            dest_register.to_index()
+                            reg_a.to_index()
                         }
                         else if opcode == 7
                         {
-                            self.registers.get(dest_register).get() as usize
+                            self.registers.get(reg_a).get() as usize
                         }
                         else
                         {
@@ -457,6 +457,39 @@ impl SolariumProcessor
 
                         // Disable the PC increment
                         pc_incr = 0;
+                    },
+                    8 | 9 | 10 => // tz, tgz, tlz
+                    {
+                        let reg_val = self.registers.get(reg_a).get_signed();
+
+                        let test_passed = match opcode
+                        {
+                            8 => // tz
+                            {
+                                reg_val == 0
+                            },
+                            9 => // tgz
+                            {
+                                reg_val > 0
+                            },
+                            10 => //tlz
+                            {
+                                reg_val < 0
+                            },
+                            _ =>
+                            {
+                                panic!();
+                            }
+                        };
+
+                        if test_passed
+                        {
+                            pc_incr = 1;
+                        }
+                        else
+                        {
+                            pc_incr = 2;
+                        }
                     },
                     _ => // ERROR
                     {
@@ -520,35 +553,50 @@ impl SolariumProcessor
                             Err(e) => return Err(e)
                         };
                     },
-                    6..=9 => // jz, jzr, jgz, jgzr
-                    {
-                        let cmp = self.registers.get(reg_b).get_signed();
-
-                        let should_jump = (
-                            (opcode == 6 || opcode == 7) && cmp == 0) ||
-                            ((opcode == 8 || opcode == 9) && cmp > 0);
-                        let jump_relative = opcode == 7 || opcode == 9;
-
-                        if should_jump
-                        {
-                            if jump_relative
-                            {
-                                pc_incr = self.registers.get(reg_a).get_signed() as i32;
-                            }
-                            else
-                            {
-                                self.registers.set(
-                                    Register::ProgramCounter,
-                                    self.registers.get(reg_a));
-                            }
-                        }
-                    },
-                    10 => // copy
+                    6 => // copy
                     {
                         self.registers.set(
                             reg_a,
                             self.registers.get(reg_b));
                     }
+                    7..=10 => // tg, tge, tl, tle
+                    {
+                        let val_a = self.registers.get(reg_a).get_signed();
+                        let val_b = self.registers.get(reg_b).get_signed();
+
+                        let test_passed = match opcode
+                        {
+                            7 => // tg
+                            {
+                                val_a > val_b
+                            },
+                            8 => //tge
+                            {
+                                val_a >= val_b
+                            },
+                            9 => // tl
+                            {
+                                val_a < val_b
+                            },
+                            10 => // tle
+                            {
+                                val_a <= val_b
+                            },
+                            _ =>
+                            {
+                                panic!();
+                            }
+                        };
+
+                        if test_passed
+                        {
+                            pc_incr = 1;
+                        }
+                        else
+                        {
+                            pc_incr = 2;
+                        }
+                    },
                     _ => // ERROR
                     {
                         return Err(SolariumError::InvalidInstruction(inst_word));
