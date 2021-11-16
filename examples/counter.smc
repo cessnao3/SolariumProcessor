@@ -40,8 +40,10 @@ ld 6, 13
 jgzr 4, 6
 jmpri hw_int_0_end
 
-ldi 7, 14
+ld 7, 14
 sav 15, 7
+
+jmpri hw_int_0_main_loop
 
 :hw_int_0_end
 retint
