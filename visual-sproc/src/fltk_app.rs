@@ -176,6 +176,10 @@ pub fn setup_and_run_app(
                     {
                         fltk_sender.send(FltkMessage::SerialInput(c));
                     }
+                    if input.value().len() > 0
+                    {
+                        fltk_sender.send(FltkMessage::SerialInput('\n'));
+                    }
                     input.set_value("");
                 }
             }
@@ -411,7 +415,7 @@ pub fn setup_and_run_app(
         // Add the serial output values
         if !serial_output_queue.is_empty()
         {
-            log_text_display.buffer().unwrap().append(&serial_output_queue.iter().collect::<String>());
+            serial_output.buffer().unwrap().append(&serial_output_queue.iter().collect::<String>());
         }
 
         // Send messages
