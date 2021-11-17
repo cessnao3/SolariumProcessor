@@ -224,8 +224,8 @@ pub fn setup_and_run_app(
         // Define the speed slider
         let mut speed_slider = HorValueSlider::default().with_label("Speed");
         speed_slider.set_maximum(6.0);
-        speed_slider.set_minimum(2.0);
-        speed_slider.set_value(2.0);
+        speed_slider.set_minimum(1.0);
+        speed_slider.set_value(1.0);
         speed_slider.set_precision(1);
         speed_slider.set_callback(move |v|
         {

@@ -64,7 +64,7 @@ pub fn run_scpu_thread(
                     },
                     ThreadMessage::SetSpeed(v) =>
                     {
-                        step_repeat_count = (v / THREAD_LOOP_HZ as f64) as u64;
+                        step_repeat_count = std::cmp::max((v / THREAD_LOOP_HZ as f64) as u64, 1);
                     },
                     ThreadMessage::SerialInput(c) =>
                     {
