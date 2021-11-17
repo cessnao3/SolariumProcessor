@@ -21,6 +21,8 @@ impl SerialInputOutputDevice
     const OFFSET_INPUT_GET: usize = 1;
     const OFFSET_OUTPUT_SIZE: usize = 2;
     const OFFSET_OUTPUT_SET: usize = 3;
+    // TODO: Provide offsets for resetting input/output values?
+    // Provide a queue limit, after which the end value will be replaced (or no new parameters can be added?)
 
     /// Constructs a new serial device
     pub fn new(base_address: usize) -> SerialInputOutputDevice
