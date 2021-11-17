@@ -9,4 +9,4 @@ edition = "2021"
 [dependencies]
 libsproc = { path = "../libsproc", version = "*" }
 libsproc-assemble = { path = "../libsproc-assemble", version = "*" }
-fltk = { version = "1.2.9" }
+fltk = { version = "1.2.16" }
