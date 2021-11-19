@@ -84,7 +84,29 @@ The stack pointer provides an offset from the stack pointer starting location. B
 
 \subsection{Interrupts}
 
-%TODO - Interrupt Items
+Interrupts provide a means to interrupt the current flow of execution and run a separate method. There are two types of interrupts - hardware interrupts, which originate by request of an external hardware device, and software interrupts, which originate from a specific instruction. When an interrupt is triggered, the flow of program execution is interrupted before the next instruction is started. The current register state is stored on the stack, and the program counter is replaced with the value in the corresponding interrupt vector. Then, the program execution continues from this new location.
+
+At the conclusion of any interrupt, the \texttt{retint} instruction should be called. This will replace the current register state with the values provided off the stack and resume program execution from the location right after the interrupt was called.
+
+It should be noted that, if any values were pushed onto the stack during the interrupt handler, they should be popped off the stack prior to the \texttt{retint} call to avoid corrupting the program state.
+
+The SProc supports up to 16 software interrupts and up to 16 hardware interrupts, as shown in Table \ref{table:interrupt-vector-locations}. Software interrupt vectors are stored in memory at location \texttt{0x2} for software interrupt 0 though \texttt{0x12}, exclusive. Similarly, the 16 hardware interrupts are stored in memory at memory address \texttt{0x12} through \texttt{0x22}, exclusive.
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{c|ccccccc}
+		\hline
+		Type & 0 & 1 & 2 & \dots & 13 & 14 & 15 \\
+		\hline
+		Software & \texttt{0x2} & \texttt{0x3} & \texttt{0x4} & \dots & \texttt{0xF} & \texttt{0x10} & \texttt{0x11} \\
+		Hardware & \texttt{0x12} & \texttt{0x13} & \texttt{0x14} & \dots & \texttt{0x1F} & \texttt{0x20} & \texttt{0x21} \\
+		\hline
+	\end{tabular}
+	\caption{Interrupt vector locations for both hardware and software interrupts}
+	\label{table:interrupt-vector-locations}
+\end{table}
+
+Note that, if a vector has a value of zero, that interrupt vector is considered to be disabled and that interrupt will effectively be disabled and not able to be run.
 
 \pagebreak
 
