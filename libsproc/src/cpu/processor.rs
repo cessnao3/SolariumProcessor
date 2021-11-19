@@ -189,35 +189,39 @@ impl SolariumProcessor
     /// Calls the interrupt at the provided interrupt vector if interrupts are enabled
     fn call_interrupt(&mut self, interrupt_vector: usize) -> Result<bool, SolariumError>
     {
-        if self.allow_interrupts
+        // Return false if interrupts are not allowed
+        if !self.allow_interrupts
         {
-            // Push all register values to the stack
-            match self.push_all_registers()
-            {
-                Ok(()) => (),
-                Err(e) => return Err(e)
-            };
-
-            // Obtain the desired value from the program counter
-            let new_pc = match self.memory_map.get(interrupt_vector)
-            {
-                Ok(v) => v,
-                Err(e) => return Err(e)
-            };
-
-            // Update the program counter to the value in the interrupt vector
-            self.registers.set(
-                Register::ProgramCounter,
-                new_pc);
-
-            // Return true if the interrupt was called
-            return Ok(true);
-        }
-        else
-        {
-            // Return false if no interrupt was called
             return Ok(false);
         }
+
+        // Obtain the desired value from the program counter
+        let new_pc = match self.memory_map.get(interrupt_vector)
+        {
+            Ok(v) => v,
+            Err(e) => return Err(e)
+        };
+
+        // Return false if the vector value is 0 (Disabled)
+        if new_pc.get() == 0
+        {
+            return Ok(false);
+        }
+
+        // Push all register values to the stack
+        match self.push_all_registers()
+        {
+            Ok(()) => (),
+            Err(e) => return Err(e)
+        };
+
+        // Update the program counter to the value in the interrupt vector
+        self.registers.set(
+            Register::ProgramCounter,
+            new_pc);
+
+        // Return true if the interrupt was called
+        return Ok(true);
     }
 
     /// Pushes all register values onto the stack
