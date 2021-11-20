@@ -83,7 +83,14 @@ pub fn run_scpu_thread(
 
             for _ in 0..inner_repeat_count
             {
-                cpu_stat.step();
+                if !cpu_stat.has_step_error()
+                {
+                    cpu_stat.step();
+                }
+                else
+                {
+                    break;
+                }
             }
         }
 
@@ -127,11 +134,6 @@ pub fn run_scpu_thread(
         if cpu_stat.msg_queue.len() > 0
         {
             cpu_stat.msg_queue.clear();
-        }
-
-        if cpu_stat.has_step_error()
-        {
-            break;
         }
 
         thread::sleep(time::Duration::from_millis(THREAD_LOOP_MS));
