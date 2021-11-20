@@ -2,6 +2,7 @@ mod instructions;
 mod assembly;
 
 use instructions::get_instruction_map;
+use libsproc::common::MemoryWord;
 
 use std::collections::HashMap;
 
@@ -113,17 +114,30 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
 
         // Extract parameters
         let command = capture_groups.name("command").unwrap().as_str().to_ascii_lowercase();
-        let args = match capture_groups.name("args")
+        let arg_text = match capture_groups.name("text")
         {
-            Some(v) => match ARGUMENT_SPLIT_REGEX
-                .split(&v.as_str().to_ascii_lowercase())
-                .map(|v| v.parse::<Argument>())
-                .collect()
+            Some(v) => Some(v.as_str().to_string()),
+            None => None
+        };
+
+        let args_opt = match arg_text
+        {
+            Some(_) => None,
+            None =>
             {
-                Ok(v) => v,
-                Err(e) => return Err(format!("line {0:} {1:}", i, e.to_string()))
+                match capture_groups.name("args")
+                {
+                    Some(v) => match ARGUMENT_SPLIT_REGEX
+                        .split(&v.as_str().to_ascii_lowercase())
+                        .map(|v| v.parse::<Argument>())
+                        .collect()
+                    {
+                        Ok(v) => Some(v),
+                        Err(e) => return Err(format!("line {0:} {1:}", i, e.to_string()))
+                    }
+                    None => Some(Vec::new())
+                }
             }
-            None => Vec::new()
         };
 
         // Check the first character of the command to determine how to handle
@@ -135,6 +149,13 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
 
             if command_type == "oper"
             {
+                // Extract the arguments
+                let args = match args_opt
+                {
+                    Some(v) => v,
+                    None => return Err(format!("line {0:} no valid arguments provided", i))
+                };
+
                 if args.len() != 1
                 {
                     return Err(format!(
@@ -169,6 +190,13 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
             }
             else if command_type == "load"
             {
+                // Extract the arguments
+                let args = match args_opt
+                {
+                    Some(v) => v,
+                    None => return Err(format!("line {0:} no valid arguments provided", i))
+                };
+
                 if args.len() != 1
                 {
                     return Err(format!("line {0:} command {1:} only takes 1 argument", i, command_type));
@@ -187,6 +215,13 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
             }
             else if command_type == "loadloc"
             {
+                // Extract the arguments
+                let args = match args_opt
+                {
+                    Some(v) => v,
+                    None => return Err(format!("line {0:} no valid arguments provided", i))
+                };
+
                 if args.len() != 1
                 {
                     return Err(format!("line {0:} command {1:} only takes 1 argument", i, command_type));
@@ -203,6 +238,34 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
                     LineValue::LoadLabelLoc(i, arg_label));
                 current_data_index += 1;
             }
+            else if command_type == "loadtext"
+            {
+                if arg_text.is_none()
+                {
+                    return Err(format!("line {0:} no text input provided", i));
+                }
+
+                let text_vals: Vec<MemoryWord> = match arg_text.unwrap().chars().map(|v| libsproc::text::character_to_word(v)).collect()
+                {
+                    Ok(v) => v,
+                    Err(e) => return Err(format!("line {0:} character error - {1:}", i, e.to_string()))
+                };
+
+                // Insert all values in the text string
+                for val in text_vals
+                {
+                    data_map.insert(
+                        current_data_index,
+                        LineValue::Load(val.get()));
+                    current_data_index += 1;
+                }
+
+                // Add the ending null terminator
+                data_map.insert(
+                    current_data_index,
+                    LineValue::Load(0));
+                current_data_index += 1;
+            }
             else
             {
                 return Err(format!("line {0:} invalid command \"{1:}\" found", i, command_type));
@@ -210,6 +273,13 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
         }
         else if first_char == ':'
         {
+            // Extract the arguments
+            let args = match args_opt
+            {
+                Some(v) => v,
+                None => return Err(format!("line {0:} no valid arguments provided", i))
+            };
+
             if args.len() > 0
             {
                 return Err(format!("line {0:} label types cannot have any arguments", i));
@@ -230,6 +300,13 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
         }
         else
         {
+            // Extract the arguments
+            let args = match args_opt
+            {
+                Some(v) => v,
+                None => return Err(format!("line {0:} no valid arguments provided", i))
+            };
+
             // Add the data values
             if data_map.contains_key(&current_data_index)
             {

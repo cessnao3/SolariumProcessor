@@ -59,7 +59,7 @@ lazy_static!
 
     // Define the regex for the overall parameters
     pub static ref VALID_LINE_REGEX: Regex = Regex::new(&format!(
-        r"^(?P<command>{0:})(\s+(?P<args>{1:}))?$",
+        r#"^(?P<command>{0:})(\s+((?P<args>{1:})|("(?P<text>[[:ascii:]]*)")))?$"#,
         STARTING_REGEX_STR.to_string(),
         ARG_LIST_STRING.to_string())).unwrap();
 }
