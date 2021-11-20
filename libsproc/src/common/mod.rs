@@ -76,7 +76,8 @@ pub enum SolariumError
     ModByZero,
     ShiftError(usize),
     CharacterToWord(char),
-    WordToCharacter(MemoryWord)
+    WordToCharacter(MemoryWord),
+    DeviceError(usize, SolariumDeviceError)
 }
 
 impl ToString for SolariumError
@@ -97,8 +98,27 @@ impl ToString for SolariumError
             SolariumError::StackOverflow => "stack overflow".to_string(),
             SolariumError::StackUnderflow => "stack underflow".to_string(),
             SolariumError::CharacterToWord(c) => format!("unable to convert {0:} to word", c),
-            SolariumError::WordToCharacter(word) => format!("unable to convert {0:04X} to character", word.get())
+            SolariumError::WordToCharacter(word) => format!("unable to convert {0:04X} to character", word.get()),
+            SolariumError::DeviceError(base_addr, err) => format!("device {0:} error: {1:}", base_addr, err.to_string())
         }
+    }
+}
+
+/// Provides a device error code
+#[derive(Clone, Copy, Debug)]
+pub enum SolariumDeviceError
+{
+    BufferFull
+}
+
+impl ToString for SolariumDeviceError
+{
+    fn to_string(&self) -> String
+    {
+        return match self
+        {
+            SolariumDeviceError::BufferFull => "device buffer is full".to_string()
+        };
     }
 }
 

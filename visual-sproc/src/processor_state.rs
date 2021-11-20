@@ -197,7 +197,13 @@ impl ProcessorStatusStruct
     {
         match libsproc::text::character_to_word(c)
         {
-            Ok(word) => self.serial_io_dev.borrow_mut().push_input(word),
+            Ok(word) =>
+            {
+                if !self.serial_io_dev.borrow_mut().push_input(word)
+                {
+                    self.msg_queue.push(GuiMessage::LogMessage("device serial input buffer full".to_string()))
+                }
+            },
             Err(e) => self.msg_queue.push(GuiMessage::LogMessage(e.to_string()))
         };
     }

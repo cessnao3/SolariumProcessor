@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 
 use crate::memory::{MemorySegment, MEM_MAX_SIZE};
-use crate::common::{MemoryWord, SolariumError};
+use crate::common::{MemoryWord, SolariumDeviceError, SolariumError};
 
 /// Provides a memory serial I/O memory-mapped device
 pub struct SerialInputOutputDevice
@@ -16,13 +16,17 @@ pub struct SerialInputOutputDevice
 /// Defines constant values for the memory address offsets
 impl SerialInputOutputDevice
 {
+    // Define memory size and offset values
     const DEVICE_MEM_SIZE: usize = 16;
     const OFFSET_INPUT_SIZE: usize = 0;
     const OFFSET_INPUT_GET: usize = 1;
     const OFFSET_OUTPUT_SIZE: usize = 2;
     const OFFSET_OUTPUT_SET: usize = 3;
-    // TODO: Provide offsets for resetting input/output values?
+    const OFFSET_INPUT_RESET_IN: usize = 4;
+    const OFFSET_INPUT_RESET_OUT: usize = 5;
+
     // Provide a queue limit, after which the end value will be replaced (or no new parameters can be added?)
+    const IO_BUFFER_SIZE: usize = 256;
 
     /// Constructs a new serial device
     pub fn new(base_address: usize) -> SerialInputOutputDevice
@@ -56,9 +60,17 @@ impl SerialInputOutputDevice
     }
 
     /// Pushes the input value into the input queue
-    pub fn push_input(&mut self, val: MemoryWord)
+    pub fn push_input(&mut self, val: MemoryWord) -> bool
     {
-        self.input_queue.borrow_mut().push_back(val);
+        if self.input_queue.borrow().len() < Self::IO_BUFFER_SIZE
+        {
+            self.input_queue.borrow_mut().push_back(val);
+            return true;
+        }
+        else
+        {
+            return false;
+        }
     }
 
     /// Pops the output value from the output queue and returns
@@ -146,7 +158,24 @@ impl MemorySegment for SerialInputOutputDevice
         {
             Self::OFFSET_OUTPUT_SET =>
             {
-                self.output_queue.push_back(data);
+                if self.output_queue.len() < Self::IO_BUFFER_SIZE
+                {
+                    self.output_queue.push_back(data);
+                    Ok(())
+                }
+                else
+                {
+                    Err(SolariumError::DeviceError(self.base_address, SolariumDeviceError::BufferFull))
+                }
+            },
+            Self::OFFSET_INPUT_RESET_IN =>
+            {
+                self.input_queue.borrow_mut().clear();
+                Ok(())
+            },
+            Self::OFFSET_INPUT_RESET_OUT =>
+            {
+                self.output_queue.clear();
                 Ok(())
             },
             _ => Err(SolariumError::InvalidMemoryWrite(ind))
