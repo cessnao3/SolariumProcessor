@@ -133,8 +133,6 @@ impl ProcessorStatusStruct
                 Ok(()) => (),
                 Err(e) =>
                 {
-                    println!("Error: {0:}", e.to_string());
-                    eprintln!("Error: {0:}", e.to_string());
                     self.msg_queue.push(GuiMessage::LogMessage(e.to_string()));
                     self.step_error = true;
                 }
