@@ -48,6 +48,7 @@ impl ProcessorStatusStruct
     {
         self.cpu.memory_map.clear();
         self.serial_io_dev.borrow_mut().reset();
+        self.step_error = false;
 
         const INIT_RO_LEN: usize = SolariumProcessor::INIT_DATA_SIZE;
 
@@ -97,6 +98,7 @@ impl ProcessorStatusStruct
     {
         self.cpu.soft_reset();
         self.update_regs();
+        self.step_error = false;
     }
 
     pub fn hardware_interrupt(&mut self, hw_irq_num: usize)
