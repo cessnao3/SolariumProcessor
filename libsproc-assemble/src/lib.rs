@@ -360,6 +360,8 @@ mod tests
 {
     use std::collections::HashMap;
 
+    use libsproc::common::MemoryWord;
+
     use super::assemble;
 
     const NUM_REGISTERS: usize = 16;
@@ -812,6 +814,44 @@ mod tests
                     assert!(assembly_result.is_err());
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_load_text()
+    {
+        let text_val = "hello, world!";
+        let text_to_load = vec![
+            format!(".loadtext \"{0:}\"", text_val)
+        ];
+
+        let expected_output: Vec<u16>;
+        {
+            let mut expected_words = match text_val.chars().map(|v| libsproc::text::character_to_word(v)).collect()
+            {
+                Ok(v) => v,
+                Err(_) =>
+                {
+                    assert!(false);
+                    Vec::new()
+                }
+            };
+            expected_words.push(MemoryWord::new(0));
+
+            expected_output = expected_words.iter().map(|v| v.get()).collect();
+        }
+
+
+        let assembly_result = assemble(text_to_load.iter().map(|v| v.as_str()).collect());
+        assert!(assembly_result.is_ok());
+
+        let data = assembly_result.unwrap();
+
+        assert_eq!(data.len(), expected_output.len());
+
+        for i in 0..data.len()
+        {
+            assert_eq!(data[i], expected_output[i]);
         }
     }
 
