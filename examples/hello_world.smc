@@ -1,0 +1,38 @@
+; Define the hard-reset vector location
+.loadloc start
+
+; Define the soft-reset vector location
+.loadloc start
+
+; Define the starting location
+.oper 0x1000
+:start
+jmpri 2
+.loadloc str_hello_world
+ldir 6, -1
+
+jmpri 2
+.load 0xA000
+ldir 13, -1
+
+; Mark the location to write serial values to
+ldi 15, 3
+add 15, 15, 13
+
+:loop
+ld 7, 6
+ldi 8, 1
+tz 7
+jmpri end
+sav 15, 7
+add 6, 8, 6
+jmpri loop
+
+:end
+ldi 7, 10
+sav 15, 7
+reset
+
+.oper 0x1100
+:str_hello_world
+.loadtext "hello, world!"
