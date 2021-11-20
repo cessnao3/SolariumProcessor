@@ -519,7 +519,8 @@ mod tests
             ("tg", 7),
             ("tge", 8),
             ("tl", 9),
-            ("tle", 10)
+            ("tle", 10),
+            ("arg", 11)
         ];
 
         for (arg, opcode) in args_to_test

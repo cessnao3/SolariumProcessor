@@ -17,6 +17,8 @@
 \author{Ian O'Rourke}
 \date{\today \\ \titlelogoimage}
 
+\lstset{basicstyle=\tiny,frame=single}
+
 \begin{document}
 
 \maketitle
@@ -152,6 +154,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			0 & 8 & R[b] & R[a] & \texttt{tge [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
 			0 & 9 & R[b] & R[a] & \texttt{tl [a], [b]} & If \texttt{R[a] < R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
 			0 & 10 & R[b] & R[a] & \texttt{tle [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2}\\
+			0 & 11 & 0x0I & R[a] & \texttt{arg [a], <imm>} & \texttt{R[a] = SP - 16 - 1 - Im} \\
 			1 & 0xI0 & 0x0I & R[dst] & \texttt{ldi [dst], <imm>} & \texttt{R[dst] = Im} \\
 			2 & 0xI0 & 0x0I & R[dst] & \texttt{ldui [dst], <imm-unsigned>} & \texttt{R[dst] = Im} \\
 			3 & 0xI0 & 0x0I & R[dst] & \texttt{ldir [dst], <imm>} & \texttt{R[dst] = mem[PC + Im]} \\
@@ -171,6 +174,8 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 	\caption{Available instruction list for the SProc provides a variety of commands.}
 	\label{table:instruction-table}
 \end{table}
+
+\pagebreak
 
 The assembler also has several commands available, detailed in Table \ref{table:assembler-commands}. Note that, for the \texttt{.loadtext} command, the text will be loaded in via the character map provided in Section \ref{sec:character-map}.
 
@@ -279,25 +284,27 @@ The following list some simple example programs that can be run on the SProc.
 
 The program listed in Listing \ref{listing:example-counter} provides a basic counter. A target value is placed in register four, and the value in register three is incremented from 0 to the target value in register four by adding one to the register each loop. Once the target value has been reached and register three is equal to register four, the program halts by entering an infinite loop.
 
-\lstinputlisting[frame=single, caption={Limited counter program}, label={listing:example-counter}]{../examples/counter.smc}
+\lstinputlisting[caption={Limited counter program}, label={listing:example-counter}]{../examples/counter.smc}
 
 \subsection{Infinite Counter}
 
 Listing \ref{listing:example-infinite-counter} makes use of some additional functionality, including the use of the register reference names, to test register reset functionality. It also modifies the program counter outside of the standard jump command.
 
-\lstinputlisting[frame=single, caption={Infinite counter program with register reference names}, label={listing:example-infinite-counter}]{../examples/infinite_counter.smc}
+\lstinputlisting[caption={Infinite counter program with register reference names}, label={listing:example-infinite-counter}]{../examples/infinite_counter.smc}
 
 \subsection{Hello World}
 
-Listing  \ref{listing:hello-world} provides a program that will infinitely write "hello, world" to the serial device, expected to be memory-mapped into the SProc at \texttt{0xA000}. This makes use of the \texttt{.loadtext} command, which loads the text, and an additional null-terminator at the end, directly into memory.
+Listing  \ref{listing:hello-world} provides a program that will infinitely write "hello, world" to the serial device, expected to be memory-mapped into the SProc at \texttt{0xA000}. This makes use of the \texttt{.loadtext} command, which loads the text, and an additional null-terminator at the end, directly into memory. It also makes use of a print-string function call to handle printing string values to the serial output devices.
 
-\lstinputlisting[frame=single, caption={Infinite "hello, world!" program}]{../examples/hello_world.smc}
+\lstinputlisting[caption={Infinite "hello, world!" program}, label={listing:hello-world}]{../examples/hello_world.smc}
+
+\pagebreak
 
 \subsection{Serial Echo}
 
 Listing \ref{listing:serial-echo} provides a serial echo program, which echos any text provided by the default serial input device back out via the serial echo device. This serial device is expected to be provided at the starting location \texttt{0xA000}.
 
-\lstinputlisting[frame=single, caption={Serial echo program reads in text characters and immediately outputs via the output device}, label={listing:serial-echo}]{../examples/serial_echo.smc}
+\lstinputlisting[caption={Serial echo program reads in text characters and immediately outputs via the output device}, label={listing:serial-echo}]{../examples/serial_echo.smc}
 
 \pagebreak
 

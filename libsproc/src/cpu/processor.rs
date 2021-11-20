@@ -601,6 +601,29 @@ impl SolariumProcessor
                             pc_incr = 2;
                         }
                     },
+                    11 => // arg
+                    {
+                        // Define the backtrack values
+                        let sp_subtract = 16 + 1 + arg0 as usize;
+                        let sp_val = self.get_sp_offset();
+
+                        if sp_subtract > sp_val
+                        {
+                            return Err(SolariumError::StackUnderflow);
+                        }
+
+                        // Load the value at the stack pointer location into the current argument
+                        let mem_index = STACK_POINTER_OFFSET + sp_val - sp_subtract;
+                        let mem_val = match self.memory_map.get(mem_index)
+                        {
+                            Ok(v) => v,
+                            Err(e) => return Err(e)
+                        };
+
+                        self.registers.set(
+                            reg_a,
+                            mem_val);
+                    }
                     _ => // ERROR
                     {
                         return Err(SolariumError::InvalidInstruction(inst_word));
