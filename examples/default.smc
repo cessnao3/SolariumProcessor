@@ -21,6 +21,7 @@ retint
 
 .oper 0x1100
 :hw_int_0
+jmpri 2
 .load 0xA000
 ldir 13, -1
 
@@ -28,7 +29,7 @@ ldir 13, -1
 ldi 14, 1
 add 14, 14, 13
 
-; Mark the location to write serial values from
+; Mark the location to write serial values to
 ldi 15, 3
 add 15, 15, 13
 
