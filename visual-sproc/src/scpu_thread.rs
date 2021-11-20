@@ -1,8 +1,6 @@
 use super::processor_state::ProcessorStatusStruct;
 use super::messages::{GuiMessage, ThreadMessage};
 
-use libsproc::text;
-
 use std::thread;
 
 use std::sync::mpsc;
