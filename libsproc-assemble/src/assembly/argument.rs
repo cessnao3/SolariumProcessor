@@ -36,7 +36,8 @@ pub enum Argument
 {
     UnsignedNumber(u32),
     SignedNumber(i32),
-    Label(String)
+    Label(String),
+    Text(String)
 }
 
 impl Argument
@@ -132,7 +133,8 @@ impl ToString for Argument
         {
             Argument::Label(s) => format!("Label({0:})", s),
             Argument::UnsignedNumber(v) => format!("Unsigned({0:})", v),
-            Argument::SignedNumber(v) => format!("Signed({0:})", v)
+            Argument::SignedNumber(v) => format!("Signed({0:})", v),
+            Argument::Text(s) => format!("Text(\"{0:}\")", s)
         }
     }
 }

@@ -20,12 +20,6 @@ enum LineValue
     LoadLabelLoc(usize, String)
 }
 
-enum ArgumentType
-{
-    List(Vec::<Argument>),
-    Text(String)
-}
-
 struct LineInformation
 {
     pub instruction: String,
@@ -122,9 +116,9 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
         let command = capture_groups.name("command").unwrap().as_str().to_ascii_lowercase();
 
         // Extract argument type
-        let all_args = match capture_groups.name("text")
+        let args = match capture_groups.name("text")
         {
-            Some(v) => ArgumentType::Text(v.as_str().to_string()),
+            Some(v) => vec![Argument::Text(v.as_str().to_string())],
             None =>
             {
                 match capture_groups.name("args")
@@ -134,10 +128,10 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
                         .map(|v| v.parse::<Argument>())
                         .collect()
                     {
-                        Ok(v) => ArgumentType::List(v),
+                        Ok(v) => v,
                         Err(e) => return Err(format!("line {0:} {1:}", i, e.to_string()))
                     }
-                    None => ArgumentType::List(Vec::new())
+                    None => Vec::new()
                 }
             }
         };
@@ -149,10 +143,83 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
         {
             let command_type = &command[1..];
 
-            // Check first for load text instruction
-            if command_type == "loadtext"
+            if command_type == "oper"
             {
-                if let ArgumentType::Text(text) = &all_args
+                if args.len() != 1
+                {
+                    return Err(format!(
+                        "line {0:} command {1:} only takes 1 argument",
+                        i,
+                        command_type));
+                }
+
+                let new_offset = match &args[0]
+                {
+                    Argument::UnsignedNumber(v) => *v as usize,
+                    arg => return Err(format!(
+                        "line {0:} command {1:} unable to parse {2:} as address",
+                        i,
+                        command_type,
+                        arg.to_string()))
+                };
+
+                if new_offset < current_data_index
+                {
+                    return Err(format!(
+                        "line {0:} command {1:} new offset {2:} must be greater or equal to current offset {3:}",
+                        i,
+                        command_type,
+                        new_offset,
+                        current_data_index));
+                }
+                else
+                {
+                    current_data_index = new_offset;
+                }
+            }
+            else if command_type == "load"
+            {
+                if args.len() != 1
+                {
+                    return Err(format!("line {0:} command {1:} only takes 1 argument", i, command_type));
+                }
+
+                let value_to_load = match args[0].to_u16()
+                {
+                    Ok(v) => v,
+                    Err(e) => return Err(format!("line {0:} {1:}", i, e))
+                };
+
+                data_map.insert(
+                    current_data_index,
+                    LineValue::Load(value_to_load));
+                current_data_index += 1;
+            }
+            else if command_type == "loadloc"
+            {
+                if args.len() != 1
+                {
+                    return Err(format!("line {0:} command {1:} only takes 1 argument", i, command_type));
+                }
+
+                let arg_label = match &args[0]
+                {
+                    Argument::Label(label) => label.clone(),
+                    _ => return Err(format!("line {0:} command {1:} may only take a label input", i, command))
+                };
+
+                data_map.insert(
+                    current_data_index,
+                    LineValue::LoadLabelLoc(i, arg_label));
+                current_data_index += 1;
+            }
+            else if command_type == "loadtext"
+            {
+                if args.len() != 1
+                {
+                    return Err(format!("line {0:} only one argument expected for {1:}", i, command_type))
+                }
+                else if let Argument::Text(text) = &args[0]
                 {
                     // Construct memory words from the text values
                     let text_vals: Vec<MemoryWord> = match text.chars().map(|v| libsproc::text::character_to_word(v)).collect()
@@ -183,98 +250,11 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
             }
             else
             {
-                // Check for matching args list, as all remaining opcodes will require the argument list
-                let args = match all_args
-                {
-                    ArgumentType::List(v) => v,
-                    _ => return Err(format!("line {0:} no valid arguments provided", i))
-                };
-
-                if command_type == "oper"
-                {
-                    if args.len() != 1
-                    {
-                        return Err(format!(
-                            "line {0:} command {1:} only takes 1 argument",
-                            i,
-                            command_type));
-                    }
-
-                    let new_offset = match &args[0]
-                    {
-                        Argument::UnsignedNumber(v) => *v as usize,
-                        arg => return Err(format!(
-                            "line {0:} command {1:} unable to parse {2:} as address",
-                            i,
-                            command_type,
-                            arg.to_string()))
-                    };
-
-                    if new_offset < current_data_index
-                    {
-                        return Err(format!(
-                            "line {0:} command {1:} new offset {2:} must be greater or equal to current offset {3:}",
-                            i,
-                            command_type,
-                            new_offset,
-                            current_data_index));
-                    }
-                    else
-                    {
-                        current_data_index = new_offset;
-                    }
-                }
-                else if command_type == "load"
-                {
-                    if args.len() != 1
-                    {
-                        return Err(format!("line {0:} command {1:} only takes 1 argument", i, command_type));
-                    }
-
-                    let value_to_load = match args[0].to_u16()
-                    {
-                        Ok(v) => v,
-                        Err(e) => return Err(format!("line {0:} {1:}", i, e))
-                    };
-
-                    data_map.insert(
-                        current_data_index,
-                        LineValue::Load(value_to_load));
-                    current_data_index += 1;
-                }
-                else if command_type == "loadloc"
-                {
-                    if args.len() != 1
-                    {
-                        return Err(format!("line {0:} command {1:} only takes 1 argument", i, command_type));
-                    }
-
-                    let arg_label = match &args[0]
-                    {
-                        Argument::Label(label) => label.clone(),
-                        _ => return Err(format!("line {0:} command {1:} may only take a label input", i, command))
-                    };
-
-                    data_map.insert(
-                        current_data_index,
-                        LineValue::LoadLabelLoc(i, arg_label));
-                    current_data_index += 1;
-                }
-                else
-                {
-                    return Err(format!("line {0:} invalid command \"{1:}\" found", i, command_type));
-                }
+                return Err(format!("line {0:} invalid command \"{1:}\" found", i, command_type));
             }
         }
         else if first_char == ':'
         {
-            // Check for matching args list, as all remaining opcodes will require the argument list
-            let args = match all_args
-            {
-                ArgumentType::List(v) => v,
-                _ => return Err(format!("line {0:} no valid arguments provided", i))
-            };
-
             if !args.is_empty()
             {
                 return Err(format!("line {0:} label types cannot have any arguments", i));
@@ -295,13 +275,6 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
         }
         else
         {
-            // Check for matching args list, as all remaining opcodes will require the argument list
-            let args = match all_args
-            {
-                ArgumentType::List(v) => v,
-                _ => return Err(format!("line {0:} no valid arguments provided", i))
-            };
-
             // Add the data values
             if data_map.contains_key(&current_data_index)
             {
