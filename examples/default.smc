@@ -12,6 +12,10 @@
 .oper 0x12
 .loadloc hw_int_0
 
+; Define the location for the serial device
+:dev_serial_loc
+.load 0xA000
+
 ; Define interrupt instructions
 .oper 0x1000
 :sw_int_0
@@ -22,8 +26,9 @@ retint
 .oper 0x1100
 :hw_int_0
 jmpri 2
-.load 0xA000
+.loadloc dev_serial_loc
 ldir 13, -1
+ld 13, 13
 
 ; Mark the location to read input values from
 ldi 14, 1
@@ -47,13 +52,66 @@ jmpri hw_int_0_main_loop
 retint
 
 .oper 0x2000
-:functest
-ldi $ret, 97
+:func_print_str
+
+jmpri 2
+.loadloc dev_serial_loc
+ldir 13, -1
+ld 13, 13
+
+; Mark the location to write serial values to
+ldi 15, 3
+add 15, 15, 13
+
+; Load the argument value
+arg 6, 0
+
+:func_print_str_loop
+ld 7, 6
+ldi 8, 1
+tz 7
+jmpri func_print_str_end
+sav 15, 7
+add 6, 8, 6
+jmpri func_print_str_loop
+
+:func_print_str_end
+ldi 7, 10
+sav 15, 7
 ret
+
+; Define the text string to load
+:input_prompt_text_str_0
+.loadtext "Hello, world!"
+
+:input_prompt_text_str_1
+.loadtext "Enter text and IRQ to enable echoing"
 
 ; Define the starting location
 .oper 0x4000
 :start
+
+; Load the input text and write the resulting values
+jmpri 2
+.loadloc func_print_str
+ldir 6, -1
+
+jmpri 2
+.loadloc input_prompt_text_str_0
+ldir 7, -1
+
+jmpri 2
+.loadloc input_prompt_text_str_1
+ldir 8, -1
+
+push 7
+call 6
+pop
+
+push 8
+call 6
+pop
+
 
 ; Setup the counter variables
 ldi 6, 1
@@ -71,11 +129,11 @@ jmpri load_data
 ldir 4, target_value
 
 ; Load the function call test
-ldir 15, 2
-jmpri 2
-.loadloc functest
-call 15
-copy $ret, 12
+;ldir 15, 2
+;jmpri 2
+;.loadloc functest
+;call 15
+;copy $ret, 12
 
 ; Perform the addition and check for reaching the target
 :loop
