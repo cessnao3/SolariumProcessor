@@ -1,7 +1,7 @@
 use super::processor_state::ProcessorStatusStruct;
 use super::messages::{GuiMessage, ThreadMessage};
 
-use libsproc::common::MemoryWord;
+use libsproc::text;
 
 use std::thread;
 
@@ -68,7 +68,7 @@ pub fn run_scpu_thread(
                     },
                     ThreadMessage::SerialInput(c) =>
                     {
-                        cpu_stat.push_serial_input(MemoryWord::new(c as u16));
+                        cpu_stat.push_serial_input_char(c);
                     }
                 },
                 Err(mpsc::TryRecvError::Disconnected) =>
@@ -96,15 +96,18 @@ pub fn run_scpu_thread(
 
         while let Some(c) = cpu_stat.pop_serial_output()
         {
-            if c.get() <= u8::MAX as u16
+            let output_char = match libsproc::text::word_to_character(c)
             {
-                match thread_to_gui_tx.send(GuiMessage::SerialOutput((c.get() as u8) as char))
+                Ok(v) => v,
+                Err(_) => '?'
+            };
+
+            match thread_to_gui_tx.send(GuiMessage::SerialOutput(output_char))
+            {
+                Ok(()) => (),
+                Err(_) =>
                 {
-                    Ok(()) => (),
-                    Err(_) =>
-                    {
-                        break;
-                    }
+                    break;
                 }
             }
         }

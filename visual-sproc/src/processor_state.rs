@@ -193,8 +193,12 @@ impl ProcessorStatusStruct
         return self.serial_io_dev.borrow_mut().pop_output();
     }
 
-    pub fn push_serial_input(&mut self, val: MemoryWord)
+    pub fn push_serial_input_char(&mut self, c: char)
     {
-        self.serial_io_dev.borrow_mut().push_input(val);
+        match libsproc::text::character_to_word(c)
+        {
+            Ok(word) => self.serial_io_dev.borrow_mut().push_input(word),
+            Err(e) => self.msg_queue.push(GuiMessage::LogMessage(e.to_string()))
+        };
     }
 }

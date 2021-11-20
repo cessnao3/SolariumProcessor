@@ -4,47 +4,6 @@
 ; Define the soft-reset vector location
 .loadloc start
 
-; Start software interrupt vectors
-.oper 0x2
-.loadloc sw_int_0
-
-; Start hardware interrupt vectors
-.oper 0x12
-.loadloc hw_int_0
-
-; Define interrupt instructions
-.oper 0x1000
-:sw_int_0
-ldi 8, 30
-ldi 9, 54
-retint
-
-.oper 0x1100
-:hw_int_0
-.load 0xA000
-ldir 13, -1
-
-; Mark the location to read input values from
-ldi 14, 1
-add 14, 14, 13
-
-; Mark he location to write serial values from
-ldi 15, 3
-add 15, 15, 13
-
-:hw_int_0_main_loop
-ld 6, 13
-tz 6
-jmpri hw_int_0_end
-
-ld 7, 14
-sav 15, 7
-
-jmpri hw_int_0_main_loop
-
-:hw_int_0_end
-retint
-
 .oper 0x2000
 :functest
 ldi $ret, 97
@@ -58,7 +17,6 @@ ret
 ldi 6, 1
 ldi 3, 0
 ldi 15, 100
-int 0
 
 ; Setup the target value
 jmpri load_data

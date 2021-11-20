@@ -172,7 +172,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 	\label{table:instruction-table}
 \end{table}
 
-The assembler also has several commands available, detailed in Table \ref{table:assembler-commands}.
+The assembler also has several commands available, detailed in Table \ref{table:assembler-commands}. Note that, for the \texttt{.loadtext} command, the text will be loaded in via the character map provided in Section \ref{sec:character-map}.
 
 \begin{table}[h!]
 	\centering
@@ -186,6 +186,8 @@ The assembler also has several commands available, detailed in Table \ref{table:
 		& or as a signed word (if negative) in the current memory location \\
 		\texttt{.loadloc [label]} & Loads the data index associated with the provided label into \\
 		& the current memory location \\
+		\texttt{.loadtext "[TEXT]"} & Loads the text into memory, starting at the current memory location, \\
+		& placing each character into the next subsequent memory location \\
 		\hline
 	\end{tabular}
 	\caption{Available assembler commands}
@@ -211,6 +213,63 @@ Reference names are available to link to the special register values, as listed 
 
 \pagebreak
 
+\section{Character Mapping}
+\label{sec:character-map}
+
+SProc computers, by default, utilize the following character map. This is similar to the American Standard Code for Information Interchange (ASCII) format. The SProc character map is defined in Table \ref{table:sproc-character-map}. Any undefined entries in the character map are considered invalid characters.
+
+\newcommand{\charmap}[1]{\texttt{#1}}
+
+\newcommand{\charslash}{\texttt{\char`\\}}
+
+\newcommand{\charmapescape}[1]{\charmap{\texttt{\charslash#1}}}
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{cc|cc|cc|cc}
+		\hline
+		Hex & Char & Hex & Char & Hex & Char & Hex & Char \\
+		\hline
+		00 & \charmapescape{0} NULL & 20 & Space & 40 & \charmap{@} & 60 & \charmap{`} \\
+		01 & {} & 21 & \charmap{!} & 41 & \charmap{A} & 61 & \charmap{a} \\
+		02 & {} & 22 & \charmap{"} & 42 & \charmap{B} & 62 & \charmap{b} \\
+		03 & {} & 23 & \charmap{\#} & 43 & \charmap{C} & 63 & \charmap{c} \\
+		04 & {} & 24 & \charmap{\$} & 44 & \charmap{D} & 64 & \charmap{d} \\
+		05 & {} & 25 & \charmap{\%} & 45 & \charmap{E} & 65 & \charmap{e} \\
+		06 & {} & 26 & \charmap{\&} & 46 & \charmap{F} & 66 & \charmap{f} \\
+		07 & {} & 27 & \charmap{\textquotesingle} & 47 & \charmap{G} & 67 & \charmap{g} \\
+		08 & \charmapescape{b} Backspace & 28 & \charmap{(} & 48 & \charmap{H} & 68 & \charmap{h} \\
+		09 & {} & 29 & \charmap{)} & 49 & \charmap{I} & 69 & \charmap{i} \\
+		0A & \charmapescape{n} New Line & 2A & \charmap{*} & 4A & \charmap{J} & 6A & \charmap{j} \\
+		0B & {} & 2B & \charmap{+} & 4B & \charmap{K} & 6B & \charmap{k} \\
+		0C & {} & 2C & \charmap{,} & 4C & \charmap{L} & 6C & \charmap{l} \\
+		0D & {} & 2D & \charmap{-} & 4D & \charmap{M} & 6D & \charmap{m} \\
+		0E & {} & 2E & \charmap{.} & 4E & \charmap{N} & 6E & \charmap{n} \\
+		0F & {} & 2F & \charmap{/} & 4F & \charmap{O} & 6F & \charmap{o} \\
+		10 & {} & 30 & \charmap{0} & 50 & \charmap{P} & 70 & \charmap{p} \\
+		11 & {} & 31 & \charmap{1} & 51 & \charmap{Q} & 71 & \charmap{q} \\
+		12 & {} & 32 & \charmap{2} & 52 & \charmap{R} & 72 & \charmap{r} \\
+		13 & {} & 33 & \charmap{3} & 53 & \charmap{S} & 73 & \charmap{s} \\
+		14 & {} & 34 & \charmap{4} & 54 & \charmap{T} & 74 & \charmap{t} \\
+		15 & {} & 35 & \charmap{5} & 55 & \charmap{U} & 75 & \charmap{u} \\
+		16 & {} & 36 & \charmap{6} & 56 & \charmap{V} & 76 & \charmap{v} \\
+		17 & {} & 37 & \charmap{7} & 57 & \charmap{W} & 77 & \charmap{w} \\
+		18 & {} & 38 & \charmap{8} & 58 & \charmap{X} & 78 & \charmap{x} \\
+		19 & {} & 39 & \charmap{9} & 59 & \charmap{Y} & 79 & \charmap{y} \\
+		1A & {} & 3A & \charmap{:} & 5A & \charmap{Z} & 7A & \charmap{z} \\
+		1B & \charmapescape{e} Escape & 3B & \charmap{;} & 5B & \charmap{[} & 7B & \charmap{\{} \\
+		1C & {} & 3C & \charmap{<} & 5C & \charmap{\charslash} & 7C & \charmap{|} \\
+		1D & {} & 3D & \charmap{=} & 5D & \charmap{]} & 7D & \charmap{\}} \\
+		1E & {} & 3E & \charmap{>} & 5E & \charmap{\textasciicircum} & 7E & \charmap{\textasciitilde} \\
+		1F & {} & 3F & \charmap{?} & 5F & \charmap{\textunderscore} & 7F & \charmapescape{d} Delete \\
+		\hline
+	\end{tabular}
+	\caption{SProc character mapping}
+	\label{table:sproc-character-map}
+\end{table}
+
+\pagebreak
+
 \section{Examples}
 
 The following list some simple example programs that can be run on the SProc.
@@ -219,11 +278,15 @@ The following list some simple example programs that can be run on the SProc.
 
 The program listed in Listing \ref{listing:example-counter} provides a basic counter. A target value is placed in register four, and the value in register three is incremented from 0 to the target value in register four by adding one to the register each loop. Once the target value has been reached and register three is equal to register four, the program halts by entering an infinite loop.
 
-\lstinputlisting[caption={Limited counter program}, label={listing:example-counter}]{../examples/counter.smc}
+\lstinputlisting[frame=single, caption={Limited counter program}, label={listing:example-counter}]{../examples/counter.smc}
 
 Another simple program is provided in Listing \ref{listing:example-infinite-counter}. This program makes use of some additional functionality, including the use of the register reference names, to test register reset functionality. It also modifies the program counter outside of the standard jump command.
 
-\lstinputlisting[caption={Infinite counter program with register reference names}, label={listing:example-infinite-counter}]{../examples/infinite_counter.smc}
+\lstinputlisting[frame=single, caption={Infinite counter program with register reference names}, label={listing:example-infinite-counter}]{../examples/infinite_counter.smc}
+
+A third simple program, provided in Listing \ref{listing:serial-echo}, echos any text provided by the default serial input device back out via the serial echo device.
+
+\lstinputlisting[frame=single, caption={Serial echo program reads in text characters and immediately outputs via the output device}, label={listing:serial-echo}]{../examples/serial_echo.smc}
 
 \pagebreak
 

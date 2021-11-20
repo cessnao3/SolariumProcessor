@@ -1,0 +1,39 @@
+; Define the hard-reset vector location
+.loadloc program_start
+
+; Define the soft-reset vector location
+.loadloc program_start
+
+; Start hardware interrupt vectors
+.oper 0x12
+.loadloc hw_int_0
+
+.oper 0x1000
+:hw_int_0
+retint
+
+.oper 0x4000
+:program_start
+.load 0xA000
+ldir 13, -1
+
+; Mark the location to read input values from
+ldi 14, 1
+add 14, 14, 13
+
+; Mark the location to write serial values from
+ldi 15, 3
+add 15, 15, 13
+
+:main_loop
+ld 6, 13
+tz 6
+jmpri main_loop_end
+
+ld 7, 14
+sav 15, 7
+
+jmpri main_loop
+
+:main_loop_end
+jmpri main_loop
