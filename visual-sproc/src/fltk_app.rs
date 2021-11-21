@@ -5,7 +5,7 @@ use fltk::prelude::*;
 use fltk::table::{Table, TableRowSelectMode, TableContext};
 use fltk::{app::*, draw, button::*, dialog::*, window::*, text::*, group::*, frame::*, valuator::*};
 
-use super::messages::{ThreadMessage, GuiMessage, FltkMessage};
+use super::messages::{ThreadMessage, GuiMessage, FltkMessage, SerialCharBuf, CHAR_BUF_SIZE};
 
 use super::fltk_registers::setup_register_group;
 
@@ -172,14 +172,32 @@ pub fn setup_and_run_app(
             {
                 if fltk::app::event_key() == Key::Enter
                 {
-                    for c in input.value().chars()
+                    let mut char_buf: SerialCharBuf = ['\0'; CHAR_BUF_SIZE];
+
+                    let input_string = input.value();
+
+                    for (i, c) in input_string.chars().enumerate()
                     {
-                        fltk_sender.send(FltkMessage::SerialInput(c));
+                        if i < CHAR_BUF_SIZE
+                        {
+                            char_buf[i] = c;
+                        }
                     }
-                    if input.value().len() > 0
+
+                    if input_string.len() > 0
                     {
-                        fltk_sender.send(FltkMessage::SerialInput('\n'));
+                        if input_string.len() < CHAR_BUF_SIZE
+                        {
+                            char_buf[input_string.len()] = '\n';
+                        }
+                        else
+                        {
+                            char_buf[CHAR_BUF_SIZE - 1] = '\n';
+                        }
                     }
+
+                    fltk_sender.send(FltkMessage::SerialInput(char_buf));
+
                     input.set_value("");
                 }
             }

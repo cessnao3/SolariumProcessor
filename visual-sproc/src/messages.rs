@@ -2,6 +2,9 @@ use libsproc::common::MemoryWord;
 
 use super::processor_state::RegisterArray;
 
+pub const CHAR_BUF_SIZE: usize = 256;
+pub type SerialCharBuf = [char; 256];
+
 #[derive(Clone, Copy)]
 pub enum FltkMessage
 {
@@ -12,7 +15,7 @@ pub enum FltkMessage
     Assemble,
     Tick,
     SetSpeed(f64),
-    SerialInput(char),
+    SerialInput(SerialCharBuf),
     HardwareInterrupt(usize)
 }
 
@@ -25,7 +28,7 @@ pub enum ThreadMessage
     Reset,
     Step,
     SetSpeed(f64),
-    SerialInput(char),
+    SerialInput(SerialCharBuf),
     HardwareInterrupt(usize)
 }
 
