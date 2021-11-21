@@ -68,6 +68,10 @@ pub fn run_scpu_thread(
                     {
                         for c in char_buf
                         {
+                            if c == '\0'
+                            {
+                                break;
+                            }
                             cpu_stat.push_serial_input_char(c);
                         }
                     }
