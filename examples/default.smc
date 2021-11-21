@@ -1,8 +1,8 @@
 ; Define the hard-reset vector location
-.loadloc start
+.loadloc start_init
 
 ; Define the soft-reset vector location
-.loadloc start
+.loadloc start_init
 
 ; Start software interrupt vectors
 .oper 0x2
@@ -89,7 +89,10 @@ ret
 
 ; Define the starting location
 .oper 0x4000
-:start
+:start_init
+
+; Disable interrupts while the init text is printing
+intoff
 
 ; Load the input text and write the resulting values
 jmpri 2
@@ -112,6 +115,10 @@ push 8
 call 6
 pop
 
+; Re-enable interrupts
+inton
+
+:start
 
 ; Setup the counter variables
 ldi 6, 1
@@ -149,4 +156,7 @@ jmpri endloc
 
 ; Otherwise, enter an infinite loop as program completion
 :endloc
-reset
+jmpri 2
+.loadloc start
+ldir 4, -1
+jmp 4
