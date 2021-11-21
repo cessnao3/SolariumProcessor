@@ -376,6 +376,7 @@ pub fn setup_and_run_app(
                             alert_default("Unable to get assembly text buffer");
                         }
                     };
+                    serial_output.buffer().unwrap().set_text("");
                 },
                 FltkMessage::SetSpeed(new_speed) =>
                 {
