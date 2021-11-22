@@ -495,6 +495,36 @@ impl SolariumProcessor
                             pc_incr = 2;
                         }
                     },
+                    11 => // bool
+                    {
+                        let reg_val = self.registers.get(reg_a).get();
+                        let new_val = if reg_val == 0
+                        {
+                            0
+                        }
+                        else
+                        {
+                            1
+                        };
+                        self.registers.set(
+                            reg_a,
+                            MemoryWord::new(new_val));
+                    },
+                    12 => // not
+                    {
+                        let reg_val = self.registers.get(reg_a).get();
+                        let new_val = if reg_val == 0
+                        {
+                            1
+                        }
+                        else
+                        {
+                            0
+                        };
+                        self.registers.set(
+                            reg_a,
+                            MemoryWord::new(new_val));
+                    },
                     _ => // ERROR
                     {
                         return Err(SolariumError::InvalidInstruction(inst_word));

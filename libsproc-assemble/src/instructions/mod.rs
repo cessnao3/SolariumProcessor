@@ -96,6 +96,12 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
         "tlz".to_string(),
         Box::new(RegisterInstruction::new(10, 1)));
     instructions.insert(
+        "bool".to_string(),
+        Box::new(RegisterInstruction::new(11, 1)));
+    instructions.insert(
+        "not".to_string(),
+        Box::new(RegisterInstruction::new(12, 1)));
+    instructions.insert(
         "jmpri".to_string(),
         Box::new(ImmediateSingleInstruction::new(1)));
     instructions.insert(
