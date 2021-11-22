@@ -1,0 +1,12 @@
+extern serial_write(src) = 0xA000;
+extern serial_writeln(src) = 0xA000;
+extern get_serial_dev() = 0xA000;
+
+const HELLO_WORLD = "Hello, world!";
+const NEWLINE = "\n";
+
+func main()
+{
+    //if, else, while
+    serial_writeln()
+}
