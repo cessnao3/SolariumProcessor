@@ -1,0 +1,126 @@
+; Define the program initialization
+.loadloc program_start
+.loadloc program_start
+
+; Define the library information
+
+.oper 0x1000
+:func_get_dev_serial_io
+    jmpri 2
+    .load 0xA000
+    ldir $ret, -1
+    ret
+
+:func_serial_write
+    ; Read the serial device base location
+    jmpri 2
+    .loadloc func_get_dev_serial_io
+    ldir 13, -1
+    call 13
+    copy 13, $ret
+
+    ; Mark the location to write serial values to
+    ldi 15, 3
+    add 15, 15, 13
+
+    ; Load the argument value for the start of the string to write out
+    arg 6, 0
+    ldi 8, 1
+    copy 9, 6
+
+    :func_print_str_loop
+        ld 7, 6
+        tz 7
+        jmpri func_print_str_end
+        sav 15, 7
+        add 6, 8, 6
+        jmpri func_print_str_loop
+
+    :func_print_str_end
+    ; Load the number of characters read into the return register
+    sub $ret, 6, 9
+    ret
+
+:func_serial_writeln
+    ; Read the first argument and push back onto the stack
+    arg 7, 0
+    push 7
+    jmpri 2
+    .loadloc func_serial_write
+    ldir 6, -1
+    call 6
+    pop
+
+    jmpri 4
+    :func_serial_writeln_newline
+    .load 0xA
+    .load 0x0
+    .loadloc func_serial_writeln_newline
+    ldir 7, -1
+    push 7
+    call 6
+    pop
+
+    ret
+
+:func_serial_read_safe
+    ; Read a string from the input serial device
+    ; ARG0 -> destination location to write the string into
+    ; ARG1 -> Character to stop reading input after
+    ; ARG2 -> Number of characters to allow writing
+    jmpri 2
+    .loadloc func_get_dev_serial_io
+    ldi 13, -1
+    call 13
+    copy 13, $ret
+
+    ; Mark the location to read serial values from
+    ldi 15, 4
+    add 15, 15, 13
+
+    ; Load the argument value for where to save the string to
+    arg 6, 0
+
+    ; Load the argument for the character to use as the ending character, or to the end of the stream
+    arg 7, 1
+
+    ; Load the argument for the maximum number of characters to read
+    arg 8, 2
+
+    ; Define the loop
+    :func_serial_read_safe_loop
+;        ld
+
+    :func_serial_read_safe_end
+    ret
+
+.oper 0x2000
+:str_spros_name
+.loadtext "SPrOS Version 0.01"
+:str_spros_prompt
+.loadtext "#"
+
+.oper 0x4000
+:program_start
+jmpri 2
+.loadloc str_spros_name
+ldir 4, -1
+jmpri 2
+.loadloc str_spros_prompt
+ldir 6, -1
+jmpri 2
+.loadloc func_serial_writeln
+ldir 7, -1
+
+push 4
+call 7
+pop
+
+push 6
+call 7
+pop
+
+jmpri 2
+.loadloc program_start
+ldir 5, -1
+jmp 5

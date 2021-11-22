@@ -25,7 +25,7 @@ fn get_app_icon() -> PngImage
 
 fn get_default_text() -> String
 {
-    let text_bytes = include_bytes!("../../examples/default.smc");
+    let text_bytes = include_bytes!("../../examples/spros.smc");
     return match std::str::from_utf8(text_bytes)
     {
         Ok(v) => v.to_string(),
