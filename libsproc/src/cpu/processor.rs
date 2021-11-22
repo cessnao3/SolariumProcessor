@@ -676,15 +676,15 @@ impl SolariumProcessor
                         {
                             4 => // add
                             {
-                                result = val_a.get() + val_b.get();
+                                result = val_a.get().wrapping_add(val_b.get());
                             },
                             5 => //sub
                             {
-                                result = val_a.get() - val_b.get();
+                                result = val_a.get().wrapping_sub(val_b.get());
                             },
                             6 => // mul
                             {
-                                result = (val_a.get_signed() * val_b.get_signed()) as u16;
+                                result = val_a.get_signed().wrapping_mul(val_b.get_signed()) as u16;
                             },
                             7 => // div
                             {
@@ -692,7 +692,7 @@ impl SolariumProcessor
                                 {
                                     return Err(SolariumError::DivideByZero);
                                 }
-                                result = (val_a.get_signed() / val_b.get_signed()) as u16;
+                                result = val_a.get_signed().wrapping_div(val_b.get_signed()) as u16;
                             },
                             8 => // mod
                             {
