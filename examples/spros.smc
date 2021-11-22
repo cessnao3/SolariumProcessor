@@ -51,6 +51,10 @@
     call 6
     pop
 
+    ; Copy the return value into register 5
+    copy 5, $ret
+
+    ; Define the static newline character and call the write function with the newline string
     jmpri 4
     :func_serial_writeln_newline
     .load 0xA
@@ -61,6 +65,10 @@
     call 6
     pop
 
+    ; Combine the two write counts together
+    add $ret, 5, $ret
+
+    ; Return the function
     ret
 
 :func_serial_read_safe
@@ -96,31 +104,31 @@
 
 .oper 0x2000
 :str_spros_name
-.loadtext "SPrOS Version 0.01"
+    .loadtext "SPrOS Version 0.01"
 :str_spros_prompt
-.loadtext "#"
+    .loadtext "#"
 
 .oper 0x4000
 :program_start
-jmpri 2
-.loadloc str_spros_name
-ldir 4, -1
-jmpri 2
-.loadloc str_spros_prompt
-ldir 6, -1
-jmpri 2
-.loadloc func_serial_writeln
-ldir 7, -1
+    jmpri 2
+    .loadloc str_spros_name
+    ldir 4, -1
+    jmpri 2
+    .loadloc str_spros_prompt
+    ldir 6, -1
+    jmpri 2
+    .loadloc func_serial_writeln
+    ldir 7, -1
 
-push 4
-call 7
-pop
+    push 4
+    call 7
+    pop
 
-push 6
-call 7
-pop
+    push 6
+    call 7
+    pop
 
-jmpri 2
-.loadloc program_start
-ldir 5, -1
-jmp 5
+    jmpri 2
+    .loadloc program_start
+    ldir 5, -1
+    jmp 5
