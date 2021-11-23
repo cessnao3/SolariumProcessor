@@ -7,6 +7,10 @@ const NEWLINE = "\n";
 
 func main()
 {
+    auto local_var = NEWLINE;
+
     //if, else, while
     serial_writeln()
+
+    return 0;
 }
