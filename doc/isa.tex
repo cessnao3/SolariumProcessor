@@ -48,6 +48,29 @@ There are 16 total registers present on the SProc. These are defined generally a
 	\label{table:register-setup}
 \end{table}
 
+The program counter indicates the next instruction to be read. At the beginning of the processor cycle, the instruction at the memory address of the program counter is read in and processed. Then, the program counter is incremented at the end of each instruction cycle. If this value is needed to be modified, it is recommended to use the absolute jump instruction, \texttt{jmp}, or the relative jump instruction, \texttt{jmpr}.
+
+The global stack pointer maintains the global stack, as defined in Section \ref{sec:the-stack}. This provides the offset from the stack's base address right off-the-end of the current stack contents. Thus, when the stack is empty, it points to the stack base address, and when the stack is completely full it points to the memory location just above the last stack entry, or the base address plus the stack size. This value should not be edited by-hand to maintain the consistency of the program execution, but is instead modified by the stack instructions \texttt{push}, \texttt{pop}, \texttt{popr}, \texttt{call}, \texttt{ret}, \texttt{retint}, and \texttt{int}, as well as hardware interrupts.
+
+The return value instruction is intended to store the result of a function call, made using the \texttt{call} instruction. When the processor status flags are replaced with the caller's flags after the \texttt{ret} instruction is called, the return value is the only register that remains unchanged.
+
+The processor status flags indicate the current setup for the processor. Currently, the following flags are assigned, as noted in Table \ref{table:processor-flags}.
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{c|cccccccc}
+		\hline
+		Bit & 7 & 6 & 5 & 4 & 3 & 2 & 1 & 0 \\
+		\hline
+		Name & & & & & & & & Interrupt Enable \\
+		\hline
+	\end{tabular}
+	\caption{Processor status flags provide a window into the current processor state}
+	\label{table:processor-flags}
+ \end{table}
+
+This provides both a means to set and to read the current processor state values to ensure that the proper operating mode is configured for the currently-running program. This is maintained and replaced when \texttt{ret} and \texttt{retint} are called, so within an interrupt or function call, it is not necessary to replace the processor flags with those of the caller.
+
 \subsection{Overall Instruction Syntax}
 
 Since the architecture of the SProc is 16-bit, this means that each word that may be addressed is 16-bits. The general instruction format is listed  in Table \ref{table:instruction-formatting}.
@@ -82,6 +105,7 @@ On soft-reset, as called by the reset the program counter will be assigned the v
 On any reset, interrupts will be allowed by default.
 
 \subsection{The Stack}
+\label{sec:the-stack}
 
 The stack pointer provides an offset from the stack pointer starting location. By default, this is at memory location 0x400. The stack pointer may grow up to a size of 0xC00, or 3072, items. This provides a maximum stack address of 0x1000. If the stack pointer is ever popped such that its value would underflow 0 or would reach greater than the maximum allowed size, the processor will error and halt.
 
@@ -157,7 +181,8 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			0 & 8 & R[b] & R[a] & \texttt{tge [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
 			0 & 9 & R[b] & R[a] & \texttt{tl [a], [b]} & If \texttt{R[a] < R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
 			0 & 10 & R[b] & R[a] & \texttt{tle [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2}\\
-			0 & 11 & 0x0I & R[a] & \texttt{arg [a], <imm>} & \texttt{R[a] = SP - 16 - 1 - Im} \\
+			0 & 11 & R[b] & R[a] & \texttt{bnot [a], [b]} & \texttt{R[a] = ~R[b]} \\
+			0 & 12 & 0x0I & R[a] & \texttt{arg [a], <imm>} & \texttt{R[a] = SP - 16 - 1 - Im} \\
 			1 & 0xI0 & 0x0I & R[dst] & \texttt{ldi [dst], <imm>} & \texttt{R[dst] = Im} \\
 			2 & 0xI0 & 0x0I & R[dst] & \texttt{ldui [dst], <imm-unsigned>} & \texttt{R[dst] = Im} \\
 			3 & 0xI0 & 0x0I & R[dst] & \texttt{ldir [dst], <imm>} & \texttt{R[dst] = mem[PC + Im]} \\
