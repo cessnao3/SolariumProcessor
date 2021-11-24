@@ -203,6 +203,10 @@ impl FromStr for Argument
             {
                 2
             }
+            else if reg_str == "stat"
+            {
+                3
+            }
             else
             {
                 return Err(ParseArgumentError

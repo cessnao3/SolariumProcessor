@@ -7,6 +7,7 @@ pub enum Register
     ProgramCounter,
     StackPointer,
     ReturnValue,
+    StatusFlags,
     GP(usize)
 }
 
@@ -37,6 +38,7 @@ impl Register
             Register::ProgramCounter => 0,
             Register::StackPointer => 1,
             Register::ReturnValue => 2,
+            Register::StatusFlags => 3,
             Register::GP(ind) => *ind
         };
 

@@ -40,7 +40,8 @@ There are 16 total registers present on the SProc. These are defined generally a
 		R0 & Program Counter \\
 		R1 & Global Stack Pointer \\
 		R2 & Return Value \\
-		R3-R15 & General Purpose Register \\
+		R3 & Processor Status Flags \\
+		R4-R15 & General Purpose Register \\
 		\hline
 	\end{tabular}
 	\caption{Outside of the program counter and global stack pointer, the registers within the SProc are all general-purpose.}
@@ -213,6 +214,7 @@ Reference names are available to link to the special register values, as listed 
 		\texttt{\$pc} & 0 & Program Counter \\
 		\texttt{\$sp} & 1 & Stack Pointer \\
 		\texttt{\$ret} & 2 & Return Value \\
+		\texttt{\$stat} & 3 & Status Flags \\
 		\hline
 	\end{tabular}
 	\caption{Assembler provides shortcuts for commonly-referenced register indices}
