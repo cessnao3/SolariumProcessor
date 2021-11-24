@@ -631,7 +631,13 @@ impl SolariumProcessor
                             pc_incr = 2;
                         }
                     },
-                    11 => // arg
+                    11 => //bnot
+                    {
+                        self.registers.set(
+                            reg_a,
+                            MemoryWord::new(!self.registers.get(reg_b).get()));
+                    },
+                    12 => // arg
                     {
                         // Define the backtrack values
                         let sp_subtract = 16 + 1 + arg0 as usize;
