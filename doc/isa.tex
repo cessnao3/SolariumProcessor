@@ -306,6 +306,38 @@ SProc computers, by default, utilize the following character map. This is simila
 
 \pagebreak
 
+\section{Devices}
+\label{sec:devices}
+
+Devices are memory-mapped in the SolariumProcessor. This means that reading or writing to special regions in memory facilitate the communication with these external devices. In a typical Solarium computer, the device region consists of up to 64 devices, starting at memory address \texttt{0xA000}, with each device allocating up to 32 words of memory. Not all devices will make use all the available memory slots for a given device. In these cases, a memory exception will be provided if any of these invalid addresses are read from or written to.
+
+\subsection{Serial Input and Output}
+
+The serial input and output device is one of the simplest devices. It essentially consists of a device two queues, one for input, and another for output. Each of these queues has an internal buffer size of 256 words. If any words are attempted to be added to the queue once either queue is full, no additional data is read and that data is lost.
+
+The current memory mapping structure for the serial input and output device is provided in Table \ref{table:dev-serial-io}.
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{l|ll}
+		\hline
+		Offset & Read/Write & Usage \\
+		\hline
+		\texttt{0} & Read & Provides the current input queue size \\
+		\texttt{1} & Read & Pops and provides a word off the front of the input queue \\
+		& & If no data is available, will return \texttt{0} by default \\
+		\texttt{2} & Read & Provides the current output queue size \\
+		\texttt{3} & Write & Pushes a word onto the output queue \\
+		\texttt{4} & Write & Clears the input queue if the value written is nonzero \\
+		\texttt{5} & Write & Clears the output queue if the value written is nonzero \\
+		\hline
+	\end{tabular}
+	\caption{Serial Input and Output device provides a simple data structure to read and write data streams}
+	\label{table:dev-serial-io}
+\end{table}
+
+\pagebreak
+
 \section{Examples}
 
 The following list some simple example programs that can be run on the SProc.

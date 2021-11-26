@@ -17,7 +17,7 @@ pub struct SerialInputOutputDevice
 impl SerialInputOutputDevice
 {
     // Define memory size and offset values
-    const DEVICE_MEM_SIZE: usize = 16;
+    const DEVICE_MEM_SIZE: usize = 32;
     const OFFSET_INPUT_SIZE: usize = 0;
     const OFFSET_INPUT_GET: usize = 1;
     const OFFSET_OUTPUT_SIZE: usize = 2;
@@ -170,12 +170,18 @@ impl MemorySegment for SerialInputOutputDevice
             },
             Self::OFFSET_INPUT_RESET_IN =>
             {
-                self.input_queue.borrow_mut().clear();
+                if data.get() != 0
+                {
+                    self.input_queue.borrow_mut().clear();
+                }
                 Ok(())
             },
             Self::OFFSET_INPUT_RESET_OUT =>
             {
-                self.output_queue.clear();
+                if data.get() != 0
+                {
+                    self.output_queue.clear();
+                }
                 Ok(())
             },
             _ => Err(SolariumError::InvalidMemoryWrite(ind))
