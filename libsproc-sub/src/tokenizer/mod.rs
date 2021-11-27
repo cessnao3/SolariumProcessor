@@ -14,7 +14,7 @@ pub enum Token
     Keyword(keyword::Keyword),
     Symbol(symbol::Symbol),
     WordLiteral(u16),
-    StringLiteral(String),
+    StringLiteral(string_literal::StringLiteral),
     Name(String)
 }
 
@@ -28,7 +28,7 @@ impl ToString for Token
             Token::Symbol(s) => format!("Symbol({0:})", s.to_string()),
             Token::WordLiteral(v) => format!("WordLiteral({0:})", v),
             Token::Name(n) => format!("Name({0:})", n),
-            Token::StringLiteral(s) => format!("String(\"{0:}\")", string_literal::print_string_literal(s))
+            Token::StringLiteral(s) => format!("String(\"{0:}\")", s.to_string())
         };
     }
 }
@@ -78,7 +78,7 @@ pub fn tokenize(line: &str) -> Result<Vec<Token>, String>
             tokens.push(Token::Name(name));
             i += len;
         }
-        else if let Some((strval, len)) = string_literal::try_string_literal(next_str)
+        else if let Some((strval, len)) = string_literal::StringLiteral::try_string_literal(next_str)
         {
             tokens.push(Token::StringLiteral(strval));
             i += len;
