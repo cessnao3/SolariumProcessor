@@ -16,5 +16,9 @@ fn get_example_program() -> String
 fn main()
 {
     let program = get_example_program();
-    compile(&program);
+    let result = match compile(&program)
+    {
+        Ok(v) => println!("Compilation Successful: {0:} lines of assembly generated", v.len()),
+        Err(e) => println!("Compilation Error: {0:}", e)
+    };
 }

@@ -1,6 +1,7 @@
-use crate::tokenizer::symbol;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, EnumIter)]
 pub enum Symbol
 {
     Plus,
@@ -24,7 +25,8 @@ pub enum Symbol
     BooleanOr,
     BitwiseNot,
     BitwiseAnd,
-    BitwiseOr
+    BitwiseOr,
+    Comma
 }
 
 impl ToString for Symbol
@@ -55,6 +57,7 @@ impl ToString for Symbol
             Symbol::BitwiseNot => "~".to_string(),
             Symbol::BitwiseAnd => "&".to_string(),
             Symbol::BitwiseOr => "|".to_string(),
+            Symbol::Comma => ",".to_string()
         };
     }
 }
@@ -63,30 +66,7 @@ impl Symbol
 {
     pub fn get_symbol_list() -> Vec<(String, Symbol)>
     {
-        let mut symbol_list = vec![
-            Symbol::Plus,
-            Symbol::Minus,
-            Symbol::Star,
-            Symbol::Divide,
-            Symbol::Modulus,
-            Symbol::Greater,
-            Symbol::Less,
-            Symbol::GreaterEqual,
-            Symbol::LessEqual,
-            Symbol::Assignment,
-            Symbol::Equal,
-            Symbol::OpenParen,
-            Symbol::CloseParen,
-            Symbol::OpenBrace,
-            Symbol::CloseBrace,
-            Symbol::Semicolon,
-            Symbol::BooleanNot,
-            Symbol::BooleanAnd,
-            Symbol::BooleanOr,
-            Symbol::BitwiseNot,
-            Symbol::BitwiseAnd,
-            Symbol::BitwiseOr
-        ];
+        let mut symbol_list: Vec<Symbol> = Symbol::iter().collect();
 
         symbol_list.sort_by(|a, b| {
             let a_s = a.to_string();
@@ -112,13 +92,13 @@ impl Symbol
             .collect();
     }
 
-    pub fn try_match_symbol(input: &str) -> Option<Symbol>
+    pub fn try_match_symbol(input: &str) -> Option<(Symbol, usize)>
     {
         for (symbol_text, symbol) in &Symbol::get_symbol_list()
         {
             if input.len() >= symbol_text.len() && &input[0..symbol_text.len()] == *symbol_text
             {
-                return Some(*symbol);
+                return Some((*symbol, symbol_text.len()));
             }
         }
 

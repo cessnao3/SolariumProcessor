@@ -1,107 +1,104 @@
-use regex::Regex;
-
-use lazy_static::lazy_static;
-
 mod keyword;
 mod symbol;
+mod word_literal;
+mod name;
+mod string_literal;
+
+mod utils;
+
+use utils::is_separator;
 
 #[derive(Debug, Clone)]
 pub enum Token
 {
     Keyword(keyword::Keyword),
     Symbol(symbol::Symbol),
-    IntegerLiteral(i16),
+    WordLiteral(u16),
+    StringLiteral(String),
     Name(String)
 }
 
-fn is_separator(c: char) -> bool
+impl ToString for Token
 {
-    lazy_static!
+    fn to_string(&self) -> String
     {
-        static ref separator_strings: Vec<char> = symbol::Symbol::get_symbol_list()
-            .iter()
-            .filter(|(s, _)| s.len() == 1)
-            .map(|(s, _)| s.chars().next().unwrap())
-            .collect();
-    }
-
-    return
-        c.is_ascii_whitespace() ||
-        separator_strings.contains(&c);
-}
-
-fn try_match_integer_literal(input: &str) -> Option<u16>
-{
-    lazy_static!
-    {
-        pub static ref regex_signed_int: Regex = Regex::new(r"$-[\d]+").unwrap();
-    }
-
-    if input.len() == 0
-    {
-        return None;
-    }
-
-    let first_char = input.chars().next().unwrap();
-
-    if first_char == '-'
-    {
-        let mut current = 1usize;
-
-        for c in input[1..input.len()].chars()
+        return match self
         {
-            if !c.is_numeric()
-            {
-                break;
-            }
-            else
-            {
-                current += 1;
-            }
-        }
-
-        return match &input[0..current].parse::<i16>()
-        {
-            Ok(v) => Some(*v as u16),
-            Err(_) => None
+            Token::Keyword(k) => format!("Keyword({0:})", k.to_string()),
+            Token::Symbol(s) => format!("Symbol({0:})", s.to_string()),
+            Token::WordLiteral(v) => format!("WordLiteral({0:})", v),
+            Token::Name(n) => format!("Name({0:})", n),
+            Token::StringLiteral(s) => format!("String(\"{0:}\")", string_literal::print_string_literal(s))
         };
     }
-    else if first_char.is_numeric()
-    {
-        let mut current = 1usize;
-        for c in input[1..input.len()].chars()
-        {
-            if !c.is_numeric()
-            {
-                break;
-            }
-            else
-            {
-                current += 1;
-            }
-        }
-    }
-
-    return None;
 }
 
 pub fn tokenize(line: &str) -> Result<Vec<Token>, String>
 {
-    let mut current_token: Option<Token> = None;
     let mut tokens: Vec<Token> = Vec::new();
+    let chars: Vec<char> = line.chars().collect();
 
-    for (i, c) in line.chars().enumerate()
+    let mut i = 0usize;
+    while i < line.len()
     {
-        // Complete the current token if needed
-        if is_separator(c) && current_token.is_some()
+        // Extract the current character
+        let c = chars[i];
+
+        // Check for ascii
+        if !c.is_ascii()
         {
-            tokens.push(current_token.unwrap());
-            current_token = None;
+            return Err(format!("Only ASCII characters are allowed"));
         }
 
-        // Add the current value to the token list
+        // Define the current reference val
+        let next_str = &line[i..line.len()];
 
+        // Skip if the current character is a separator
+        if c.is_whitespace()
+        {
+            i += 1;
+        }
+        else if let Some((symb, len)) = symbol::Symbol::try_match_symbol(next_str)
+        {
+            tokens.push(Token::Symbol(symb));
+            i += len;
+        }
+        else if let Some((key, len)) = keyword::Keyword::try_match_keyword(next_str)
+        {
+            tokens.push(Token::Keyword(key));
+            i += len;
+        }
+        else if let Some((val, len)) = word_literal::try_match_integer_literal(next_str)
+        {
+            tokens.push(Token::WordLiteral(val));
+            i += len;
+        }
+        else if let Some((name, len)) = name::try_match_name(next_str)
+        {
+            tokens.push(Token::Name(name));
+            i += len;
+        }
+        else if let Some((strval, len)) = string_literal::try_string_literal(next_str)
+        {
+            tokens.push(Token::StringLiteral(strval));
+            i += len;
+        }
+        else
+        {
+            let mut j = i + 1;
+            while j < chars.len()
+            {
+                if is_separator(chars[j])
+                {
+                    break;
+                }
+
+                j += 1;
+            }
+
+            return Err(format!("unable to generate token for \"{0:}\"", &line[i..j]));
+        }
     }
 
-    return Err("not implemented".to_string());
+    return Ok(tokens);
 }

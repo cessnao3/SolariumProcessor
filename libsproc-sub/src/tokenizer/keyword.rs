@@ -1,8 +1,9 @@
-use std::net::ToSocketAddrs;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
-use crate::tokenizer::{is_separator, keyword};
+use crate::tokenizer::utils::is_separator;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, EnumIter)]
 pub enum Keyword
 {
     If,
@@ -11,7 +12,8 @@ pub enum Keyword
     Func,
     Static,
     Const,
-    Auto
+    Auto,
+    Extern
 }
 
 impl ToString for Keyword
@@ -26,14 +28,15 @@ impl ToString for Keyword
             Keyword::Func => "func".to_string(),
             Keyword::Static => "static".to_string(),
             Keyword::Const => "const".to_string(),
-            Keyword::Auto => "auto".to_string()
+            Keyword::Auto => "auto".to_string(),
+            Keyword::Extern => "extern".to_string()
         }
     }
 }
 
 impl Keyword
 {
-    pub fn check_from_string(input: &str) -> Option<Keyword>
+    pub fn try_match_keyword(input: &str) -> Option<(Keyword, usize)>
     {
         fn matches_keyword(input: &str, keyword: &str) -> bool
         {
@@ -60,15 +63,7 @@ impl Keyword
             return true;
         }
 
-        let keyword_vals = vec![
-            Keyword::If,
-            Keyword::Else,
-            Keyword::While,
-            Keyword::Func,
-            Keyword::Static,
-            Keyword::Const,
-            Keyword::Auto
-        ];
+        let keyword_vals: Vec<Keyword> = Keyword::iter().collect();
 
         let keyword_checks: Vec<(Keyword, String)> = keyword_vals
             .iter()
@@ -79,7 +74,7 @@ impl Keyword
         {
             if matches_keyword(input, &key_str)
             {
-                return Some(key);
+                return Some((key, key_str.len()));
             }
         }
 
