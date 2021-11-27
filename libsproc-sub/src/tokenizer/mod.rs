@@ -58,6 +58,10 @@ pub fn tokenize(line: &str) -> Result<Vec<Token>, String>
         {
             i += 1;
         }
+        else if let Some(len) = try_clear_comment(next_str)
+        {
+            i += len;
+        }
         else if let Some((symb, len)) = symbol::Symbol::try_match_symbol(next_str)
         {
             tokens.push(Token::Symbol(symb));
@@ -101,4 +105,27 @@ pub fn tokenize(line: &str) -> Result<Vec<Token>, String>
     }
 
     return Ok(tokens);
+}
+
+fn try_clear_comment(input: &str) -> Option<usize>
+{
+    let mut len = 0usize;
+
+    for (i, c) in input.chars().enumerate()
+    {
+        if (i == 0 || i == 1) && c != '/'
+        {
+            return None;
+        }
+        else if c == '\n' || c == '\r'
+        {
+            break;
+        }
+        else
+        {
+            len += 1;
+        }
+    }
+
+    return Some(len);
 }
