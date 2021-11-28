@@ -64,7 +64,8 @@ impl ScopeManager
 
     pub fn add_scope(&mut self)
     {
-        self.scopes.push(Scope::new(self.generate_index()));
+        let next_ind = self.generate_index();
+        self.scopes.push(Scope::new(next_ind));
     }
 
     pub fn pop_scope(&mut self)

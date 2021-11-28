@@ -38,6 +38,14 @@ impl LoadValue for StaticVariable
     }
 }
 
+impl ToString for StaticVariable
+{
+    fn to_string(&self) -> String
+    {
+        return format!("static({0:})", self.name);
+    }
+}
+
 pub struct Variable
 {
     name: String,
@@ -75,5 +83,13 @@ impl LoadValue for Variable
         assembly.push(format!("ld {0:}, {0:}", register));
 
         return assembly;
+    }
+}
+
+impl ToString for Variable
+{
+    fn to_string(&self) -> String
+    {
+        return format!("var({0:} -> {1:})", self.name, self.offset);
     }
 }

@@ -143,9 +143,13 @@ impl LoadValue for BinaryExpression
                 assembly.push("jmpri 2".to_string());
                 assembly.push(format!("ldi {0:}, 1", register));
 
-                if self.op_type == BinaryExpressionType::NotEqual
+                match self.op_type
                 {
-                    assembly.push(format!("bnot {0:}", register));
+                    BinaryExpressionType::NotEqual =>
+                    {
+                        assembly.push(format!("bnot {0:}", register));
+                    },
+                    _ => ()
                 }
             }
         }
