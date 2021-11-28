@@ -2,8 +2,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub const REG_DEFAULT_TEST_RESULT: usize = 5;
-pub const REG_DEFAULT_TEST_JUMP_A: usize = 6;
-pub const REG_DEFAULT_TEST_JUMP_B: usize = 7;
+pub const REG_DEFAULT_SPARE: usize = 6;
+pub const REG_DEFAULT_TEST_JUMP_A: usize = 7;
+pub const REG_DEFAULT_TEST_JUMP_B: usize = 8;
 pub const REG_FRAME_SP_VALUE: usize = 15;
 
 pub trait EmitAssembly
@@ -13,7 +14,7 @@ pub trait EmitAssembly
 
 pub trait LoadValue: ToString
 {
-    fn load_value_to_register(&self, register: usize) -> Vec<String>;
+    fn load_value_to_register(&self, register: usize, register_spare: usize) -> Vec<String>;
 }
 
 pub trait FunctionCall
@@ -25,7 +26,7 @@ pub trait FunctionCall
 
 pub trait NamedMemoryValue: LoadValue
 {
-    fn set_value_from_register(&self, register: usize) -> Vec<String>;
+    fn set_value_from_register(&self, register_from: usize, register_spare: usize) -> Vec<String>;
 
     fn get_name(&self) -> String;
 }

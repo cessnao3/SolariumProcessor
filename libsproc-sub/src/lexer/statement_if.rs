@@ -16,7 +16,7 @@ impl EmitAssembly for IfStatement
         let if_label = format!("statement_if_{0:}", scopes.generate_index());
 
         // Load the expression value into the test array
-        assembly.extend(self.test_expression.load_value_to_register(REG_DEFAULT_TEST_RESULT));
+        assembly.extend(self.test_expression.load_value_to_register(REG_DEFAULT_TEST_RESULT, REG_DEFAULT_SPARE));
 
         // Start the if statement
         assembly.push(format!("; {0:}", if_label));
@@ -44,8 +44,8 @@ impl EmitAssembly for IfStatement
 
         assembly.push("jmp 2".to_string());
         assembly.push(format!(".loadloc {0:}_end", if_label));
-        assembly.push("ldir 5, -1".to_string());
-        assembly.push("jmp 5".to_string());
+        assembly.push(format!("ldir {0:}, -1", REG_DEFAULT_TEST_RESULT));
+        assembly.push(format!("jmp {0:}", REG_DEFAULT_TEST_RESULT));
 
         // If False
         assembly.push(format!(":{0:}_false", if_label));

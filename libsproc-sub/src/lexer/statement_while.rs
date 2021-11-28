@@ -17,7 +17,7 @@ impl EmitAssembly for StatementWhile
         assembly.push(format!(":{0:}_test", while_label));
 
         // Load the expression value into the test array
-        assembly.extend(self.test_expression.load_value_to_register(REG_DEFAULT_TEST_RESULT));
+        assembly.extend(self.test_expression.load_value_to_register(REG_DEFAULT_TEST_RESULT, REG_DEFAULT_SPARE));
 
         // Start the if statement
         assembly.push(format!("; {0:}", while_label));
@@ -40,8 +40,8 @@ impl EmitAssembly for StatementWhile
 
         assembly.push("jmp 2".to_string());
         assembly.push(format!(".loadloc {0:}_test", while_label));
-        assembly.push("ldir 5, -1".to_string());
-        assembly.push("jmp 5".to_string());
+        assembly.push(format!("ldir {0:}, -1", REG_DEFAULT_TEST_RESULT));
+        assembly.push(format!("jmp {0:}", REG_DEFAULT_TEST_RESULT));
 
         // Ending
         assembly.push(format!(":{0:}_end", while_label));

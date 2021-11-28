@@ -381,15 +381,14 @@ The Solarium Processor Advanced Computing Environment, or spACE, is a higher-lev
 The language specification is as follows.
 
 \begin{tabular}{rl}
-	Program & $\rightarrow$ \textlangle BaseStatement\textrangle \\
+	Program & $\rightarrow$ \\
+	& \textlangle BaseStatement\textrangle \\
 	BaseStatement & $\rightarrow$ \\
 	& \textlangle BaseStatement\textrangle \textlangle BaseStatement\textrangle \\
 	& func \texttt{FunctionName}(\texttt{Variable}[, \texttt{Variable}\dots]) \{ \textlangle Statement\textrangle \} \\
-	& static VarType \texttt{Variable} = \textlangle Literal\textrangle \\
+	& static VarType \texttt{Variable}[ = \textlangle Expression\textrangle]; \\
 	Statement & $\rightarrow$ \\
-	& int \texttt{Variable}; \\
-	& uint \texttt{Variable}; \\
-	& \texttt{Variable} = \textlangle Expression\textrangle; \\
+	& \textlangle VarType\textrangle \texttt{Variable}[ = \textlangle Expression\textrangle]; \\
 	& return; \\
 	& return \textlangle Expression\textrangle; \\
 	& \{ \textlangle Statement\textrangle \} \\
@@ -404,9 +403,12 @@ The language specification is as follows.
 	& \textlangle UnaryOp\textrangle \textlangle Expression\textrangle \\
 	& (\textlangle Expression\textrangle) \\
 	& \texttt{FunctionName}([\textlangle Expression\textrangle[, \textlangle Expression\textrangle,\dots]]) \\
-	BinaryOp & $\rightarrow$  +, -, *, /, \textless, \textgreater, \textless=, \textgreater=, \&\&, \textbar\textbar, \&, \textbar, ==, !=\\
-	UnaryOp & $\rightarrow$ *, -, +, !, \textasciitilde \\
-	VarScope & $\rightarrow$ int, uint \\
+	BinaryOp & $\rightarrow$  \\
+	& +, -, *, /, \textless, \textgreater, \textless=, \textgreater=, \&\&, \textbar\textbar, \&, \textbar, ==, !=\\
+	UnaryOp & $\rightarrow$ \\
+	& *, -, +, !, \textasciitilde \\
+	VarType & $\rightarrow$ \\
+	& int, uint \\
 \end{tabular}
 
 

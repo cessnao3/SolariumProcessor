@@ -4,6 +4,8 @@ mod lexer;
 
 use crate::compiler::compile;
 
+use libsproc_assemble::assemble;
+
 fn get_example_program() -> String
 {
     let text_bytes = include_bytes!("../../examples/test.sub");
@@ -19,7 +21,16 @@ fn main()
     let program = get_example_program();
     match compile(&program)
     {
-        Ok(v) => println!("Compilation Successful: {0:} lines of assembly generated", v.len()),
+        Ok(v) =>
+        {
+            println!("Compilation Successful: {0:} lines of assembly generated", v.len());
+
+            match assemble(v.iter().map(|v| v.as_str()).collect())
+            {
+                Ok(_) => println!("Assembly Successful!"),
+                Err(e) => println!("Assembly Error: {0:}", e)
+            };
+        },
         Err(e) => println!("Compilation Error: {0:}", e)
     };
 }

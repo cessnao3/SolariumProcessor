@@ -51,7 +51,7 @@ impl StaticVariable
 
 impl LoadValue for StaticVariable
 {
-    fn load_value_to_register(&self, register: usize) -> Vec<String>
+    fn load_value_to_register(&self, register: usize, _: usize) -> Vec<String>
     {
         return load_variable_to_register(
             self.get_address_instructions(register),
@@ -62,12 +62,12 @@ impl LoadValue for StaticVariable
 
 impl NamedMemoryValue for StaticVariable
 {
-    fn set_value_from_register(&self, register: usize) -> Vec<String>
+    fn set_value_from_register(&self, register_from: usize, register_spare: usize) -> Vec<String>
     {
         return save_register_to_variable(
-            self.get_address_instructions(register + 1),
-            register,
-            register + 1,
+            self.get_address_instructions(register_spare),
+            register_from,
+            register_spare,
             &self.get_name());
     }
 
@@ -115,7 +115,7 @@ impl Variable
 
 impl LoadValue for Variable
 {
-    fn load_value_to_register(&self, register: usize) -> Vec<String>
+    fn load_value_to_register(&self, register: usize, _: usize) -> Vec<String>
     {
         return load_variable_to_register(
             self.get_address_instructions(register),
@@ -126,12 +126,12 @@ impl LoadValue for Variable
 
 impl NamedMemoryValue for Variable
 {
-    fn set_value_from_register(&self, register: usize) -> Vec<String>
+    fn set_value_from_register(&self, register_from: usize, register_spare: usize) -> Vec<String>
     {
         return save_register_to_variable(
-            self.get_address_instructions(register + 1),
-            register,
-            register + 1,
+            self.get_address_instructions(register_spare),
+            register_from,
+            register_spare,
             &self.get_name());
     }
 

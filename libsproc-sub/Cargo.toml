@@ -10,3 +10,5 @@ lazy_static = "1.4.0"
 regex = "1.5.4"
 strum = "0.23"
 strum_macros = "0.23"
+libsproc = { path = "../libsproc", version = "*" }
+libsproc-assemble = { path = "../libsproc-assemble", version = "*" }

@@ -65,18 +65,19 @@ impl ToString for BinaryExpression
 
 impl LoadValue for BinaryExpression
 {
-    fn load_value_to_register(&self, register: usize) -> Vec<String>
+    fn load_value_to_register(&self, register: usize, register_spare: usize) -> Vec<String>
     {
         // Define the assembly output
         let mut assembly = Vec::new();
         assembly.push(format!("; {0:}", self.to_string()));
 
-        // Define the next register to use
-        let reg_other = register + 1;
-
         // Load the right value to the final register, and left into the next register up
-        self.right.load_value_to_register(register);
-        self.left.load_value_to_register(reg_other);
+        assembly.extend(self.right.load_value_to_register(register, register_spare));
+        assembly.push(format!("push {0:}", register));
+
+        assembly.extend(self.left.load_value_to_register(register, register_spare));
+        assembly.push(format!("copy {0:}, {1:}", register_spare, register));
+        assembly.push(format!("popr {0:}", register));
 
         // Apply the correct operation
         match self.op_type
@@ -103,7 +104,7 @@ impl LoadValue for BinaryExpression
                     _ => panic!()
                 };
 
-                assembly.push(format!("{0:} {1:}, {1:}, {2:}", arith_inst, register, reg_other));
+                assembly.push(format!("{0:} {1:}, {1:}, {2:}", arith_inst, register, register_spare));
 
                 match self.op_type
                 {
@@ -122,7 +123,7 @@ impl LoadValue for BinaryExpression
             BinaryExpressionType::Equal |
             BinaryExpressionType::NotEqual =>
             {
-                assembly.push(format!("tg {0:}, {1:}", register, reg_other));
+                assembly.push(format!("tg {0:}, {1:}", register, register_spare));
                 assembly.push(format!("ldi {0:}, 1", register));
                 assembly.push(format!("ldi {0:}, 0", register));
 
@@ -137,7 +138,7 @@ impl LoadValue for BinaryExpression
                     _ => panic!()
                 };
 
-                assembly.push(format!("{0:} {1:}, {2:}", test_inst, register, reg_other));
+                assembly.push(format!("{0:} {1:}, {2:}", test_inst, register, register_spare));
                 assembly.push("jmpri 3".to_string());
                 assembly.push(format!("ldi {0:}, 0", register));
                 assembly.push("jmpri 2".to_string());
@@ -149,7 +150,10 @@ impl LoadValue for BinaryExpression
                     {
                         assembly.push(format!("bnot {0:}", register));
                     },
-                    _ => ()
+                    _ =>
+                    {
+                        assembly.push(format!("bool {0:}", register));
+                    }
                 }
             }
         }
