@@ -1,4 +1,4 @@
-use super::common::{EmitAssembly, ScopeManager, LoadValue};
+use super::common::*;
 
 pub struct IfStatement
 {
@@ -13,10 +13,10 @@ impl EmitAssembly for IfStatement
     {
         // Define the assembly value
         let mut assembly = Vec::new();
-        let if_label = format!("statement_if_{0:}", scopes.generate_index_name());
+        let if_label = format!("statement_if_{0:}", scopes.generate_index());
 
         // Load the expression value into the test array
-        assembly.extend(self.test_expression.load_value_to_register(5));
+        assembly.extend(self.test_expression.load_value_to_register(REG_DEFAULT_TEST_RESULT));
 
         // Start the if statement
         assembly.push(format!("; {0:}", if_label));
@@ -25,13 +25,13 @@ impl EmitAssembly for IfStatement
         assembly.push("jmpri 3".to_string());
         assembly.push(format!(".loadloc {0:}_true", if_label));
         assembly.push(format!(".loadloc {0:}_false", if_label));
-        assembly.push("ldir 6, -2".to_string());
-        assembly.push("ldir 7, -2".to_string());
+        assembly.push(format!("ldir {0:}, -2", REG_DEFAULT_TEST_JUMP_A));
+        assembly.push(format!("ldir {0:}, -2", REG_DEFAULT_TEST_JUMP_B));
 
         // Perform the test and jump to the correct locations
-        assembly.push("tnz 5".to_string());
-        assembly.push("jmp 6".to_string());
-        assembly.push("jmp 7".to_string());
+        assembly.push(format!("tnz {0:}", REG_DEFAULT_TEST_RESULT));
+        assembly.push(format!("jmp {0:}", REG_DEFAULT_TEST_JUMP_A));
+        assembly.push(format!("jmp {0:}", REG_DEFAULT_TEST_JUMP_B));
 
         // If True
 

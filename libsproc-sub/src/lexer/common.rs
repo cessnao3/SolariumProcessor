@@ -1,11 +1,16 @@
 use std::collections::HashMap;
 
+pub const REG_DEFAULT_TEST_RESULT: usize = 5;
+pub const REG_DEFAULT_TEST_JUMP_A: usize = 6;
+pub const REG_DEFAULT_TEST_JUMP_B: usize = 7;
+pub const REG_FRAME_SP_VALUE: usize = 15;
+
 pub trait EmitAssembly
 {
     fn emit(&self, scopes: &mut ScopeManager) -> Vec<String>;
 }
 
-pub trait LoadValue
+pub trait LoadValue: ToString
 {
     fn load_value_to_register(&self, register: usize) -> Vec<String>;
 }

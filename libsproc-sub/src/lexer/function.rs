@@ -1,4 +1,4 @@
-use super::common::{EmitAssembly, ScopeManager, LoadValue};
+use super::common::*;
 
 pub trait FunctionCall
 {
@@ -7,11 +7,13 @@ pub trait FunctionCall
 
 fn call_function_with_lcoation(loadloc: String, args: Vec<Box<dyn LoadValue>>) -> Vec<String>
 {
+    const REG_PUSH_ARG: usize = 5;
+
     let mut assembly = Vec::new();
     for a in args.iter().rev()
     {
-        assembly.extend(a.load_value_to_register(5));
-        assembly.push(format!("push {0:}", 5));
+        assembly.extend(a.load_value_to_register(REG_PUSH_ARG));
+        assembly.push(format!("push {0:}", REG_PUSH_ARG));
     }
 
     assembly.push("jmpri 2".to_string());
@@ -67,7 +69,7 @@ impl EmitAssembly for FunctionDefinition
 
         assembly.push(format!(":{0:}", self.get_label()));
 
-
+        assembly.push(format!("copy {0:}, $sp", REG_FRAME_SP_VALUE));
 
         for s in self.statements.iter()
         {
