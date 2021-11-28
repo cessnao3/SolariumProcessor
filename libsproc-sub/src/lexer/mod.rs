@@ -10,282 +10,22 @@ mod statement;
 mod statement_if;
 mod statement_while;
 
+mod token_iter;
+
 use common::ScopeManager;
 
 use std::rc::Rc;
 
 use self::{common::NamedMemoryValue, variable::StaticVariable};
 
-struct TokenIter
-{
-    list: Vec<Token>,
-    current: usize,
-    started: bool
-}
+use self::token_iter::TokenIter;
 
-impl TokenIter
-{
-    pub fn new(tokens: Vec<Token>) -> TokenIter
-    {
-        return Self
-        {
-            list: tokens,
-            current: 0,
-            started: false
-        };
-    }
-
-    pub fn next(&mut self) -> Option<&Token>
-    {
-        if !self.started
-        {
-            self.started = true;
-        }
-        else if self.current < self.list.len()
-        {
-            self.current += 1;
-        }
-
-        return self.get_index_val(self.current);
-    }
-
-    pub fn last(&self) -> Option<&Token>
-    {
-        if !self.started
-        {
-            return None;
-        }
-        else
-        {
-            return self.get_index_val(self.current);
-        }
-    }
-
-    pub fn peek(&self) -> Option<&Token>
-    {
-        if !self.started
-        {
-            return self.get_index_val(self.current);
-        }
-        else
-        {
-            return self.get_index_val(self.current + 1);
-        }
-    }
-
-    fn get_index_val(&self, ind: usize) -> Option<&Token>
-    {
-        if ind < self.list.len()
-        {
-            return Some(&self.list[ind]);
-        }
-        else
-        {
-            return None;
-        }
-    }
-}
+use self::expression::read_expression;
 
 enum VariableType
 {
     Stack,
     Static
-}
-
-fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: usize, register_spare: usize) -> Result<Vec<String>, String>
-{
-    let mut assembly = Vec::new();
-
-    if let Some(t) = iter.next()
-    {
-        match t
-        {
-            Token::Name(name) =>
-            {
-                if let Some(Token::Symbol(Symbol::OpenParen)) = iter.peek()
-                {
-                    panic!("function calls do not yet work...");
-                }
-                else
-                {
-                    match scopes.get_variable(name)
-                    {
-                        Ok(var) => assembly.extend(var.load_value_to_register(register, register_spare)),
-                        Err(e) => return Err(e)
-                    };
-                }
-            },
-            Token::Symbol(Symbol::OpenParen) =>
-            {
-                match read_expression(iter, scopes, register, register_spare)
-                {
-                    Ok(v) => assembly.extend(v),
-                    Err(e) => return Err(e)
-                };
-
-                let post_load_instruction;
-
-                match iter.peek()
-                {
-                    Some(v) => match v
-                    {
-                        Token::Symbol(Symbol::BitwiseAnd) =>
-                        {
-                            post_load_instruction = vec![
-                                format!("band {0:}, {0:}, {1:}", register, register_spare)
-                            ];
-                        }
-                        Token::Symbol(Symbol::BitwiseOr) =>
-                        {
-                            post_load_instruction = vec![
-                                format!("bor {0:}, {0:}, {1:}", register, register_spare)
-                            ];
-                        }
-                        Token::Symbol(Symbol::BooleanAnd) =>
-                        {
-                            post_load_instruction = vec![
-                                format!("band {0:}, {0:}, {1:}", register, register_spare),
-                                format!("bool {0:}", register)
-                            ];
-                        }
-                        Token::Symbol(Symbol::BooleanOr) =>
-                        {
-                            post_load_instruction = vec![
-                                format!("bor {0:}, {0:}, {1:}", register, register_spare),
-                                format!("bool {0:}", register)
-                            ];
-                        }
-                        Token::Symbol(Symbol::Equal) =>
-                        {
-                            post_load_instruction = vec![
-                                format!("teq {0:}, {1:}"),
-
-                            ];
-                        }
-                        Token::Symbol(Symbol::NotEqual) =>
-                        {
-
-                        }
-                        Token::Symbol(Symbol::Greater) =>
-                        {
-
-                        }
-                        Token::Symbol(Symbol::GreaterEqual) =>
-                        {
-
-                        }
-                        Token::Symbol(Symbol::Less) =>
-                        {
-
-                        }
-                        Token::Symbol(Symbol::LessEqual) =>
-                        {
-
-                        }
-                        Token::Symbol(Symbol::Plus) =>
-                        {
-
-                        }
-                        Token::Symbol(Symbol::Minus) =>
-                        {
-
-                        }
-                        Token::Symbol(Symbol::Star) =>
-                        {
-
-                        }
-                        Token::Symbol(Symbol::Divide) =>
-                        {
-
-                        }
-                        Token::Symbol(Symbol::Modulus) =>
-                        {
-
-                        }
-                        _ => ()
-                    }
-                    _ => ()
-                };
-
-                if let Some(Token::Symbol(Symbol::CloseParen)) = iter.peek()
-                {
-                    // Add the
-
-                    // Clear out the close paren
-                    iter.next();
-                }
-                else
-                {
-                    return Err(match iter.peek()
-                    {
-                        Some(t) => format!("expected closing parenthesis, found {0:}", t.to_string()),
-                        None => format!("unexpected end of token stream")
-                    });
-                }
-            }
-            Token::Symbol(symb) =>
-            {
-                // Determine instructions that must be run on the resulting data values
-                let post_load_vec = match symb
-                {
-                    Symbol::Plus =>
-                    {
-                        Vec::new()
-                    },
-                    Symbol::Minus =>
-                    {
-                        vec![
-                            format!("ldi {0:}, -1", register_spare_a),
-                            format!("mul {0:}, {0:}, {1:}", register, register_spare_a)
-                        ]
-                    },
-                    Symbol::Star =>
-                    {
-                        vec![
-                            format!("ld {0:}, {0:}", register)
-                        ]
-                    },
-                    Symbol::BooleanNot =>
-                    {
-                        vec![
-                            format!("not {0:}", register)
-                        ]
-                    },
-                    Symbol::BitwiseNot =>
-                    {
-                        vec![
-                            format!("bnot {0:}, {0:}", register)
-                        ]
-                    },
-                    Symbol::BitwiseAnd =>
-                    {
-                        panic!("address-of not yet implemented!");
-                    }
-                    _ =>
-                    {
-                        return Err(format!("unexpected use of symbol {0:} in expression", symb.to_string()));
-                    }
-                };
-
-                // Provide the resulting read instruction
-                match read_expression(iter, scopes, register, register_spare_a, register_spare_b)
-                {
-                    Ok(vals) =>
-                    {
-                        assembly.extend(vals);
-                        assembly.extend(post_load_vec);
-                    },
-                    Err(e) => return Err(e)
-                };
-            },
-            _ => return Err(format!("unexpexcted token {0:} found in expression", t.to_string()))
-        };
-    }
-    else
-    {
-        return Err(format!("unexpected end of token stream"));
-    }
-    return Err(format!("not implemented"));
 }
 
 fn read_statement(inter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec<String>, String>
@@ -329,6 +69,7 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
             {
                 let variable_label = format!("static_variable_{0:}_{1:}", variable_name, scopes.generate_index());
 
+                assembly.push("jmpri 2".to_string());
                 assembly.push(format!(":{0:}", variable_label));
                 for _ in 0..variable_size
                 {
@@ -371,7 +112,7 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
     if let Some(Token::Symbol(Symbol::Assignment)) = next_val
     {
         // Read the expression to assign the variable to
-        match read_expression(iter, scopes, 6, 7, 8)
+        match read_expression(iter, scopes, 6, 7)
         {
             Ok(asm) =>
             {

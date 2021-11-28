@@ -1,163 +1,231 @@
 use super::common::*;
 
-pub enum BinaryExpressionType
-{
-    Addition,
-    Subtraction,
-    Multiplication,
-    Division,
-    Greater,
-    Less,
-    GreaterEqual,
-    LessEqual,
-    And,
-    Or,
-    BitwiseAnd,
-    BitwiseOr,
-    Equal,
-    NotEqual
-}
+use crate::tokenizer::{Token, Symbol};
+use super::token_iter::TokenIter;
 
-impl ToString for BinaryExpressionType
+pub fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: usize, register_spare: usize) -> Result<Vec<String>, String>
 {
-    fn to_string(&self) -> String
+    let mut assembly = Vec::new();
+
+    if let Some(t) = iter.next()
     {
-        let s = match self
+        match t
         {
-            BinaryExpressionType::Addition => "+",
-            BinaryExpressionType::Subtraction => "-",
-            BinaryExpressionType::Multiplication => "*",
-            BinaryExpressionType::Division => "/",
-            BinaryExpressionType::Greater => ">",
-            BinaryExpressionType::Less => "<",
-            BinaryExpressionType::GreaterEqual => ">=",
-            BinaryExpressionType::LessEqual => "<=",
-            BinaryExpressionType::And => "&&",
-            BinaryExpressionType::Or => "||",
-            BinaryExpressionType::BitwiseAnd => "&",
-            BinaryExpressionType::BitwiseOr => "|",
-            BinaryExpressionType::Equal => "==",
-            BinaryExpressionType::NotEqual => "!="
-        };
-
-        return s.to_string();
-    }
-}
-
-pub struct BinaryExpression
-{
-    left: Box<dyn LoadValue>,
-    right: Box<dyn LoadValue>,
-    op_type: BinaryExpressionType
-}
-
-impl ToString for BinaryExpression
-{
-    fn to_string(&self) -> String
-    {
-        return format!(
-            "({0:} {1:} {2:})",
-            self.left.to_string(),
-            self.op_type.to_string(),
-            self.right.to_string());
-    }
-}
-
-impl LoadValue for BinaryExpression
-{
-    fn load_value_to_register(&self, register: usize, register_spare: usize) -> Vec<String>
-    {
-        // Define the assembly output
-        let mut assembly = Vec::new();
-        assembly.push(format!("; {0:}", self.to_string()));
-
-        // Load the right value to the final register, and left into the next register up
-        assembly.extend(self.right.load_value_to_register(register, register_spare));
-        assembly.push(format!("push {0:}", register));
-
-        assembly.extend(self.left.load_value_to_register(register, register_spare));
-        assembly.push(format!("copy {0:}, {1:}", register_spare, register));
-        assembly.push(format!("popr {0:}", register));
-
-        // Apply the correct operation
-        match self.op_type
-        {
-            BinaryExpressionType::Addition |
-            BinaryExpressionType::Subtraction |
-            BinaryExpressionType::Multiplication |
-            BinaryExpressionType::Division |
-            BinaryExpressionType::BitwiseAnd |
-            BinaryExpressionType::BitwiseOr |
-            BinaryExpressionType::And |
-            BinaryExpressionType::Or =>
+            Token::WordLiteral(val) =>
             {
-                let arith_inst = match self.op_type
+                assembly.extend(vec![
+                    "jmpri 2".to_string(),
+                    format!(".load {0:}", val),
+                    format!("ldri {0:}, -1", register)
+                ]);
+            },
+            Token::Name(name) =>
+            {
+                if let Some(Token::Symbol(Symbol::OpenParen)) = iter.peek()
                 {
-                    BinaryExpressionType::Addition => "add",
-                    BinaryExpressionType::Subtraction => "sub",
-                    BinaryExpressionType::Multiplication => "mul",
-                    BinaryExpressionType::Division => "div",
-                    BinaryExpressionType::BitwiseAnd => "band",
-                    BinaryExpressionType::BitwiseOr => "bor",
-                    BinaryExpressionType::And => "band",
-                    BinaryExpressionType::Or => "bor",
-                    _ => panic!()
-                };
-
-                assembly.push(format!("{0:} {1:}, {1:}, {2:}", arith_inst, register, register_spare));
-
-                match self.op_type
+                    panic!("function calls do not yet work...");
+                }
+                else
                 {
-                    BinaryExpressionType::And |
-                    BinaryExpressionType::Or =>
+                    match scopes.get_variable(&name)
                     {
-                        assembly.push(format!("bool {0:}", register))
-                    }
-                    _ => ()
+                        Ok(var) => assembly.extend(var.load_value_to_register(register, register_spare)),
+                        Err(e) => return Err(e)
+                    };
                 }
             },
-            BinaryExpressionType::Greater |
-            BinaryExpressionType::Less |
-            BinaryExpressionType::GreaterEqual |
-            BinaryExpressionType::LessEqual |
-            BinaryExpressionType::Equal |
-            BinaryExpressionType::NotEqual =>
+            Token::Symbol(Symbol::OpenParen) =>
             {
-                assembly.push(format!("tg {0:}, {1:}", register, register_spare));
-                assembly.push(format!("ldi {0:}, 1", register));
-                assembly.push(format!("ldi {0:}, 0", register));
-
-                let test_inst = match self.op_type
+                match read_expression(iter, scopes, register, register_spare)
                 {
-                    BinaryExpressionType::Greater => "tg",
-                    BinaryExpressionType::GreaterEqual => "tge",
-                    BinaryExpressionType::Less => "tl",
-                    BinaryExpressionType::LessEqual => "tle",
-                    BinaryExpressionType::Equal |
-                    BinaryExpressionType::NotEqual => "teq",
-                    _ => panic!()
+                    Ok(v) => assembly.extend(v),
+                    Err(e) => return Err(e)
                 };
 
-                assembly.push(format!("{0:} {1:}, {2:}", test_inst, register, register_spare));
-                assembly.push("jmpri 3".to_string());
-                assembly.push(format!("ldi {0:}, 0", register));
-                assembly.push("jmpri 2".to_string());
-                assembly.push(format!("ldi {0:}, 1", register));
+                let mut post_load_instruction = Vec::new();
 
-                match self.op_type
+                match iter.peek()
                 {
-                    BinaryExpressionType::NotEqual =>
+                    Some(Token::Symbol(symb)) => match symb
                     {
-                        assembly.push(format!("bnot {0:}", register));
+                        Symbol::Plus |
+                        Symbol::Minus |
+                        Symbol::Star |
+                        Symbol::Divide |
+                        Symbol::BitwiseAnd |
+                        Symbol::BitwiseOr |
+                        Symbol::BooleanAnd |
+                        Symbol::BooleanOr =>
+                        {
+                            let arith_inst = match symb
+                            {
+                                Symbol::Plus => "add",
+                                Symbol::Minus => "sub",
+                                Symbol::Star => "mul",
+                                Symbol::Divide => "div",
+                                Symbol::BitwiseAnd => "band",
+                                Symbol::BitwiseOr => "bor",
+                                Symbol::BooleanAnd => "band",
+                                Symbol::BooleanOr => "bor",
+                                _ => panic!()
+                            };
+
+                            post_load_instruction.push(format!("{0:} {1:}, {1:}, {2:}", arith_inst, register, register_spare));
+
+                            match symb
+                            {
+                                Symbol::BooleanAnd |
+                                Symbol::BooleanOr =>
+                                {
+                                    post_load_instruction.push(format!("bool {0:}", register))
+                                }
+                                _ => ()
+                            }
+                        },
+                        Symbol::Greater |
+                        Symbol::Less |
+                        Symbol::GreaterEqual |
+                        Symbol::LessEqual |
+                        Symbol::Equal |
+                        Symbol::NotEqual =>
+                        {
+                            post_load_instruction.push(format!("tg {0:}, {1:}", register, register_spare));
+                            post_load_instruction.push(format!("ldi {0:}, 1", register));
+                            post_load_instruction.push(format!("ldi {0:}, 0", register));
+
+                            let test_inst = match symb
+                            {
+                                Symbol::Greater => "tg",
+                                Symbol::GreaterEqual => "tge",
+                                Symbol::Less => "tl",
+                                Symbol::LessEqual => "tle",
+                                Symbol::Equal |
+                                Symbol::NotEqual => "teq",
+                                _ => panic!()
+                            };
+
+                            post_load_instruction.push(format!("{0:} {1:}, {2:}", test_inst, register, register_spare));
+                            post_load_instruction.push("jmpri 3".to_string());
+                            post_load_instruction.push(format!("ldi {0:}, 0", register));
+                            post_load_instruction.push("jmpri 2".to_string());
+                            post_load_instruction.push(format!("ldi {0:}, 1", register));
+
+                            match symb
+                            {
+                                Symbol::NotEqual =>
+                                {
+                                    post_load_instruction.push(format!("bnot {0:}", register));
+                                },
+                                _ =>
+                                {
+                                    post_load_instruction.push(format!("bool {0:}", register));
+                                }
+                            }
+                        },
+                        _ => ()
                     },
-                    _ =>
+                    _ => ()
+                };
+
+                if post_load_instruction.len() > 0
+                {
+                    // Consume the next value
+                    iter.next();
+
+                    // Add the current value to the stack
+                    assembly.push(format!("push {0:}", register));
+
+                    // Read the right-hand of the expression
+                    match read_expression(iter, scopes, register, register_spare)
                     {
-                        assembly.push(format!("bool {0:}", register));
-                    }
+                        Ok(v) => assembly.extend(v),
+                        Err(e) => return Err(e)
+                    };
+
+                    // Move values into the correct locations
+                    assembly.push(format!("copy {0:}, {1:}", register_spare, register));
+                    assembly.push(format!("popr {0:}", register));
+
+                    // Add the resulting instruction values
+                    assembly.extend(post_load_instruction);
+                }
+
+                if let Some(Token::Symbol(Symbol::CloseParen)) = iter.peek()
+                {
+                    // Clear out the close paren
+                    iter.next();
+                }
+                else
+                {
+                    return Err(match iter.peek()
+                    {
+                        Some(t) => format!("expected closing parenthesis, found {0:}", t.to_string()),
+                        None => format!("unexpected end of token stream")
+                    });
                 }
             }
-        }
+            Token::Symbol(symb) =>
+            {
+                // Determine instructions that must be run on the resulting data values
+                let post_load_vec = match symb
+                {
+                    Symbol::Plus =>
+                    {
+                        Vec::new()
+                    },
+                    Symbol::Minus =>
+                    {
+                        vec![
+                            format!("ldi {0:}, -1", register_spare),
+                            format!("mul {0:}, {0:}, {1:}", register, register_spare)
+                        ]
+                    },
+                    Symbol::Star =>
+                    {
+                        vec![
+                            format!("ld {0:}, {0:}", register)
+                        ]
+                    },
+                    Symbol::BooleanNot =>
+                    {
+                        vec![
+                            format!("not {0:}", register)
+                        ]
+                    },
+                    Symbol::BitwiseNot =>
+                    {
+                        vec![
+                            format!("bnot {0:}, {0:}", register)
+                        ]
+                    },
+                    Symbol::BitwiseAnd =>
+                    {
+                        panic!("address-of not yet implemented!");
+                    }
+                    _ =>
+                    {
+                        return Err(format!("unexpected use of symbol {0:} in expression", symb.to_string()));
+                    }
+                };
 
-        return assembly;
+                // Provide the resulting read instruction
+                match read_expression(iter, scopes, register, register_spare)
+                {
+                    Ok(vals) =>
+                    {
+                        assembly.extend(vals);
+                        assembly.extend(post_load_vec);
+                    },
+                    Err(e) => return Err(e)
+                };
+            },
+            _ => return Err(format!("unexpexcted token {0:} found in expression", t.to_string()))
+        };
     }
+    else
+    {
+        return Err(format!("unexpected end of token stream"));
+    }
+
+    return Ok(assembly);
 }
