@@ -6,6 +6,8 @@
 
 \usepackage{comment}
 
+\usepackage{amsmath}
+
 \newcommand{\titlelogoimage}{
 \begin{figure}[h!]
 	\centering
@@ -366,6 +368,44 @@ Listing  \ref{listing:hello-world} provides a program that will infinitely write
 Listing \ref{listing:serial-echo} provides a serial echo program, which echos any text provided by the default serial input device back out via the serial echo device. This serial device is expected to be provided at the starting location \texttt{0xA000}.
 
 \lstinputlisting[caption={Serial echo program reads in text characters and immediately outputs via the output device}, label={listing:serial-echo}]{../examples/serial_echo.smc}
+
+\pagebreak
+
+\section{Solarium Processor Advanced Computing Environment}
+
+The Solarium Processor Advanced Computing Environment, or spACE, is a higher-level language than the raw assembly that provides some nicer tools to program applications in, at the cost of being less space and time efficient than programming in assembly directly. It does offer a slightly safer method of computing, however, as it provides a more traditional function call structure, variables, and scopes that help abstract away some of the hardware and provide some simple limits on what the user is allowed to do.
+
+The language specification is as follows.
+
+\begin{tabular}{rl}
+	Program & $\rightarrow$ \textlangle BaseStatement\textrangle \\
+	BaseStatement & $\rightarrow$ \\
+	& \textlangle BaseStatement\textrangle \textlangle BaseStatement\textlangle \\
+	& func \texttt{FunctionName}(\texttt{Variable}[, \texttt{Variable}\dots]) \{ \textlangle Statement\textrangle \} \\
+	& const VarType \texttt{Variable} = \textlangle Literal\textrangle \\
+	Statement & $\rightarrow$ \\
+	& int \texttt{Variable}; \\
+	& uint \texttt{Variable}; \\
+	& \texttt{Variable} = \textlangle Expression\textrangle; \\
+	& return; \\
+	& return \textlangle Expression\textrangle; \\
+	& \{ \textlangle Statement\textrangle \} \\
+	& if (\textlangle Expression\textrangle) \textlangle Statement\textrangle \\
+	& if (\textlangle Expression\textrangle) \textlangle Statement\textrangle else \textlangle Statement\textrangle \\
+	& while (\textlangle Expression\textrangle) \textlangle Statement\textrangle \\
+	& \textlangle Statement\textrangle \textlangle Statement\textrangle \\
+	Expression & $\rightarrow$ \\
+	& \texttt{Variable} \\
+	& \textlangle Literal\textrangle \\
+	& \textlangle Expression\textrangle \textlangle BinaryOp\textrangle \textlangle Expression\textrangle \\
+	& \textlangle UnaryOp\textrangle \textlangle Expression\textrangle \\
+	& (\textlangle Expression\textrangle) \\
+	BinaryOp & $\rightarrow$  +, -, *, /, \&\&, \textbar\textbar, \&, \textbar \\
+	UnaryOp & $\rightarrow$ *, -, + \\
+	VarScope & $\rightarrow$ int, uint \\
+\end{tabular}
+
+
 
 \pagebreak
 
