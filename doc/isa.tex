@@ -8,6 +8,8 @@
 
 \usepackage{amsmath}
 
+\usepackage{todonotes}
+
 \newcommand{\titlelogoimage}{
 \begin{figure}[h!]
 	\centering
@@ -142,7 +144,7 @@ Note that, if a vector has a value of zero, that interrupt vector is considered 
 
 \section{Instructions and Assembly Code}
 
-All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field.
+All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field. \todo{combine left/right shift?} \todo{add load reg = base + offset?} \todo{keep bxor?} \todo{test equal}
 
 \begin{table}[h!]
 	\centering
@@ -310,7 +312,7 @@ SProc computers, by default, utilize the following character map. This is simila
 \section{Devices}
 \label{sec:devices}
 
-Devices are memory-mapped in the SolariumProcessor. This means that reading or writing to special regions in memory facilitate the communication with these external devices. In a typical Solarium computer, the device region consists of up to 64 devices, starting at memory address \texttt{0xA000}, with each device allocating up to 32 words of memory. Not all devices will make use all the available memory slots for a given device. In these cases, a memory exception will be provided if any of these invalid addresses are read from or written to.
+Devices are memory-mapped in the SolariumProcessor. This means that reading or writing to special regions in memory facilitate the communication with these external devices. In a typical Solarium computer, the device region consists of up to 64 devices, starting at memory address \texttt{0xA000}, with each device allocating up to 32 words of memory. Not all devices will make use all the available memory slots for a given device. In these cases, a memory exception will be provided if any of these invalid addresses are read from or written to. \todo{add device ID}
 
 \subsection{Serial Input and Output}
 
@@ -382,7 +384,7 @@ The language specification is as follows.
 	BaseStatement & $\rightarrow$ \\
 	& \textlangle BaseStatement\textrangle \textlangle BaseStatement\textlangle \\
 	& func \texttt{FunctionName}(\texttt{Variable}[, \texttt{Variable}\dots]) \{ \textlangle Statement\textrangle \} \\
-	& const VarType \texttt{Variable} = \textlangle Literal\textrangle \\
+	& static VarType \texttt{Variable} = \textlangle Literal\textrangle \\
 	Statement & $\rightarrow$ \\
 	& int \texttt{Variable}; \\
 	& uint \texttt{Variable}; \\
@@ -400,8 +402,9 @@ The language specification is as follows.
 	& \textlangle Expression\textrangle \textlangle BinaryOp\textrangle \textlangle Expression\textrangle \\
 	& \textlangle UnaryOp\textrangle \textlangle Expression\textrangle \\
 	& (\textlangle Expression\textrangle) \\
-	BinaryOp & $\rightarrow$  +, -, *, /, \&\&, \textbar\textbar, \&, \textbar \\
-	UnaryOp & $\rightarrow$ *, -, + \\
+	& \texttt{FunctionName}([\textlangle Expression\textrangle[, \textlangle Expression\textrangle,\dots]]) \\
+	BinaryOp & $\rightarrow$  +, -, *, /, \textless, \textgreater, \textless=, \textgreater=, \&\&, \textbar\textbar, \&, \textbar, ==, !=\\
+	UnaryOp & $\rightarrow$ *, -, +, !, \textasciitilde \\
 	VarScope & $\rightarrow$ int, uint \\
 \end{tabular}
 
