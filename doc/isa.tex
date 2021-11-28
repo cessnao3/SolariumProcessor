@@ -144,7 +144,7 @@ Note that, if a vector has a value of zero, that interrupt vector is considered 
 
 \section{Instructions and Assembly Code}
 
-All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field. \todo{combine left/right shift?} \todo{add load reg = base + offset?} \todo{keep bxor?} \todo{test equal}
+All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field. \todo{combine left/right shift?} \todo{add load reg = base + offset?} \todo{keep bxor?}
 
 \begin{table}[h!]
 	\centering
@@ -184,9 +184,10 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			0 & 7 & R[b] & R[a] & \texttt{tg [a], [b]} & If \texttt{R[a] > R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
 			0 & 8 & R[b] & R[a] & \texttt{tge [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
 			0 & 9 & R[b] & R[a] & \texttt{tl [a], [b]} & If \texttt{R[a] < R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
-			0 & 10 & R[b] & R[a] & \texttt{tle [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2}\\
-			0 & 11 & R[b] & R[a] & \texttt{bnot [a], [b]} & \texttt{R[a] = ~R[b]} \\
-			0 & 12 & 0x0I & R[a] & \texttt{arg [a], <imm>} & \texttt{R[a] = SP - 16 - 1 - Im} \\
+			0 & 10 & R[b] & R[a] & \texttt{tle [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+			0 & 11 & R[b] & R[a] & \texttt{teq [a], [b]} & If \texttt{R[a] == R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+			0 & 12 & R[b] & R[a] & \texttt{bnot [a], [b]} & \texttt{R[a] = \textasciitilde R[b]} \\
+			0 & 13 & 0x0I & R[a] & \texttt{arg [a], <imm>} & \texttt{R[a] = SP - 16 - 1 - Im} \\
 			1 & 0xI0 & 0x0I & R[dst] & \texttt{ldi [dst], <imm>} & \texttt{R[dst] = Im} \\
 			2 & 0xI0 & 0x0I & R[dst] & \texttt{ldui [dst], <imm-unsigned>} & \texttt{R[dst] = Im} \\
 			3 & 0xI0 & 0x0I & R[dst] & \texttt{ldir [dst], <imm>} & \texttt{R[dst] = mem[PC + Im]} \\

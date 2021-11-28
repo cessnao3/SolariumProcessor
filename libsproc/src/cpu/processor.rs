@@ -589,7 +589,7 @@ impl SolariumProcessor
                             reg_a,
                             self.registers.get(reg_b));
                     }
-                    7..=10 => // tg, tge, tl, tle
+                    7..=11 => // tg, tge, tl, tle, teq
                     {
                         let val_a = self.registers.get(reg_a).get_signed();
                         let val_b = self.registers.get(reg_b).get_signed();
@@ -612,6 +612,10 @@ impl SolariumProcessor
                             {
                                 val_a <= val_b
                             },
+                            11 => // teq
+                            {
+                                val_a == val_b
+                            },
                             _ =>
                             {
                                 panic!();
@@ -627,13 +631,13 @@ impl SolariumProcessor
                             pc_incr = 2;
                         }
                     },
-                    11 => //bnot
+                    12 => //bnot
                     {
                         self.registers.set(
                             reg_a,
                             MemoryWord::new(!self.registers.get(reg_b).get()));
                     },
-                    12 => // arg
+                    13 => // arg
                     {
                         // Define the backtrack values
                         let sp_subtract = 16 + 1 + arg0 as usize;

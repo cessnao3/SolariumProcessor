@@ -129,11 +129,14 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
         "tle".to_string(),
         Box::new(RegisterInstruction::new(10, 2)));
     instructions.insert(
-        "bnot".to_string(),
+        "teq".to_string(),
         Box::new(RegisterInstruction::new(11, 2)));
     instructions.insert(
-        "arg".to_string(),
+        "bnot".to_string(),
         Box::new(RegisterInstruction::new(12, 2)));
+    instructions.insert(
+        "arg".to_string(),
+        Box::new(RegisterInstruction::new(13, 2)));
     instructions.insert(
         "ldi".to_string(),
         Box::new(ImmediateRegisterInstruction::new(1)));

@@ -523,8 +523,9 @@ mod tests
             ("tge", 8),
             ("tl", 9),
             ("tle", 10),
-            ("bnot", 11),
-            ("arg", 12)
+            ("teq", 11),
+            ("bnot", 12),
+            ("arg", 13)
         ];
 
         for (arg, opcode) in args_to_test
