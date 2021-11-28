@@ -462,7 +462,7 @@ impl SolariumProcessor
                         // Disable the PC increment
                         pc_incr = 0;
                     },
-                    8 | 9 | 10 => // tz, tgz, tlz
+                    8 | 9 => // tz, tnz
                     {
                         let reg_val = self.registers.get(reg_a).get_signed();
 
@@ -472,13 +472,9 @@ impl SolariumProcessor
                             {
                                 reg_val == 0
                             },
-                            9 => // tgz
+                            9 => // tnz
                             {
-                                reg_val > 0
-                            },
-                            10 => //tlz
-                            {
-                                reg_val < 0
+                                reg_val != 0
                             },
                             _ =>
                             {
@@ -495,7 +491,7 @@ impl SolariumProcessor
                             pc_incr = 2;
                         }
                     },
-                    11 => // bool
+                    10 => // bool
                     {
                         let reg_val = self.registers.get(reg_a).get();
                         let new_val = if reg_val == 0
@@ -510,7 +506,7 @@ impl SolariumProcessor
                             reg_a,
                             MemoryWord::new(new_val));
                     },
-                    12 => // not
+                    11 => // not
                     {
                         let reg_val = self.registers.get(reg_a).get();
                         let new_val = if reg_val == 0
