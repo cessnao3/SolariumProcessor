@@ -1,5 +1,6 @@
 mod compiler;
 mod tokenizer;
+mod lexer;
 
 use crate::compiler::compile;
 
