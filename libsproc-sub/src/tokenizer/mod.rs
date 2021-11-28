@@ -7,6 +7,9 @@ mod string_literal;
 mod utils;
 
 use utils::is_separator;
+pub use keyword::Keyword;
+pub use symbol::Symbol;
+pub use string_literal::StringLiteral;
 
 #[derive(Debug, Clone)]
 pub enum Token

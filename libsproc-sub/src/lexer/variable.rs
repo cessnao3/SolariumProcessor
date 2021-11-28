@@ -1,5 +1,27 @@
 use super::common::*;
 
+fn load_variable_to_register(address_load: Vec<String>, register: usize, variable_name: &str) -> Vec<String>
+{
+    let mut assembly = Vec::new();
+
+    assembly.push(format!("; Load Variable {0:} to Register {1:}", variable_name, register));
+    assembly.extend(address_load);
+    assembly.push(format!("ld {0:}, {0:}", register));
+
+    return assembly;
+}
+
+fn save_register_to_variable(address_load: Vec<String>, register_value: usize, register_loc: usize, variable_name: &str) -> Vec<String>
+{
+    let mut assembly = Vec::new();
+
+    assembly.push(format!("; Set Variable {0:} from Register {1:} using {2:}", variable_name, register_value, register_loc));
+    assembly.extend(address_load);
+    assembly.push(format!("sav {0:}, {1:}", register_loc, register_value));
+
+    return assembly;
+}
+
 pub struct StaticVariable
 {
     name: String,
@@ -17,9 +39,13 @@ impl StaticVariable
         };
     }
 
-    pub fn get_name(&self) -> String
+    fn get_address_instructions(&self, register: usize) -> Vec<String>
     {
-        return self.name.clone();
+        return vec![
+            "jmpri 2".to_string(),
+            format!(".loadloc {0:}", self.label),
+            format!("ldir {0:}, -1", register)
+        ];
     }
 }
 
@@ -27,14 +53,27 @@ impl LoadValue for StaticVariable
 {
     fn load_value_to_register(&self, register: usize) -> Vec<String>
     {
-        let mut assembly = Vec::new();
+        return load_variable_to_register(
+            self.get_address_instructions(register),
+            register,
+            &self.get_name());
+    }
+}
 
-        assembly.push(format!("; Load Variable {0:}/{1:} to Register {2:}", self.name, self.label, register));
-        assembly.push("jmpri 2".to_string());
-        assembly.push(format!(".loadloc {0:}", self.label));
-        assembly.push(format!("ldir {0:}, -1", register));
+impl NamedMemoryValue for StaticVariable
+{
+    fn set_value_from_register(&self, register: usize) -> Vec<String>
+    {
+        return save_register_to_variable(
+            self.get_address_instructions(register + 1),
+            register,
+            register + 1,
+            &self.get_name());
+    }
 
-        return assembly;
+    fn get_name(&self) -> String
+    {
+        return self.name.clone();
     }
 }
 
@@ -63,9 +102,14 @@ impl Variable
         };
     }
 
-    pub fn get_name(&self) -> String
+    fn get_address_instructions(&self, register: usize) -> Vec<String>
     {
-        return self.name.clone();
+        return vec![
+            "jmpri 2".to_string(),
+            format!(".load {0:}", self.offset),
+            format!("ldir {0:}, -1", register),
+            format!("add {0:}, {0:}, {1:}", register, REG_FRAME_SP_VALUE)
+        ];
     }
 }
 
@@ -73,16 +117,27 @@ impl LoadValue for Variable
 {
     fn load_value_to_register(&self, register: usize) -> Vec<String>
     {
-        let mut assembly = Vec::new();
+        return load_variable_to_register(
+            self.get_address_instructions(register),
+            register,
+            &self.get_name());
+    }
+}
 
-        assembly.push(format!("; Load Variable {0:}/{1:} to Register {2:}", self.name, self.offset, register));
-        assembly.push("jmpri 2".to_string());
-        assembly.push(format!(".load {0:}", self.offset));
-        assembly.push(format!("ldir {0:}, -1", register));
-        assembly.push(format!("add {0:}, {0:}, {1:}", register, REG_FRAME_SP_VALUE));
-        assembly.push(format!("ld {0:}, {0:}", register));
+impl NamedMemoryValue for Variable
+{
+    fn set_value_from_register(&self, register: usize) -> Vec<String>
+    {
+        return save_register_to_variable(
+            self.get_address_instructions(register + 1),
+            register,
+            register + 1,
+            &self.get_name());
+    }
 
-        return assembly;
+    fn get_name(&self) -> String
+    {
+        return self.name.clone();
     }
 }
 

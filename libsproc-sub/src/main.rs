@@ -6,7 +6,7 @@ use crate::compiler::compile;
 
 fn get_example_program() -> String
 {
-    let text_bytes = include_bytes!("../../examples/hello_world.sub");
+    let text_bytes = include_bytes!("../../examples/test.sub");
     return match std::str::from_utf8(text_bytes)
     {
         Ok(v) => v.to_string(),
