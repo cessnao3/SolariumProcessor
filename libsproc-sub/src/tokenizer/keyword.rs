@@ -13,7 +13,8 @@ pub enum Keyword
     Static,
     Const,
     Auto,
-    Extern
+    Extern,
+    Return
 }
 
 impl ToString for Keyword
@@ -29,7 +30,8 @@ impl ToString for Keyword
             Keyword::Static => "static".to_string(),
             Keyword::Const => "const".to_string(),
             Keyword::Auto => "auto".to_string(),
-            Keyword::Extern => "extern".to_string()
+            Keyword::Extern => "extern".to_string(),
+            Keyword::Return => "return".to_string()
         }
     }
 }

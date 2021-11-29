@@ -1,4 +1,4 @@
-use crate::{lexer::variable::Variable, tokenizer::{Token, Keyword, Symbol}};
+use crate::{lexer::{common::{REG_DEFAULT_SPARE, REG_DEFAULT_TEST_RESULT}, variable::Variable}, tokenizer::{Token, Keyword, Symbol}};
 
 mod common;
 mod variable;
@@ -14,7 +14,7 @@ mod token_iter;
 
 use common::ScopeManager;
 
-use std::{ops::RangeBounds, rc::Rc};
+use std::rc::Rc;
 
 use self::{common::NamedMemoryValue, variable::StaticVariable};
 
@@ -28,9 +28,140 @@ enum VariableType
     Static
 }
 
-fn read_statement(inter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec<String>, String>
+fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec<String>, String>
 {
-    return Err(format!("not implemented"));
+    // Define the assembly list
+    let mut assembly = Vec::new();
+
+    // Check for a return statement
+    let first_token;
+    if let Some(tok) = iter.peek()
+    {
+        first_token = tok;
+    }
+    else
+    {
+        return Err(format!("unexpected end of stream found"));
+    }
+
+    match first_token
+    {
+        Token::Symbol(Symbol::OpenBrace) =>
+        {
+            match read_statement_brackets(iter, scopes)
+            {
+                Ok(v) => assembly.extend(v),
+                Err(e) => return Err(e)
+            };
+        },
+        Token::Keyword(Keyword::Auto) =>
+        {
+            match read_variable_def(iter, scopes, VariableType::Stack)
+            {
+                Ok(v) => assembly.extend(v),
+                Err(e) => return Err(e)
+            };
+        },
+        Token::Keyword(Keyword::Return) =>
+        {
+            // Read the init return keyword
+            iter.next();
+
+            // Check for an expression
+            if let Some(Token::Symbol(Symbol::Semicolon)) = iter.peek()
+            {
+                // Ignore semicolon for now
+            }
+            else
+            {
+                match read_expression(iter, scopes, REG_DEFAULT_TEST_RESULT, REG_DEFAULT_SPARE)
+                {
+                    Ok(v) => assembly.extend(v),
+                    Err(e) => return Err(e)
+                };
+
+                assembly.push(format!("copy $ret, {0:}", REG_DEFAULT_TEST_RESULT))
+            }
+
+            // Check for the ending semicolon
+            if let Some(Token::Symbol(Symbol::Semicolon)) = iter.peek()
+            {
+                iter.next();
+                let end_label = scopes.get_function_end_label().unwrap();
+
+                while scopes.should_pop_scope_for_return()
+                {
+                    assembly.extend(scopes.pop_scope());
+                }
+
+                assembly.push("jmpri 2".to_string());
+                assembly.push(format!(".loadloc {0:}", end_label));
+                assembly.push(format!("ldi {0:}, -1", REG_DEFAULT_TEST_RESULT));
+                assembly.push(format!("jmp {0:}", REG_DEFAULT_TEST_RESULT));
+            }
+            else
+            {
+                return Err("return statement must end in a semicolon".to_string());
+            }
+        },
+        _ =>
+        {
+            match read_expression(iter, scopes, 6, 7)
+            {
+                Ok(v) => assembly.extend(v),
+                Err(e) => return Err(e)
+            };
+
+            if let Some(Token::Symbol(Symbol::Semicolon)) = iter.next()
+            {
+                // Do Nothing
+            }
+            else
+            {
+                return Err(format!("expected semicolon at the end of the expression"));
+            }
+        }
+    }
+
+
+    // Return the resulting values
+    return Ok(assembly);
+}
+
+fn read_statement_brackets(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec<String>, String>
+{
+    // Define the assembly results
+    let mut assembly = Vec::new();
+
+    // Add a new scope
+    assembly.extend(scopes.add_scope());
+
+    // Read the statement list
+    if let Some(Token::Symbol(Symbol::OpenBrace)) = iter.next()
+    {
+        loop
+        {
+            if let Some(Token::Symbol(Symbol::CloseBrace)) = iter.peek()
+            {
+                break;
+            }
+
+            match read_statement(iter, scopes)
+            {
+                Ok(v) => assembly.extend(v),
+                Err(e) => return Err(e)
+            };
+        }
+    }
+
+    // Clear the ending scope
+    assembly.extend(scopes.pop_scope());
+
+    // Define the function ending by clearing the closing brace
+    iter.next();
+
+    // Return the successful assembly
+    return Ok(assembly);
 }
 
 fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_type: VariableType) -> Result<Vec<String>, String>
@@ -182,7 +313,7 @@ fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Resul
                 }
 
                 // Read the list of variables
-                if let Some(token::Symbol(Symbol::OpenParen)) = iter.next()
+                if let Some(Token::Symbol(Symbol::OpenParen)) = iter.next()
                 {
                     // Clear open paren
                 }
@@ -223,7 +354,7 @@ fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Resul
                 }
 
                 // Check for the open brace
-                if let Some(Token::Symbol(Symbol::OpenBrace)) = iter.next()
+                if let Some(Token::Symbol(Symbol::OpenBrace)) = iter.peek()
                 {
                     // Do Nothing
                 }
@@ -234,43 +365,36 @@ fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Resul
 
                 // Determine the function label
                 let function_label = format!("function_{0:}_{1:}", function_name, scopes.generate_index());
+                let function_label_end = format!("{0:}_end", function_label);
 
                 // Add the init values
                 assembly.push(format!("; {0:}({1:})", function_name, varnames.join(", ")));
                 assembly.push(format!(":{0:}_start", function_label));
 
                 // Define the new scope list and add offset values
-                assembly.extend(scopes.add_scope());
+                assembly.extend(scopes.add_function_scope(&function_label_end));
 
                 for (i, name) in varnames.iter().enumerate()
                 {
-                    scopes.add_variable(name, Rc::new(Variable::new(name, -(i as i32) - 16)));
-                }
-
-                // Read the statement list
-                loop
-                {
-                    if let Some(Token::Symbol(Symbol::CloseBrace)) = iter.peek()
+                    match scopes.add_variable(name, Rc::new(Variable::new(name, -(i as i32) - 16)))
                     {
-                        break;
-                    }
-
-                    match read_statement(iter, scopes)
-                    {
-                        Ok(v) => assembly.extend(v),
+                        Ok(()) => (),
                         Err(e) => return Err(e)
                     };
                 }
+
+                match read_statement_brackets(iter, scopes)
+                {
+                    Ok(v) => assembly.extend(v),
+                    Err(e) => return Err(e)
+                };
 
                 // Clear the scope
                 assembly.extend(scopes.pop_scope());
 
                 // Provide the return call
-                assembly.push(format!(":{0:}_ending", function_label));
+                assembly.push(format!(":{0:}", function_label_end));
                 assembly.push("ret".to_string());
-
-                // Define the function ending by clearing the closing brace
-                iter.next();
             },
             _ => return Err(format!("unable to find base expression for token {0:}", tok.to_string()))
         }

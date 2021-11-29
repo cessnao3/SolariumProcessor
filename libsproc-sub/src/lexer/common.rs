@@ -22,6 +22,10 @@ pub trait FunctionCall
     fn call_function(&self, arg_values: Vec<Rc<dyn LoadValue>>) -> String;
 
     fn get_name(&self) -> String;
+
+    fn get_start_label(&self) -> String;
+
+    fn get_end_label(&self) -> String;
 }
 
 pub trait NamedMemoryValue: LoadValue
@@ -35,10 +39,10 @@ pub trait NamedMemoryValue: LoadValue
 
 struct Scope
 {
-    id: usize,
-    variables: HashMap<String, Rc<dyn NamedMemoryValue>>,
-    functions: HashMap<String, Rc<dyn FunctionCall>>,
-    stack_offset: usize
+    pub id: usize,
+    pub variables: HashMap<String, Rc<dyn NamedMemoryValue>>,
+    pub stack_offset: usize,
+    pub function_end_label: Option<String>
 }
 
 impl Scope
@@ -49,78 +53,21 @@ impl Scope
         {
             id,
             variables: HashMap::new(),
-            functions: HashMap::new(),
-            stack_offset: 0
+            stack_offset: 0,
+            function_end_label: None
         };
-    }
-
-    pub fn add_variable(&mut self, name: &str, var: Rc<dyn NamedMemoryValue>) -> Result<(), String>
-    {
-        if self.variables.contains_key(name)
-        {
-            return Err(format!("variable {0:} already exists in the current {1:}", name, self.get_name()));
-        }
-        else
-        {
-            self.variables.insert(
-                name.into(),
-                var);
-            return Ok(());
-        }
-    }
-
-    pub fn add_function(&mut self, name: &str, func: Rc<dyn FunctionCall>) -> Result<(), String>
-    {
-        if self.functions.contains_key(name)
-        {
-            return Err(format!("function {0:} already exists in the current {1:}", name, self.get_name()));
-        }
-        else
-        {
-            self.functions.insert(
-                name.into(),
-                func);
-            return Ok(());
-        }
-    }
-
-    pub fn get_variable(&self, name: &str) -> Option<Rc<dyn NamedMemoryValue>>
-    {
-        return match self.variables.get(name)
-        {
-            Some(v) => Some(v.clone()),
-            None => None
-        };
-    }
-
-    pub fn get_function(&self, name: &str) -> Option<Rc<dyn FunctionCall>>
-    {
-        return match self.functions.get(name)
-        {
-            Some(v) => Some(v.clone()),
-            None => None
-        }
     }
 
     pub fn get_name(&self) -> String
     {
         return format!("s{0:}", self.id);
     }
-
-    pub fn get_stack_offset(&self) -> usize
-    {
-        return self.stack_offset;
-    }
-
-    pub fn add_stack_offset(&mut self, incr: usize)
-    {
-        self.stack_offset += incr;
-    }
 }
 
 pub struct ScopeManager
 {
     scopes: Vec<Scope>,
+    functions: HashMap<String, Rc<dyn FunctionCall>>,
     gen_index: usize
 }
 
@@ -131,6 +78,7 @@ impl ScopeManager
         return Self
         {
             scopes: Vec::new(),
+            functions: HashMap::new(),
             gen_index: 0
         };
     }
@@ -138,16 +86,29 @@ impl ScopeManager
     pub fn add_scope(&mut self) -> Vec<String>
     {
         let next_ind = self.generate_index();
-        self.scopes.push(Scope::new(next_ind));
+        let mut next_scope = Scope::new(next_ind);
+        next_scope.stack_offset = match self.scopes.last()
+        {
+            Some(s) => s.stack_offset,
+            None => 0
+        };
+        self.scopes.push(next_scope);
 
         return vec![
             format!("copy {0:}, $sp", REG_FRAME_SP_VALUE)
         ];
     }
 
+    pub fn add_function_scope(&mut self, end_label: &str) -> Vec<String>
+    {
+        let assembly = self.add_scope();
+        self.scopes.last_mut().unwrap().function_end_label = Some(end_label.to_string());
+        return assembly;
+    }
+
     pub fn pop_scope(&mut self) -> Vec<String>
     {
-        let assembly = (0..self.scopes.last().unwrap().get_stack_offset())
+        let assembly = (0..self.scopes.last().unwrap().stack_offset)
             .map(|_| "pop".to_string())
             .collect();
 
@@ -166,9 +127,9 @@ impl ScopeManager
     {
         for s in self.scopes.iter().rev()
         {
-            match s.get_variable(name)
+            match s.variables.get(name)
             {
-                Some(v) => return Ok(v),
+                Some(v) => return Ok(v.clone()),
                 None => ()
             };
         }
@@ -178,34 +139,66 @@ impl ScopeManager
 
     pub fn get_function(&self, name: &str) -> Result<Rc<dyn FunctionCall>, String>
     {
-        for s in self.scopes.iter().rev()
+        return match self.functions.get(name)
         {
-            match s.get_function(name)
-            {
-                Some(v) => return Ok(v),
-                None => ()
-            };
-        }
-
-        return Err(format!("no function named {0:} found in any available scopes", name));
+            Some(v) => Ok(v.clone()),
+            None => Err(format!("function {0:} not found in scope", name))
+        };
     }
 
     pub fn add_variable(&mut self, name: &str, var: Rc<dyn NamedMemoryValue>) -> Result<(), String>
     {
         return match self.scopes.last_mut()
         {
-            Some(v) => v.add_variable(name, var),
+            Some(v) =>
+            {
+                if v.variables.contains_key(name)
+                {
+                    Err(format!("scope already contains variable {0:}", name))
+                }
+                else
+                {
+                    v.variables.insert(name.to_string(), var);
+                    Ok(())
+                }
+            }
             None => Err(format!("no scope available"))
         };
     }
 
     pub fn add_function(&mut self, name: &str, func: Rc<dyn FunctionCall>) -> Result<(), String>
     {
-        return match self.scopes.last_mut()
+        if self.functions.contains_key(name)
         {
-            Some(v) => v.add_function(name, func),
-            None => Err(format!("no scope available"))
-        };
+            return Err(format!("function {0:} already exists in scope", name));
+        }
+        else
+        {
+            self.functions.insert(
+                name.into(),
+                func);
+            return Ok(());
+        }
+    }
+
+    pub fn get_function_end_label(&self) -> Option<String>
+    {
+        for s in self.scopes.iter().rev()
+        {
+            if let Some(label) = &s.function_end_label
+            {
+                return Some(label.clone())
+            }
+        }
+
+        return None;
+    }
+
+    pub fn should_pop_scope_for_return(&self) -> bool
+    {
+        return
+            self.scopes.len() > 1 &&
+            self.scopes.last().unwrap().function_end_label.is_none();
     }
 
     pub fn generate_index(&mut self) -> usize
@@ -217,11 +210,11 @@ impl ScopeManager
 
     pub fn get_stack_offset(&self) -> usize
     {
-        return self.scopes.last().unwrap().get_stack_offset();
+        return self.scopes.last().unwrap().stack_offset;
     }
 
     pub fn add_stack_offset(&mut self, incr: usize)
     {
-        self.scopes.last_mut().unwrap().add_stack_offset(incr);
+        self.scopes.last_mut().unwrap().stack_offset += incr;
     }
 }
