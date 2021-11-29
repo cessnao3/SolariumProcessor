@@ -15,18 +15,24 @@ pub fn compile(text: &str) -> Result<Vec<String>, String>
         println!("  {0:}", t.to_string());
     }
 
+    let mut assembly_result;
+
     println!("Compiling...");
     match lexer(tokens)
     {
         Ok(v) =>
         {
-            for s in v
+            for s in v.iter()
             {
                 println!("  {0:}", s);
             }
+            assembly_result = Ok(v);
         },
-        Err(e) => println!("Error: {0:}", e)
+        Err(e) => {
+            println!("Error: {0:}", e);
+            assembly_result = Err(e);
+        }
     };
 
-    return Ok(Vec::new());
+    return assembly_result;
 }

@@ -106,13 +106,42 @@ impl ScopeManager
         return assembly;
     }
 
-    pub fn pop_scope(&mut self) -> Vec<String>
+    fn pop_scope_assembly(&self, s: &Scope) -> Vec<String>
     {
-        let assembly = (0..self.scopes.last().unwrap().stack_offset)
+        let assembly = (0..s.stack_offset)
             .map(|_| "pop".to_string())
             .collect();
+        return assembly;
+    }
 
+    pub fn pop_scope(&mut self) -> Vec<String>
+    {
+        let assembly = self.pop_scope_assembly(self.scopes.last().unwrap());
         self.scopes.remove(self.scopes.len() - 1);
+        return assembly;
+    }
+
+    fn scopes_to_pop_for_return(&self) -> Vec<usize>
+    {
+        let mut vals = Vec::new();
+        for (i, val) in self.scopes.iter().enumerate().rev()
+        {
+            if i > 1 && val.function_end_label.is_none()
+            {
+                vals.push(i);
+            }
+        }
+        return vals;
+    }
+
+    pub fn assembly_to_pop_for_return(&self) -> Vec<String>
+    {
+        let mut assembly = Vec::new();
+
+        for i in self.scopes_to_pop_for_return()
+        {
+            assembly.extend(self.pop_scope_assembly(&self.scopes[i]));
+        }
 
         return assembly;
     }
@@ -192,13 +221,6 @@ impl ScopeManager
         }
 
         return None;
-    }
-
-    pub fn should_pop_scope_for_return(&self) -> bool
-    {
-        return
-            self.scopes.len() > 1 &&
-            self.scopes.last().unwrap().function_end_label.is_none();
     }
 
     pub fn generate_index(&mut self) -> usize

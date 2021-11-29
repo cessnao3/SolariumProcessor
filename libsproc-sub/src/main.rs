@@ -2,6 +2,8 @@ mod compiler;
 mod tokenizer;
 mod lexer;
 
+use std::io::Write;
+
 use crate::compiler::compile;
 
 use libsproc_assemble::assemble;
@@ -24,6 +26,11 @@ fn main()
         Ok(v) =>
         {
             println!("Compilation Successful: {0:} lines of assembly generated", v.len());
+
+            {
+                let mut file = std::fs::File::create("test.smc").unwrap();
+                file.write_all(v.join("\n").as_bytes()).unwrap();
+            }
 
             match assemble(v.iter().map(|v| v.as_str()).collect())
             {

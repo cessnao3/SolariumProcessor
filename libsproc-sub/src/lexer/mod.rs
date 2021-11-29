@@ -89,14 +89,11 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
                 iter.next();
                 let end_label = scopes.get_function_end_label().unwrap();
 
-                while scopes.should_pop_scope_for_return()
-                {
-                    assembly.extend(scopes.pop_scope());
-                }
+                assembly.extend(scopes.assembly_to_pop_for_return());
 
                 assembly.push("jmpri 2".to_string());
                 assembly.push(format!(".loadloc {0:}", end_label));
-                assembly.push(format!("ldi {0:}, -1", REG_DEFAULT_TEST_RESULT));
+                assembly.push(format!("ldir {0:}, -1", REG_DEFAULT_TEST_RESULT));
                 assembly.push(format!("jmp {0:}", REG_DEFAULT_TEST_RESULT));
             }
             else
