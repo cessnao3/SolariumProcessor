@@ -7,9 +7,9 @@ pub fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register
 {
     let mut assembly = Vec::new();
 
-    if let Some(t) = iter.next()
+    if let Some(init_token) = iter.next()
     {
-        match t
+        match init_token
         {
             Token::WordLiteral(val) =>
             {
@@ -164,6 +164,32 @@ pub fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register
                     });
                 }
             }
+            Token::Symbol(Symbol::BitwiseAnd) =>
+            {
+                let load_address_instructions;
+
+                if let Some(Token::Name(varname)) = iter.next()
+                {
+                    if let Some(Token::Symbol(Symbol::OpenParen)) = iter.peek()
+                    {
+                        return Err(format!("address-of does not yet work with functions"));
+                    }
+                    else
+                    {
+                        match scopes.get_variable(&varname)
+                        {
+                            Ok(var) => load_address_instructions = var.load_address_to_register(register),
+                            Err(e) => return Err(e)
+                        };
+                    }
+                }
+                else
+                {
+                    return Err(format!("the next symbol for the address-of must be a variable name"));
+                }
+
+                assembly.extend(load_address_instructions);
+            }
             Token::Symbol(symb) =>
             {
                 // Determine instructions that must be run on the resulting data values
@@ -198,10 +224,6 @@ pub fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register
                             format!("bnot {0:}, {0:}", register)
                         ]
                     },
-                    Symbol::BitwiseAnd =>
-                    {
-                        panic!("address-of not yet implemented!");
-                    }
                     _ =>
                     {
                         return Err(format!("unexpected use of symbol {0:} in expression", symb.to_string()));
@@ -219,7 +241,7 @@ pub fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register
                     Err(e) => return Err(e)
                 };
             },
-            _ => return Err(format!("unexpexcted token {0:} found in expression", t.to_string()))
+            _ => return Err(format!("unexpexcted token {0:} found in expression", init_token.to_string()))
         };
     }
     else

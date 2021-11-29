@@ -14,7 +14,7 @@ mod token_iter;
 
 use common::ScopeManager;
 
-use std::rc::Rc;
+use std::{ops::RangeBounds, rc::Rc};
 
 use self::{common::NamedMemoryValue, variable::StaticVariable};
 
@@ -170,7 +170,107 @@ fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Resul
             },
             Token::Keyword(Keyword::Func) =>
             {
+                // Extract the function name
+                let function_name;
+                if let Some(Token::Name(name)) = iter.next()
+                {
+                    function_name = name;
+                }
+                else
+                {
+                    return Err(format!("function definition expects a function name"));
+                }
 
+                // Read the list of variables
+                if let Some(token::Symbol(Symbol::OpenParen)) = iter.next()
+                {
+                    // Clear open paren
+                }
+                else
+                {
+                    return Err(format!("function definition expects ( for the function list"));
+                }
+
+                // Define the variable name list
+                let mut varnames = Vec::new();
+
+                // Loop through the results
+                loop
+                {
+                    if let Some(Token::Name(varname)) = iter.peek()
+                    {
+                        iter.next();
+                        varnames.push(varname);
+
+                        if let Some(Token::Symbol(Symbol::Comma)) = iter.peek()
+                        {
+                            iter.next();
+                        }
+                    }
+                    else if let Some(Token::Symbol(Symbol::CloseParen)) = iter.peek()
+                    {
+                        iter.next();
+                        break;
+                    }
+                    else if let Some(tok) = iter.peek()
+                    {
+                        return Err(format!("unexpected token {0:} found", tok.to_string()));
+                    }
+                    else
+                    {
+                        return Err(format!("unexpected end of stream found"));
+                    }
+                }
+
+                // Check for the open brace
+                if let Some(Token::Symbol(Symbol::OpenBrace)) = iter.next()
+                {
+                    // Do Nothing
+                }
+                else
+                {
+                    return Err(format!("no new scope provided"));
+                }
+
+                // Determine the function label
+                let function_label = format!("function_{0:}_{1:}", function_name, scopes.generate_index());
+
+                // Add the init values
+                assembly.push(format!("; {0:}({1:})", function_name, varnames.join(", ")));
+                assembly.push(format!(":{0:}_start", function_label));
+
+                // Define the new scope list and add offset values
+                assembly.extend(scopes.add_scope());
+
+                for (i, name) in varnames.iter().enumerate()
+                {
+                    scopes.add_variable(name, Rc::new(Variable::new(name, -(i as i32) - 16)));
+                }
+
+                // Read the statement list
+                loop
+                {
+                    if let Some(Token::Symbol(Symbol::CloseBrace)) = iter.peek()
+                    {
+                        break;
+                    }
+
+                    match read_statement(iter, scopes)
+                    {
+                        Ok(v) => assembly.extend(v),
+                        Err(e) => return Err(e)
+                    };
+                }
+
+                // Clear the scope
+                assembly.extend(scopes.pop_scope());
+
+                // Provide the return call
+                assembly.push(format!(":{0:}_ending", function_label));
+                assembly.push("ret".to_string());
+
+                // Define the function ending by clearing the closing brace
+                iter.next();
             },
             _ => return Err(format!("unable to find base expression for token {0:}", tok.to_string()))
         }

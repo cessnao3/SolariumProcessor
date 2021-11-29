@@ -29,6 +29,8 @@ pub trait NamedMemoryValue: LoadValue
     fn set_value_from_register(&self, register_from: usize, register_spare: usize) -> Vec<String>;
 
     fn get_name(&self) -> String;
+
+    fn load_address_to_register(&self, register: usize) -> Vec<String>;
 }
 
 struct Scope
