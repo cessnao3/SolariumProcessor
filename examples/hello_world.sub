@@ -8,6 +8,8 @@ const NEWLINE = "\n";
 func main()
 {
     auto local_var = NEWLINE;
+    auto local_array[40];
+    local_array[5] = 3;
 
     //if, else, while
     serial_writeln()
