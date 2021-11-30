@@ -1,12 +1,18 @@
-static auto VARNAME = (3 & ((5 && 5) + 5));
-static auto TEST = (3 * *(&VARNAME));
+//static auto VARNAME = (3 & ((5 && 5) + 5));
+//static auto TEST = (3 * *(&VARNAME));
 
-func test_func()
-{
-    return (54 + VARNAME);
-}
+//func test_func()
+//{
+//    return (54 + VARNAME);
+//}
 
 func main()
 {
-    return (&TEST + (*VARNAME - *1));
+    auto a = 5;
+    auto b = 3;
+    auto c = (a + (3 * b));
+    a = c;
+    auto d = a;
+    b = 10;
+    return a;
 }
