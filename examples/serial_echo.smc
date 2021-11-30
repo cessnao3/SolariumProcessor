@@ -15,7 +15,7 @@ retint
 .oper 0x4000
 :program_start
 .load 0xA000
-ldir 13, -1
+ldri 13, -1
 
 ; Mark the location to read input values from
 ldi 14, 1

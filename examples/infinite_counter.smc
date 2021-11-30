@@ -6,7 +6,7 @@
 :start
 
 :register_reset
-ldir 5, addloc
+ldri 5, addloc
 add $pc, $pc, 5
 reset
 ldi $sp, 22

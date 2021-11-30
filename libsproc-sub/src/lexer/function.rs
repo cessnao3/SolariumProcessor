@@ -18,7 +18,7 @@ fn call_function_with_lcoation(loadloc: String, args: Vec<Box<dyn LoadValue>>) -
 
     assembly.push("jmpri 2".to_string());
     assembly.push(loadloc);
-    assembly.push(format!("ldir {0:}, -1", REG_PUSH_ARG));
+    assembly.push(format!("ldri {0:}, -1", REG_PUSH_ARG));
     assembly.push(format!("call {0:}", REG_PUSH_ARG));
 
     for _ in args.iter()

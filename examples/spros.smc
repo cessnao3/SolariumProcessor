@@ -8,14 +8,14 @@
 :func_get_dev_serial_io
     jmpri 2
     .load 0xA000
-    ldir $ret, -1
+    ldri $ret, -1
     ret
 
 :func_serial_write
     ; Read the serial device base location
     jmpri 2
     .loadloc func_get_dev_serial_io
-    ldir 13, -1
+    ldri 13, -1
     call 13
     copy 13, $ret
 
@@ -47,7 +47,7 @@
     push 7
     jmpri 2
     .loadloc func_serial_write
-    ldir 6, -1
+    ldri 6, -1
     call 6
     pop
 
@@ -60,7 +60,7 @@
     .load 0xA
     .load 0x0
     .loadloc func_serial_writeln_newline
-    ldir 7, -1
+    ldri 7, -1
     push 7
     call 6
     pop
@@ -112,13 +112,13 @@
 :program_start
     jmpri 2
     .loadloc str_spros_name
-    ldir 4, -1
+    ldri 4, -1
     jmpri 2
     .loadloc str_spros_prompt
-    ldir 6, -1
+    ldri 6, -1
     jmpri 2
     .loadloc func_serial_writeln
-    ldir 7, -1
+    ldri 7, -1
 
     push 4
     call 7
@@ -130,5 +130,5 @@
 
     jmpri 2
     .loadloc program_start
-    ldir 5, -1
+    ldri 5, -1
     jmp 5

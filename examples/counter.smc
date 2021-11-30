@@ -25,10 +25,10 @@ jmpri load_data
 .load 32767 ; 0x7FFF
 
 :load_data
-ldir 4, target_value
+ldri 4, target_value
 
 ; Load the function call test
-ldir 15, 2
+ldri 15, 2
 jmpri 2
 .loadloc functest
 call 15

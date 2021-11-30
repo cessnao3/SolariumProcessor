@@ -25,8 +25,8 @@ impl EmitAssembly for IfStatement
         assembly.push("jmpri 3".to_string());
         assembly.push(format!(".loadloc {0:}_true", if_label));
         assembly.push(format!(".loadloc {0:}_false", if_label));
-        assembly.push(format!("ldir {0:}, -2", REG_DEFAULT_TEST_JUMP_A));
-        assembly.push(format!("ldir {0:}, -2", REG_DEFAULT_TEST_JUMP_B));
+        assembly.push(format!("ldri {0:}, -2", REG_DEFAULT_TEST_JUMP_A));
+        assembly.push(format!("ldri {0:}, -2", REG_DEFAULT_TEST_JUMP_B));
 
         // Perform the test and jump to the correct locations
         assembly.push(format!("tnz {0:}", REG_DEFAULT_TEST_RESULT));
@@ -44,7 +44,7 @@ impl EmitAssembly for IfStatement
 
         assembly.push("jmp 2".to_string());
         assembly.push(format!(".loadloc {0:}_end", if_label));
-        assembly.push(format!("ldir {0:}, -1", REG_DEFAULT_TEST_RESULT));
+        assembly.push(format!("ldri {0:}, -1", REG_DEFAULT_TEST_RESULT));
         assembly.push(format!("jmp {0:}", REG_DEFAULT_TEST_RESULT));
 
         // If False

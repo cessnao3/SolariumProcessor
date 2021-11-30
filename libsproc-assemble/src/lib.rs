@@ -624,7 +624,7 @@ mod tests
         let instruction_vals = vec![
             ("ldi", 1),
             ("ldui", 2),
-            ("ldir", 3)
+            ("ldri", 3)
         ];
 
         for (instruction, opcode) in instruction_vals
@@ -675,7 +675,7 @@ mod tests
             ":start",
             "",
             ":register_reset",
-            "ldir 5, addloc",
+            "ldri 5, addloc",
             "add $pc, $pc, 5",
             "reset",
             "ldi $sp, 22",
@@ -789,7 +789,7 @@ mod tests
             ("jmpri", 1),
             ("ldr", 2),
             ("ldi", 2),
-            ("ldir", 2),
+            ("ldri", 2),
             ("add", 3),
             (".load", 1),
             (".oper", 1)

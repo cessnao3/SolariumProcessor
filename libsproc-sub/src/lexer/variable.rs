@@ -72,7 +72,7 @@ impl NamedMemoryValue for StaticVariable
         return vec![
             "jmpri 2".to_string(),
             format!(".loadloc {0:}", self.label),
-            format!("ldir {0:}, -1", register)
+            format!("ldri {0:}, -1", register)
         ];
     }
 }
@@ -130,7 +130,7 @@ impl NamedMemoryValue for Variable
         return vec![
             "jmpri 2".to_string(),
             format!(".load {0:}", self.offset),
-            format!("ldir {0:}, -1", register),
+            format!("ldri {0:}, -1", register),
             format!("add {0:}, {0:}, {1:}", register, REG_FRAME_SP_VALUE)
         ];
     }

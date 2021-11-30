@@ -16,7 +16,7 @@ pub fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register
                 assembly.extend(vec![
                     "jmpri 2".to_string(),
                     format!(".load {0:}", val),
-                    format!("ldir {0:}, -1", register)
+                    format!("ldri {0:}, -1", register)
                 ]);
             },
             Token::Name(name) =>

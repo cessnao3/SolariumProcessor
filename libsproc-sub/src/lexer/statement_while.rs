@@ -25,7 +25,7 @@ impl EmitAssembly for StatementWhile
         // Load the location values into the correct registers
         assembly.push("jmpri 2".to_string());
         assembly.push(format!(".loadloc {0:}_end", while_label));
-        assembly.push(format!("ldir {0:}, -1", REG_DEFAULT_TEST_JUMP_A));
+        assembly.push(format!("ldri {0:}, -1", REG_DEFAULT_TEST_JUMP_A));
 
         // Perform the test and jump to end if false
         assembly.push(format!("tz {0:}", REG_DEFAULT_TEST_RESULT));
@@ -40,7 +40,7 @@ impl EmitAssembly for StatementWhile
 
         assembly.push("jmp 2".to_string());
         assembly.push(format!(".loadloc {0:}_test", while_label));
-        assembly.push(format!("ldir {0:}, -1", REG_DEFAULT_TEST_RESULT));
+        assembly.push(format!("ldri {0:}, -1", REG_DEFAULT_TEST_RESULT));
         assembly.push(format!("jmp {0:}", REG_DEFAULT_TEST_RESULT));
 
         // Ending

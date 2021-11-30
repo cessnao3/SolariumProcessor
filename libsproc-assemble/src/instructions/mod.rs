@@ -144,7 +144,7 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
         "ldui".to_string(),
         Box::new(ImmediateRegisterInstruction::new(2)));
     instructions.insert(
-        "ldir".to_string(),
+        "ldri".to_string(),
         Box::new(ImmediateRegisterInstruction::new(3)));
     instructions.insert(
         "add".to_string(),

@@ -683,7 +683,7 @@ impl SolariumProcessor
                             Register::from_index(arg2 as usize),
                             immediate);
                     },
-                    3 => // ldir
+                    3 => // ldri
                     {
                         let immediate = get_immediate_value_signed(arg0, arg1);
 

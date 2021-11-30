@@ -93,7 +93,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
 
                 assembly.push("jmpri 2".to_string());
                 assembly.push(format!(".loadloc {0:}", end_label));
-                assembly.push(format!("ldir {0:}, -1", REG_DEFAULT_TEST_RESULT));
+                assembly.push(format!("ldri {0:}, -1", REG_DEFAULT_TEST_RESULT));
                 assembly.push(format!("jmp {0:}", REG_DEFAULT_TEST_RESULT));
             }
             else
@@ -422,8 +422,10 @@ pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String>
 
     assembly.push("; Load and call the main function".to_string());
     assembly.push("jmpri 2".to_string());
+    assembly.push(format!(".load {0:}", 0));
     assembly.push(".loadloc main_entry_point".to_string());
-    assembly.push("ldri 5, -1".to_string());
+    assembly.push(format!("ldri {0:}, -2", REG_FRAME_SP_BASE));
+    assembly.push("ldri 5, -2".to_string());
     assembly.push("call 5".to_string());
 
     assembly.push("; Infinite Loop Ending Program".to_string());

@@ -27,7 +27,7 @@ retint
 :hw_int_0
 jmpri 2
 .loadloc dev_serial_loc
-ldir 13, -1
+ldri 13, -1
 ld 13, 13
 
 ; Mark the location to read input values from
@@ -56,7 +56,7 @@ retint
 
 jmpri 2
 .loadloc dev_serial_loc
-ldir 13, -1
+ldri 13, -1
 ld 13, 13
 
 ; Mark the location to write serial values to
@@ -97,15 +97,15 @@ intoff
 ; Load the input text and write the resulting values
 jmpri 2
 .loadloc func_print_str
-ldir 6, -1
+ldri 6, -1
 
 jmpri 2
 .loadloc input_prompt_text_str_0
-ldir 7, -1
+ldri 7, -1
 
 jmpri 2
 .loadloc input_prompt_text_str_1
-ldir 8, -1
+ldri 8, -1
 
 push 7
 call 6
@@ -133,10 +133,10 @@ jmpri load_data
 .load 32767 ; 0x7FFF
 
 :load_data
-ldir 4, target_value
+ldri 4, target_value
 
 ; Load the function call test
-;ldir 15, 2
+;ldri 15, 2
 ;jmpri 2
 ;.loadloc functest
 ;call 15
@@ -158,5 +158,5 @@ jmpri endloc
 :endloc
 jmpri 2
 .loadloc start
-ldir 4, -1
+ldri 4, -1
 jmp 4
