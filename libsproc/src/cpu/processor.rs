@@ -14,10 +14,6 @@ const VECTOR_IRQ_SW_SIZE: usize = 16;
 const VECTOR_HW_HJW_OFFSET: usize = 0x2 + VECTOR_IRQ_SW_SIZE;
 const VECTOR_HW_HJW_SIZE: usize = 16;
 
-// Define the stack pointer offset and allowed size
-const STACK_POINTER_OFFSET: usize = 0x400;
-const STACK_POINTER_MAX_SIZE: usize = 0xC00;
-
 
 /// Creates the Solarium CPU parameters
 pub struct SolariumProcessor
@@ -34,6 +30,10 @@ impl SolariumProcessor
 
     /// Define the public overall initial data size
     pub const INIT_DATA_SIZE: usize = VECTOR_HW_HJW_OFFSET + VECTOR_HW_HJW_SIZE;
+
+    // Define the stack pointer offset and allowed size
+    pub const STACK_POINTER_OFFSET: usize = 0x400;
+    pub const STACK_POINTER_MAX_SIZE: usize = 0xC00;
 
     /// Creates a new CPU parameter
     pub fn new() -> SolariumProcessor
@@ -120,7 +120,7 @@ impl SolariumProcessor
         let current_sp = self.get_sp_offset();
         let new_sp = current_sp + 1;
 
-        if new_sp > STACK_POINTER_MAX_SIZE
+        if new_sp > SolariumProcessor::STACK_POINTER_MAX_SIZE
         {
             return Err(SolariumError::StackOverflow);
         }
@@ -139,7 +139,7 @@ impl SolariumProcessor
     /// Provide the resulting stack pointer address for the given offset
     fn get_sp_address_for_offset(&self, offset: usize) -> usize
     {
-        return STACK_POINTER_OFFSET + offset;
+        return SolariumProcessor::STACK_POINTER_OFFSET + offset;
     }
 
     /// Pops a value off of the stack and returns the result
@@ -649,7 +649,7 @@ impl SolariumProcessor
                         }
 
                         // Load the value at the stack pointer location into the current argument
-                        let mem_index = STACK_POINTER_OFFSET + sp_val - sp_subtract;
+                        let mem_index = SolariumProcessor::STACK_POINTER_OFFSET + sp_val - sp_subtract;
                         let mem_val = match self.memory_map.get(mem_index)
                         {
                             Ok(v) => v,

@@ -131,6 +131,7 @@ impl NamedMemoryValue for Variable
             "jmpri 2".to_string(),
             format!(".load {0:}", self.offset),
             format!("ldri {0:}, -1", register),
+            format!("add {0:}, {0:}, {1:}", register, REG_FRAME_SP_BASE),
             format!("add {0:}, {0:}, {1:}", register, REG_FRAME_SP_VALUE)
         ];
     }

@@ -1,4 +1,4 @@
-use crate::{lexer::{common::{REG_DEFAULT_SPARE, REG_DEFAULT_TEST_RESULT}, variable::Variable}, tokenizer::{Token, Keyword, Symbol}};
+use crate::{lexer::{common::{REG_DEFAULT_SPARE, REG_DEFAULT_TEST_RESULT, REG_FRAME_SP_BASE}, variable::Variable}, tokenizer::{Token, Keyword, Symbol}};
 
 mod common;
 mod variable;
@@ -16,7 +16,7 @@ use common::ScopeManager;
 
 use std::rc::Rc;
 
-use self::{common::NamedMemoryValue, variable::StaticVariable};
+use self::{common::{NamedMemoryValue, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B}, variable::StaticVariable};
 
 use self::token_iter::TokenIter;
 
@@ -103,7 +103,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
         },
         _ =>
         {
-            match read_expression(iter, scopes, 6, 7)
+            match read_expression(iter, scopes, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B)
             {
                 Ok(v) => assembly.extend(v),
                 Err(e) => return Err(e)
@@ -219,7 +219,7 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
 
                 for _ in 0..variable_size
                 {
-                    assembly.push("push 16".to_string());
+                    assembly.push("push 15".to_string());
                 }
             }
         };
@@ -240,12 +240,12 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
     if let Some(Token::Symbol(Symbol::Assignment)) = next_val
     {
         // Read the expression to assign the variable to
-        match read_expression(iter, scopes, 6, 7)
+        match read_expression(iter, scopes, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B)
         {
             Ok(asm) =>
             {
                 assembly.extend(asm);
-                assembly.extend(variable_value.set_value_from_register(6, 7));
+                assembly.extend(variable_value.set_value_from_register(REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B));
             },
             Err(e) => return Err(e)
         };
@@ -422,7 +422,7 @@ pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String>
 
     assembly.push("; Load and call the main function".to_string());
     assembly.push("jmpri 2".to_string());
-    assembly.push(format!(".load {0:}", 0));
+    assembly.push(format!(".load {0:}", libsproc::cpu::SolariumProcessor::STACK_POINTER_OFFSET));
     assembly.push(".loadloc main_entry_point".to_string());
     assembly.push(format!("ldri {0:}, -2", REG_FRAME_SP_BASE));
     assembly.push("ldri 5, -2".to_string());

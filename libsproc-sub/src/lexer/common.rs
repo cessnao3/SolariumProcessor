@@ -5,6 +5,7 @@ pub const REG_DEFAULT_TEST_RESULT: usize = 5;
 pub const REG_DEFAULT_SPARE: usize = 6;
 pub const REG_DEFAULT_TEST_JUMP_A: usize = 7;
 pub const REG_DEFAULT_TEST_JUMP_B: usize = 8;
+pub const REG_FRAME_SP_BASE: usize = 14;
 pub const REG_FRAME_SP_VALUE: usize = 15;
 
 pub trait EmitAssembly
@@ -129,28 +130,31 @@ impl ScopeManager
         return assembly;
     }
 
-    fn scopes_to_pop_for_return(&self) -> Vec<usize>
-    {
-        let mut vals = Vec::new();
-        for (i, val) in self.scopes.iter().enumerate().rev()
-        {
-            if i > 1 && val.function_end_label.is_none()
-            {
-                vals.push(i);
-            }
-        }
-        return vals;
-    }
-
     pub fn assembly_to_pop_for_return(&self) -> Vec<String>
     {
-        let mut assembly = Vec::new();
+        // Find the index of the last scope back
+        let mut index_val = None;
+        for (i, val) in self.scopes.iter().enumerate().rev()
+        {
+            if val.function_end_label.is_some()
+            {
+                index_val = Some(i);
+            }
+        }
 
-        for i in self.scopes_to_pop_for_return()
+        // Determine the vector for scopes to pop
+        let pop_scope_inds = match index_val
+        {
+            Some(v) => (v..self.scopes.len()).rev().collect(),
+            None => Vec::new()
+        };
+
+        // Pop the appropriate scopes and create the assembly
+        let mut assembly = Vec::new();
+        for i in pop_scope_inds
         {
             assembly.extend(self.pop_scope_assembly(&self.scopes[i]));
         }
-
         return assembly;
     }
 
