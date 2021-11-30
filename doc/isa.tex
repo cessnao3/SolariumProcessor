@@ -386,29 +386,33 @@ The language specification is as follows.
 	BaseStatement & $\rightarrow$ \\
 	& \textlangle BaseStatement\textrangle \textlangle BaseStatement\textrangle \\
 	& func \texttt{FunctionName}(\texttt{Variable}[, \texttt{Variable}\dots]) \{ \textlangle StatementList\textrangle \} \\
-	& static VarType \texttt{Variable}[ = \textlangle Expression\textrangle]; \\
+	& static VarType \texttt{Variable}[ = \textlangle BaseExpression\textrangle]; \\
 	Statement & $\rightarrow$ \\
-	& \textlangle VarType\textrangle \texttt{Variable}[ = \textlangle Expression\textrangle]; \\
-	& \textlangle VarType\textrangle \texttt{Variable} = \textlangle Expression\textrangle; \\
+	& \textlangle VarType\textrangle \texttt{Variable}[ = \textlangle BaseExpression\textrangle]; \\
+	& \texttt{Variable} = \textlangle BaseExpression\textrangle; \\
+	& \texttt{Variable} := \textlangle BaseExpression\textrangle; \\
 	& return; \\
-	& return \textlangle Expression\textrangle; \\
-	& \textlangle Expression\textrangle; \\
-	& \textlangle Expression\textrangle = \textlangle Expression\textrangle; \\
-	& \texttt{Variable} = \textlangle Expression\textrangle; \\
+	& return \textlangle BaseExpression\textrangle; \\
+	& \textlangle BaseExpression\textrangle; \\
 	& \{ \textlangle StatementList\textrangle \} \\
-	& if (\textlangle Expression\textrangle) \textlangle Statement\textrangle \\
-	& if (\textlangle Expression\textrangle) \textlangle Statement\textrangle else \textlangle Statement\textrangle \\
-	& while (\textlangle Expression\textrangle) \textlangle Statement\textrangle \\
+	& if (\textlangle BaseExpression\textrangle) \textlangle Statement\textrangle \\
+	& if (\textlangle BaseExpression\textrangle) \textlangle Statement\textrangle else \textlangle Statement\textrangle \\
+	& while (\textlangle BaseExpression\textrangle) \textlangle Statement\textrangle \\
 	StatementList & $\rightarrow$ \\
 	& \textlangle Statement\textrangle \\
 	& \textlangle Statement\textrangle \textlangle Statement\textrangle \\
+	BaseExpression & $\rightarrow$ \\
+	& \texttt{Variable} \\
+	& \textlangle Literal\textrangle \\
+	& \textlangle Expression\textrangle \textlangle BinaryOp\textrangle \textlangle Expression\textrangle \\
+	& \texttt{Variable} = \textlangle BaseExpression\textrangle; \\
+	& \textlangle Expression\textrangle := \textlangle BaseExpression\textrangle; \\
+	& \texttt{FunctionName}([\textlangle BaseExpression\textrangle[, \textlangle BaseExpression\textrangle,\dots]]) \\
+	& \textlangle UnaryOp\textrangle \textlangle Expression\textrangle \\
 	Expression & $\rightarrow$ \\
 	& \texttt{Variable} \\
 	& \textlangle Literal\textrangle \\
-	& (\textlangle Expression\textrangle \textlangle BinaryOp\textrangle \textlangle Expression\textrangle) \\
-	& \textlangle UnaryOp\textrangle \textlangle Expression\textrangle \\
-	& (\textlangle Expression\textrangle) \\
-	& \texttt{FunctionName}([\textlangle Expression\textrangle[, \textlangle Expression\textrangle,\dots]]) \\
+	& (\textlangle BaseExpression\textrangle) \\
 	BinaryOp & $\rightarrow$  \\
 	& +, -, *, /, \textless, \textgreater, \textless=, \textgreater=, \&\&, \textbar\textbar, \&, \textbar, ==, !=\\
 	UnaryOp & $\rightarrow$ \\
