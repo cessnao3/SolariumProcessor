@@ -92,11 +92,16 @@ impl ScopeManager
             Some(s) => s.stack_offset,
             None => 0
         };
+
+        let rvec = vec![
+            format!("; opening scope {0:}", next_scope.id),
+            format!("copy {0:}, $sp", REG_FRAME_SP_VALUE),
+            format!(";")
+        ];
+
         self.scopes.push(next_scope);
 
-        return vec![
-            format!("copy {0:}, $sp", REG_FRAME_SP_VALUE)
-        ];
+        return rvec;
     }
 
     pub fn add_function_scope(&mut self, end_label: &str) -> Vec<String>
@@ -108,9 +113,12 @@ impl ScopeManager
 
     fn pop_scope_assembly(&self, s: &Scope) -> Vec<String>
     {
-        let assembly = (0..s.stack_offset)
-            .map(|_| "pop".to_string())
-            .collect();
+        let mut assembly = vec![
+            format!("; popping scope {0:}", s.id)
+        ];
+
+        assembly.extend((0..s.stack_offset).map(|_| "pop".to_string()));
+        assembly.push(format!(";"));
         return assembly;
     }
 

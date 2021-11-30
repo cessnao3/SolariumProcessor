@@ -15,7 +15,7 @@ pub fn compile(text: &str) -> Result<Vec<String>, String>
         println!("  {0:}", t.to_string());
     }
 
-    let mut assembly_result;
+    let assembly_result;
 
     println!("Compiling...");
     match lexer(tokens)

@@ -5,3 +5,8 @@ func test_func()
 {
     return (54 + VARNAME);
 }
+
+func main()
+{
+    return (&TEST + (*VARNAME - *1));
+}

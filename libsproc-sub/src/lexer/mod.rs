@@ -367,6 +367,10 @@ fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Resul
                 // Add the init values
                 assembly.push(format!("; {0:}({1:})", function_name, varnames.join(", ")));
                 assembly.push(format!(":{0:}_start", function_label));
+                if function_name == "main"
+                {
+                    assembly.push(format!(":main_entry_point"));
+                }
 
                 // Define the new scope list and add offset values
                 assembly.extend(scopes.add_function_scope(&function_label_end));
@@ -416,7 +420,14 @@ pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String>
 
     assembly.push(".oper 0x4000".to_string());
 
+    assembly.push("; Load and call the main function".to_string());
     assembly.push("jmpri 2".to_string());
+    assembly.push(".loadloc main_entry_point".to_string());
+    assembly.push("ldri 5, -1".to_string());
+    assembly.push("call 5".to_string());
+
+    assembly.push("; Infinite Loop Ending Program".to_string());
+    assembly.push("jmpri 0".to_string());
     // Load the main function location and call!
 
     // Define the scope results
