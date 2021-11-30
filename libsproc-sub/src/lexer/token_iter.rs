@@ -33,6 +33,18 @@ impl TokenIter
         return self.get_index_val(self.current);
     }
 
+    pub fn undo(&mut self)
+    {
+        if self.current == 0
+        {
+            self.started = false;
+        }
+        else
+        {
+            self.current -= 1;
+        }
+    }
+
     pub fn last(&self) -> Option<Token>
     {
         if !self.started

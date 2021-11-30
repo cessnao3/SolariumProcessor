@@ -58,11 +58,6 @@ impl Scope
             function_end_label: None
         };
     }
-
-    pub fn get_name(&self) -> String
-    {
-        return format!("s{0:}", self.id);
-    }
 }
 
 pub struct ScopeManager
@@ -156,12 +151,6 @@ impl ScopeManager
             assembly.extend(self.pop_scope_assembly(&self.scopes[i]));
         }
         return assembly;
-    }
-
-    pub fn get_full_name(&self) -> String
-    {
-        let names: Vec<String> = self.scopes.iter().map(|v| v.get_name()).collect();
-        return names.join("_");
     }
 
     pub fn get_variable(&self, name: &str) -> Result<Rc<dyn NamedMemoryValue>, String>
