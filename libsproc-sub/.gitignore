@@ -1,3 +1,6 @@
+# Temporary files
+*.smc
+
 # IDE Items
 /.idea/
 /.vscode/
