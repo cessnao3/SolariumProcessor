@@ -18,7 +18,8 @@ pub enum Token
     Symbol(symbol::Symbol),
     WordLiteral(u16),
     StringLiteral(string_literal::StringLiteral),
-    Name(String)
+    VariableName(String),
+    FunctionName(String)
 }
 
 impl ToString for Token
@@ -30,23 +31,17 @@ impl ToString for Token
             Token::Keyword(k) => format!("Keyword({0:})", k.to_string()),
             Token::Symbol(s) => format!("Symbol({0:})", s.to_string()),
             Token::WordLiteral(v) => format!("WordLiteral({0:})", v),
-            Token::Name(n) => format!("Name({0:})", n),
+            Token::VariableName(n) => format!("VarName({0:})", n),
+            Token::FunctionName(n) => format!("FuncName({0:})", n),
             Token::StringLiteral(s) => format!("String(\"{0:}\")", s.to_string())
         };
     }
 }
 
-pub fn tokenize(line: &str) -> Result<Vec<Token>, String>
+fn next_token(line: &str) -> Result<Option<(Token, usize)>, String>
 {
-    let mut tokens: Vec<Token> = Vec::new();
-    let chars: Vec<char> = line.chars().collect();
-
-    let mut i = 0usize;
-    while i < line.len()
+    for (i, c) in line.chars().enumerate()
     {
-        // Extract the current character
-        let c = chars[i];
-
         // Check for ascii
         if !c.is_ascii()
         {
@@ -59,52 +54,82 @@ pub fn tokenize(line: &str) -> Result<Vec<Token>, String>
         // Skip if the current character is a separator
         if c.is_whitespace()
         {
-            i += 1;
+            continue;
         }
         else if let Some(len) = try_clear_comment(next_str)
         {
-            i += len;
+            return match next_token(&line[i + len..line.len()])
+            {
+                Ok(Some((token, next_len))) => Ok(Some((token, next_len + i + len))),
+                Ok(None) => Ok(None),
+                Err(e) => Err(e)
+            };
         }
         else if let Some((symb, len)) = symbol::Symbol::try_match_symbol(next_str)
         {
-            tokens.push(Token::Symbol(symb));
-            i += len;
+            return Ok(Some((Token::Symbol(symb), i + len)));
         }
         else if let Some((key, len)) = keyword::Keyword::try_match_keyword(next_str)
         {
-            tokens.push(Token::Keyword(key));
-            i += len;
+            return Ok(Some((Token::Keyword(key), i + len)));
         }
         else if let Some((val, len)) = word_literal::try_match_integer_literal(next_str)
         {
-            tokens.push(Token::WordLiteral(val));
-            i += len;
+            return Ok(Some((Token::WordLiteral(val), i + len)));
         }
         else if let Some((name, len)) = name::try_match_name(next_str)
         {
-            tokens.push(Token::Name(name));
-            i += len;
+            // Attempt to get the next token and see if it is a parenthesis (for a function call)
+            // Otherwise, is a variable name
+            let token = match next_token(&line[i + len .. line.len()])
+            {
+                Ok(Some((Token::Symbol(Symbol::OpenParen), _))) => Token::FunctionName(name),
+                Ok(_) => Token::VariableName(name),
+                Err(e) => return Err(e)
+            };
+
+            return Ok(Some((token, i + len)));
         }
         else if let Some((strval, len)) = string_literal::StringLiteral::try_string_literal(next_str)
         {
-            tokens.push(Token::StringLiteral(strval));
-            i += len;
+            return Ok(Some((Token::StringLiteral(strval), i + len)));
         }
         else
         {
-            let mut j = i + 1;
-            while j < chars.len()
+            let mut curr = 0;
+            for (j, cj) in line[i..line.len()].chars().enumerate()
             {
-                if is_separator(chars[j])
+                if is_separator(cj)
                 {
                     break;
                 }
-
-                j += 1;
+                curr = j;
             }
 
-            return Err(format!("unable to generate token for \"{0:}\"", &line[i..j]));
+            return Err(format!("unable to generate token for \"{0:}\"", &line[i..curr]));
         }
+    }
+
+    return Ok(None);
+}
+
+pub fn tokenize(line: &str) -> Result<Vec<Token>, String>
+{
+    let mut tokens: Vec<Token> = Vec::new();
+
+    let mut i = 0usize;
+    while i < line.len()
+    {
+        match next_token(&line[i..line.len()])
+        {
+            Ok(Some((tok, delta))) =>
+            {
+                tokens.push(tok);
+                i += delta;
+            }
+            Ok(None) => break,
+            Err(e) => return Err(e)
+        };
     }
 
     return Ok(tokens);

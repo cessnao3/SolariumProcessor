@@ -62,6 +62,49 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
                 Err(e) => return Err(e)
             };
         },
+        Token::VariableName(name) =>
+        {
+            iter.next();
+
+            let var = match scopes.get_variable(&name)
+            {
+                Ok(v) => v,
+                Err(e) => return Err(e)
+            };
+
+            let next_token = iter.next();
+
+            if let Some(Token::Symbol(Symbol::Assignment)) = next_token
+            {
+                // Get the results of the following expression
+                match read_expression(iter, scopes, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B)
+                {
+                    Ok(v) => assembly.extend(v),
+                    Err(e) => return Err(e)
+                };
+
+                // Assign the variable result
+                assembly.extend(var.set_value_from_register(REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B));
+
+                // Ensure that a semicolon ends the statemnt
+                if let Some(Token::Symbol(Symbol::Semicolon)) = iter.next()
+                {
+                    // Do Nothing
+                }
+                else
+                {
+                    return Err(format!("assignment expression must end in a semicolon"));
+                }
+            }
+            else if let Some(tok) = next_token
+            {
+                return Err(format!("expected assignment after variable name in a statement - found {0:}", tok.to_string()));
+            }
+            else
+            {
+                return Err(format!("unexpected end of stream"));
+            }
+        },
         Token::Keyword(Keyword::Return) =>
         {
             // Read the init return keyword
@@ -187,7 +230,7 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
     }
 
     // Check the variable name
-    if let Some(Token::Name(name)) = iter.next()
+    if let Some(Token::VariableName(name)) = iter.next()
     {
         variable_name = name.clone();
 
@@ -300,7 +343,7 @@ fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Resul
             {
                 // Extract the function name
                 let function_name;
-                if let Some(Token::Name(name)) = iter.next()
+                if let Some(Token::FunctionName(name)) = iter.next()
                 {
                     function_name = name;
                 }
@@ -325,7 +368,7 @@ fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Resul
                 // Loop through the results
                 loop
                 {
-                    if let Some(Token::Name(varname)) = iter.peek()
+                    if let Some(Token::VariableName(varname)) = iter.peek()
                     {
                         iter.next();
                         varnames.push(varname);

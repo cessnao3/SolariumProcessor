@@ -19,21 +19,18 @@ pub fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register
                     format!("ldri {0:}, -1", register)
                 ]);
             },
-            Token::Name(name) =>
+            Token::VariableName(name) =>
             {
-                if let Some(Token::Symbol(Symbol::OpenParen)) = iter.peek()
+                match scopes.get_variable(&name)
                 {
-                    panic!("function calls do not yet work...");
-                }
-                else
-                {
-                    match scopes.get_variable(&name)
-                    {
-                        Ok(var) => assembly.extend(var.load_value_to_register(register, register_spare)),
-                        Err(e) => return Err(e)
-                    };
-                }
+                    Ok(var) => assembly.extend(var.load_value_to_register(register, register_spare)),
+                    Err(e) => return Err(e)
+                };
             },
+            Token::FunctionName(_) =>
+            {
+                panic!("function calls do not yet work");
+            }
             Token::Symbol(Symbol::OpenParen) =>
             {
                 match read_expression(iter, scopes, register, register_spare)
@@ -48,6 +45,13 @@ pub fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register
                 {
                     Some(Token::Symbol(symb)) => match symb
                     {
+                        Symbol::AddressAssignment =>
+                        {
+                            post_load_instruction = vec![
+                                format!("sav {0:}, {1:}", register, register_spare),
+                                format!("copy {0:}, {1:}", register, register_spare)
+                            ];
+                        },
                         Symbol::Plus |
                         Symbol::Minus |
                         Symbol::Star |
@@ -166,29 +170,18 @@ pub fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register
             }
             Token::Symbol(Symbol::BitwiseAnd) =>
             {
-                let load_address_instructions;
-
-                if let Some(Token::Name(varname)) = iter.next()
+                if let Some(Token::VariableName(varname)) = iter.next()
                 {
-                    if let Some(Token::Symbol(Symbol::OpenParen)) = iter.peek()
+                    match scopes.get_variable(&varname)
                     {
-                        return Err(format!("address-of does not yet work with functions"));
-                    }
-                    else
-                    {
-                        match scopes.get_variable(&varname)
-                        {
-                            Ok(var) => load_address_instructions = var.load_address_to_register(register),
-                            Err(e) => return Err(e)
-                        };
-                    }
+                        Ok(var) => assembly.extend(var.load_address_to_register(register)),
+                        Err(e) => return Err(e)
+                    };
                 }
                 else
                 {
                     return Err(format!("the next symbol for the address-of must be a variable name"));
                 }
-
-                assembly.extend(load_address_instructions);
             }
             Token::Symbol(symb) =>
             {

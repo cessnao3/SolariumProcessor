@@ -14,5 +14,7 @@ func main()
     a = c;
     auto d = a;
     b = 10;
-    return a;
+    d = &b;
+    (d := 105);
+    return *d;
 }
