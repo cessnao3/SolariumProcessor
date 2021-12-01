@@ -8,7 +8,6 @@ mod expression;
 mod statement;
 
 mod statement_if;
-mod statement_while;
 
 mod token_iter;
 

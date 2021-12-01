@@ -92,7 +92,6 @@ impl ScopeManager
 
         let rvec = vec![
             format!("; opening scope {0:}", next_scope.id),
-            format!("copy {0:}, $sp", REG_FRAME_SP_VALUE),
             format!(";")
         ];
 
@@ -103,8 +102,10 @@ impl ScopeManager
 
     pub fn add_function_scope(&mut self, end_label: &str) -> Vec<String>
     {
-        let assembly = self.add_scope();
+        let mut assembly = self.add_scope();
         self.scopes.last_mut().unwrap().function_end_label = Some(end_label.to_string());
+        assembly.push(format!("copy {0:}, $sp", REG_FRAME_SP_VALUE));
+        assembly.push(";".to_string());
         return assembly;
     }
 

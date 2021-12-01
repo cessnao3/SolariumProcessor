@@ -15,10 +15,9 @@ func while_test()
 {
     auto a = 0;
     auto lim = 100;
-    while (a <= lim)
+    while (a < lim)
     {
-        auto b = a + 1;
-        a = b;
+        a = a + 1;
     }
     return a;
 }

@@ -120,9 +120,13 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
                         _ => panic!()
                     };
 
-                    post_load_instruction.push(format!("ldi {0:}, 0", register));
-                    post_load_instruction.push(format!("{0:} {1:}, {2:}", test_inst, register, register_spare));
-                    post_load_instruction.push(format!("ldi {0:}, 1", register));
+                    post_load_instruction.extend(vec![
+                        format!("{0:} {1:}, {2:}", test_inst, register, register_spare),
+                        "jmpri 3".to_string(),
+                        format!("ldi {0:}, 0", register),
+                        "jmpri 2".to_string(),
+                        format!("ldi {0:}, 1", register)
+                    ]);
 
                     let post_inst_boolean = match symb
                     {
