@@ -11,6 +11,18 @@ func test_func(a, b, c)
     return c;
 }
 
+func while_test()
+{
+    auto a = 0;
+    auto lim = 100;
+    while (a <= lim)
+    {
+        auto b = a + 1;
+        a = b;
+    }
+    return a;
+}
+
 func main()
 {
     auto a = 5;
@@ -21,5 +33,5 @@ func main()
     b = 10;
     d = &b;
     d := (a = 105);
-    return test_func(1, 2, a);
+    return while_test();
 }

@@ -41,6 +41,7 @@ struct Scope
     pub id: usize,
     pub variables: HashMap<String, Rc<dyn NamedMemoryValue>>,
     pub stack_offset: usize,
+    init_stack_offset: usize,
     pub function_end_label: Option<String>
 }
 
@@ -53,6 +54,7 @@ impl Scope
             id,
             variables: HashMap::new(),
             stack_offset: 0,
+            init_stack_offset: 0,
             function_end_label: None
         };
     }
@@ -86,6 +88,7 @@ impl ScopeManager
             Some(s) => s.stack_offset,
             None => 0
         };
+        next_scope.init_stack_offset = next_scope.stack_offset;
 
         let rvec = vec![
             format!("; opening scope {0:}", next_scope.id),
@@ -111,7 +114,7 @@ impl ScopeManager
             format!("; popping scope {0:}", s.id)
         ];
 
-        assembly.extend((0..s.stack_offset).map(|_| "pop".to_string()));
+        assembly.extend((s.init_stack_offset..s.stack_offset).map(|_| "pop".to_string()));
         assembly.push(format!(";"));
         return assembly;
     }

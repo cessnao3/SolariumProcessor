@@ -51,6 +51,74 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
                 Err(e) => return Err(e)
             };
         },
+        Token::Keyword(Keyword::While) =>
+        {
+            // Read the first token
+            iter.next();
+
+            // Read the list of variables
+            if let Some(Token::Symbol(Symbol::OpenParen)) = iter.next()
+            {
+                // Clear open paren
+            }
+            else
+            {
+                return Err(format!("while loop definition expects ( for the expression start"));
+            }
+
+            // Define the while label
+            let while_label = format!("while_loop_{0:}", scopes.generate_index());
+
+            assembly.push(format!(":{0:}_start", while_label));
+
+            // Read the statement value
+            match read_base_expression(iter, scopes, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_SPARE)
+            {
+                Ok(v) => assembly.extend(v),
+                Err(e) => return Err(e)
+            };
+
+            // Read the close paren
+            if let Some(Token::Symbol(Symbol::CloseParen)) = iter.next()
+            {
+                // Clear open paren
+            }
+            else
+            {
+                return Err(format!("while loop definition expects ) for expression end"));
+            }
+
+            // Determine where to jump
+            assembly.extend(vec![
+                format!("jmpri 2"),
+                format!(".loadloc {0:}_end", while_label),
+                format!("ldri {0:}, -1", REG_DEFAULT_SPARE),
+                format!("tz {0:}", REG_DEFAULT_TEST_JUMP_A),
+                format!("jmp {0:}", REG_DEFAULT_SPARE)
+            ]);
+
+            // Loop back to the start
+            assembly.push("; while loop content start".to_string());
+
+            // Read the resulting values
+            match read_statement_brackets(iter, scopes)
+            {
+                Ok(v) => assembly.extend(v),
+                Err(e) => return Err(e)
+            };
+
+            // Loop back to the start
+            assembly.extend(vec![
+                format!("jmpri 2"),
+                format!(".loadloc {0:}_start", while_label),
+                format!("ldri {0:}, -1", REG_DEFAULT_SPARE),
+                format!("jmp {0:}", REG_DEFAULT_SPARE)
+            ]);
+
+            // Define the ending value
+            assembly.push(format!(":{0:}_end", while_label));
+
+        },
         Token::Keyword(Keyword::Return) =>
         {
             // Read the init return keyword

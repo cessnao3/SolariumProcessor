@@ -109,10 +109,6 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
                 Symbol::Equal |
                 Symbol::NotEqual =>
                 {
-                    post_load_instruction.push(format!("tg {0:}, {1:}", register, register_spare));
-                    post_load_instruction.push(format!("ldi {0:}, 1", register));
-                    post_load_instruction.push(format!("ldi {0:}, 0", register));
-
                     let test_inst = match symb
                     {
                         Symbol::Greater => "tg",
@@ -124,23 +120,17 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
                         _ => panic!()
                     };
 
-                    post_load_instruction.push(format!("{0:} {1:}, {2:}", test_inst, register, register_spare));
-                    post_load_instruction.push("jmpri 3".to_string());
                     post_load_instruction.push(format!("ldi {0:}, 0", register));
-                    post_load_instruction.push("jmpri 2".to_string());
+                    post_load_instruction.push(format!("{0:} {1:}, {2:}", test_inst, register, register_spare));
                     post_load_instruction.push(format!("ldi {0:}, 1", register));
 
-                    match symb
+                    let post_inst_boolean = match symb
                     {
-                        Symbol::NotEqual =>
-                        {
-                            post_load_instruction.push(format!("bnot {0:}", register));
-                        },
-                        _ =>
-                        {
-                            post_load_instruction.push(format!("bool {0:}", register));
-                        }
-                    }
+                        Symbol::NotEqual => "bnot",
+                        _ => "bool"
+                    };
+
+                    post_load_instruction.push(format!("{0:} {1:}", post_inst_boolean, register));
                 },
                 _ => ()
             },
