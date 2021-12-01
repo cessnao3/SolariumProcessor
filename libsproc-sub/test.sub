@@ -10,11 +10,11 @@ func main()
 {
     auto a = 5;
     auto b = 3;
-    auto c = (a + (3 * b));
+    auto c = a + (3 * b);
     a = c;
     auto d = a;
     b = 10;
     d = &b;
-    (d := 105);
-    return *d;
+    d := (a = 105);
+    return a + (&d);
 }
