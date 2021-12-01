@@ -20,13 +20,11 @@ pub trait LoadValue: ToString
 
 pub trait FunctionCall
 {
-    fn call_function(&self, arg_values: Vec<Rc<dyn LoadValue>>) -> String;
-
     fn get_name(&self) -> String;
 
-    fn get_start_label(&self) -> String;
+    fn load_function_address(&self, register: usize) -> Vec<String>;
 
-    fn get_end_label(&self) -> String;
+    fn num_args(&self) -> usize;
 }
 
 pub trait NamedMemoryValue: LoadValue

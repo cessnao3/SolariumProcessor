@@ -203,9 +203,79 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
                     Err(e) => return Err(e)
                 };
             },
-            Token::FunctionName(_) =>
+            Token::FunctionName(name) =>
             {
-                panic!("function calls do not yet work");
+                // Check for the open paren
+                match iter.next()
+                {
+                    Some(Token::Symbol(Symbol::OpenParen)) => (),
+                    Some(tok) => return Err(format!("expected (, but found {0:}, after function call", tok.to_string())),
+                    _ => return Err("unexpected end of stream found".to_string())
+                }
+
+                // Check for the output function
+                let func = match scopes.get_function(&name)
+                {
+                    Ok(f) => f,
+                    Err(e) => return Err(e)
+                };
+
+                // Loop through to read each of the input arguments
+                let mut num_args = 0usize;
+
+                loop
+                {
+                    // Break on close paren
+                    if let Some(Token::Symbol(Symbol::CloseParen)) = iter.peek()
+                    {
+                        iter.next();
+                        break;
+                    }
+
+                    // Check for comma if needed
+                    if num_args > 0
+                    {
+                        // Read the comma
+                        match iter.next()
+                        {
+                            Some(Token::Symbol(Symbol::Comma)) => (),
+                            Some(tok) => return Err(format!("comma must follow expression in function {0:} call, found {1:}", name, tok.to_string())),
+                            None => return Err("unexpected end of stream found".to_string())
+                        };
+                    }
+
+                    // Read the expression
+                    match read_base_expression(iter, scopes, register, register_spare)
+                    {
+                        Ok(v) => assembly.extend(v),
+                        Err(e) => return Err(e)
+                    };
+
+                    // Push the result to the stack
+                    assembly.push(format!("push {0:}", register));
+
+                    // Increment the argument count
+                    num_args += 1;
+                }
+
+                // Check the argument count
+                if num_args != func.num_args()
+                {
+                    return Err(format!("function {0:} expected {1:} arguments, found {2:}", name, func.num_args(), num_args));
+                }
+
+                // Load the function call value
+                assembly.extend(func.load_function_address(register));
+                assembly.push(format!("call {0:}", register));
+
+                // Pop the resulting stack values
+                for _ in 0..func.num_args()
+                {
+                    assembly.push("pop".to_string());
+                }
+
+                // Copy the return address into the expected register
+                assembly.push(format!("copy {0:}, $ret", register));
             },
             Token::Symbol(Symbol::OpenParen) =>
             {

@@ -1,4 +1,5 @@
 use super::common::{ScopeManager, NamedMemoryValue, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B, REG_DEFAULT_SPARE, REG_DEFAULT_TEST_RESULT};
+use super::function::FunctionDefinition;
 use super::token_iter::TokenIter;
 
 use super::variable::{StaticVariable, Variable};
@@ -329,12 +330,23 @@ pub fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> R
 
                 for (i, name) in varnames.iter().enumerate()
                 {
-                    match scopes.add_variable(name, Rc::new(Variable::new(name, -(i as i32) - 16)))
+                    match scopes.add_variable(name, Rc::new(Variable::new(name, (i as i32) - 16 - varnames.len() as i32)))
                     {
                         Ok(()) => (),
                         Err(e) => return Err(e)
                     };
                 }
+
+                let func = Rc::new(FunctionDefinition::new(
+                    &function_name,
+                    varnames.len(),
+                    &format!("{0:}_start", function_label)));
+
+                match scopes.add_function(&function_name, func)
+                {
+                    Ok(()) => (),
+                    Err(e) => return Err(e)
+                };
 
                 match read_statement_brackets(iter, scopes)
                 {

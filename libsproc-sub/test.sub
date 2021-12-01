@@ -6,6 +6,11 @@
 //    return (54 + VARNAME);
 //}
 
+func test_func(a, b, c)
+{
+    return c;
+}
+
 func main()
 {
     auto a = 5;
@@ -16,5 +21,5 @@ func main()
     b = 10;
     d = &b;
     d := (a = 105);
-    return a + (&d);
+    return test_func(1, 2, a);
 }
