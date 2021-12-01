@@ -5,7 +5,7 @@ use super::token_iter::TokenIter;
 
 pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: usize, register_spare: usize) -> Result<Vec<String>, String>
 {
-    if let Some(init_token) = iter.next()
+    if let Some(init_token) = iter.peek()
     {
         // Provide the assembly values
         let mut assembly = Vec::new();
@@ -13,6 +13,9 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
         // Check for an initial variable name (for assignment, etc)
         if let Token::VariableName(name) = init_token
         {
+            // Read the first token and the variable name
+            iter.next();
+
             let var = match scopes.get_variable(&name)
             {
                 Ok(v) => v,
@@ -44,119 +47,11 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
         }
         else
         {
-            match init_token
+            match read_expression(iter, scopes, register, register_spare)
             {
-                Token::Symbol(Symbol::OpenParen) =>
-                {
-                    match read_base_expression(iter, scopes, register, register_spare)
-                    {
-                        Ok(v) => assembly.extend(v),
-                        Err(e) => return Err(e)
-                    };
-
-                    if let Some(Token::Symbol(Symbol::CloseParen)) = iter.next()
-                    {
-                        // Do nothing here...
-                    }
-                    else
-                    {
-                        return Err(format!("expected closing paren after expression"));
-                    }
-                }
-                Token::WordLiteral(val) =>
-                {
-                    assembly.extend(vec![
-                        "jmpri 2".to_string(),
-                        format!(".load {0:}", val),
-                        format!("ldri {0:}, -1", register)
-                    ]);
-                },
-                Token::FunctionName(_) =>
-                {
-                    panic!("function calls do not yet work");
-                }
-                Token::Symbol(Symbol::BitwiseAnd) =>
-                {
-                    if let Some(Token::VariableName(varname)) = iter.next()
-                    {
-                        match scopes.get_variable(&varname)
-                        {
-                            Ok(var) => assembly.extend(var.load_address_to_register(register)),
-                            Err(e) => return Err(e)
-                        };
-                    }
-                    else
-                    {
-                        return Err(format!("the next symbol for the address-of must be a variable name"));
-                    }
-                }
-                Token::Symbol(Symbol::Plus) |
-                Token::Symbol(Symbol::Minus) |
-                Token::Symbol(Symbol::Star) |
-                Token::Symbol(Symbol::BooleanNot) |
-                Token::Symbol(Symbol::BitwiseNot) =>
-                {
-                    let symb;
-                    if let Token::Symbol(s) = init_token
-                    {
-                        symb = s;
-                    }
-                    else
-                    {
-                        panic!();
-                    }
-
-                    // Determine instructions that must be run on the resulting data values
-                    let post_load_vec = match symb
-                    {
-                        Symbol::Plus =>
-                        {
-                            Vec::new()
-                        },
-                        Symbol::Minus =>
-                        {
-                            vec![
-                                format!("ldi {0:}, -1", register_spare),
-                                format!("mul {0:}, {0:}, {1:}", register, register_spare)
-                            ]
-                        },
-                        Symbol::Star =>
-                        {
-                            vec![
-                                format!("ld {0:}, {0:}", register)
-                            ]
-                        },
-                        Symbol::BooleanNot =>
-                        {
-                            vec![
-                                format!("not {0:}", register)
-                            ]
-                        },
-                        Symbol::BitwiseNot =>
-                        {
-                            vec![
-                                format!("bnot {0:}, {0:}", register)
-                            ]
-                        },
-                        _ =>
-                        {
-                            return Err(format!("unexpected use of symbol {0:} in expression", symb.to_string()));
-                        }
-                    };
-
-                    // Provide the resulting read instruction
-                    match read_expression(iter, scopes, register, register_spare)
-                    {
-                        Ok(vals) =>
-                        {
-                            assembly.extend(vals);
-                            assembly.extend(post_load_vec);
-                        },
-                        Err(e) => return Err(e)
-                    };
-                },
-                _ => return Err(format!("unexpected token {0:}", init_token.to_string()))
-            }
+                Ok(v) => assembly.extend(v),
+                Err(e) => return Err(e)
+            };
         }
 
         // TODO - Check for binary expression here?
@@ -308,6 +203,10 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
                     Err(e) => return Err(e)
                 };
             },
+            Token::FunctionName(_) =>
+            {
+                panic!("function calls do not yet work");
+            },
             Token::Symbol(Symbol::OpenParen) =>
             {
                 match read_base_expression(iter, scopes, register, register_spare)
@@ -330,8 +229,88 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
                 {
                     return Err("unexpected end of stream".to_string());
                 }
+            },
+            Token::Symbol(Symbol::BitwiseAnd) =>
+            {
+                if let Some(Token::VariableName(varname)) = iter.next()
+                {
+                    match scopes.get_variable(&varname)
+                    {
+                        Ok(var) => assembly.extend(var.load_address_to_register(register)),
+                        Err(e) => return Err(e)
+                    };
+                }
+                else
+                {
+                    return Err(format!("the next symbol for the address-of must be a variable name"));
+                }
             }
-            _ => return Err(format!("unexpexcted token {0:} found in expression", init_token.to_string()))
+            Token::Symbol(Symbol::Plus) |
+            Token::Symbol(Symbol::Minus) |
+            Token::Symbol(Symbol::Star) |
+            Token::Symbol(Symbol::BooleanNot) |
+            Token::Symbol(Symbol::BitwiseNot) =>
+            {
+                let symb;
+                if let Token::Symbol(s) = init_token
+                {
+                    symb = s;
+                }
+                else
+                {
+                    panic!();
+                }
+
+                // Determine instructions that must be run on the resulting data values
+                let post_load_vec = match symb
+                {
+                    Symbol::Plus =>
+                    {
+                        Vec::new()
+                    },
+                    Symbol::Minus =>
+                    {
+                        vec![
+                            format!("ldi {0:}, -1", register_spare),
+                            format!("mul {0:}, {0:}, {1:}", register, register_spare)
+                        ]
+                    },
+                    Symbol::Star =>
+                    {
+                        vec![
+                            format!("ld {0:}, {0:}", register)
+                        ]
+                    },
+                    Symbol::BooleanNot =>
+                    {
+                        vec![
+                            format!("not {0:}", register)
+                        ]
+                    },
+                    Symbol::BitwiseNot =>
+                    {
+                        vec![
+                            format!("bnot {0:}, {0:}", register)
+                        ]
+                    },
+                    _ =>
+                    {
+                        return Err(format!("unexpected use of symbol {0:} in expression", symb.to_string()));
+                    }
+                };
+
+                // Provide the resulting read instruction
+                match read_expression(iter, scopes, register, register_spare)
+                {
+                    Ok(vals) =>
+                    {
+                        assembly.extend(vals);
+                        assembly.extend(post_load_vec);
+                    },
+                    Err(e) => return Err(e)
+                };
+            }
+            _ => return Err(format!("unexpected token {0:} found in expression", init_token.to_string()))
         };
     }
     else

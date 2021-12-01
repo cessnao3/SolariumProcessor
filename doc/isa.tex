@@ -400,17 +400,16 @@ The language specification is as follows.
 	& \textlangle Statement\textrangle \\
 	& \textlangle Statement\textrangle \textlangle Statement\textrangle \\
 	BaseExpression & $\rightarrow$ \\
-	& \texttt{Variable} \\
 	& \texttt{Variable} = \textlangle BaseExpression\textrangle; \\
+	& \textlangle Expression\textrangle \textlangle BinaryOp\textrangle \textlangle Expression\textrangle \\
+	& \textlangle Expression\textrangle := \textlangle BaseExpression\textrangle; \\
+	& \textlangle Expression\textrangle \\
+	Expression & $\rightarrow$ \\
+	& \texttt{Variable} \\
 	& \textlangle Literal\textrangle \\
 	& \textlangle UnaryOp\textrangle \textlangle Expression\textrangle \\
 	& \& \texttt{Variable} \\
 	& \texttt{FunctionName}([\textlangle BaseExpression\textrangle[, \textlangle BaseExpression\textrangle,\dots]]) \\
-	& \textlangle Expression\textrangle \textlangle BinaryOp\textrangle \textlangle Expression\textrangle \\
-	& \textlangle Expression\textrangle := \textlangle BaseExpression\textrangle; \\
-	Expression & $\rightarrow$ \\
-	& \texttt{Variable} \\
-	& \textlangle Literal\textrangle \\
 	& (\textlangle BaseExpression\textrangle) \\
 	BinaryOp & $\rightarrow$  \\
 	& +, -, *, /, \textless, \textgreater, \textless=, \textgreater=, \&\&, \textbar\textbar, \&, \textbar, ==, !=\\
