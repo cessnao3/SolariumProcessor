@@ -31,7 +31,7 @@ pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String>
     assembly.push(".oper 0x4000".to_string());
 
     assembly.push("; Load and call the main function".to_string());
-    assembly.push("jmpri 2".to_string());
+    assembly.push("jmpri 3".to_string());
     assembly.push(format!(".load {0:}", libsproc::cpu::SolariumProcessor::STACK_POINTER_OFFSET));
     assembly.push(".loadloc main_entry_point".to_string());
     assembly.push(format!("ldri {0:}, -2", REG_FRAME_SP_BASE));
