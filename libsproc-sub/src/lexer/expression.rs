@@ -74,6 +74,7 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
                 Symbol::Minus |
                 Symbol::Star |
                 Symbol::Divide |
+                Symbol::Modulus |
                 Symbol::BitwiseAnd |
                 Symbol::BitwiseOr |
                 Symbol::BooleanAnd |
@@ -85,6 +86,7 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
                         Symbol::Minus => "sub",
                         Symbol::Star => "mul",
                         Symbol::Divide => "div",
+                        Symbol::Modulus => "mod",
                         Symbol::BitwiseAnd => "band",
                         Symbol::BitwiseOr => "bor",
                         Symbol::BooleanAnd => "band",
@@ -132,7 +134,7 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
 
                     let post_inst_boolean = match symb
                     {
-                        Symbol::NotEqual => "bnot",
+                        Symbol::NotEqual => "not",
                         _ => "bool"
                     };
 
