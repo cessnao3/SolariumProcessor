@@ -368,6 +368,8 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
     }
 
     // Read the assignment operator if present for initial value
+    // TODO - ADD STATIC INIT SECTION!
+
     let next_val = iter.next();
     if let Some(Token::Symbol(Symbol::Assignment)) = next_val
     {
@@ -377,7 +379,9 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
             Ok(asm) =>
             {
                 assembly.extend(asm);
-                assembly.extend(variable_value.set_value_from_register(REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B));
+                assembly.extend(variable_value.set_value_from_register(
+                    REG_DEFAULT_TEST_JUMP_A,
+                    REG_DEFAULT_TEST_JUMP_B));
             },
             Err(e) => return Err(e)
         };
