@@ -1,52 +1,64 @@
-//static auto VARNAME = (3 & ((5 && 5) + 5));
-//static auto TEST = (3 * *(&VARNAME));
+static auto[10] INPUT;
 
-//func test_func()
-//{
-//    return (54 + VARNAME);
-//}
-
-func test_func(a, b, c)
+func init_input()
 {
-    return c;
+    auto loc = &INPUT;
+    (loc + 0) := 199;
+    (loc + 1) := 200;
+    (loc + 2) := 208;
+    (loc + 3) := 210;
+    (loc + 4) := 200;
+    (loc + 5) := 207;
+    (loc + 6) := 240;
+    (loc + 7) := 269;
+    (loc + 8) := 260;
+    (loc + 9) := 263;
 }
 
-func while_test()
+func run_part_1(input, size)
 {
-    auto a = 0;
-    auto lim = 100;
-    while (a < lim)
+    auto count = 0;
+    auto index = 1;
+
+    while (index < size)
     {
-        a = a + 1;
+        auto ind = input + index;
+        auto last = *(ind - 1);
+        auto val = *ind;
+
+        if (val > last)
+        {
+            count = count + 1;
+        }
+
+        index = index + 1;
     }
 
-    a = 0;
+    return count;
+}
 
-    if (a == 0)
+func run_part_2(input, size)
+{
+    auto new_buffer_loc = 0x8000;
+    auto index = 2;
+
+    auto a1 = *(input);
+    auto a2 = *(input + 1);
+
+    while (index < size)
     {
-        return 1;
-    }
-    else if (a == 1)
-    {
-        return 2;
-    }
-    else
-    {
-        //return 3;
+        auto current = *(input + index);
+        (new_buffer_loc + (index - 2)) := (a1 + (a2 + current));
+        a1 = a2;
+        a2 = current;
+        index = index + 1;
     }
 
-    return a;
+    return run_part_1(new_buffer_loc, size - 2);
 }
 
 func main()
 {
-    auto a = 5;
-    auto b = 3;
-    auto c = a + (3 * b);
-    a = c;
-    auto d = a;
-    b = 10;
-    d = &b;
-    d := (a = 105);
-    return while_test();
+    init_input();
+    return run_part_2(&INPUT, 10);
 }
