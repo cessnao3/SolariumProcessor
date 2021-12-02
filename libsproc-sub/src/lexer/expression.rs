@@ -56,6 +56,7 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
 
         // TODO - Check for binary expression here?
         let mut post_load_instruction = Vec::new();
+        let mut can_be_base_expression = false;
 
         match iter.peek()
         {
@@ -67,6 +68,7 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
                         format!("sav {0:}, {1:}", register, register_spare),
                         format!("copy {0:}, {1:}", register, register_spare)
                     ];
+                    can_be_base_expression = true;
                 },
                 Symbol::Plus |
                 Symbol::Minus |
@@ -150,11 +152,22 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
             assembly.push(format!("push {0:}", register));
 
             // Read the right-hand of the expression
-            match read_expression(iter, scopes, register, register_spare)
+            if can_be_base_expression
             {
-                Ok(v) => assembly.extend(v),
-                Err(e) => return Err(e)
-            };
+                match read_base_expression(iter, scopes, register, register_spare)
+                {
+                    Ok(v) => assembly.extend(v),
+                    Err(e) => return Err(e)
+                };
+            }
+            else
+            {
+                match read_expression(iter, scopes, register, register_spare)
+                {
+                    Ok(v) => assembly.extend(v),
+                    Err(e) => return Err(e)
+                };
+            }
 
             // Move values into the correct locations
             assembly.push(format!("copy {0:}, {1:}", register_spare, register));

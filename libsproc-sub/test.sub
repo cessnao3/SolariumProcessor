@@ -48,7 +48,7 @@ func run_part_2(input, size)
     while (index < size)
     {
         auto current = *(input + index);
-        (new_buffer_loc + (index - 2)) := (a1 + (a2 + current));
+        (new_buffer_loc + (index - 2)) := a1 + (a2 + current);
         a1 = a2;
         a2 = current;
         index = index + 1;
