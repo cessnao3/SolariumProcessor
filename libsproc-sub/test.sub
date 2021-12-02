@@ -1,5 +1,71 @@
 static auto[10] INPUT;
 
+func write_serial(num)
+{
+    auto base_address = 0xA000;
+    auto write_address = base_address + 3;
+
+    auto CHAR_OFFSET = 0x30;
+    auto NEWLINE = 0xA;
+
+    if (num == 0)
+    {
+        write_address := num + CHAR_OFFSET;
+        write_address := NEWLINE;
+        return;
+    }
+
+    auto[20] chars;
+    auto index = 0;
+
+    while (num > 0)
+    {
+        (&chars + index) := num % 10;
+        index = index + 1;
+        num = num / 10;
+    }
+
+    while (index > 0)
+    {
+        index = index - 1;
+        write_address := *(&chars + index) + CHAR_OFFSET;
+    }
+
+    write_address := NEWLINE;
+}
+
+func read_serial()
+{
+    auto base_address = 0xA000;
+    auto available_address = base_address;
+    auto read_address = base_address + 1;
+
+    auto CHAR_OFFSET = 0x30;
+    auto NEWLINE = 0xA;
+
+    auto num = 0;
+    auto run = 1;
+
+    while (run)
+    {
+        if (*available_address)
+        {
+            auto c = *read_address;
+
+            if ((c < CHAR_OFFSET) || (c > (CHAR_OFFSET + 9)))
+            {
+                run = 0;
+            }
+            else
+            {
+                num = (num * 10) + (c - CHAR_OFFSET);
+            }
+        }
+    }
+
+    return num;
+}
+
 func init_input()
 {
     auto loc = &INPUT;
@@ -60,5 +126,7 @@ func run_part_2(input, size)
 func main()
 {
     init_input();
-    return run_part_2(&INPUT, 10);
+    write_serial(read_serial());
+    write_serial(run_part_1(&INPUT, 10));
+    write_serial(run_part_2(&INPUT, 10));
 }
