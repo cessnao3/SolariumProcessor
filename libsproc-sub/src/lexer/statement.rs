@@ -119,6 +119,92 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
             assembly.push(format!(":{0:}_end", while_label));
 
         },
+        Token::Keyword(Keyword::If) =>
+        {
+            // Read the if keyword
+            iter.next();
+
+            // Determine the input expression
+            // Read the list of variables
+            if let Some(Token::Symbol(Symbol::OpenParen)) = iter.next()
+            {
+                // Clear open paren
+            }
+            else
+            {
+                return Err(format!("if loop definition expects ( for the expression start"));
+            }
+
+            // Define the if label
+            let if_label = format!("if_statement_{0:}", scopes.generate_index());
+
+            // Read the statement value
+            match read_base_expression(iter, scopes, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_SPARE)
+            {
+                Ok(v) => assembly.extend(v),
+                Err(e) => return Err(e)
+            };
+
+            // Read the close paren
+            if let Some(Token::Symbol(Symbol::CloseParen)) = iter.next()
+            {
+                // Clear open paren
+            }
+            else
+            {
+                return Err(format!("while loop definition expects ) for expression end"));
+            }
+
+            // Define the resulting jumps
+            assembly.extend(vec![
+                format!("jmpri 3"),
+                format!(".loadloc {0:}_true", if_label),
+                format!(".loadloc {0:}_false", if_label),
+                format!("ldri {0:}, -2", REG_DEFAULT_TEST_JUMP_B),
+                format!("ldri {0:}, -2", REG_DEFAULT_SPARE),
+                format!("tnz {0:}", REG_DEFAULT_TEST_JUMP_A),
+                format!("jmp {0:}", REG_DEFAULT_TEST_JUMP_B),
+                format!("jmp {0:}", REG_DEFAULT_SPARE)
+            ]);
+
+            // Read the "true" block
+            assembly.push(format!(":{0:}_true", if_label));
+
+            match read_statement(iter, scopes)
+            {
+                Ok(v) => assembly.extend(v),
+                Err(e) => return Err(e)
+            };
+
+            if let Some(Token::Keyword(Keyword::Else)) = iter.peek()
+            {
+                // Clear the next
+                iter.next();
+
+                // Read the "false" block if it exists
+                assembly.extend(vec![
+                    format!("jmpri 2"),
+                    format!(".loadloc {0:}_end", if_label),
+                    format!("ldri {0:}, -1", REG_DEFAULT_SPARE),
+                    format!(":{0:}_false", if_label)
+                ]);
+
+                // Read the next statement
+                match read_statement(iter, scopes)
+                {
+                    Ok(v) => assembly.extend(v),
+                    Err(e) => return Err(e)
+                };
+            }
+            else
+            {
+                // Read the "false" block if it exists
+                assembly.push(format!(":{0:}_false", if_label));
+            }
+
+            // Mark the end of the if statement
+            assembly.push(format!(":{0:}_end", if_label));
+        },
         Token::Keyword(Keyword::Return) =>
         {
             // Read the init return keyword

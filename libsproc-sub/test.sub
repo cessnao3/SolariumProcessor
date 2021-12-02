@@ -19,6 +19,22 @@ func while_test()
     {
         a = a + 1;
     }
+
+    a = 0;
+
+    if (a == 0)
+    {
+        return 1;
+    }
+    else if (a == 1)
+    {
+        return 2;
+    }
+    else
+    {
+        //return 3;
+    }
+
     return a;
 }
 
