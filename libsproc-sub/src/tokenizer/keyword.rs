@@ -21,18 +21,18 @@ impl ToString for Keyword
 {
     fn to_string(&self) -> String
     {
-        match &self
+        return (match self
         {
-            Keyword::If => "if".to_string(),
-            Keyword::Else => "else".to_string(),
-            Keyword::While => "while".to_string(),
-            Keyword::Func => "func".to_string(),
-            Keyword::Static => "static".to_string(),
-            Keyword::Const => "const".to_string(),
-            Keyword::Auto => "auto".to_string(),
-            Keyword::Extern => "extern".to_string(),
-            Keyword::Return => "return".to_string()
-        }
+            Keyword::If => "if",
+            Keyword::Else => "else",
+            Keyword::While => "while",
+            Keyword::Func => "func",
+            Keyword::Static => "static",
+            Keyword::Const => "const",
+            Keyword::Auto => "auto",
+            Keyword::Extern => "extern",
+            Keyword::Return => "return"
+        }).to_string();
     }
 }
 

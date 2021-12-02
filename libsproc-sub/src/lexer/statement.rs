@@ -281,8 +281,7 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
     // Check the variable type
     if let Some(Token::Keyword(Keyword::Auto)) = iter.next()
     {
-        // Defines the variable size, type
-        variable_size = 1;
+        // Currently auto is the only type allowed
     }
     else
     {
@@ -291,6 +290,32 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
             Some(t) => Err(format!("no valid variable type provided, found {0:}", t.to_string())),
             None => Err(format!("unexpected end of token stream"))
         };
+    }
+
+    // Check for a variable size definition
+    if let Some(Token::Symbol(Symbol::OpenBracket)) = iter.peek()
+    {
+        // Clear the bracket
+        iter.next();
+
+        // Check for a word literal to create the size
+        match iter.next()
+        {
+            Some(Token::WordLiteral(val)) => variable_size = val as usize,
+            Some(tok) => return Err(format!("size must be provided as a word literal, found {0:}", tok.to_string())),
+            None => return Err("unexpected end of token stream".to_string())
+        };
+
+        // Check for a closing brace
+        match iter.next()
+        {
+            Some(Token::Symbol(Symbol::CloseBracket)) => (),
+            _ => return Err("expected close brace after variable size definition".to_string())
+        };
+    }
+    else
+    {
+        variable_size = 1;
     }
 
     // Check the variable name
