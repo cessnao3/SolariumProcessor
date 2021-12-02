@@ -66,7 +66,7 @@ func read_serial()
     return num;
 }
 
-func init_input()
+func init_test_input()
 {
     auto loc = &INPUT;
     (loc + 0) := 199;
@@ -79,6 +79,25 @@ func init_input()
     (loc + 7) := 269;
     (loc + 8) := 260;
     (loc + 9) := 263;
+}
+
+func init_real_input(input, size)
+{
+    auto base_addr = 0x6000;
+    auto index = 0;
+
+    auto curr = read_serial();
+    while (curr != 0)
+    {
+        (base_addr + index) := curr;
+        index = index + 1;
+        curr = read_serial();
+    }
+
+    input := base_addr;
+    size := index;
+
+    return base_addr;
 }
 
 func run_part_1(input, size)
@@ -125,8 +144,14 @@ func run_part_2(input, size)
 
 func main()
 {
-    init_input();
-    write_serial(read_serial());
+    init_test_input();
     write_serial(run_part_1(&INPUT, 10));
     write_serial(run_part_2(&INPUT, 10));
+
+    auto input_addr;
+    auto input_size;
+    init_real_input(&input_addr, &input_size);
+
+    write_serial(run_part_1(input_addr, input_size));
+    write_serial(run_part_2(input_addr, input_size));
 }
