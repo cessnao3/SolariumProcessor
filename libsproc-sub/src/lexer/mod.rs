@@ -7,8 +7,6 @@ mod function;
 mod expression;
 mod statement;
 
-mod statement_if;
-
 mod token_iter;
 
 use self::common::ScopeManager;
