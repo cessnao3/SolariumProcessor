@@ -175,6 +175,11 @@ impl ProcessorStatusStruct
         }
     }
 
+    pub fn add_log_to_queue(&mut self, msg: String)
+    {
+        self.msg_queue.push(GuiMessage::LogMessage(msg));
+    }
+
     pub fn send_memory_to_queue(&mut self)
     {
         let mem_vec: Vec<MemoryWord> = (0..MEM_MAX_SIZE).map(|i| {

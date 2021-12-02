@@ -111,7 +111,11 @@ pub fn run_scpu_thread(
             let output_char = match libsproc::text::word_to_character(c)
             {
                 Ok(v) => v,
-                Err(_) => '?'
+                Err(e) =>
+                {
+                    cpu_stat.add_log_to_queue(e.to_string());
+                    '?'
+                }
             };
 
             match thread_to_gui_tx.send(GuiMessage::SerialOutput(output_char))
