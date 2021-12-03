@@ -186,6 +186,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
                     format!("jmpri 2"),
                     format!(".loadloc {0:}_end", if_label),
                     format!("ldri {0:}, -1", REG_DEFAULT_SPARE),
+                    format!("jmp {0:}", REG_DEFAULT_SPARE),
                     format!(":{0:}_false", if_label)
                 ]);
 
