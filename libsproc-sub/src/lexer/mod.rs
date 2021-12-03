@@ -23,10 +23,10 @@ pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String>
     let mut scopes = ScopeManager::new();
 
     let mut assembly: Vec<String> = Vec::new();
-    assembly.push(".load 0x4000".to_string());
-    assembly.push(".load 0x4000".to_string());
+    assembly.push(".load 0x2000".to_string());
+    assembly.push(".load 0x2000".to_string());
 
-    assembly.push(".oper 0x4000".to_string());
+    assembly.push(".oper 0x2000".to_string());
 
     assembly.push("; Load and call the main function".to_string());
     assembly.push("jmpri 3".to_string());
