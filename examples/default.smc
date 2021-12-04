@@ -150,7 +150,7 @@ sub 5, 4, 3
 
 ; Jump back to the add instruction if the
 ; target minus current is greater than zero
-tgz 5
+tnz 5
 jmpri loop
 jmpri endloc
 

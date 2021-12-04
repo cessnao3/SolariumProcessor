@@ -17,7 +17,7 @@
 \end{figure}}
 
 %opening
-\title{SProc Instruction Set Architecture}
+\title{S/Proc Instruction Set Architecture}
 \author{Ian O'Rourke}
 \date{\today \\ \titlelogoimage}
 
@@ -29,11 +29,11 @@
 
 \section{Overview}
 
-SProc is a general-purpose Reduced Instruction Count (RISC) Instruction Set Architecture (ISA). Each program instruction is designed to take up exactly one word of memory. In this case, each word is 16-bits, with the primary data type being integers. In cases where signed arithmatic is performed, signed integers are encoded using the two's-complement format.
+S/Proc is a general-purpose Reduced Instruction Count (RISC) Instruction Set Architecture (ISA). Each program instruction is designed to take up exactly one word of memory. In this case, each word is 16-bits, with the primary data type being integers. In cases where signed arithmatic is performed, signed integers are encoded using the two's-complement format.
 
 \subsection{Registers}
 
-There are 16 total registers present on the SProc. These are defined generally as follows in Table \ref{table:register-setup}. Note that, as SProc is a 16-bit architecture, this means that each register is 16 bits wide.
+There are 16 total registers present on the S/Proc. These are defined generally as follows in Table \ref{table:register-setup}. Note that, as S/Proc is a 16-bit architecture, this means that each register is 16 bits wide.
 
 \begin{table}[h!]
 	\centering
@@ -48,7 +48,7 @@ There are 16 total registers present on the SProc. These are defined generally a
 		R4-R15 & General Purpose Register \\
 		\hline
 	\end{tabular}
-	\caption{Outside of the program counter and global stack pointer, the registers within the SProc are all general-purpose.}
+	\caption{Outside of the program counter and global stack pointer, the registers within the S/Proc are all general-purpose.}
 	\label{table:register-setup}
 \end{table}
 
@@ -78,7 +78,7 @@ This provides both a means to set and to read the current processor state values
 
 \subsection{Overall Instruction Syntax}
 
-Since the architecture of the SProc is 16-bit, this means that each word that may be addressed is 16-bits. The general instruction format is listed  in Table \ref{table:instruction-formatting}.
+Since the architecture of the S/Proc is 16-bit, this means that each word that may be addressed is 16-bits. The general instruction format is listed  in Table \ref{table:instruction-formatting}.
 
 \begin{table}[h!]
 	\centering
@@ -89,7 +89,7 @@ Since the architecture of the SProc is 16-bit, this means that each word that ma
 		Usage & opcode & arg0 & arg1 & arg2 \\
 		\hline
 	\end{tabular}
-	\caption{The SProc instruction format typically has one opcode and three possible arguments associated with a particular opcode}
+	\caption{The S/Proc instruction format typically has one opcode and three possible arguments associated with a particular opcode}
 	\label{table:instruction-formatting}
 \end{table}
 
@@ -122,7 +122,7 @@ At the conclusion of any interrupt, the \texttt{retint} instruction should be ca
 
 It should be noted that, if any values were pushed onto the stack during the interrupt handler, they should be popped off the stack prior to the \texttt{retint} call to avoid corrupting the program state.
 
-The SProc supports up to 16 software interrupts and up to 16 hardware interrupts, as shown in Table \ref{table:interrupt-vector-locations}. Software interrupt vectors are stored in memory at location \texttt{0x2} for software interrupt 0 though \texttt{0x12}, exclusive. Similarly, the 16 hardware interrupts are stored in memory at memory address \texttt{0x12} through \texttt{0x22}, exclusive.
+The S/Proc supports up to 16 software interrupts and up to 16 hardware interrupts, as shown in Table \ref{table:interrupt-vector-locations}. Software interrupt vectors are stored in memory at location \texttt{0x2} for software interrupt 0 though \texttt{0x12}, exclusive. Similarly, the 16 hardware interrupts are stored in memory at memory address \texttt{0x12} through \texttt{0x22}, exclusive.
 
 \begin{table}[h!]
 	\centering
@@ -204,7 +204,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			\hline
 		\end{tabular}
 	\end{footnotesize}
-	\caption{Available instruction list for the SProc provides a variety of commands.}
+	\caption{Available instruction list for the S/Proc provides a variety of commands.}
 	\label{table:instruction-table}
 \end{table}
 
@@ -256,7 +256,7 @@ Reference names are available to link to the special register values, as listed 
 \section{Character Mapping}
 \label{sec:character-map}
 
-SProc computers, by default, utilize the following character map. This is similar to the American Standard Code for Information Interchange (ASCII) format. The SProc character map is defined in Table \ref{table:sproc-character-map}. Any undefined entries in the character map are considered invalid characters.
+S/Proc computers, by default, utilize the following character map. This is similar to the American Standard Code for Information Interchange (ASCII) format. The S/Proc character map is defined in Table \ref{table:sproc-character-map}. Any undefined entries in the character map are considered invalid characters.
 
 \newcommand{\charmap}[1]{\texttt{#1}}
 
@@ -304,7 +304,7 @@ SProc computers, by default, utilize the following character map. This is simila
 		1F & {} & 3F & \charmap{?} & 5F & \charmap{\textunderscore} & 7F & {} \\
 		\hline
 	\end{tabular}
-	\caption{SProc character mapping}
+	\caption{S/Proc character mapping}
 	\label{table:sproc-character-map}
 \end{table}
 
@@ -344,7 +344,7 @@ The current memory mapping structure for the serial input and output device is p
 
 \section{Examples}
 
-The following list some simple example programs that can be run on the SProc.
+The following list some simple example programs that can be run on the S/Proc.
 
 \subsection{Counter}
 
@@ -360,7 +360,7 @@ Listing \ref{listing:example-infinite-counter} makes use of some additional func
 
 \subsection{Hello World}
 
-Listing  \ref{listing:hello-world} provides a program that will infinitely write "hello, world" to the serial device, expected to be memory-mapped into the SProc at \texttt{0xA000}. This makes use of the \texttt{.loadtext} command, which loads the text, and an additional null-terminator at the end, directly into memory. It also makes use of a print-string function call to handle printing string values to the serial output devices.
+Listing  \ref{listing:hello-world} provides a program that will infinitely write "hello, world" to the serial device, expected to be memory-mapped into the S/Proc at \texttt{0xA000}. This makes use of the \texttt{.loadtext} command, which loads the text, and an additional null-terminator at the end, directly into memory. It also makes use of a print-string function call to handle printing string values to the serial output devices.
 
 \lstinputlisting[caption={Infinite "hello, world!" program}, label={listing:hello-world}]{../examples/hello_world.smc}
 
@@ -426,7 +426,7 @@ The language specification is as follows.
 
 \section{Tools}
 
-Several tools can help in the development of SProc programs.
+Several tools can help in the development of S/Proc programs.
 
 \subsection{VisualSProc}
 

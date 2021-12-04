@@ -123,7 +123,7 @@ impl ToString for SolariumDeviceError
 }
 
 /// Defines the core instruction group value
-pub struct InstructionGroup
+pub struct InstructionData
 {
     pub opcode: u8,
     pub arg0: u8,
@@ -131,10 +131,10 @@ pub struct InstructionGroup
     pub arg2: u8
 }
 
-impl InstructionGroup
+impl InstructionData
 {
     /// Constructs the instruction group from a given instruction value
-    pub fn new(instruction: MemoryWord) -> InstructionGroup
+    pub fn new(instruction: MemoryWord) -> InstructionData
     {
         // Extracts the instruction value
         let inst_val = instruction.get();
@@ -157,5 +157,20 @@ impl InstructionGroup
             arg1,
             arg2
         };
+    }
+
+    /// Combines the instruction components into their word values
+    pub fn combine(&self) -> u16
+    {
+        assert!(self.opcode & 0xF == self.opcode);
+        assert!(self.arg0 & 0xF == self.arg0);
+        assert!(self.arg1 & 0xF == self.arg1);
+        assert!(self.arg2 & 0xF == self.arg2);
+
+        return
+            ((self.opcode as u16) << 12) |
+            ((self.arg0 as u16) << 8) |
+            ((self.arg1 as u16) << 4) |
+            (self.arg2 as u16);
     }
 }

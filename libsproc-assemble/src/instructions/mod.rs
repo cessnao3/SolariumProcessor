@@ -10,30 +10,7 @@ use single::SingleInstruction;
 
 use crate::assembly::argument::Argument;
 
-pub struct InstructionData
-{
-    opcode: u8,
-    arg0: u8,
-    arg1: u8,
-    arg2: u8
-}
-
-impl InstructionData
-{
-    pub fn combine(&self) -> u16
-    {
-        assert!(self.opcode & 0xF == self.opcode);
-        assert!(self.arg0 & 0xF == self.arg0);
-        assert!(self.arg1 & 0xF == self.arg1);
-        assert!(self.arg2 & 0xF == self.arg2);
-
-        return
-            ((self.opcode as u16) << 12) |
-            ((self.arg0 as u16) << 8) |
-            ((self.arg1 as u16) << 4) |
-            (self.arg2 as u16);
-    }
-}
+use libsproc::common::InstructionData;
 
 pub trait ToInstructionData
 {

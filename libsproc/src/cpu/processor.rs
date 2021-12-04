@@ -1,4 +1,4 @@
-use crate::common::{MemoryWord, SolariumError, InstructionGroup};
+use crate::common::{MemoryWord, SolariumError, InstructionData};
 use crate::memory::MemoryMap;
 
 use super::registers::{Register, RegisterManager};
@@ -277,7 +277,7 @@ impl SolariumProcessor
         self.registers.set(Register::ProgramCounter, pc);
 
         // Extract the different argument types
-        let inst = InstructionGroup::new(inst_word);
+        let inst = InstructionData::new(inst_word);
 
         // Define a function to combine two arguments into an item
         fn get_immediate_value_signed(
@@ -301,7 +301,7 @@ impl SolariumProcessor
         // Switch based on opcode
         match inst
         {
-            InstructionGroup { opcode: 0, arg0: 0, arg1: 0, arg2: opcode } =>
+            InstructionData { opcode: 0, arg0: 0, arg1: 0, arg2: opcode } =>
             {
                 match opcode
                 {
@@ -368,7 +368,7 @@ impl SolariumProcessor
                     }
                 };
             },
-            InstructionGroup { opcode: 0, arg0: 0, arg1: opcode, arg2: arg0 } =>
+            InstructionData { opcode: 0, arg0: 0, arg1: opcode, arg2: arg0 } =>
             {
                 let reg_a = Register::from_index(arg0 as usize);
 
@@ -527,7 +527,7 @@ impl SolariumProcessor
                     }
                 };
             },
-            InstructionGroup { opcode: 0, arg0: opcode, arg1: arg0, arg2: arg1 } =>
+            InstructionData { opcode: 0, arg0: opcode, arg1: arg0, arg2: arg1 } =>
             {
                 let reg_a = Register::from_index(arg1 as usize);
                 let reg_b = Register::from_index(arg0 as usize);
@@ -666,7 +666,7 @@ impl SolariumProcessor
                     }
                 }
             },
-            InstructionGroup { opcode, arg0, arg1, arg2 } =>
+            InstructionData { opcode, arg0, arg1, arg2 } =>
             {
                 match opcode
                 {
