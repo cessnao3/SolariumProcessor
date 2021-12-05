@@ -1,10 +1,9 @@
 static auto[10] INPUT;
-static auto BASE_ADDRESS = 0x1000;
+static auto BASE_ADDRESS = 0xA000;
 
 func write_serial(num)
 {
-    auto base_address = 0xA000;
-    auto write_address = base_address + 3;
+    auto write_address = BASE_ADDRESS + 3;
 
     auto CHAR_OFFSET = 0x30;
     auto NEWLINE = 0xA;
@@ -37,9 +36,8 @@ func write_serial(num)
 
 func read_serial()
 {
-    auto base_address = 0xA000;
-    auto available_address = base_address;
-    auto read_address = base_address + 1;
+    auto available_address = BASE_ADDRESS;
+    auto read_address = BASE_ADDRESS + 1;
 
     auto CHAR_OFFSET = 0x30;
     auto NEWLINE = 0xA;
@@ -145,9 +143,6 @@ func run_part_2(input, size)
 
 func main()
 {
-    write_serial(BASE_ADDRESS);
-    write_serial(&BASE_ADDRESS);
-
     init_test_input();
     write_serial(run_part_1(&INPUT, 10));
     write_serial(run_part_2(&INPUT, 10));
