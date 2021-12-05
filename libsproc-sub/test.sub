@@ -1,4 +1,5 @@
 static auto[10] INPUT;
+static auto BASE_ADDRESS = 0x1000;
 
 func write_serial(num)
 {
@@ -18,7 +19,7 @@ func write_serial(num)
     auto[20] chars;
     auto index = 0;
 
-    while (num > 0)
+    while (num != 0)
     {
         (&chars + index) := num % 10;
         index = index + 1;
@@ -144,6 +145,9 @@ func run_part_2(input, size)
 
 func main()
 {
+    write_serial(BASE_ADDRESS);
+    write_serial(&BASE_ADDRESS);
+
     init_test_input();
     write_serial(run_part_1(&INPUT, 10));
     write_serial(run_part_2(&INPUT, 10));

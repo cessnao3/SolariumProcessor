@@ -1,5 +1,6 @@
 use super::common::{ScopeManager, NamedMemoryValue, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B, REG_DEFAULT_SPARE, REG_DEFAULT_TEST_RESULT};
 use super::function::FunctionDefinition;
+use super::program::ProgramSection;
 use super::token_iter::TokenIter;
 
 use super::variable::{StaticVariable, Variable};
@@ -17,10 +18,10 @@ enum VariableType
 }
 
 
-fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec<String>, String>
+fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<ProgramSection, String>
 {
     // Define the assembly list
-    let mut assembly = Vec::new();
+    let mut program = ProgramSection::new();
 
     // Check for a return statement
     let first_token;
@@ -39,7 +40,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
         {
             match read_statement_brackets(iter, scopes)
             {
-                Ok(v) => assembly.extend(v),
+                Ok(v) => program.append(v),
                 Err(e) => return Err(e)
             };
         },
@@ -47,7 +48,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
         {
             match read_variable_def(iter, scopes, VariableType::Stack)
             {
-                Ok(v) => assembly.extend(v),
+                Ok(v) => program.append(v),
                 Err(e) => return Err(e)
             };
         },
@@ -69,12 +70,12 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
             // Define the while label
             let while_label = format!("while_loop_{0:}", scopes.generate_index());
 
-            assembly.push(format!(":{0:}_start", while_label));
+            program.push(format!(":{0:}_start", while_label));
 
             // Read the statement value
             match read_base_expression(iter, scopes, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_SPARE)
             {
-                Ok(v) => assembly.extend(v),
+                Ok(v) => program.extend(v),
                 Err(e) => return Err(e)
             };
 
@@ -89,7 +90,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
             }
 
             // Determine where to jump
-            assembly.extend(vec![
+            program.extend(vec![
                 format!("jmpri 2"),
                 format!(".loadloc {0:}_end", while_label),
                 format!("ldri {0:}, -1", REG_DEFAULT_SPARE),
@@ -98,17 +99,17 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
             ]);
 
             // Loop back to the start
-            assembly.push("; while loop content start".to_string());
+            program.push("; while loop content start".to_string());
 
             // Read the resulting values
             match read_statement_brackets(iter, scopes)
             {
-                Ok(v) => assembly.extend(v),
+                Ok(v) => program.append(v),
                 Err(e) => return Err(e)
             };
 
             // Loop back to the start
-            assembly.extend(vec![
+            program.extend(vec![
                 format!("jmpri 2"),
                 format!(".loadloc {0:}_start", while_label),
                 format!("ldri {0:}, -1", REG_DEFAULT_SPARE),
@@ -116,7 +117,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
             ]);
 
             // Define the ending value
-            assembly.push(format!(":{0:}_end", while_label));
+            program.push(format!(":{0:}_end", while_label));
 
         },
         Token::Keyword(Keyword::If) =>
@@ -141,7 +142,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
             // Read the statement value
             match read_base_expression(iter, scopes, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_SPARE)
             {
-                Ok(v) => assembly.extend(v),
+                Ok(v) => program.extend(v),
                 Err(e) => return Err(e)
             };
 
@@ -156,7 +157,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
             }
 
             // Define the resulting jumps
-            assembly.extend(vec![
+            program.extend(vec![
                 format!("jmpri 3"),
                 format!(".loadloc {0:}_true", if_label),
                 format!(".loadloc {0:}_false", if_label),
@@ -168,11 +169,11 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
             ]);
 
             // Read the "true" block
-            assembly.push(format!(":{0:}_true", if_label));
+            program.push(format!(":{0:}_true", if_label));
 
             match read_statement(iter, scopes)
             {
-                Ok(v) => assembly.extend(v),
+                Ok(v) => program.append(v),
                 Err(e) => return Err(e)
             };
 
@@ -182,7 +183,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
                 iter.next();
 
                 // Read the "false" block if it exists
-                assembly.extend(vec![
+                program.extend(vec![
                     format!("jmpri 2"),
                     format!(".loadloc {0:}_end", if_label),
                     format!("ldri {0:}, -1", REG_DEFAULT_SPARE),
@@ -193,18 +194,18 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
                 // Read the next statement
                 match read_statement(iter, scopes)
                 {
-                    Ok(v) => assembly.extend(v),
+                    Ok(v) => program.append(v),
                     Err(e) => return Err(e)
                 };
             }
             else
             {
                 // Read the "false" block if it exists
-                assembly.push(format!(":{0:}_false", if_label));
+                program.push(format!(":{0:}_false", if_label));
             }
 
             // Mark the end of the if statement
-            assembly.push(format!(":{0:}_end", if_label));
+            program.push(format!(":{0:}_end", if_label));
         },
         Token::Keyword(Keyword::Return) =>
         {
@@ -220,11 +221,11 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
             {
                 match read_base_expression(iter, scopes, REG_DEFAULT_TEST_RESULT, REG_DEFAULT_SPARE)
                 {
-                    Ok(v) => assembly.extend(v),
+                    Ok(v) => program.extend(v),
                     Err(e) => return Err(e)
                 };
 
-                assembly.push(format!("copy $ret, {0:}", REG_DEFAULT_TEST_RESULT))
+                program.push(format!("copy $ret, {0:}", REG_DEFAULT_TEST_RESULT))
             }
 
             // Check for the ending semicolon
@@ -233,12 +234,14 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
                 iter.next();
                 let end_label = scopes.get_function_end_label().unwrap();
 
-                assembly.extend(scopes.assembly_to_pop_for_return());
+                program.extend(scopes.assembly_to_pop_for_return());
 
-                assembly.push("jmpri 2".to_string());
-                assembly.push(format!(".loadloc {0:}", end_label));
-                assembly.push(format!("ldri {0:}, -1", REG_DEFAULT_TEST_RESULT));
-                assembly.push(format!("jmp {0:}", REG_DEFAULT_TEST_RESULT));
+                program.extend(vec![
+                    "jmpri 2".to_string(),
+                    format!(".loadloc {0:}", end_label),
+                    format!("ldri {0:}, -1", REG_DEFAULT_TEST_RESULT),
+                    format!("jmp {0:}", REG_DEFAULT_TEST_RESULT)
+                ]);
             }
             else
             {
@@ -249,7 +252,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
         {
             match read_base_expression(iter, scopes, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B)
             {
-                Ok(v) => assembly.extend(v),
+                Ok(v) => program.extend(v),
                 Err(e) => return Err(e)
             };
 
@@ -266,10 +269,10 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec
 
 
     // Return the resulting values
-    return Ok(assembly);
+    return Ok(program);
 }
 
-fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_type: VariableType) -> Result<Vec<String>, String>
+fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_type: VariableType) -> Result<ProgramSection, String>
 {
     // Define the variable name
     let variable_name: String;
@@ -277,7 +280,7 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
     let variable_size: usize;
 
     // Define the assembly to emit
-    let mut assembly = Vec::new();
+    let mut program = ProgramSection::new_static();
 
     // Check the variable type
     if let Some(Token::Keyword(Keyword::Auto)) = iter.next()
@@ -330,11 +333,11 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
             {
                 let variable_label = format!("static_variable_{0:}_{1:}", variable_name, scopes.generate_index());
 
-                assembly.push("jmpri 2".to_string());
-                assembly.push(format!(":{0:}", variable_label));
+                program.push_static("jmpri 2".to_string());
+                program.push_static(format!(":{0:}", variable_label));
                 for _ in 0..variable_size
                 {
-                    assembly.push(".load 0".to_string());
+                    program.push_static(".load 0".to_string());
                 }
 
                 variable_value = Rc::new(StaticVariable::new(
@@ -352,7 +355,7 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
 
                 for _ in 0..variable_size
                 {
-                    assembly.push("push 15".to_string());
+                    program.push("push 15".to_string());
                 }
             }
         };
@@ -369,7 +372,6 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
     }
 
     // Read the assignment operator if present for initial value
-    // TODO - ADD STATIC INIT SECTION!
 
     let next_val = iter.next();
     if let Some(Token::Symbol(Symbol::Assignment)) = next_val
@@ -379,10 +381,17 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
         {
             Ok(asm) =>
             {
-                assembly.extend(asm);
-                assembly.extend(variable_value.set_value_from_register(
+                let mut vals = Vec::new();
+                vals.extend(asm);
+                vals.extend(variable_value.set_value_from_register(
                     REG_DEFAULT_TEST_JUMP_A,
                     REG_DEFAULT_TEST_JUMP_B));
+
+                match variable_type
+                {
+                    VariableType::Stack => program.extend(vals),
+                    VariableType::Static => program.extend_static(vals)
+                };
             },
             Err(e) => return Err(e)
         };
@@ -391,7 +400,7 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
         if let Some(Token::Symbol(Symbol::Semicolon)) = iter.next()
         {
             // Skip the closing assignment operator
-            return Ok(assembly);
+            return Ok(program);
         }
         else
         {
@@ -405,7 +414,7 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
     else if let Some(Token::Symbol(Symbol::Semicolon)) = next_val
     {
         // Return as-is
-        return Ok(assembly);
+        return Ok(program);
     }
     else
     {
@@ -417,11 +426,11 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
     }
 }
 
-pub fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Option<Vec<String>>, String>
+pub fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Option<ProgramSection>, String>
 {
     if let Some(tok) = iter.next()
     {
-        let mut assembly: Vec<String> = Vec::new();
+        let mut program = ProgramSection::new_static();
 
         match tok
         {
@@ -429,7 +438,7 @@ pub fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> R
             {
                 match read_variable_def(iter, scopes, VariableType::Static)
                 {
-                    Ok(v) => assembly.extend(v),
+                    Ok(v) => program.append(v),
                     Err(e) => return Err(e)
                 };
             },
@@ -502,15 +511,15 @@ pub fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> R
                 let function_label_end = format!("{0:}_end", function_label);
 
                 // Add the init values
-                assembly.push(format!("; {0:}({1:})", function_name, varnames.join(", ")));
-                assembly.push(format!(":{0:}_start", function_label));
+                program.push(format!("; {0:}({1:})", function_name, varnames.join(", ")));
+                program.push(format!(":{0:}_start", function_label));
                 if function_name == "main"
                 {
-                    assembly.push(format!(":main_entry_point"));
+                    program.push(format!(":main_entry_point"));
                 }
 
                 // Define the new scope list and add offset values
-                assembly.extend(scopes.add_function_scope(&function_label_end));
+                program.extend(scopes.add_function_scope(&function_label_end));
 
                 for (i, name) in varnames.iter().enumerate()
                 {
@@ -534,21 +543,21 @@ pub fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> R
 
                 match read_statement_brackets(iter, scopes)
                 {
-                    Ok(v) => assembly.extend(v),
+                    Ok(v) => program.append(v),
                     Err(e) => return Err(e)
                 };
 
                 // Clear the scope
-                assembly.extend(scopes.pop_scope());
+                program.extend(scopes.pop_scope());
 
                 // Provide the return call
-                assembly.push(format!(":{0:}", function_label_end));
-                assembly.push("ret".to_string());
+                program.push(format!(":{0:}", function_label_end));
+                program.push("ret".to_string());
             },
             _ => return Err(format!("unable to find base expression for token {0:}", tok.to_string()))
         }
 
-        return Ok(Some(assembly));
+        return Ok(Some(program));
     }
     else
     {
@@ -556,13 +565,13 @@ pub fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> R
     }
 }
 
-fn read_statement_brackets(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Vec<String>, String>
+fn read_statement_brackets(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<ProgramSection, String>
 {
     // Define the assembly results
-    let mut assembly = Vec::new();
+    let mut program = ProgramSection::new();
 
     // Add a new scope
-    assembly.extend(scopes.add_scope());
+    program.extend(scopes.add_scope());
 
     // Read the statement list
     if let Some(Token::Symbol(Symbol::OpenBrace)) = iter.next()
@@ -576,18 +585,18 @@ fn read_statement_brackets(iter: &mut TokenIter, scopes: &mut ScopeManager) -> R
 
             match read_statement(iter, scopes)
             {
-                Ok(v) => assembly.extend(v),
+                Ok(v) => program.append(v),
                 Err(e) => return Err(e)
             };
         }
     }
 
     // Clear the ending scope
-    assembly.extend(scopes.pop_scope());
+    program.extend(scopes.pop_scope());
 
     // Define the function ending by clearing the closing brace
     iter.next();
 
     // Return the successful assembly
-    return Ok(assembly);
+    return Ok(program);
 }

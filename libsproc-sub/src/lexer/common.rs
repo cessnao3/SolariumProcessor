@@ -10,7 +10,9 @@ pub const REG_FRAME_SP_VALUE: usize = 15;
 
 pub trait EmitAssembly
 {
-    fn emit(&self, scopes: &mut ScopeManager) -> Vec<String>;
+    fn emit_primary(&self) -> Vec<String>;
+
+    fn emit_static(&self) -> Vec<String>;
 }
 
 pub trait LoadValue: ToString

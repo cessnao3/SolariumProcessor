@@ -1,5 +1,6 @@
 use super::common::*;
 
+
 fn load_variable_to_register(address_load: Vec<String>, register: usize, variable_name: &str) -> Vec<String>
 {
     let mut assembly = Vec::new();

@@ -20,14 +20,6 @@ impl FunctionDefinition
     }
 }
 
-impl EmitAssembly for FunctionDefinition
-{
-    fn emit(&self, _: &mut ScopeManager) -> Vec<String>
-    {
-        return Vec::new();
-    }
-}
-
 impl FunctionCall for FunctionDefinition
 {
     fn get_name(&self) -> String
