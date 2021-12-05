@@ -97,7 +97,7 @@ impl ToString for SolariumError
             SolariumError::ShiftError(shift_count) => format!("invalid attempt to shift by {0:}", shift_count),
             SolariumError::StackOverflow => "stack overflow".to_string(),
             SolariumError::StackUnderflow => "stack underflow".to_string(),
-            SolariumError::CharacterToWord(c) => format!("unable to convert {0:} to word", c),
+            SolariumError::CharacterToWord(c) => format!("unable to convert {0:02X} to word", *c as u8),
             SolariumError::WordToCharacter(word) => format!("unable to convert {0:04X} to character", word.get()),
             SolariumError::DeviceError(base_addr, err) => format!("device {0:} error: {1:}", base_addr, err.to_string())
         }
