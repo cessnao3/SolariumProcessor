@@ -334,11 +334,15 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
                 let variable_label = format!("static_variable_{0:}_{1:}", variable_name, scopes.generate_index());
 
                 program.push_static("jmpri 2".to_string());
+                program.push_static(format!(".loadloc {0:}_end", variable_label));
+                program.push_static(format!("ldri {0:}, -1", REG_DEFAULT_TEST_RESULT));
+                program.push_static(format!("jmp {0:}", REG_DEFAULT_TEST_RESULT));
                 program.push_static(format!(":{0:}", variable_label));
                 for _ in 0..variable_size
                 {
                     program.push_static(".load 0".to_string());
                 }
+                program.push_static(format!(":{0:}_end", variable_label));
 
                 variable_value = Rc::new(StaticVariable::new(
                     &variable_name,
