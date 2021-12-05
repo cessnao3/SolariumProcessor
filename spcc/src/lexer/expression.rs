@@ -86,7 +86,7 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
                         Symbol::Minus => "sub",
                         Symbol::Star => "mul",
                         Symbol::Divide => "div",
-                        Symbol::Modulus => "mod",
+                        Symbol::Modulus => "rem",
                         Symbol::BitwiseAnd => "band",
                         Symbol::BitwiseOr => "bor",
                         Symbol::BooleanAnd => "band",

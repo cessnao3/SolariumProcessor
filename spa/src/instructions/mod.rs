@@ -142,7 +142,7 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
         "div".to_string(),
         Box::new(RegisterInstruction::new(7, 3)));
     instructions.insert(
-        "mod".to_string(),
+        "rem".to_string(),
         Box::new(RegisterInstruction::new(8, 3)));
     instructions.insert(
         "band".to_string(),

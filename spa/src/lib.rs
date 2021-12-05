@@ -574,7 +574,7 @@ mod tests
             ("sub", 5),
             ("mul", 6),
             ("div", 7),
-            ("mod", 8),
+            ("rem", 8),
             ("band", 9),
             ("bor", 10),
             ("bxor", 11),

@@ -734,7 +734,7 @@ impl SolariumProcessor
                         let fun_sub: ArithFun;
                         let fun_mul: ArithFun;
                         let fun_div: ArithFun;
-                        let fun_mod: ArithFun;
+                        let fun_rem: ArithFun;
                         let fun_band: ArithFun = |a, b| Ok(MemoryWord::new(a.get() & b.get()));
                         let fun_bor: ArithFun = |a, b| Ok(MemoryWord::new(a.get() | b.get()));
                         let fun_bxor: ArithFun = |a, b| Ok(MemoryWord::new(a.get() ^ b.get()));
@@ -767,10 +767,10 @@ impl SolariumProcessor
                                 }
                                 else
                                 {
-                                    return Ok(MemoryWord::new(a.get_signed().wrapping_add(b.get_signed()) as u16));
+                                    return Ok(MemoryWord::new(a.get_signed().wrapping_div(b.get_signed()) as u16));
                                 }
                             };
-                            fun_mod = |a, b| {
+                            fun_rem = |a, b| {
                                 if b.get() == 0
                                 {
                                     return Err(SolariumError::ModByZero);
@@ -793,10 +793,10 @@ impl SolariumProcessor
                                 }
                                 else
                                 {
-                                    return Ok(MemoryWord::new(a.get().wrapping_add(b.get())));
+                                    return Ok(MemoryWord::new(a.get().wrapping_div(b.get())));
                                 }
                             };
-                            fun_mod = |a, b| {
+                            fun_rem = |a, b| {
                                 if b.get() == 0
                                 {
                                     return Err(SolariumError::ModByZero);
@@ -826,9 +826,9 @@ impl SolariumProcessor
                             {
                                 fun_div
                             },
-                            8 => // mod
+                            8 => // rem
                             {
-                                fun_mod
+                                fun_rem
                             },
                             9 => // band
                             {
