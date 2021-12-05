@@ -35,7 +35,7 @@ impl ProcessorStatusStruct
             regs_updated: false,
             step_error: false,
             last_assembly: Vec::new(),
-            serial_io_dev: Rc::new(RefCell::new(SerialInputOutputDevice::new(Self::DEVICE_START_IND))),
+            serial_io_dev: Rc::new(RefCell::new(SerialInputOutputDevice::new(Self::DEVICE_START_IND, usize::MAX))),
             msg_queue: Vec::new()
         };
 

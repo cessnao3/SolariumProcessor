@@ -66,7 +66,7 @@ pub fn run_scpu_thread(
                     },
                     ThreadMessage::SerialInput(char_buf) =>
                     {
-                        for c in char_buf
+                        for c in char_buf.into_iter()
                         {
                             if c == '\0'
                             {

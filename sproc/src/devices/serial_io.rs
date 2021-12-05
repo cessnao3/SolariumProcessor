@@ -10,7 +10,8 @@ pub struct SerialInputOutputDevice
     /// Provides the base address for the input device
     base_address: usize,
     input_queue: RefCell<VecDeque<MemoryWord>>,
-    output_queue: VecDeque<MemoryWord>
+    output_queue: VecDeque<MemoryWord>,
+    buffer_size: usize
 }
 
 /// Defines constant values for the memory address offsets
@@ -25,11 +26,8 @@ impl SerialInputOutputDevice
     const OFFSET_INPUT_RESET_IN: usize = 4;
     const OFFSET_INPUT_RESET_OUT: usize = 5;
 
-    // Provide a queue limit, after which the end value will be replaced (or no new parameters can be added?)
-    const IO_BUFFER_SIZE: usize = 256;
-
     /// Constructs a new serial device
-    pub fn new(base_address: usize) -> SerialInputOutputDevice
+    pub fn new(base_address: usize, buffer_size: usize) -> SerialInputOutputDevice
     {
         // Define the top address
         let top_address = base_address + Self::DEVICE_MEM_SIZE;
@@ -43,7 +41,8 @@ impl SerialInputOutputDevice
         {
             base_address,
             input_queue: RefCell::new(VecDeque::new()),
-            output_queue: VecDeque::new()
+            output_queue: VecDeque::new(),
+            buffer_size
         };
     }
 
@@ -62,7 +61,7 @@ impl SerialInputOutputDevice
     /// Pushes the input value into the input queue
     pub fn push_input(&mut self, val: MemoryWord) -> bool
     {
-        if self.input_queue.borrow().len() < Self::IO_BUFFER_SIZE
+        if self.input_queue.borrow().len() < self.buffer_size
         {
             self.input_queue.borrow_mut().push_back(val);
             return true;
@@ -158,7 +157,7 @@ impl MemorySegment for SerialInputOutputDevice
         {
             Self::OFFSET_OUTPUT_SET =>
             {
-                if self.output_queue.len() < Self::IO_BUFFER_SIZE
+                if self.output_queue.len() < self.buffer_size
                 {
                     self.output_queue.push_back(data);
                     Ok(())
