@@ -1,10 +1,12 @@
 [package]
-name = "libsproc"
+name = "spa"
 version = "0.1.0"
-edition = "2021"
 authors = ["Ian O'Rourke <cessna.ian@gmail.com>"]
-crate-type = ["lib", "cdylib"]
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+regex = "1.5.4"
+lazy_static = "1.4.0"
+sproc = { path = "../sproc", version = "*" }

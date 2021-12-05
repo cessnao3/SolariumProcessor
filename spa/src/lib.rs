@@ -2,7 +2,7 @@ mod instructions;
 mod assembly;
 
 use instructions::get_instruction_map;
-use libsproc::common::MemoryWord;
+use sproc::common::MemoryWord;
 
 use std::collections::HashMap;
 
@@ -222,7 +222,7 @@ pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
                 else if let Argument::Text(text) = &args[0]
                 {
                     // Construct memory words from the text values
-                    let text_vals: Vec<MemoryWord> = match text.chars().map(|v| libsproc::text::character_to_word(v)).collect()
+                    let text_vals: Vec<MemoryWord> = match text.chars().map(|v| sproc::text::character_to_word(v)).collect()
                     {
                         Ok(v) => v,
                         Err(e) => return Err(format!("line {0:} character error - {1:}", i, e.to_string()))
@@ -360,7 +360,7 @@ mod tests
 {
     use std::collections::HashMap;
 
-    use libsproc::common::MemoryWord;
+    use sproc::common::MemoryWord;
 
     use super::assemble;
 
@@ -411,10 +411,12 @@ mod tests
             ("noop", 0),
             ("inton", 1),
             ("intoff", 2),
-            ("reset", 3),
-            ("pop", 4),
-            ("ret", 5),
-            ("retint", 6)
+            ("ari", 3),
+            ("aru", 4),
+            ("reset", 5),
+            ("pop", 6),
+            ("ret", 7),
+            ("retint", 8)
         ];
 
         let binary_result = assemble(line_test.iter().map(|v| v.0).collect());
@@ -699,7 +701,7 @@ mod tests
         expected_result.insert(0, 0x20);
         expected_result.insert(0x20, 0x3095);
         expected_result.insert(0x21, 0x4500);
-        expected_result.insert(0x22, 0x3);
+        expected_result.insert(0x22, 0x5);
         expected_result.insert(0x23, 0x1161);
         expected_result.insert(0x24, 0x1212);
         expected_result.insert(0x25, 0x1016);
@@ -731,7 +733,7 @@ mod tests
                 None => 0
             };
 
-            assert!(resulting_val == *word)
+            assert_eq!(resulting_val, *word)
         }
     }
 
@@ -830,7 +832,7 @@ mod tests
 
         let expected_output: Vec<u16>;
         {
-            let mut expected_words = match text_val.chars().map(|v| libsproc::text::character_to_word(v)).collect()
+            let mut expected_words = match text_val.chars().map(|v| sproc::text::character_to_word(v)).collect()
             {
                 Ok(v) => v,
                 Err(_) =>

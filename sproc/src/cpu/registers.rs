@@ -54,6 +54,39 @@ impl Register
     }
 }
 
+/// Define the types of status flags allowed
+#[derive(Clone, Copy, Debug)]
+pub enum StatusFlag
+{
+    InterruptEnable,
+    SignedArithmetic
+}
+
+impl StatusFlag
+{
+    /// Provides the mask required to set the flag with a bitwise-or
+    pub fn get_mask(&self) -> MemoryWord
+    {
+        return MemoryWord::new(match self
+        {
+            StatusFlag::InterruptEnable => (1 << 0),
+            StatusFlag::SignedArithmetic => (1 << 1)
+        });
+    }
+}
+
+impl ToString for StatusFlag
+{
+    fn to_string(&self) -> String
+    {
+        return match self
+        {
+            StatusFlag::InterruptEnable => "I".to_string(),
+            StatusFlag::SignedArithmetic => "U".to_string()
+        };
+    }
+}
+
 /// Defines a register manager to maintain register values
 pub struct RegisterManager
 {
@@ -92,6 +125,32 @@ impl RegisterManager
         let reg_ind = register.to_index();
         self.registers[reg_ind] = value;
         return true;
+    }
+
+    /// Sets the given flag for the processor status flags
+    pub fn set_flag(&mut self, flag: StatusFlag)
+    {
+        let last_val = self.get(Register::StatusFlags);
+        let new_val = MemoryWord::new(last_val.get() | flag.get_mask().get());
+        self.set(
+            Register::StatusFlags,
+            new_val);
+    }
+
+    /// Clears the given flag to the processor status
+    pub fn clear_flag(&mut self, flag: StatusFlag)
+    {
+        let last_val = self.get(Register::StatusFlags);
+        let new_val = MemoryWord::new(last_val.get() & !flag.get_mask().get());
+        self.set(
+            Register::StatusFlags,
+            new_val);
+    }
+
+    /// Gets the value of the given processor status flags
+    pub fn get_flag(&self, flag: StatusFlag) -> bool
+    {
+        return (self.get(Register::StatusFlags).get() & flag.get_mask().get()) != 0;
     }
 }
 

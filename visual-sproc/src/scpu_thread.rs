@@ -108,7 +108,7 @@ pub fn run_scpu_thread(
 
         while let Some(c) = cpu_stat.pop_serial_output()
         {
-            let output_char = match libsproc::text::word_to_character(c)
+            let output_char = match sproc::text::word_to_character(c)
             {
                 Ok(v) => v,
                 Err(e) =>

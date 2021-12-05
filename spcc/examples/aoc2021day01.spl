@@ -1,0 +1,156 @@
+static auto[10] INPUT;
+static auto BASE_ADDRESS = 0xA000;
+
+func write_serial(num)
+{
+    auto write_address = BASE_ADDRESS + 3;
+
+    auto CHAR_OFFSET = 0x30;
+    auto NEWLINE = 0xA;
+
+    if (num == 0)
+    {
+        write_address := num + CHAR_OFFSET;
+        write_address := NEWLINE;
+        return;
+    }
+
+    auto[20] chars;
+    auto index = 0;
+
+    while (num != 0)
+    {
+        (&chars + index) := num % 10;
+        index = index + 1;
+        num = num / 10;
+    }
+
+    while (index > 0)
+    {
+        index = index - 1;
+        write_address := *(&chars + index) + CHAR_OFFSET;
+    }
+
+    write_address := NEWLINE;
+}
+
+func read_serial()
+{
+    auto available_address = BASE_ADDRESS;
+    auto read_address = BASE_ADDRESS + 1;
+
+    auto CHAR_OFFSET = 0x30;
+    auto NEWLINE = 0xA;
+
+    auto num = 0;
+    auto run = 1;
+
+    while (run)
+    {
+        if (*available_address)
+        {
+            auto c = *read_address;
+
+            if ((c < CHAR_OFFSET) || (c > (CHAR_OFFSET + 9)))
+            {
+                run = 0;
+            }
+            else
+            {
+                num = (num * 10) + (c - CHAR_OFFSET);
+            }
+        }
+    }
+
+    return num;
+}
+
+func init_test_input()
+{
+    auto loc = &INPUT;
+    (loc + 0) := 199;
+    (loc + 1) := 200;
+    (loc + 2) := 208;
+    (loc + 3) := 210;
+    (loc + 4) := 200;
+    (loc + 5) := 207;
+    (loc + 6) := 240;
+    (loc + 7) := 269;
+    (loc + 8) := 260;
+    (loc + 9) := 263;
+}
+
+func init_real_input(input, size)
+{
+    auto base_addr = 0x6000;
+    auto index = 0;
+
+    auto curr = read_serial();
+    while (curr != 0)
+    {
+        (base_addr + index) := curr;
+        index = index + 1;
+        curr = read_serial();
+    }
+
+    input := base_addr;
+    size := index;
+
+    return base_addr;
+}
+
+func run_part_1(input, size)
+{
+    auto count = 0;
+    auto index = 1;
+
+    while (index < size)
+    {
+        auto ind = input + index;
+        auto last = *(ind - 1);
+        auto val = *ind;
+
+        if (val > last)
+        {
+            count = count + 1;
+        }
+
+        index = index + 1;
+    }
+
+    return count;
+}
+
+func run_part_2(input, size)
+{
+    auto new_buffer_loc = 0x8000;
+    auto index = 2;
+
+    auto a1 = *(input);
+    auto a2 = *(input + 1);
+
+    while (index < size)
+    {
+        auto current = *(input + index);
+        (new_buffer_loc + (index - 2)) := a1 + (a2 + current);
+        a1 = a2;
+        a2 = current;
+        index = index + 1;
+    }
+
+    return run_part_1(new_buffer_loc, size - 2);
+}
+
+func main()
+{
+    init_test_input();
+    write_serial(run_part_1(&INPUT, 10));
+    write_serial(run_part_2(&INPUT, 10));
+
+    auto input_addr;
+    auto input_size;
+    init_real_input(&input_addr, &input_size);
+
+    write_serial(run_part_1(input_addr, input_size));
+    write_serial(run_part_2(input_addr, input_size));
+}

@@ -7,6 +7,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libsproc = { path = "../libsproc", version = "*" }
-libsproc-assemble = { path = "../libsproc-assemble", version = "*" }
+sproc = { path = "../sproc", version = "*" }
+spa = { path = "../spa", version = "*" }
 fltk = { version = "1.2.19" }

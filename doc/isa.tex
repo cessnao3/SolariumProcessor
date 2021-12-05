@@ -67,7 +67,7 @@ The processor status flags indicate the current setup for the processor. Current
 		Bit & Value \\
 		\hline
 		0 & Interrupt Enable \\
-		1 & Signed Relational Operators \\
+		1 & Signed Operations \\
 		\hline
 	\end{tabular}
 	\caption{Processor status flags provide a window into the current processor state}
@@ -157,12 +157,14 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			0 & 0 & 0 & 0 & \texttt{noop} & No Operation \\
 			0 & 0 & 0 & 1 & \texttt{inton} & Turn Interrupts On \\
 			0 & 0 & 0 & 2 & \texttt{intoff} & Turn Interrupts Off \\
-			0 & 0 & 0 & 3 & \texttt{reset} & \texttt{PC = Reset Vector}, \texttt{R[0-15] = 0} \\
-			0 & 0 & 0 & 4 & \texttt{pop} & \texttt{--SP} \\
-			0 & 0 & 0 & 5 & \texttt{ret} & \texttt{x = R[ret]} \\
+			0 & 0 & 0 & 3 & \texttt{ari} & Set Signed Arithmetic \\
+			0 & 0 & 0 & 4 & \texttt{aru} & Set Unsigned Arithmetic \\ 
+			0 & 0 & 0 & 5 & \texttt{reset} & \texttt{PC = Reset Vector}, \texttt{R[0-15] = 0} \\
+			0 & 0 & 0 & 6 & \texttt{pop} & \texttt{--SP} \\
+			0 & 0 & 0 & 7 & \texttt{ret} & \texttt{x = R[ret]} \\
 			{} & {} & {} & {} & {} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
 			{} & {} & {} & {} & {} & \texttt{R[ret] = x} \\
-			0 & 0 & 0 & 6 & \texttt{retint} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
+			0 & 0 & 0 & 8 & \texttt{retint} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
 			0 & 0 & 1 & R[a] & \texttt{jmp [a]} & \texttt{PC = R[a]} \\
 			0 & 0 & 2 & R[a] & \texttt{jmpr [a]} & \texttt{PC += R[a]} \\
 			0 & 0 & 3 & R[a] & \texttt{push [a]} & \texttt{mem[SP++] = R[a]} \\
@@ -376,7 +378,7 @@ Listing \ref{listing:serial-echo} provides a serial echo program, which echos an
 
 \section{Solarium Processor Advanced Computing Environment}
 
-The Solarium Processor Advanced Computing Environment, or spACE, is a higher-level language than the raw assembly that provides some nicer tools to program applications in, at the cost of being less space and time efficient than programming in assembly directly. It does offer a slightly safer method of computing, however, as it provides a more traditional function call structure, variables, and scopes that help abstract away some of the hardware and provide some simple limits on what the user is allowed to do.
+The Solarium Processor Advanced Computing Environment, or \texttt{sp/ACE}, is a higher-level language than the raw assembly that provides some nicer tools to program applications in, at the cost of being less space and time efficient than programming in assembly directly. It does offer a slightly safer method of computing, however, as it provides a more traditional function call structure, variables, and scopes that help abstract away some of the hardware and provide some simple limits on what the user is allowed to do.
 
 The language specification is as follows.
 

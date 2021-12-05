@@ -3,10 +3,10 @@ use std::cell::RefCell;
 
 use super::messages::GuiMessage;
 
-use libsproc::cpu::SolariumProcessor;
-use libsproc::devices::SerialInputOutputDevice;
-use libsproc::memory::{MEM_MAX_SIZE, MemorySegment, ReadOnlySegment, ReadWriteSegment};
-use libsproc::common::MemoryWord;
+use sproc::cpu::SolariumProcessor;
+use sproc::devices::SerialInputOutputDevice;
+use sproc::memory::{MEM_MAX_SIZE, MemorySegment, ReadOnlySegment, ReadWriteSegment};
+use sproc::common::MemoryWord;
 
 
 pub type RegisterArray = [u16; SolariumProcessor::NUM_REGISTERS];
@@ -200,7 +200,7 @@ impl ProcessorStatusStruct
 
     pub fn push_serial_input_char(&mut self, c: char)
     {
-        match libsproc::text::character_to_word(c)
+        match sproc::text::character_to_word(c)
         {
             Ok(word) =>
             {

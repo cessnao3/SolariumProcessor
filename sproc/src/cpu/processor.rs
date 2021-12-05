@@ -1,7 +1,7 @@
 use crate::common::{MemoryWord, SolariumError, InstructionData};
 use crate::memory::MemoryMap;
 
-use super::registers::{Register, RegisterManager};
+use super::registers::{Register, RegisterManager, StatusFlag};
 
 
 /// Defines the reset vector location
@@ -19,8 +19,7 @@ const VECTOR_HW_HJW_SIZE: usize = 16;
 pub struct SolariumProcessor
 {
     pub memory_map: MemoryMap,
-    pub registers: RegisterManager,
-    allow_interrupts: bool
+    pub registers: RegisterManager
 }
 
 impl SolariumProcessor
@@ -42,8 +41,7 @@ impl SolariumProcessor
         let mut cpu = SolariumProcessor
         {
             memory_map: MemoryMap::new(),
-            registers: RegisterManager::new(),
-            allow_interrupts: true
+            registers: RegisterManager::new()
         };
 
         // Initiate the reset
@@ -68,8 +66,6 @@ impl SolariumProcessor
         self.registers.set(
             Register::ProgramCounter,
             reset_loc);
-
-        self.allow_interrupts = true;
     }
 
     /// Resets the CPU and memory to a known state as a hard-reset
@@ -190,7 +186,7 @@ impl SolariumProcessor
     fn call_interrupt(&mut self, interrupt_vector: usize) -> Result<bool, SolariumError>
     {
         // Return false if interrupts are not allowed
-        if !self.allow_interrupts
+        if !self.registers.get_flag(StatusFlag::InterruptEnable)
         {
             return Ok(false);
         }
@@ -311,18 +307,26 @@ impl SolariumProcessor
                     },
                     1 => // inton
                     {
-                        self.allow_interrupts = true;
+                        self.registers.set_flag(StatusFlag::InterruptEnable);
                     },
                     2 => // intoff
                     {
-                        self.allow_interrupts = false;
+                        self.registers.clear_flag(StatusFlag::InterruptEnable);
                     },
                     3 => // reset
                     {
                         self.soft_reset();
                         pc_incr = 0;
                     },
-                    4 => // pop
+                    4 => // ari
+                    {
+                        self.registers.set_flag(StatusFlag::SignedArithmetic);
+                    },
+                    5 => // aru
+                    {
+                        self.registers.clear_flag(StatusFlag::SignedArithmetic);
+                    },
+                    6 => // pop
                     {
                         match self.pop_sp()
                         {
@@ -330,7 +334,7 @@ impl SolariumProcessor
                             Err(e) => return Err(e)
                         };
                     },
-                    5 => // ret
+                    7 => // ret
                     {
                         // Save the return register
                         let ret_register = self.registers.get(Register::ReturnValue);
@@ -350,7 +354,7 @@ impl SolariumProcessor
                         // Set no PC increment so that we start at the first instruction value
                         pc_incr = 0;
                     },
-                    6 => // retint
+                    8 => // retint
                     {
                         // Pop all register values
                         match self.pop_all_registers()
@@ -591,30 +595,48 @@ impl SolariumProcessor
                     }
                     7..=11 => // tg, tge, tl, tle, teq
                     {
-                        let val_a = self.registers.get(reg_a).get_signed();
-                        let val_b = self.registers.get(reg_b).get_signed();
+                        let fun_tg: fn(MemoryWord, MemoryWord) -> bool;
+                        let fun_tge: fn(MemoryWord, MemoryWord) -> bool;
+                        let fun_tl: fn(MemoryWord, MemoryWord) -> bool;
+                        let fun_tle: fn(MemoryWord, MemoryWord) -> bool;
+                        let fun_teq: fn(MemoryWord, MemoryWord) -> bool = |a, b| a.get() == b.get();
 
-                        let test_passed = match opcode
+                        if self.registers.get_flag(StatusFlag::SignedArithmetic)
+                        {
+                            fun_tg = |a, b| a.get_signed() > b.get_signed();
+                            fun_tge = |a, b| a.get_signed() >= b.get_signed();
+                            fun_tl = |a, b| a.get_signed() < b.get_signed();
+                            fun_tle = |a, b| a.get_signed() <= b.get_signed();
+                        }
+                        else
+                        {
+                            fun_tg = |a, b| a.get() > b.get();
+                            fun_tge = |a, b| a.get() >= b.get();
+                            fun_tl = |a, b| a.get() < b.get();
+                            fun_tle = |a, b| a.get() <= b.get();
+                        }
+
+                        let test_function = match opcode
                         {
                             7 => // tg
                             {
-                                val_a > val_b
+                                fun_tg
                             },
                             8 => //tge
                             {
-                                val_a >= val_b
+                                fun_tge
                             },
                             9 => // tl
                             {
-                                val_a < val_b
+                                fun_tl
                             },
                             10 => // tle
                             {
-                                val_a <= val_b
+                                fun_tle
                             },
                             11 => // teq
                             {
-                                val_a == val_b
+                                fun_teq
                             },
                             _ =>
                             {
@@ -622,7 +644,10 @@ impl SolariumProcessor
                             }
                         };
 
-                        if test_passed
+                        let word_a = self.registers.get(reg_a);
+                        let word_b = self.registers.get(reg_b);
+
+                        if test_function(word_a, word_b)
                         {
                             pc_incr = 1;
                         }
@@ -703,81 +728,148 @@ impl SolariumProcessor
                     },
                     opcode if opcode <= 13 =>
                     {
-                        let val_a = self.registers.get(Register::from_index(arg1 as usize));
-                        let val_b = self.registers.get(Register::from_index(arg0 as usize));
+                        type ArithFun = fn(MemoryWord, MemoryWord) -> Result<MemoryWord, SolariumError>;
 
-                        let result: u16;
+                        let fun_add: ArithFun;
+                        let fun_sub: ArithFun;
+                        let fun_mul: ArithFun;
+                        let fun_div: ArithFun;
+                        let fun_mod: ArithFun;
+                        let fun_band: ArithFun = |a, b| Ok(MemoryWord::new(a.get() & b.get()));
+                        let fun_bor: ArithFun = |a, b| Ok(MemoryWord::new(a.get() | b.get()));
+                        let fun_bxor: ArithFun = |a, b| Ok(MemoryWord::new(a.get() ^ b.get()));
+                        let fun_bsftl: ArithFun = |a, b| {
+                            let shift_count = b.get();
+                            if shift_count >= 16
+                            {
+                                return Err(SolariumError::ShiftError(shift_count as usize));
+                            }
+                            return Ok(MemoryWord::new(a.get() << shift_count));
+                        };
+                        let fun_bsftr: ArithFun = |a, b| {
+                            let shift_count = b.get();
+                            if shift_count >= 16
+                            {
+                                return Err(SolariumError::ShiftError(shift_count as usize));
+                            }
+                            return Ok(MemoryWord::new(a.get() >> shift_count));
+                        };
 
-                        match opcode
+                        if self.registers.get_flag(StatusFlag::SignedArithmetic)
                         {
-                            4 => // add
-                            {
-                                result = val_a.get().wrapping_add(val_b.get());
-                            },
-                            5 => //sub
-                            {
-                                result = val_a.get().wrapping_sub(val_b.get());
-                            },
-                            6 => // mul
-                            {
-                                result = val_a.get_signed().wrapping_mul(val_b.get_signed()) as u16;
-                            },
-                            7 => // div
-                            {
-                                if val_b.get() == 0
+                            fun_add = |a, b| Ok(MemoryWord::new(a.get_signed().wrapping_add(b.get_signed()) as u16));
+                            fun_sub = |a, b| Ok(MemoryWord::new(a.get_signed().wrapping_sub(b.get_signed()) as u16));
+                            fun_mul = |a, b| Ok(MemoryWord::new(a.get_signed().wrapping_mul(b.get_signed()) as u16));
+                            fun_div = |a, b| {
+                                if b.get() == 0
                                 {
                                     return Err(SolariumError::DivideByZero);
                                 }
-                                result = val_a.get_signed().wrapping_div(val_b.get_signed()) as u16;
-                            },
-                            8 => // mod
-                            {
-                                if val_b.get() == 0
+                                else
+                                {
+                                    return Ok(MemoryWord::new(a.get_signed().wrapping_add(b.get_signed()) as u16));
+                                }
+                            };
+                            fun_mod = |a, b| {
+                                if b.get() == 0
                                 {
                                     return Err(SolariumError::ModByZero);
                                 }
-                                result = (val_a.get_signed() % val_b.get_signed()) as u16;
+                                else
+                                {
+                                    return Ok(MemoryWord::new(a.get_signed().wrapping_rem(b.get_signed()) as u16));
+                                }
+                            };
+                        }
+                        else
+                        {
+                            fun_add = |a, b| Ok(MemoryWord::new(a.get().wrapping_add(b.get())));
+                            fun_sub = |a, b| Ok(MemoryWord::new(a.get().wrapping_sub(b.get())));
+                            fun_mul = |a, b| Ok(MemoryWord::new(a.get().wrapping_mul(b.get())));
+                            fun_div = |a, b| {
+                                if b.get() == 0
+                                {
+                                    return Err(SolariumError::DivideByZero);
+                                }
+                                else
+                                {
+                                    return Ok(MemoryWord::new(a.get().wrapping_add(b.get())));
+                                }
+                            };
+                            fun_mod = |a, b| {
+                                if b.get() == 0
+                                {
+                                    return Err(SolariumError::ModByZero);
+                                }
+                                else
+                                {
+                                    return Ok(MemoryWord::new(a.get().wrapping_rem(b.get())));
+                                }
+                            };
+                        }
+
+                        let arith_func = match opcode
+                        {
+                            4 => // add
+                            {
+                                fun_add
+                            },
+                            5 => //sub
+                            {
+                                fun_sub
+                            },
+                            6 => // mul
+                            {
+                                fun_mul
+                            },
+                            7 => // div
+                            {
+                                fun_div
+                            },
+                            8 => // mod
+                            {
+                                fun_mod
                             },
                             9 => // band
                             {
-                                result = val_a.get() & val_b.get();
+                                fun_band
                             }
                             10 => // bor
                             {
-                                result = val_a.get() | val_b.get();
+                                fun_bor
                             }
                             11 => //bxor
                             {
-                                result = val_a.get() ^ val_b.get();
+                                fun_bxor
                             }
                             12 => // bsftl
                             {
-                                let shift_count = val_b.get();
-                                if shift_count >= 16
-                                {
-                                    return Err(SolariumError::ShiftError(shift_count as usize));
-                                }
-                                result = val_a.get() << shift_count;
+                                fun_bsftl
                             },
                             13 => // bsftr
                             {
-                                let shift_count = val_b.get();
-                                if shift_count >= 16
-                                {
-                                    return Err(SolariumError::ShiftError(shift_count as usize));
-                                }
-                                result = val_a.get() >> shift_count;
+                                fun_bsftr
                             },
                             _ => // ERROR
                             {
                                 panic!();
                             }
-                        }
+                        };
+
+                        let val_a = self.registers.get(Register::from_index(arg1 as usize));
+                        let val_b = self.registers.get(Register::from_index(arg0 as usize));
+
+
+                        let result = match arith_func(val_a, val_b)
+                        {
+                            Ok(v) => v,
+                            Err(e) => return Err(e)
+                        };
 
                         let reg_dest = Register::from_index(arg2 as usize);
                         self.registers.set(
                             reg_dest,
-                            MemoryWord::new(result));
+                            result);
                     },
                     _ =>
                     {

@@ -9,9 +9,9 @@ use super::messages::{ThreadMessage, GuiMessage, FltkMessage, SerialCharBuf, CHA
 
 use super::fltk_registers::setup_register_group;
 
-use libsproc::common::MemoryWord;
-use libsproc::memory::MEM_MAX_SIZE;
-use libsproc_assemble::assemble;
+use sproc::common::MemoryWord;
+use sproc::memory::MEM_MAX_SIZE;
+use spa::assemble;
 
 use std::cell::RefCell;
 use std::rc::Rc;

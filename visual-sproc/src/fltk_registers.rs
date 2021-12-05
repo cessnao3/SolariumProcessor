@@ -5,7 +5,7 @@ use fltk::text::{TextDisplay, TextBuffer};
 use fltk::group::Flex;
 use fltk::frame::Frame;
 
-use libsproc::cpu::SolariumProcessor;
+use sproc::cpu::SolariumProcessor;
 
 pub fn setup_register_group(parent: &mut Flex) -> Vec<TextDisplay>
 {

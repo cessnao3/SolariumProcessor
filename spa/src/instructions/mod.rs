@@ -10,7 +10,7 @@ use single::SingleInstruction;
 
 use crate::assembly::argument::Argument;
 
-use libsproc::common::InstructionData;
+use sproc::common::InstructionData;
 
 pub trait ToInstructionData
 {
@@ -31,17 +31,23 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
         "intoff".to_string(),
         Box::new(SingleInstruction::new(2)));
     instructions.insert(
-        "reset".to_string(),
+        "ari".to_string(),
         Box::new(SingleInstruction::new(3)));
     instructions.insert(
-        "pop".to_string(),
+        "aru".to_string(),
         Box::new(SingleInstruction::new(4)));
     instructions.insert(
-        "ret".to_string(),
+        "reset".to_string(),
         Box::new(SingleInstruction::new(5)));
     instructions.insert(
-        "retint".to_string(),
+        "pop".to_string(),
         Box::new(SingleInstruction::new(6)));
+    instructions.insert(
+        "ret".to_string(),
+        Box::new(SingleInstruction::new(7)));
+    instructions.insert(
+        "retint".to_string(),
+        Box::new(SingleInstruction::new(8)));
     instructions.insert(
         "jmp".to_string(),
         Box::new(RegisterInstruction::new(1, 1)));
