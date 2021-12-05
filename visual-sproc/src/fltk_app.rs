@@ -301,7 +301,7 @@ pub fn setup_and_run_app(
                         {
                             for i in 0..regs.len()
                             {
-                                register_labels[i].buffer().unwrap().set_text(&format!("{0:}", regs[i]));
+                                register_labels[i].buffer().unwrap().set_text(&format!("{0:04X}", regs[i]));
                             }
                         },
                         GuiMessage::LogMessage(err) =>
