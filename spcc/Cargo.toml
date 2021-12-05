@@ -9,4 +9,4 @@ regex = "1.5.4"
 strum = "0.23"
 strum_macros = "0.23"
 sproc = { path = "../sproc", version = "*" }
-libsproc-assemble = { path = "../libsproc-assemble", version = "*" }
+spa = { path = "../spa", version = "*" }
