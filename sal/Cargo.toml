@@ -1,5 +1,5 @@
 [package]
-name = "spa"
+name = "sal"
 version = "0.1.0"
 authors = ["Ian O'Rourke <cessna.ian@gmail.com>"]
 edition = "2021"

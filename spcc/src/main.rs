@@ -6,7 +6,7 @@ use std::io::Write;
 
 use crate::compiler::compile;
 
-use spa::assemble;
+use sal::assemble;
 
 fn get_example_program() -> String
 {

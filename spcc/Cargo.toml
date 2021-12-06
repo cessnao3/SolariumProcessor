@@ -7,4 +7,4 @@ edition = "2021"
 lazy_static = "1.4.0"
 regex = "1.5.4"
 sproc = { path = "../sproc", version = "*" }
-spa = { path = "../spa", version = "*" }
+sal = { path = "../sal", version = "*" }
