@@ -1,7 +1,4 @@
-use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
-
-#[derive(Debug, Clone, Copy, EnumIter)]
+#[derive(Debug, Clone, Copy)]
 pub enum Symbol
 {
     Plus,
@@ -72,9 +69,44 @@ impl ToString for Symbol
 
 impl Symbol
 {
+    fn enum_iter() -> &'static [Symbol]
+    {
+        static VALUES: [Symbol; 27] = [
+            Symbol::Plus,
+            Symbol::Minus,
+            Symbol::Star,
+            Symbol::Divide,
+            Symbol::Modulus,
+            Symbol::Greater,
+            Symbol::Less,
+            Symbol::GreaterEqual,
+            Symbol::LessEqual,
+            Symbol::Assignment,
+            Symbol::AddressAssignment,
+            Symbol::Equal,
+            Symbol::NotEqual,
+            Symbol::OpenParen,
+            Symbol::CloseParen,
+            Symbol::OpenBrace,
+            Symbol::CloseBrace,
+            Symbol::OpenBracket,
+            Symbol::CloseBracket,
+            Symbol::Semicolon,
+            Symbol::BooleanNot,
+            Symbol::BooleanAnd,
+            Symbol::BooleanOr,
+            Symbol::BitwiseNot,
+            Symbol::BitwiseAnd,
+            Symbol::BitwiseOr,
+            Symbol::Comma
+        ];
+
+        return &VALUES;
+    }
+
     pub fn get_symbol_list() -> Vec<(String, Symbol)>
     {
-        let mut symbol_list: Vec<Symbol> = Symbol::iter().collect();
+        let mut symbol_list: Vec<Symbol> = Symbol::enum_iter().iter().map(|v| *v).collect();
 
         symbol_list.sort_by(|a, b| {
             let a_s = a.to_string();

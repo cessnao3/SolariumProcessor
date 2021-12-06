@@ -1,9 +1,6 @@
-use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
-
 use crate::tokenizer::utils::is_separator;
 
-#[derive(Debug, Copy, Clone, EnumIter)]
+#[derive(Debug, Copy, Clone)]
 pub enum Keyword
 {
     If,
@@ -38,6 +35,23 @@ impl ToString for Keyword
 
 impl Keyword
 {
+    fn enum_iter() -> &'static [Keyword]
+    {
+        static VALUES: [Keyword; 9] = [
+            Keyword::If,
+            Keyword::Else,
+            Keyword::While,
+            Keyword::Func,
+            Keyword::Static,
+            Keyword::Const,
+            Keyword::Auto,
+            Keyword::Extern,
+            Keyword::Return
+        ];
+
+        return &VALUES;
+    }
+
     pub fn try_match_keyword(input: &str) -> Option<(Keyword, usize)>
     {
         fn matches_keyword(input: &str, keyword: &str) -> bool
@@ -65,7 +79,7 @@ impl Keyword
             return true;
         }
 
-        let keyword_vals: Vec<Keyword> = Keyword::iter().collect();
+        let keyword_vals: Vec<Keyword> = Keyword::enum_iter().iter().map(|v| *v).collect();
 
         let keyword_checks: Vec<(Keyword, String)> = keyword_vals
             .iter()

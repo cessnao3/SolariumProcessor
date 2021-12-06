@@ -6,7 +6,5 @@ edition = "2021"
 [dependencies]
 lazy_static = "1.4.0"
 regex = "1.5.4"
-strum = "0.23"
-strum_macros = "0.23"
 sproc = { path = "../sproc", version = "*" }
 spa = { path = "../spa", version = "*" }
