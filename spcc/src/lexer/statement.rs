@@ -1,4 +1,4 @@
-use super::common::{ScopeManager, NamedMemoryValue, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B, REG_DEFAULT_SPARE, REG_DEFAULT_TEST_RESULT};
+use super::common::*;
 use super::function::FunctionDefinition;
 use super::program::ProgramSection;
 use super::token_iter::TokenIter;
@@ -73,7 +73,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Pro
             program.push(format!(":{0:}_start", while_label));
 
             // Read the statement value
-            match read_base_expression(iter, scopes, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_SPARE)
+            match read_base_expression(iter, scopes, REG_DEFAULT_PRIMARY_A, REG_DEFAULT_SPARE)
             {
                 Ok(v) => program.extend(v),
                 Err(e) => return Err(e)
@@ -94,7 +94,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Pro
                 format!("jmpri 2"),
                 format!(".loadloc {0:}_end", while_label),
                 format!("ldri {0:}, -1", REG_DEFAULT_SPARE),
-                format!("tz {0:}", REG_DEFAULT_TEST_JUMP_A),
+                format!("tz {0:}", REG_DEFAULT_PRIMARY_A),
                 format!("jmp {0:}", REG_DEFAULT_SPARE)
             ]);
 
@@ -140,7 +140,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Pro
             let if_label = format!("if_statement_{0:}", scopes.generate_index());
 
             // Read the statement value
-            match read_base_expression(iter, scopes, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_SPARE)
+            match read_base_expression(iter, scopes, REG_DEFAULT_PRIMARY_A, REG_DEFAULT_SPARE)
             {
                 Ok(v) => program.extend(v),
                 Err(e) => return Err(e)
@@ -161,10 +161,10 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Pro
                 format!("jmpri 3"),
                 format!(".loadloc {0:}_true", if_label),
                 format!(".loadloc {0:}_false", if_label),
-                format!("ldri {0:}, -2", REG_DEFAULT_TEST_JUMP_B),
+                format!("ldri {0:}, -2", REG_DEFAULT_PRIMARY_B),
                 format!("ldri {0:}, -2", REG_DEFAULT_SPARE),
-                format!("tnz {0:}", REG_DEFAULT_TEST_JUMP_A),
-                format!("jmp {0:}", REG_DEFAULT_TEST_JUMP_B),
+                format!("tnz {0:}", REG_DEFAULT_PRIMARY_A),
+                format!("jmp {0:}", REG_DEFAULT_PRIMARY_B),
                 format!("jmp {0:}", REG_DEFAULT_SPARE)
             ]);
 
@@ -219,13 +219,13 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Pro
             }
             else
             {
-                match read_base_expression(iter, scopes, REG_DEFAULT_TEST_RESULT, REG_DEFAULT_SPARE)
+                match read_base_expression(iter, scopes, REG_DEFAULT_PRIMARY_A, REG_DEFAULT_SPARE)
                 {
                     Ok(v) => program.extend(v),
                     Err(e) => return Err(e)
                 };
 
-                program.push(format!("copy $ret, {0:}", REG_DEFAULT_TEST_RESULT))
+                program.push(format!("copy $ret, {0:}", REG_DEFAULT_PRIMARY_A))
             }
 
             // Check for the ending semicolon
@@ -239,8 +239,8 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Pro
                 program.extend(vec![
                     "jmpri 2".to_string(),
                     format!(".loadloc {0:}", end_label),
-                    format!("ldri {0:}, -1", REG_DEFAULT_TEST_RESULT),
-                    format!("jmp {0:}", REG_DEFAULT_TEST_RESULT)
+                    format!("ldri {0:}, -1", REG_DEFAULT_JUMP_LOC),
+                    format!("jmp {0:}", REG_DEFAULT_JUMP_LOC)
                 ]);
             }
             else
@@ -250,7 +250,7 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Pro
         },
         _ =>
         {
-            match read_base_expression(iter, scopes, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B)
+            match read_base_expression(iter, scopes, REG_DEFAULT_PRIMARY_A, REG_DEFAULT_SPARE)
             {
                 Ok(v) => program.extend(v),
                 Err(e) => return Err(e)
@@ -335,8 +335,8 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
 
                 program.push_static("jmpri 2".to_string());
                 program.push_static(format!(".loadloc {0:}_end", variable_label));
-                program.push_static(format!("ldri {0:}, -1", REG_DEFAULT_TEST_RESULT));
-                program.push_static(format!("jmp {0:}", REG_DEFAULT_TEST_RESULT));
+                program.push_static(format!("ldri {0:}, -1", REG_DEFAULT_JUMP_LOC));
+                program.push_static(format!("jmp {0:}", REG_DEFAULT_JUMP_LOC));
                 program.push_static(format!(":{0:}", variable_label));
                 for _ in 0..variable_size
                 {
@@ -381,15 +381,15 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
     if let Some(Token::Symbol(Symbol::Assignment)) = next_val
     {
         // Read the expression to assign the variable to
-        match read_base_expression(iter, scopes, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B)
+        match read_base_expression(iter, scopes, REG_DEFAULT_PRIMARY_A, REG_DEFAULT_SPARE)
         {
             Ok(asm) =>
             {
                 let mut vals = Vec::new();
                 vals.extend(asm);
                 vals.extend(variable_value.set_value_from_register(
-                    REG_DEFAULT_TEST_JUMP_A,
-                    REG_DEFAULT_TEST_JUMP_B));
+                    REG_DEFAULT_PRIMARY_A,
+                    REG_DEFAULT_SPARE));
 
                 match variable_type
                 {

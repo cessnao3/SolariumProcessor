@@ -28,14 +28,14 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
                 iter.next();
 
                 // Get the results of the following expression
-                match read_base_expression(iter, scopes, REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B)
+                match read_base_expression(iter, scopes, register, register_spare)
                 {
                     Ok(v) => assembly.extend(v),
                     Err(e) => return Err(e)
                 };
 
                 // Assign the variable result
-                assembly.extend(var.set_value_from_register(REG_DEFAULT_TEST_JUMP_A, REG_DEFAULT_TEST_JUMP_B));
+                assembly.extend(var.set_value_from_register(register, register_spare));
 
                 // Return the current assembly to prevent additional binary expressions from causing problems
                 return Ok(assembly);

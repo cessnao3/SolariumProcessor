@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub const REG_DEFAULT_TEST_RESULT: usize = 5;
-pub const REG_DEFAULT_SPARE: usize = 6;
-pub const REG_DEFAULT_TEST_JUMP_A: usize = 7;
-pub const REG_DEFAULT_TEST_JUMP_B: usize = 8;
+pub const REG_DEFAULT_JUMP_LOC: usize = 4;
+pub const REG_DEFAULT_SPARE: usize = 5;
+pub const REG_DEFAULT_PRIMARY_A: usize = 7;
+pub const REG_DEFAULT_PRIMARY_B: usize = 8;
 pub const REG_FRAME_SP_BASE: usize = 14;
 pub const REG_FRAME_SP_VALUE: usize = 15;
 
