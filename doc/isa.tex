@@ -158,7 +158,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			0 & 0 & 0 & 1 & \texttt{inton} & Turn Interrupts On \\
 			0 & 0 & 0 & 2 & \texttt{intoff} & Turn Interrupts Off \\
 			0 & 0 & 0 & 3 & \texttt{ari} & Set Signed Arithmetic \\
-			0 & 0 & 0 & 4 & \texttt{aru} & Set Unsigned Arithmetic \\ 
+			0 & 0 & 0 & 4 & \texttt{aru} & Set Unsigned Arithmetic \\
 			0 & 0 & 0 & 5 & \texttt{reset} & \texttt{PC = Reset Vector}, \texttt{R[0-15] = 0} \\
 			0 & 0 & 0 & 6 & \texttt{pop} & \texttt{--SP} \\
 			0 & 0 & 0 & 7 & \texttt{ret} & \texttt{x = R[ret]} \\
@@ -177,6 +177,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
  			0 & 0 & 9 & R[a] & \texttt{tnz [a]} & If \texttt{R[a] != 0} \texttt{PC += 1}, Else \texttt{PC += 2} \\
  			0 & 0 & 10 & R[a] & \texttt{bool [a]} & If \texttt{R[a] != 0} \texttt{R[a] = 1}, Else \texttt{R[a] = 0} \\
  			0 & 0 & 11 & R[a] & \texttt{not [a]} & If \texttt{R[a] != 0} \texttt{R[a] = 0}, Else \texttt{R[a] = 1} \\
+ 			0 & 0 & 12 & R[a] & \texttt{ldn [a]} & \texttt{R[a] = mem[PC + 1]}, \texttt{PC += 2} \\
 			0 & 1 & 0xI0 & 0x0I & \texttt{jmpri <imm>} & \texttt{PC += Im} \\
 			0 & 2 & R[src] & R[dst] & \texttt{ld [dst], [src]} & \texttt{R[dst] = mem[R[src]]} \\
 			0 & 3 & R[src] & R[dst] & \texttt{sav [dst], [src]} & \texttt{mem[R[dst]] = R[src]} \\

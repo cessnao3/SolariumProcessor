@@ -11,7 +11,7 @@ use super::fltk_registers::setup_register_group;
 
 use sproc::common::MemoryWord;
 use sproc::memory::MEM_MAX_SIZE;
-use sal::assemble;
+use sda::assemble;
 
 use std::cell::RefCell;
 use std::path::PathBuf;

@@ -525,6 +525,24 @@ impl SolariumProcessor
                             reg_a,
                             MemoryWord::new(new_val));
                     },
+                    12 => //ldn
+                    {
+                        // Load the memory location at the PC + 1 value
+                        let pc_val = self.registers.get(Register::ProgramCounter).get();
+                        let mem_val = match self.memory_map.get((pc_val + 1) as usize)
+                        {
+                            Ok(v) => v,
+                            Err(e) => return Err(e)
+                        };
+
+                        // Save the resulting memory location in the register
+                        self.registers.set(
+                            reg_a,
+                            mem_val);
+
+                        // Save the PC Increment
+                        pc_incr = 2;
+                    },
                     _ => // ERROR
                     {
                         return Err(SolariumError::InvalidInstruction(inst_word));

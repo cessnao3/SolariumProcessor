@@ -447,7 +447,8 @@ mod tests
             ("tz", 8),
             ("tnz", 9),
             ("bool", 10),
-            ("not", 11)
+            ("not", 11),
+            ("ldn", 12)
         ];
 
         for (arg, opcode) in args_to_test
