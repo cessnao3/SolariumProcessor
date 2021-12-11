@@ -27,11 +27,10 @@ pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String>
     let mut program = ProgramSection::new_static();
     program.extend(vec![
         "; Load and call the main function".to_string(),
-        "jmpri 3".to_string(),
+        format!("ldn {0:}", REG_FRAME_SP_BASE),
         format!(".load {0:}", sproc::cpu::SolariumProcessor::STACK_POINTER_OFFSET),
+        format!("ldn 5"),
         ".loadloc main_entry_point".to_string(),
-        format!("ldri {0:}, -2", REG_FRAME_SP_BASE),
-        "ldri 5, -2".to_string(),
         "call 5".to_string(),
         "; Infinite Loop Ending Program".to_string(),
         "jmpri 0".to_string()]);

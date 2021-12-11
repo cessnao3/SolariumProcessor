@@ -71,9 +71,8 @@ impl NamedMemoryValue for StaticVariable
     fn load_address_to_register(&self, register: usize) -> Vec<String>
     {
         return vec![
-            "jmpri 2".to_string(),
-            format!(".loadloc {0:}", self.label),
-            format!("ldri {0:}, -1", register)
+            format!("ldn {0:}", register),
+            format!(".loadloc {0:}", self.label)
         ];
     }
 }
@@ -129,9 +128,8 @@ impl NamedMemoryValue for Variable
     fn load_address_to_register(&self, register: usize) -> Vec<String>
     {
         return vec![
-            "jmpri 2".to_string(),
+            format!("ldn {0:}", register),
             format!(".load {0:}", self.offset),
-            format!("ldri {0:}, -1", register),
             format!("add {0:}, {0:}, {1:}", register, REG_FRAME_SP_BASE),
             format!("add {0:}, {0:}, {1:}", register, REG_FRAME_SP_VALUE)
         ];

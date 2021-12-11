@@ -91,9 +91,8 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Pro
 
             // Determine where to jump
             program.extend(vec![
-                format!("jmpri 2"),
+                format!("ldn {0:}", REG_DEFAULT_SPARE),
                 format!(".loadloc {0:}_end", while_label),
-                format!("ldri {0:}, -1", REG_DEFAULT_SPARE),
                 format!("tz {0:}", REG_DEFAULT_PRIMARY_A),
                 format!("jmp {0:}", REG_DEFAULT_SPARE)
             ]);
@@ -110,9 +109,8 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Pro
 
             // Loop back to the start
             program.extend(vec![
-                format!("jmpri 2"),
+                format!("ldn {0:}", REG_DEFAULT_SPARE),
                 format!(".loadloc {0:}_start", while_label),
-                format!("ldri {0:}, -1", REG_DEFAULT_SPARE),
                 format!("jmp {0:}", REG_DEFAULT_SPARE)
             ]);
 
@@ -158,11 +156,10 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Pro
 
             // Define the resulting jumps
             program.extend(vec![
-                format!("jmpri 3"),
+                format!("ldn {0:}", REG_DEFAULT_PRIMARY_B),
                 format!(".loadloc {0:}_true", if_label),
+                format!("ldn {0:}", REG_DEFAULT_SPARE),
                 format!(".loadloc {0:}_false", if_label),
-                format!("ldri {0:}, -2", REG_DEFAULT_PRIMARY_B),
-                format!("ldri {0:}, -2", REG_DEFAULT_SPARE),
                 format!("tnz {0:}", REG_DEFAULT_PRIMARY_A),
                 format!("jmp {0:}", REG_DEFAULT_PRIMARY_B),
                 format!("jmp {0:}", REG_DEFAULT_SPARE)
@@ -184,9 +181,8 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Pro
 
                 // Read the "false" block if it exists
                 program.extend(vec![
-                    format!("jmpri 2"),
+                    format!("ldn {0:}", REG_DEFAULT_SPARE),
                     format!(".loadloc {0:}_end", if_label),
-                    format!("ldri {0:}, -1", REG_DEFAULT_SPARE),
                     format!("jmp {0:}", REG_DEFAULT_SPARE),
                     format!(":{0:}_false", if_label)
                 ]);
@@ -237,9 +233,8 @@ fn read_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> Result<Pro
                 program.extend(scopes.assembly_to_pop_for_return());
 
                 program.extend(vec![
-                    "jmpri 2".to_string(),
+                    format!("ldn {0:}", REG_DEFAULT_JUMP_LOC),
                     format!(".loadloc {0:}", end_label),
-                    format!("ldri {0:}, -1", REG_DEFAULT_JUMP_LOC),
                     format!("jmp {0:}", REG_DEFAULT_JUMP_LOC)
                 ]);
             }
@@ -333,9 +328,8 @@ fn read_variable_def(iter: &mut TokenIter, scopes: &mut ScopeManager, variable_t
             {
                 let variable_label = format!("static_variable_{0:}_{1:}", variable_name, scopes.generate_index());
 
-                program.push_static("jmpri 2".to_string());
+                program.push_static(format!("ldn {0:}", REG_DEFAULT_JUMP_LOC));
                 program.push_static(format!(".loadloc {0:}_end", variable_label));
-                program.push_static(format!("ldri {0:}, -1", REG_DEFAULT_JUMP_LOC));
                 program.push_static(format!("jmp {0:}", REG_DEFAULT_JUMP_LOC));
                 program.push_static(format!(":{0:}", variable_label));
                 for _ in 0..variable_size

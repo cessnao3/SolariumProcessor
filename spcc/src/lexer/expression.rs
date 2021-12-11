@@ -199,9 +199,8 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
             Token::WordLiteral(val) =>
             {
                 assembly.extend(vec![
-                    "jmpri 2".to_string(),
+                    format!("ldn {0:}", register),
                     format!(".load {0:}", val),
-                    format!("ldri {0:}, -1", register)
                 ]);
             },
             Token::VariableName(name) =>

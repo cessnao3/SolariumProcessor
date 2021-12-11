@@ -30,9 +30,8 @@ impl FunctionCall for FunctionDefinition
     fn load_function_address(&self, register: usize) -> Vec<String>
     {
         return vec![
-            format!("jmpri 2"),
-            format!(".loadloc {0:}", self.label),
-            format!("ldri {0:}, -1", register)
+            format!("ldn {0:}", register),
+            format!(".loadloc {0:}", self.label)
         ];
     }
 
