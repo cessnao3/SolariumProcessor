@@ -420,7 +420,7 @@ pub fn setup_and_run_app(
         {
             *callback_val = false;
             let callback_finished_cb = Arc::clone(&callback_finished);
-            add_timeout(1.0 / 30.0, move ||
+            add_timeout3(1.0 / 30.0, move |_|
             {
                 fltk_sender.send(FltkMessage::Tick);
                 let mut data = callback_finished_cb.lock().unwrap();
