@@ -50,14 +50,7 @@ pub fn setup_and_run_app(
 
     main_window.handle(move |_, event|
     {
-        if event == Event::KeyDown && fltk::app::event_key() == Key::Escape
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
+        return event == Event::KeyDown && event_key() == Key::Escape;
     });
 
     main_window.set_icon(Some(get_app_icon()));
@@ -171,7 +164,7 @@ pub fn setup_and_run_app(
         {
             if event == Event::KeyDown
             {
-                if fltk::app::event_key() == Key::Enter
+                if event_key() == Key::Enter
                 {
                     let mut input_string = input.value();
                     input_string.push('\n');
@@ -364,9 +357,9 @@ pub fn setup_and_run_app(
                 {
                     msg_to_send = Some(ThreadMessage::Reset);
                 },
-                FltkMessage::HardwareInterrupt(intval) =>
+                FltkMessage::HardwareInterrupt(int_val) =>
                 {
-                    msg_to_send = Some(ThreadMessage::HardwareInterrupt(intval));
+                    msg_to_send = Some(ThreadMessage::HardwareInterrupt(int_val));
                 },
                 FltkMessage::SerialInput(c) =>
                 {
@@ -414,13 +407,13 @@ pub fn setup_and_run_app(
             }
         }
 
-        // Setup a new callback value to ensure that the event counter is updated at 30 Hzs
+        // Setup a new callback value to ensure that the event counter is updated at 10 Hzs
         let mut callback_val = callback_finished.lock().unwrap();
         if *callback_val && main_window.visible()
         {
             *callback_val = false;
             let callback_finished_cb = Arc::clone(&callback_finished);
-            add_timeout3(1.0 / 30.0, move |_|
+            add_timeout3(1.0 / 10.0, move |_|
             {
                 fltk_sender.send(FltkMessage::Tick);
                 let mut data = callback_finished_cb.lock().unwrap();
