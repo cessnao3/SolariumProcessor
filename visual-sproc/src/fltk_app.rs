@@ -16,7 +16,7 @@ use sda::assemble;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::mpsc;
 
 fn get_app_icon() -> PngImage
 {
@@ -275,16 +275,14 @@ pub fn setup_and_run_app(
     // Finish Window Setup
     main_window.end();
 
-    // Define whether the callback has been triggered
-    let callback_finished = Arc::new(Mutex::new(true));
-
     // Show the window and run the application
     main_window.show();
+    let mut tick_callback_run = true;
+    let mut message_queue: Vec<String> = Vec::new();
+    let mut serial_output_queue: Vec<char> = Vec::new();
+
     while app.wait()
     {
-        let mut message_queue: Vec<String> = Vec::new();
-        let mut serial_output_queue: Vec<char> = Vec::new();
-
         let mut thread_exit = false;
 
         for _ in 0..10000
@@ -403,41 +401,39 @@ pub fn setup_and_run_app(
                 {
                     msg_to_send = Some(ThreadMessage::SetSpeed(new_speed));
                 },
-                FltkMessage::Tick => ()
+                FltkMessage::Tick =>
+                {
+                    tick_callback_run = false;
+                }
             }
         }
 
         // Setup a new callback value to ensure that the event counter is updated at 10 Hzs
-        let mut callback_val = callback_finished.lock().unwrap();
-        if *callback_val && main_window.visible()
+        if tick_callback_run && main_window.visible()
         {
-            *callback_val = false;
-            let callback_finished_cb = Arc::clone(&callback_finished);
-            add_timeout3(1.0 / 10.0, move |_|
+            add_timeout3(1.0 / 30.0, move |_|
             {
                 fltk_sender.send(FltkMessage::Tick);
-                let mut data = callback_finished_cb.lock().unwrap();
-                *data = true;
             });
         }
 
         // Add all log message values
+        for msg in message_queue.iter()
         {
-            for msg in message_queue.iter()
-            {
-                // Add the text
-                log_text_display.buffer().unwrap().append(&format!("{0:}\n", msg));
+            // Add the text
+            log_text_display.buffer().unwrap().append(&format!("{0:}\n", msg));
 
-                // Scroll to end
-                let num_lines = log_text_display.buffer().unwrap().text().split("\n").count();
-                log_text_display.scroll(num_lines as i32, 0);
-            }
+            // Scroll to end
+            let num_lines = log_text_display.buffer().unwrap().text().split("\n").count();
+            log_text_display.scroll(num_lines as i32, 0);
         }
+        message_queue.clear();
 
         // Add the serial output values
         if !serial_output_queue.is_empty()
         {
             serial_output.buffer().unwrap().append(&serial_output_queue.iter().collect::<String>());
+            serial_output_queue.clear();
         }
 
         // Send messages
