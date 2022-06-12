@@ -521,7 +521,7 @@ pub fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> R
 
                 for (i, name) in varnames.iter().enumerate()
                 {
-                    match scopes.add_variable(name, Rc::new(Variable::new(name, (i as i32) - 16 - varnames.len() as i32)))
+                    match scopes.add_variable(name, Rc::new(Variable::new(name, (i as i32) - (sproc::cpu::SolariumProcessor::NUM_REGISTERS as i32) - (varnames.len() as i32))))
                     {
                         Ok(()) => (),
                         Err(e) => return Err(e)

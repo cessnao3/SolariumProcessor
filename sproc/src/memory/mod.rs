@@ -9,7 +9,8 @@ pub use self::segment_rw::ReadWriteSegment as ReadWriteSegment;
 pub use self::segment_ro::ReadOnlySegment as ReadOnlySegment;
 
 /// Define the maximum possible size
-pub const MEM_MAX_SIZE: usize = (2usize).pow(16);
+pub const BITS_PER_WORD: usize = 16usize;
+pub const MEM_MAX_SIZE: usize = (2usize).pow(BITS_PER_WORD as u32);
 
 /// Provides a trait for memory segments to implement
 pub trait MemorySegment

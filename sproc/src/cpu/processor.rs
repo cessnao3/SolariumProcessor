@@ -1,5 +1,5 @@
 use crate::common::{MemoryWord, SolariumError, InstructionData};
-use crate::memory::MemoryMap;
+use crate::memory::{MemoryMap, self};
 
 use super::registers::{Register, RegisterManager, StatusFlag};
 
@@ -758,7 +758,7 @@ impl SolariumProcessor
                         let fun_bxor: ArithFun = |a, b| Ok(MemoryWord::new(a.get() ^ b.get()));
                         let fun_bsftl: ArithFun = |a, b| {
                             let shift_count = b.get();
-                            if shift_count >= 16
+                            if shift_count >= memory::BITS_PER_WORD as u16
                             {
                                 return Err(SolariumError::ShiftError(shift_count as usize));
                             }
@@ -766,7 +766,7 @@ impl SolariumProcessor
                         };
                         let fun_bsftr: ArithFun = |a, b| {
                             let shift_count = b.get();
-                            if shift_count >= 16
+                            if shift_count >= memory::BITS_PER_WORD as u16
                             {
                                 return Err(SolariumError::ShiftError(shift_count as usize));
                             }
