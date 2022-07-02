@@ -192,6 +192,8 @@ pub fn setup_and_run_app(
                     fltk_sender.send(FltkMessage::SerialInput(SerialBuffer::from_box(box_char)));
 
                     input.set_value("");
+
+                    return true;
                 }
             }
             return false;
