@@ -16,7 +16,7 @@ use sda::assemble;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::mpsc;
+use std::sync::{Arc, Mutex, mpsc};
 
 fn get_app_icon() -> PngImage
 {
@@ -32,6 +32,25 @@ fn get_default_text() -> String
         Ok(v) => v.to_string(),
         Err(e) => panic!("UTF-8 Error: {0:}", e.to_string())
     };
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TickTimerState
+{
+    pub tick_running: bool,
+    pub thread_exit: bool
+}
+
+impl TickTimerState
+{
+    pub fn new() -> Self
+    {
+        return Self
+        {
+            tick_running: false,
+            thread_exit: false
+        };
+    }
 }
 
 pub fn setup_and_run_app(
@@ -277,9 +296,39 @@ pub fn setup_and_run_app(
 
     // Show the window and run the application
     main_window.show();
-    let mut tick_callback_run = true;
     let mut message_queue: Vec<String> = Vec::new();
     let mut serial_output_queue: Vec<char> = Vec::new();
+
+    // Create a thread timer callback
+    let tick_thread_state = Arc::<Mutex::<TickTimerState>>::new(Mutex::<TickTimerState>::new(TickTimerState::new()));
+    let tick_thread_join;
+    {
+        let thread_arc = tick_thread_state.clone();
+
+        tick_thread_join = std::thread::spawn(move || {
+            loop
+            {
+                match thread_arc.lock()
+                {
+                    Ok(mut v) =>
+                    {
+                        if v.thread_exit
+                        {
+                            break;
+                        }
+
+                        if !v.tick_running
+                        {
+                            fltk_sender.send(FltkMessage::Tick);
+                            v.tick_running = true;
+                        }
+                    },
+                    Err(_) => panic!("Tick Thread Exited!")
+                };
+                std::thread::sleep(std::time::Duration::from_secs_f64(1.0 / 30.0));
+            }
+        });
+    }
 
     while app.wait()
     {
@@ -403,18 +452,12 @@ pub fn setup_and_run_app(
                 },
                 FltkMessage::Tick =>
                 {
-                    tick_callback_run = false;
+                    if let Ok(mut v) = tick_thread_state.lock()
+                    {
+                        v.tick_running = false;
+                    }
                 }
             }
-        }
-
-        // Setup a new callback value to ensure that the event counter is updated at 10 Hzs
-        if tick_callback_run && main_window.visible()
-        {
-            add_timeout3(1.0 / 30.0, move |_|
-            {
-                fltk_sender.send(FltkMessage::Tick);
-            });
         }
 
         // Add all log message values
@@ -453,4 +496,16 @@ pub fn setup_and_run_app(
             None => ()
         }
     }
+
+    // Exit the timer thread
+    if let Ok(mut v) = tick_thread_state.lock()
+    {
+        v.thread_exit = true;
+    }
+    else
+    {
+        panic!("Unable to acquire mutex");
+    }
+
+    tick_thread_join.join().expect("couldn't join thread result");
 }
