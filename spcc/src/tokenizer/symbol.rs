@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub enum Symbol
 {
     Plus,
@@ -75,7 +75,7 @@ impl Symbol
 {
     fn enum_iter() -> &'static [Symbol]
     {
-        static VALUES: [Symbol; 27] = [
+        static VALUES: [Symbol; 29] = [
             Symbol::Plus,
             Symbol::Minus,
             Symbol::Star,
@@ -102,7 +102,9 @@ impl Symbol
             Symbol::BitwiseNot,
             Symbol::BitwiseAnd,
             Symbol::BitwiseOr,
-            Symbol::Comma
+            Symbol::Comma,
+            Symbol::ShiftLeft,
+            Symbol::ShiftRight
         ];
 
         return &VALUES;

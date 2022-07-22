@@ -19,6 +19,15 @@ impl MemoryWord
         };
     }
 
+    /// Constructs a new memory value
+    pub fn new_signed(val: i16) -> MemoryWord
+    {
+        return Self
+        {
+            value: val as u16
+        };
+    }
+
     /// Gets the current value
     pub fn get(&self) -> u16
     {

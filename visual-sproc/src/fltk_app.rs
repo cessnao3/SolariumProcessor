@@ -99,6 +99,9 @@ pub fn setup_and_run_app(
         let mut compile_button = Button::default().with_label("Compile");
         compile_button.emit(fltk_sender, FltkMessage::Compile);
 
+        let mut compile_text_button = Button::default().with_label("C->Text");
+        compile_text_button.emit(fltk_sender, FltkMessage::CompileToText);
+
         button_group.set_margin(5);
         button_group.end();
 
@@ -429,18 +432,18 @@ pub fn setup_and_run_app(
                 {
                     message_queue.push("Unable to load file".to_string());
                 },
-                FltkMessage::Assemble | FltkMessage::Compile =>
+                FltkMessage::Assemble | FltkMessage::Compile | FltkMessage::CompileToText =>
                 {
                     match code_editor.buffer()
                     {
-                        Some(v) =>
+                        Some(mut v) =>
                         {
                             let editor_text = v.text();
 
                             let lines_opt = match msg
                             {
                                 FltkMessage::Assemble => Some(editor_text.split('\n').map(|v| v.to_string()).collect()),
-                                FltkMessage::Compile => {
+                                FltkMessage::Compile | FltkMessage::CompileToText => {
                                     match spcc::compile(&editor_text)
                                     {
                                         Ok(s) => Some(s),
@@ -455,6 +458,15 @@ pub fn setup_and_run_app(
 
                             if let Some(lines) = lines_opt
                             {
+                                match msg
+                                {
+                                    FltkMessage::CompileToText =>
+                                    {
+                                        v.set_text(&lines.join("\n"));
+                                    }
+                                    _ => ()
+                                }
+
                                 let assembled_binary = assemble(&lines.iter().map(|v| v.as_str()).collect::<Vec<_>>());
 
                                 match assembled_binary

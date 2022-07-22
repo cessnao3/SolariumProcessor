@@ -149,6 +149,12 @@ func main()
 
     auto input_addr;
     auto input_size;
+
+    input_addr = 3 << 1;
+    write_serial(input_addr);
+    input_addr = (3 << 2) >> 1;
+    write_serial(input_addr);
+
     init_real_input(&input_addr, &input_size);
 
     write_serial(run_part_1(input_addr, input_size));

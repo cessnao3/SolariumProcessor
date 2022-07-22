@@ -471,7 +471,7 @@ impl SolariumProcessor
                             reg_a,
                             MemoryWord::new(new_val));
                     },
-                    12 => //ldn
+                    12 => // ldn
                     {
                         // Load the memory location at the PC + 1 value
                         let pc_val = self.registers.get(Register::ProgramCounter).get();
@@ -484,6 +484,13 @@ impl SolariumProcessor
 
                         // Save the PC Increment
                         pc_incr = 2;
+                    },
+                    13 => // neg
+                    {
+                        // Save the resulting memory location in the register
+                        self.registers.set(
+                            reg_a,
+                            MemoryWord::new_signed(-self.registers.get(reg_a).get_signed()));
                     },
                     _ => // ERROR
                     {
@@ -684,21 +691,21 @@ impl SolariumProcessor
                             let val = a.get();
                             let new_val = if shift_count >= 0
                             {
-                                val << shift_count
+                                val.overflowing_shl(shift_count as u32)
                             }
                             else
                             {
-                                val >> shift_count
+                                val.overflowing_shr((-shift_count) as u32)
                             };
 
-                            return Ok(MemoryWord::new(new_val));
+                            return Ok(MemoryWord::new(new_val.0));
                         };
 
                         if self.registers.get_flag(StatusFlag::SignedArithmetic)
                         {
-                            fun_add = |a, b| Ok(MemoryWord::new(a.get_signed().wrapping_add(b.get_signed()) as u16));
-                            fun_sub = |a, b| Ok(MemoryWord::new(a.get_signed().wrapping_sub(b.get_signed()) as u16));
-                            fun_mul = |a, b| Ok(MemoryWord::new(a.get_signed().wrapping_mul(b.get_signed()) as u16));
+                            fun_add = |a, b| Ok(MemoryWord::new_signed(a.get_signed().wrapping_add(b.get_signed())));
+                            fun_sub = |a, b| Ok(MemoryWord::new_signed(a.get_signed().wrapping_sub(b.get_signed())));
+                            fun_mul = |a, b| Ok(MemoryWord::new_signed(a.get_signed().wrapping_mul(b.get_signed())));
                             fun_div = |a, b| {
                                 if b.get() == 0
                                 {
@@ -706,7 +713,7 @@ impl SolariumProcessor
                                 }
                                 else
                                 {
-                                    return Ok(MemoryWord::new(a.get_signed().wrapping_div(b.get_signed()) as u16));
+                                    return Ok(MemoryWord::new_signed(a.get_signed().wrapping_div(b.get_signed())));
                                 }
                             };
                             fun_rem = |a, b| {
@@ -716,7 +723,7 @@ impl SolariumProcessor
                                 }
                                 else
                                 {
-                                    return Ok(MemoryWord::new(a.get_signed().wrapping_rem(b.get_signed()) as u16));
+                                    return Ok(MemoryWord::new_signed(a.get_signed().wrapping_rem(b.get_signed())));
                                 }
                             };
                         }

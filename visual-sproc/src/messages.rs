@@ -30,6 +30,7 @@ pub enum FltkMessage
     Reset,
     Assemble,
     Compile,
+    CompileToText,
     Tick,
     SetSpeed(f64),
     SerialInput(SerialBuffer),

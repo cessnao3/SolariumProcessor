@@ -11,7 +11,7 @@ pub use keyword::Keyword;
 pub use symbol::Symbol;
 pub use string_literal::StringLiteral;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Token
 {
     Keyword(keyword::Keyword),
