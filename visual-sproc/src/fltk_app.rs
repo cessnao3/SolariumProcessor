@@ -67,7 +67,7 @@ pub fn setup_and_run_app(
 
     let mut main_window = Window::default()
         .with_size(1100, 600)
-        .with_label("VisualSProc");
+        .with_label("V/SProc");
 
     main_window.handle(move |_, event|
     {
