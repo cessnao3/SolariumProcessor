@@ -78,7 +78,9 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
                 Symbol::BitwiseAnd |
                 Symbol::BitwiseOr |
                 Symbol::BooleanAnd |
-                Symbol::BooleanOr =>
+                Symbol::BooleanOr |
+                Symbol::ShiftLeft |
+                Symbol::ShiftRight =>
                 {
                     let arith_inst = match symb
                     {
@@ -91,7 +93,14 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
                         Symbol::BitwiseOr => "bor",
                         Symbol::BooleanAnd => "band",
                         Symbol::BooleanOr => "bor",
+                        Symbol::ShiftLeft | Symbol::ShiftRight => "bshft",
                         _ => panic!()
+                    };
+
+                    match symb
+                    {
+                        Symbol::ShiftRight => post_load_instruction.push(format!("neg {0:}", register_spare)),
+                        _ => ()
                     };
 
                     post_load_instruction.push(format!("{0:} {1:}, {1:}, {2:}", arith_inst, register, register_spare));

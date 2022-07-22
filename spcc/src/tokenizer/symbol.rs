@@ -27,6 +27,8 @@ pub enum Symbol
     BitwiseNot,
     BitwiseAnd,
     BitwiseOr,
+    ShiftLeft,
+    ShiftRight,
     Comma
 }
 
@@ -60,6 +62,8 @@ impl ToString for Symbol
             Symbol::BitwiseNot => "~",
             Symbol::BitwiseAnd => "&",
             Symbol::BitwiseOr => "|",
+            Symbol::ShiftLeft => "<<",
+            Symbol::ShiftRight => ">>",
             Symbol::Comma => ",",
             Symbol::OpenBracket => "[",
             Symbol::CloseBracket => "]"

@@ -85,6 +85,9 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
         "ldn".to_string(),
         Box::new(RegisterInstruction::new(12, 1)));
     instructions.insert(
+        "neg".to_string(),
+        Box::new(RegisterInstruction::new(13, 1)));
+    instructions.insert(
         "jmpri".to_string(),
         Box::new(ImmediateSingleInstruction::new(1)));
     instructions.insert(
@@ -157,11 +160,8 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
         "bxor".to_string(),
         Box::new(RegisterInstruction::new(11, 3)));
     instructions.insert(
-        "bsftl".to_string(),
+        "bshft".to_string(),
         Box::new(RegisterInstruction::new(12, 3)));
-    instructions.insert(
-        "bsftr".to_string(),
-        Box::new(RegisterInstruction::new(13, 3)));
 
     return instructions;
 }

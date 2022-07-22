@@ -13,6 +13,8 @@ use sproc::common::MemoryWord;
 use sproc::memory::MEM_MAX_SIZE;
 use sda::assemble;
 
+use spcc;
+
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -78,21 +80,29 @@ pub fn setup_and_run_app(
     let mut main_group = Flex::default_fill().row();
 
     // Define the editor
-    let mut assembly_editor;
+    let mut code_editor;
     {
         let mut editor_group = Flex::default_fill().column();
 
-        let mut assembly_label = Frame::default().with_label("Assembly Editor");
-        editor_group.set_size(&mut assembly_label, 20);
+        let mut editor_label = Frame::default().with_label("Code Editor");
+        editor_group.set_size(&mut editor_label, 20);
 
-        assembly_editor = TextEditor::default();
-        assembly_editor.set_buffer(TextBuffer::default());
+        code_editor = TextEditor::default();
+        code_editor.set_buffer(TextBuffer::default());
+        code_editor.set_linenumber_width(48);
+
+        let mut button_group = Flex::default_fill().row();
 
         let mut assemble_button = Button::default().with_label("Assemble");
         assemble_button.emit(fltk_sender, FltkMessage::Assemble);
-        assembly_editor.set_linenumber_width(48);
 
-        editor_group.set_size(&mut assemble_button, 50);
+        let mut compile_button = Button::default().with_label("Compile");
+        compile_button.emit(fltk_sender, FltkMessage::Compile);
+
+        button_group.set_margin(5);
+        button_group.end();
+
+        editor_group.set_size(&mut button_group, 50);
         editor_group.set_margin(10);
 
         editor_group.end();
@@ -228,7 +238,7 @@ pub fn setup_and_run_app(
     }
 
     // Set initial text
-    assembly_editor.buffer().unwrap().set_text(&get_default_text());
+    code_editor.buffer().unwrap().set_text(&get_default_text());
 
     // Define a logging text display
     let mut log_text_display;
@@ -419,27 +429,46 @@ pub fn setup_and_run_app(
                 {
                     message_queue.push("Unable to load file".to_string());
                 },
-                FltkMessage::Assemble =>
+                FltkMessage::Assemble | FltkMessage::Compile =>
                 {
-                    match assembly_editor.buffer()
+                    match code_editor.buffer()
                     {
                         Some(v) =>
                         {
-                            let assembly_text = v.text();
-                            let lines = assembly_text.split('\n').map(|v| v).collect();
-                            let assembled_binary = assemble(lines);
+                            let editor_text = v.text();
 
-                            match assembled_binary
+                            let lines_opt = match msg
                             {
-                                Ok(v) =>
-                                {
-                                    msg_to_send = Some(ThreadMessage::SetMemory(v.iter().map(|v| MemoryWord::new(*v)).collect()));
+                                FltkMessage::Assemble => Some(editor_text.split('\n').map(|v| v.to_string()).collect()),
+                                FltkMessage::Compile => {
+                                    match spcc::compile(&editor_text)
+                                    {
+                                        Ok(s) => Some(s),
+                                        Err(e) => {
+                                            message_queue.push(e);
+                                            None
+                                        }
+                                    }
                                 },
-                                Err(e) =>
-                                {
-                                    message_queue.push(e);
-                                }
+                                _ => panic!("unexpected message provided")
                             };
+
+                            if let Some(lines) = lines_opt
+                            {
+                                let assembled_binary = assemble(&lines.iter().map(|v| v.as_str()).collect::<Vec<_>>());
+
+                                match assembled_binary
+                                {
+                                    Ok(v) =>
+                                    {
+                                        msg_to_send = Some(ThreadMessage::SetMemory(v.iter().map(|v| MemoryWord::new(*v)).collect()));
+                                    },
+                                    Err(e) =>
+                                    {
+                                        message_queue.push(e);
+                                    }
+                                };
+                            }
                         },
                         None =>
                         {

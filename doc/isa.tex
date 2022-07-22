@@ -178,6 +178,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
  			0 & 0 & 10 & R[a] & \texttt{bool [a]} & If \texttt{R[a] != 0} \texttt{R[a] = 1}, Else \texttt{R[a] = 0} \\
  			0 & 0 & 11 & R[a] & \texttt{not [a]} & If \texttt{R[a] != 0} \texttt{R[a] = 0}, Else \texttt{R[a] = 1} \\
  			0 & 0 & 12 & R[a] & \texttt{ldn [a]} & \texttt{R[a] = mem[PC + 1]}, \texttt{PC += 2} \\
+ 			0 & 0 & 13 & R[a] & \texttt{neg [a]} & \texttt{R[a] = -R[a]} \\
 			0 & 1 & 0xI0 & 0x0I & \texttt{jmpri <imm>} & \texttt{PC += Im} \\
 			0 & 2 & R[src] & R[dst] & \texttt{ld [dst], [src]} & \texttt{R[dst] = mem[R[src]]} \\
 			0 & 3 & R[src] & R[dst] & \texttt{sav [dst], [src]} & \texttt{mem[R[dst]] = R[src]} \\
@@ -202,8 +203,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			9 & R[b] & R[a] & R[dst] & \texttt{band [dst], [a], [b]} & \texttt{R[dst] = R[a] \& R[b]} \\
 			10 & R[b] & R[a] & R[dst] & \texttt{bor [dst], [a], [b]} & \texttt{R[dst] = R[a] | R[b]} \\
 			11 & R[b] & R[a] & R[dst] & \texttt{bxor [dst], [a], [b]} & \texttt{R[dst] = R[a] $\wedge$ R[b]} \\
-			12 & R[b] & R[a] & R[dst] & \texttt{bsftl [dst], [a], [b]} & \texttt{R[dst] = R[a] << R[b]} \\
-			13 & R[b] & R[a] & R[dst] & \texttt{bsftr [dst], [a], [b]} & \texttt{R[dst] = R[a] >> R[b]} \\
+			12 & R[b] & R[a] & R[dst] & \texttt{bshft [dst], [a], [b]} & \texttt{R[dst] = R[a] << R[b]} (Negative shifts right) \\
 			\hline
 		\end{tabular}
 	\end{footnotesize}

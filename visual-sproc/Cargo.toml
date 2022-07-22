@@ -9,4 +9,5 @@ edition = "2021"
 [dependencies]
 sproc = { path = "../sproc", version = "*" }
 sda = { path = "../sda", version = "*" }
+spcc = { path = "../spcc", version = "*" }
 fltk = { version = "1.3" }

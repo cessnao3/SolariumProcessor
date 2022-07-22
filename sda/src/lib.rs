@@ -75,7 +75,7 @@ impl LineInformation
 }
 
 
-pub fn assemble(lines: Vec<&str>) -> Result<Vec<u16>, String>
+pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String>
 {
     let mut data_map = HashMap::<usize, LineValue>::new();
     let mut current_data_index = 0usize;
@@ -374,7 +374,7 @@ mod tests
             "popr 3"
         ];
 
-        let assemble_result = assemble(line_test);
+        let assemble_result = assemble(&line_test);
 
         assert!(assemble_result.is_ok());
 
@@ -393,7 +393,7 @@ mod tests
             "noop"
         ];
 
-        let binary_result = assemble(line_test);
+        let binary_result = assemble(&line_test);
 
         assert!(binary_result.is_ok());
 
@@ -419,7 +419,7 @@ mod tests
             ("retint", 8)
         ];
 
-        let binary_result = assemble(line_test.iter().map(|v| v.0).collect());
+        let binary_result = assemble(&line_test.iter().map(|v| v.0).collect::<Vec<_>>());
 
         assert    !(binary_result.is_ok());
 
@@ -448,7 +448,8 @@ mod tests
             ("tnz", 9),
             ("bool", 10),
             ("not", 11),
-            ("ldn", 12)
+            ("ldn", 12),
+            ("neg", 13)
         ];
 
         for (arg, opcode) in args_to_test
@@ -467,7 +468,7 @@ mod tests
 
                 let expected_result = ((opcode << 4) | reg) as u16;
 
-                let binary_result = assemble(assembly_text.iter().map(|s| s.as_ref()).collect());
+                let binary_result = assemble(&assembly_text.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
 
                 assert!(binary_result.is_ok());
 
@@ -498,7 +499,7 @@ mod tests
                 format!("jmpri {0:}", i as i8)
             ];
 
-            let binary_result = assemble(code.iter().map(|v| v.as_ref()).collect());
+            let binary_result = assemble(&code.iter().map(|v| v.as_ref()).collect::<Vec<_>>());
 
             assert!(binary_result.is_ok());
 
@@ -550,7 +551,7 @@ mod tests
 
                     let expected_result = (opcode << 8) | ((reg2 as u16) << 4) | (reg1 as u16);
 
-                    let binary_result = assemble(assembly_text.iter().map(|s| s.as_ref()).collect());
+                    let binary_result = assemble(&assembly_text.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
 
                     assert!(binary_result.is_ok());
 
@@ -579,8 +580,7 @@ mod tests
             ("band", 9),
             ("bor", 10),
             ("bxor", 11),
-            ("bsftl", 12),
-            ("bsftr", 13)
+            ("bshft", 12),
         ];
 
         for (arg, opcode) in args_to_test
@@ -604,7 +604,7 @@ mod tests
 
                         let expected_result = (opcode << 12) | ((reg3 as u16) << 8) | ((reg2 as u16) << 4) | (reg1 as u16);
 
-                        let binary_result = assemble(assembly_text.iter().map(|s| s.as_ref()).collect());
+                        let binary_result = assemble(&assembly_text.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
 
                         assert!(binary_result.is_ok());
 
@@ -649,7 +649,7 @@ mod tests
                         format!("{0:} {1:}, {2:}", instruction, reg, immediate_val as i8)
                     ];
 
-                    let binary_result = assemble(code.iter().map(|v| v.as_ref()).collect());
+                    let binary_result = assemble(&code.iter().map(|v| v.as_ref()).collect::<Vec<_>>());
 
                     assert!(binary_result.is_ok());
 
@@ -712,7 +712,7 @@ mod tests
         expected_result.insert(0x29, 1);
 
         // Assemble the program
-        let binary_result = assemble(assembly_lines);
+        let binary_result = assemble(&assembly_lines);
         assert!(binary_result.is_ok());
         let binary = binary_result.unwrap();
 
@@ -768,7 +768,7 @@ mod tests
 
                 let expected_result = ((opcode as u16) << 4) | *reg;
 
-                let binary_result = assemble(assembly_text.iter().map(|s| s.as_ref()).collect());
+                let binary_result = assemble(&assembly_text.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
 
                 assert!(binary_result.is_ok());
 
@@ -809,7 +809,7 @@ mod tests
                     line_val.trim()
                 ];
 
-                let assembly_result = assemble(lines);
+                let assembly_result = assemble(&lines);
 
                 if i == arg_num
                 {
@@ -848,7 +848,7 @@ mod tests
         }
 
 
-        let assembly_result = assemble(text_to_load.iter().map(|v| v.as_str()).collect());
+        let assembly_result = assemble(&text_to_load.iter().map(|v| v.as_str()).collect::<Vec<_>>());
         assert!(assembly_result.is_ok());
 
         let data = assembly_result.unwrap();
@@ -884,7 +884,7 @@ mod tests
                 line
             ];
 
-            let assembly_result = assemble(new_lines);
+            let assembly_result = assemble(&new_lines);
 
             assert!(assembly_result.is_err());
         }

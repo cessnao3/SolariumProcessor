@@ -132,6 +132,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "spcc"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "regex",
+ "sda",
+ "sproc",
+]
+
+[[package]]
 name = "sproc"
 version = "0.1.0"
 
@@ -147,5 +157,6 @@ version = "0.1.0"
 dependencies = [
  "fltk",
  "sda",
+ "spcc",
  "sproc",
 ]

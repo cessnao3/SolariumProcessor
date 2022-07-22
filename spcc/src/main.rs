@@ -32,7 +32,7 @@ fn main()
                 file.write_all(v.join("\n").as_bytes()).unwrap();
             }
 
-            match assemble(v.iter().map(|v| v.as_str()).collect())
+            match assemble(&v.iter().map(|v| v.as_str()).collect::<Vec<_>>())
             {
                 Ok(_) => println!("Assembly Successful!"),
                 Err(e) => println!("Assembly Error: {0:}", e)

@@ -662,7 +662,7 @@ impl SolariumProcessor
                             Register::from_index(arg2 as usize),
                             mem_val);
                     },
-                    opcode if opcode <= 13 =>
+                    opcode if opcode <= 12 =>
                     {
                         type ArithFun = fn(MemoryWord, MemoryWord) -> Result<MemoryWord, SolariumError>;
 
@@ -674,21 +674,24 @@ impl SolariumProcessor
                         let fun_band: ArithFun = |a, b| Ok(MemoryWord::new(a.get() & b.get()));
                         let fun_bor: ArithFun = |a, b| Ok(MemoryWord::new(a.get() | b.get()));
                         let fun_bxor: ArithFun = |a, b| Ok(MemoryWord::new(a.get() ^ b.get()));
-                        let fun_bsftl: ArithFun = |a, b| {
-                            let shift_count = b.get();
-                            if shift_count >= memory::BITS_PER_WORD as u16
+                        let fun_bshft: ArithFun = |a, b| {
+                            let shift_count = b.get_signed();
+                            if shift_count.abs() >= memory::BITS_PER_WORD as i16
                             {
                                 return Err(SolariumError::ShiftError(shift_count as usize));
                             }
-                            return Ok(MemoryWord::new(a.get() << shift_count));
-                        };
-                        let fun_bsftr: ArithFun = |a, b| {
-                            let shift_count = b.get();
-                            if shift_count >= memory::BITS_PER_WORD as u16
+
+                            let val = a.get();
+                            let new_val = if shift_count >= 0
                             {
-                                return Err(SolariumError::ShiftError(shift_count as usize));
+                                val << shift_count
                             }
-                            return Ok(MemoryWord::new(a.get() >> shift_count));
+                            else
+                            {
+                                val >> shift_count
+                            };
+
+                            return Ok(MemoryWord::new(new_val));
                         };
 
                         if self.registers.get_flag(StatusFlag::SignedArithmetic)
@@ -778,13 +781,9 @@ impl SolariumProcessor
                             {
                                 fun_bxor
                             }
-                            12 => // bsftl
+                            12 => // bshft
                             {
-                                fun_bsftl
-                            },
-                            13 => // bsftr
-                            {
-                                fun_bsftr
+                                fun_bshft
                             },
                             _ => // ERROR
                             {
