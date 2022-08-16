@@ -20,15 +20,6 @@ pub trait LoadValue: ToString
     fn load_value_to_register(&self, register: usize, register_spare: usize) -> Vec<String>;
 }
 
-pub trait FunctionCall
-{
-    fn get_name(&self) -> String;
-
-    fn load_function_address(&self, register: usize) -> Vec<String>;
-
-    fn num_args(&self) -> usize;
-}
-
 pub trait NamedMemoryValue: LoadValue
 {
     fn set_value_from_register(&self, register_from: usize, register_spare: usize) -> Vec<String>;
@@ -65,7 +56,6 @@ impl Scope
 pub struct ScopeManager
 {
     scopes: Vec<Scope>,
-    functions: HashMap<String, Rc<dyn FunctionCall>>,
     gen_index: usize
 }
 
@@ -76,7 +66,6 @@ impl ScopeManager
         return Self
         {
             scopes: Vec::new(),
-            functions: HashMap::new(),
             gen_index: 0
         };
     }
@@ -171,15 +160,6 @@ impl ScopeManager
         return Err(format!("no variable named {0:} found in any available scopes", name));
     }
 
-    pub fn get_function(&self, name: &str) -> Result<Rc<dyn FunctionCall>, String>
-    {
-        return match self.functions.get(name)
-        {
-            Some(v) => Ok(v.clone()),
-            None => Err(format!("function {0:} not found in scope", name))
-        };
-    }
-
     pub fn add_variable(&mut self, name: &str, var: Rc<dyn NamedMemoryValue>) -> Result<(), String>
     {
         return match self.scopes.last_mut()
@@ -198,21 +178,6 @@ impl ScopeManager
             }
             None => Err(format!("no scope available"))
         };
-    }
-
-    pub fn add_function(&mut self, name: &str, func: Rc<dyn FunctionCall>) -> Result<(), String>
-    {
-        if self.functions.contains_key(name)
-        {
-            return Err(format!("function {0:} already exists in scope", name));
-        }
-        else
-        {
-            self.functions.insert(
-                name.into(),
-                func);
-            return Ok(());
-        }
     }
 
     pub fn get_function_end_label(&self) -> Option<String>

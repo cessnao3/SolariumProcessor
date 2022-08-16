@@ -381,8 +381,9 @@ Listing \ref{listing:serial-echo} provides a serial echo program, which echos an
 
 The Solarium Processor Advanced Computing Environment, or \texttt{sp/ACE}, is a higher-level language than the raw assembly that provides some nicer tools to program applications in, at the cost of being less space and time efficient than programming in assembly directly. It does offer a slightly safer method of computing, however, as it provides a more traditional function call structure, variables, and scopes that help abstract away some of the hardware and provide some simple limits on what the user is allowed to do.
 
-The language specification is as follows.
+Note that, in this case, both functions and variables share the same namespace. This allows for easy use of function pointers by variable names, though currently only names are allowed, and no expressions may be used as yet.
 
+\begin{table}[h!]
 \begin{tabular}{rl}
 	Program & $\rightarrow$ \\
 	& \textlangle BaseStatement\textrangle \\
@@ -423,7 +424,7 @@ The language specification is as follows.
 	& auto[\textlangle WordLiteral\textrangle] \\
 	& [int, uint] \\
 \end{tabular}
-
+\end{table}
 
 
 \pagebreak

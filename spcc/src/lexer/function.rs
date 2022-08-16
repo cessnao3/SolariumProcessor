@@ -1,3 +1,4 @@
+/*
 use super::common::*;
 
 pub struct FunctionDefinition
@@ -40,3 +41,4 @@ impl FunctionCall for FunctionDefinition
         return self.num_args;
     }
 }
+*/

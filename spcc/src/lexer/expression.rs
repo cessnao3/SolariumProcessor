@@ -214,11 +214,7 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
             },
             Token::VariableName(name) =>
             {
-                match scopes.get_variable(&name)
-                {
-                    Ok(var) => assembly.extend(var.load_value_to_register(register, register_spare)),
-                    Err(e) => return Err(e)
-                };
+                assembly.extend(scopes.get_variable(&name)?.load_value_to_register(register, register_spare));
             },
             Token::FunctionName(name) =>
             {
@@ -229,13 +225,6 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
                     Some(tok) => return Err(format!("expected (, but found {0:}, after function call", tok.to_string())),
                     _ => return Err("unexpected end of stream found".to_string())
                 }
-
-                // Check for the output function
-                let func = match scopes.get_function(&name)
-                {
-                    Ok(f) => f,
-                    Err(e) => return Err(e)
-                };
 
                 // Loop through to read each of the input arguments
                 let mut num_args = 0usize;
@@ -262,11 +251,7 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
                     }
 
                     // Read the expression
-                    match read_base_expression(iter, scopes, register, register_spare)
-                    {
-                        Ok(v) => assembly.extend(v),
-                        Err(e) => return Err(e)
-                    };
+                    assembly.extend(read_base_expression(iter, scopes, register, register_spare)?);
 
                     // Push the result to the stack
                     assembly.push(format!("push {0:}", register));
@@ -275,18 +260,16 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
                     num_args += 1;
                 }
 
-                // Check the argument count
-                if num_args != func.num_args()
-                {
-                    return Err(format!("function {0:} expected {1:} arguments, found {2:}", name, func.num_args(), num_args));
-                }
+
+                // Check for the output function
+                let func_var = scopes.get_variable(&name)?;
 
                 // Load the function call value
-                assembly.extend(func.load_function_address(register));
+                assembly.extend(func_var.load_value_to_register(register, register_spare));
                 assembly.push(format!("call {0:}", register));
 
                 // Pop the resulting stack values
-                for _ in 0..func.num_args()
+                for _ in 0..num_args
                 {
                     assembly.push("pop".to_string());
                 }
@@ -296,11 +279,7 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
             },
             Token::Symbol(Symbol::OpenParen) =>
             {
-                match read_base_expression(iter, scopes, register, register_spare)
-                {
-                    Ok(v) => assembly.extend(v),
-                    Err(e) => return Err(e)
-                };
+                assembly.extend(read_base_expression(iter, scopes, register, register_spare)?);
 
                 let next_token = iter.next();
 
@@ -321,11 +300,7 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
             {
                 if let Some(Token::VariableName(varname)) = iter.next()
                 {
-                    match scopes.get_variable(&varname)
-                    {
-                        Ok(var) => assembly.extend(var.load_address_to_register(register)),
-                        Err(e) => return Err(e)
-                    };
+                    assembly.extend(scopes.get_variable(&varname)?.load_address_to_register(register));
                 }
                 else
                 {
@@ -387,15 +362,8 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
                 };
 
                 // Provide the resulting read instruction
-                match read_expression(iter, scopes, register, register_spare)
-                {
-                    Ok(vals) =>
-                    {
-                        assembly.extend(vals);
-                        assembly.extend(post_load_vec);
-                    },
-                    Err(e) => return Err(e)
-                };
+                assembly.extend(read_expression(iter, scopes, register, register_spare)?);
+                assembly.extend(post_load_vec);
             }
             _ => return Err(format!("unexpected token {0:} found in expression", init_token.to_string()))
         };

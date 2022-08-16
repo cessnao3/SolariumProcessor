@@ -1,5 +1,4 @@
 use super::common::*;
-use super::function::FunctionDefinition;
 use super::program::ProgramSection;
 use super::token_iter::TokenIter;
 
@@ -434,11 +433,7 @@ pub fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> R
         {
             Token::Keyword(Keyword::Static) =>
             {
-                match read_variable_def(iter, scopes, VariableType::Static)
-                {
-                    Ok(v) => program.append(v),
-                    Err(e) => return Err(e)
-                };
+                program.append(read_variable_def(iter, scopes, VariableType::Static)?);
             },
             Token::Keyword(Keyword::Func) =>
             {
@@ -506,6 +501,20 @@ pub fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> R
 
                 // Determine the function label
                 let function_label = format!("function_{0:}_{1:}", function_name, scopes.generate_index());
+
+                // Create the variable to store the function start location
+                let variable_label = format!("static_variable_{0:}_{1:}", function_name, scopes.generate_index());
+                program.push_static(format!("jmpri 2"));
+                program.push_static(format!(":{0:}", variable_label));
+                program.push_static(format!(".loadloc {0:}_start", function_label));
+
+                let variable_value = Rc::new(StaticVariable::new(
+                    &function_name,
+                    &variable_label));
+
+                scopes.add_variable(&function_name, variable_value.clone())?;
+
+                // Determine the function label
                 let function_label_end = format!("{0:}_end", function_label);
 
                 // Add the init values
@@ -521,29 +530,10 @@ pub fn read_base_statement(iter: &mut TokenIter, scopes: &mut ScopeManager) -> R
 
                 for (i, name) in varnames.iter().enumerate()
                 {
-                    match scopes.add_variable(name, Rc::new(Variable::new(name, (i as i32) - (sproc::cpu::SolariumProcessor::NUM_REGISTERS as i32) - (varnames.len() as i32))))
-                    {
-                        Ok(()) => (),
-                        Err(e) => return Err(e)
-                    };
+                    scopes.add_variable(name, Rc::new(Variable::new(name, (i as i32) - (sproc::cpu::SolariumProcessor::NUM_REGISTERS as i32) - (varnames.len() as i32))))?;
                 }
 
-                let func = Rc::new(FunctionDefinition::new(
-                    &function_name,
-                    varnames.len(),
-                    &format!("{0:}_start", function_label)));
-
-                match scopes.add_function(&function_name, func)
-                {
-                    Ok(()) => (),
-                    Err(e) => return Err(e)
-                };
-
-                match read_statement_brackets(iter, scopes)
-                {
-                    Ok(v) => program.append(v),
-                    Err(e) => return Err(e)
-                };
+                program.append(read_statement_brackets(iter, scopes)?);
 
                 // Clear the scope
                 program.extend(scopes.pop_scope());
@@ -581,11 +571,7 @@ fn read_statement_brackets(iter: &mut TokenIter, scopes: &mut ScopeManager) -> R
                 break;
             }
 
-            match read_statement(iter, scopes)
-            {
-                Ok(v) => program.append(v),
-                Err(e) => return Err(e)
-            };
+            program.append(read_statement(iter, scopes)?);
         }
     }
 
