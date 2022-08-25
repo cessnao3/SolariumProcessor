@@ -2,7 +2,6 @@ use crate::tokenizer::Token;
 
 mod common;
 mod variable;
-mod function;
 
 mod expression;
 mod statement;
