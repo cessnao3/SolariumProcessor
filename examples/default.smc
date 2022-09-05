@@ -90,6 +90,8 @@ ret
 ; Define the starting location
 .oper 0x4000
 :start_init
+ldn $spb
+.load 0x400
 
 ; Disable interrupts while the init text is printing
 intoff
@@ -134,13 +136,6 @@ jmpri load_data
 
 :load_data
 ldri 4, target_value
-
-; Load the function call test
-;ldri 15, 2
-;jmpri 2
-;.loadloc functest
-;call 15
-;copy $ret, 12
 
 ; Perform the addition and check for reaching the target
 :loop

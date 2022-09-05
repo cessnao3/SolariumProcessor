@@ -8,6 +8,8 @@ pub enum Register
     StackPointer,
     StackBase,
     StatusFlags,
+    Return,
+    ArgumentBase,
     GP(usize)
 }
 
@@ -36,9 +38,11 @@ impl Register
         let ind: usize = match self
         {
             Register::ProgramCounter => 0,
-            Register::StackPointer => 1,
-            Register::StackBase => 2,
-            Register::StatusFlags => 3,
+            Register::StatusFlags => 1,
+            Register::StackPointer => 2,
+            Register::StackBase => 3,
+            Register::Return => 4,
+            Register::ArgumentBase => 5,
             Register::GP(ind) => *ind
         };
 

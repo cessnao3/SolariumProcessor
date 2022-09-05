@@ -12,6 +12,8 @@ ret
 ; Define the starting location
 .oper 0x4000
 :start
+ldn $spb
+.load 0x400
 
 ; Setup the counter variables
 ldi 6, 1

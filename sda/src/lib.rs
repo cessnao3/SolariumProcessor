@@ -676,13 +676,15 @@ mod tests
             "; Move to the starting location",
             ".oper 0x20",
             ":start",
+            "ldn $spb",
+            ".load 0x400",
             "",
             ":register_reset",
             "ldri 5, addloc",
             "add $pc, $pc, 5",
             "reset",
             "ldi $sp, 22",
-            "ldi $ret, 33",
+            "ldi 8, 33",
             "",
             "; Load initial values",
             "ldi 6, 1",
@@ -700,16 +702,18 @@ mod tests
         // Determine the expected values
         let mut expected_result = HashMap::<usize, u16>::new();
         expected_result.insert(0, 0x20);
-        expected_result.insert(0x20, 0x3095);
-        expected_result.insert(0x21, 0x4500);
-        expected_result.insert(0x22, 0x5);
-        expected_result.insert(0x23, 0x1161);
-        expected_result.insert(0x24, 0x1212);
-        expected_result.insert(0x25, 0x1016);
-        expected_result.insert(0x26, 0x1007);
-        expected_result.insert(0x27, 0x4677);
-        expected_result.insert(0x28, 0x1FF);
-        expected_result.insert(0x29, 1);
+        expected_result.insert(0x20, 0xC2);
+        expected_result.insert(0x21, 0x0400);
+        expected_result.insert(0x22, 0x3095);
+        expected_result.insert(0x23, 0x4500);
+        expected_result.insert(0x24, 0x5);
+        expected_result.insert(0x25, 0x1161);
+        expected_result.insert(0x26, 0x1218);
+        expected_result.insert(0x27, 0x1016);
+        expected_result.insert(0x28, 0x1007);
+        expected_result.insert(0x29, 0x4677);
+        expected_result.insert(0x2A, 0x1FF);
+        expected_result.insert(0x2B, 1);
 
         // Assemble the program
         let binary_result = assemble(&assembly_lines);
@@ -750,7 +754,10 @@ mod tests
         let reg_shortcuts = vec![
             ("$pc", 0),
             ("$sp", 1),
-            ("$spb", 2)
+            ("$spb", 2),
+            ("$stat", 3),
+            ("$ret", 4),
+            ("$arg", 5)
         ];
 
         // Iterate over selected values

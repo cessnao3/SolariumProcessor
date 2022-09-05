@@ -12,8 +12,8 @@
 
 \newcommand{\titlelogoimage}{
 \begin{figure}[h!]
-	\centering
-	\includegraphics[width=1in]{images/logo.eps}
+    \centering
+    \includegraphics[width=1in]{images/logo.eps}
 \end{figure}}
 
 %opening
@@ -36,20 +36,22 @@ S/Proc is a general-purpose Reduced Instruction Count (RISC) Instruction Set Arc
 There are 16 total registers present on the S/Proc. These are defined generally as follows in Table \ref{table:register-setup}. Note that, as S/Proc is a 16-bit architecture, this means that each register is 16 bits wide.
 
 \begin{table}[h!]
-	\centering
-	\begin{tabular}{c|c}
-		\hline
-		Register & Usage \\
-		\hline
-		R0 & Program Counter \\
-		R1 & Stack Pointer \\
-		R2 & Stack Base \\
-		R3 & Processor Status Flags \\
-		R4-R15 & General Purpose Register \\
-		\hline
-	\end{tabular}
-	\caption{Registers 0 through 3 are reserved for system-level parameters. All remaining registers are general-purpose.}
-	\label{table:register-setup}
+    \centering
+    \begin{tabular}{c|c}
+        \hline
+        Register & Usage \\
+        \hline
+        R0 & Program Counter \\
+        R1 & Stack Pointer \\
+        R2 & Stack Base \\
+        R3 & Processor Status Flags \\
+        R4 & Return Register \\
+        R5 & Argument Register \\
+        R6-R15 & General Purpose Register \\
+        \hline
+    \end{tabular}
+    \caption{Registers 0 through 5 are reserved for system-level parameters. All remaining registers are general-purpose.}
+    \label{table:register-setup}
 \end{table}
 
 The program counter indicates the next instruction to be read. At the beginning of the processor cycle, the instruction at the memory address of the program counter is read in and processed. Then, the program counter is incremented at the end of each instruction cycle. If this value is needed to be modified, it is recommended to use the absolute jump instruction, \texttt{jmp}, or the relative jump instruction, \texttt{jmpr}.
@@ -61,18 +63,18 @@ The return value instruction is intended to store the result of a function call,
 The processor status flags indicate the current setup for the processor. Currently, the following flags are assigned, as noted in Table \ref{table:processor-flags}.
 
 \begin{table}[h!]
-	\centering
-	\begin{tabular}{l|l}
-		\hline
-		Bit & Value \\
-		\hline
-		0 & Interrupt Enable \\
-		1 & Signed Operations \\
-		\hline
-	\end{tabular}
-	\caption{Processor status flags provide a window into the current processor state}
-	\label{table:processor-flags}
- \end{table}
+    \centering
+    \begin{tabular}{l|l}
+        \hline
+        Bit & Value \\
+        \hline
+        0 & Interrupt Enable \\
+        1 & Signed Operations \\
+        \hline
+    \end{tabular}
+    \caption{Processor status flags provide a window into the current processor state}
+    \label{table:processor-flags}
+\end{table}
 
 This provides both a means to set and to read the current processor state values to ensure that the proper operating mode is configured for the currently-running program. This is maintained and replaced when \texttt{ret} and \texttt{retint} are called, so within an interrupt or function call, it is not necessary to replace the processor flags with those of the caller.
 
@@ -81,22 +83,22 @@ This provides both a means to set and to read the current processor state values
 Since the architecture of the S/Proc is 16-bit, this means that each word that may be addressed is 16-bits. The general instruction format is listed  in Table \ref{table:instruction-formatting}.
 
 \begin{table}[h!]
-	\centering
-	\begin{tabular}{l|cccc}
-		\hline
-		Location & 0xF000 & 0x0F00 & 0x00F0 & 0x000F \\
-		\hline
-		Usage & opcode & arg0 & arg1 & arg2 \\
-		\hline
-	\end{tabular}
-	\caption{The S/Proc instruction format typically has one opcode and three possible arguments associated with a particular opcode}
-	\label{table:instruction-formatting}
+    \centering
+    \begin{tabular}{l|cccc}
+        \hline
+        Location & 0xF000 & 0x0F00 & 0x00F0 & 0x000F \\
+        \hline
+        Usage & opcode & arg0 & arg1 & arg2 \\
+        \hline
+    \end{tabular}
+    \caption{The S/Proc instruction format typically has one opcode and three possible arguments associated with a particular opcode}
+    \label{table:instruction-formatting}
 \end{table}
 
 This is contrasted with the typical assembly language formatting, which is provided as
 
 \begin{center}
-	\texttt{instruction <arg2>, <arg1>, <arg0>}
+    \texttt{instruction <arg2>, <arg1>, <arg0>}
 \end{center}
 
 where the number of arguments depends on the required number of arguments for the instruction.
@@ -125,17 +127,17 @@ It should be noted that, if any values were pushed onto the stack during the int
 The S/Proc supports up to 16 software interrupts and up to 16 hardware interrupts, as shown in Table \ref{table:interrupt-vector-locations}. Software interrupt vectors are stored in memory at location \texttt{0x2} for software interrupt 0 though \texttt{0x12}, exclusive. Similarly, the 16 hardware interrupts are stored in memory at memory address \texttt{0x12} through \texttt{0x22}, exclusive.
 
 \begin{table}[h!]
-	\centering
-	\begin{tabular}{c|ccccccc}
-		\hline
-		Type & 0 & 1 & 2 & \dots & 13 & 14 & 15 \\
-		\hline
-		Software & \texttt{0x2} & \texttt{0x3} & \texttt{0x4} & \dots & \texttt{0xF} & \texttt{0x10} & \texttt{0x11} \\
-		Hardware & \texttt{0x12} & \texttt{0x13} & \texttt{0x14} & \dots & \texttt{0x1F} & \texttt{0x20} & \texttt{0x21} \\
-		\hline
-	\end{tabular}
-	\caption{Interrupt vector locations for both hardware and software interrupts}
-	\label{table:interrupt-vector-locations}
+    \centering
+    \begin{tabular}{c|ccccccc}
+        \hline
+        Type & 0 & 1 & 2 & \dots & 13 & 14 & 15 \\
+        \hline
+        Software & \texttt{0x2} & \texttt{0x3} & \texttt{0x4} & \dots & \texttt{0xF} & \texttt{0x10} & \texttt{0x11} \\
+        Hardware & \texttt{0x12} & \texttt{0x13} & \texttt{0x14} & \dots & \texttt{0x1F} & \texttt{0x20} & \texttt{0x21} \\
+        \hline
+    \end{tabular}
+    \caption{Interrupt vector locations for both hardware and software interrupts}
+    \label{table:interrupt-vector-locations}
 \end{table}
 
 Note that, if a vector has a value of zero, that interrupt vector is considered to be disabled and that interrupt will effectively be disabled and not able to be run.
@@ -147,68 +149,68 @@ Note that, if a vector has a value of zero, that interrupt vector is considered 
 All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field. \todo{combine left/right shift?} \todo{add load reg = base + offset?} \todo{keep bxor?}
 
 \begin{table}[h!]
-	\centering
-	\begin{footnotesize}
-		\begin{tabular}{cccc|c|l}
-			\hline
-			\multicolumn{4}{c|}{Instruction Word} & Assembly & Description \\
-			opcode & arg0 & arg1 & arg2 & & \\
-			\hline
-			0 & 0 & 0 & 0 & \texttt{noop} & No Operation \\
-			0 & 0 & 0 & 1 & \texttt{inton} & Turn Interrupts On \\
-			0 & 0 & 0 & 2 & \texttt{intoff} & Turn Interrupts Off \\
-			0 & 0 & 0 & 3 & \texttt{ari} & Set Signed Arithmetic \\
-			0 & 0 & 0 & 4 & \texttt{aru} & Set Unsigned Arithmetic \\
-			0 & 0 & 0 & 5 & \texttt{reset} & \texttt{PC = Reset Vector}, \texttt{R[0-15] = 0} \\
-			0 & 0 & 0 & 6 & \texttt{pop} & \texttt{--SP} \\
-			0 & 0 & 0 & 7 & \texttt{ret} & \texttt{x = R[ret]} \\
-			{} & {} & {} & {} & {} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
-			{} & {} & {} & {} & {} & \texttt{R[ret] = x} \\
-			0 & 0 & 0 & 8 & \texttt{retint} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
-			0 & 0 & 1 & R[a] & \texttt{jmp [a]} & \texttt{PC = R[a]} \\
-			0 & 0 & 2 & R[a] & \texttt{jmpr [a]} & \texttt{PC += R[a]} \\
-			0 & 0 & 3 & R[a] & \texttt{push [a]} & \texttt{mem[SP++] = R[a]} \\
-			0 & 0 & 4 & R[a] & \texttt{popr [a]} & \texttt{R[a] = mem[--SP]} \\
-			0 & 0 & 5 & R[a] & \texttt{call [a]} & $\forall_{i \in [0 \rightarrow 15]}$
-			 \texttt{mem[SP++] = R[i]}, \texttt{PC = R[a]} \\
- 			0 & 0 & 6 & 0xI & \texttt{int <imm>} & Trigger software interrupt number \texttt{imm} \\
- 			0 & 0 & 7 & R[a] & \texttt{intr [a]} & Trigger software interrupt number in \texttt{R[a]} \\
- 			0 & 0 & 8 & R[a] & \texttt{tz [a]} & If \texttt{R[a] == 0} \texttt{PC += 1}, Else \texttt{PC += 2} \\
- 			0 & 0 & 9 & R[a] & \texttt{tnz [a]} & If \texttt{R[a] != 0} \texttt{PC += 1}, Else \texttt{PC += 2} \\
- 			0 & 0 & 10 & R[a] & \texttt{bool [a]} & If \texttt{R[a] != 0} \texttt{R[a] = 1}, Else \texttt{R[a] = 0} \\
- 			0 & 0 & 11 & R[a] & \texttt{not [a]} & If \texttt{R[a] != 0} \texttt{R[a] = 0}, Else \texttt{R[a] = 1} \\
- 			0 & 0 & 12 & R[a] & \texttt{ldn [a]} & \texttt{R[a] = mem[PC + 1]}, \texttt{PC += 2} \\
- 			0 & 0 & 13 & R[a] & \texttt{neg [a]} & \texttt{R[a] = -R[a]} \\
-			0 & 1 & 0xI0 & 0x0I & \texttt{jmpri <imm>} & \texttt{PC += Im} \\
-			0 & 2 & R[src] & R[dst] & \texttt{ld [dst], [src]} & \texttt{R[dst] = mem[R[src]]} \\
-			0 & 3 & R[src] & R[dst] & \texttt{sav [dst], [src]} & \texttt{mem[R[dst]] = R[src]} \\
-			0 & 4 & R[src] & R[dst] & \texttt{ldr [dst], [src]} & \texttt{R[dst] = mem[PC + R[src]]} \\
-			0 & 5 & R[src] & R[dst] & \texttt{savr [dst], [src]} & \texttt{mem[PC + R[dst]] = R[src]} \\
-			0 & 6 & R[b] & R[a] & \texttt{copy [a], [b]} & \texttt{R[a] = R[b]} \\
-			0 & 7 & R[b] & R[a] & \texttt{tg [a], [b]} & If \texttt{R[a] > R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
-			0 & 8 & R[b] & R[a] & \texttt{tge [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
-			0 & 9 & R[b] & R[a] & \texttt{tl [a], [b]} & If \texttt{R[a] < R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
-			0 & 10 & R[b] & R[a] & \texttt{tle [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
-			0 & 11 & R[b] & R[a] & \texttt{teq [a], [b]} & If \texttt{R[a] == R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
-			0 & 12 & R[b] & R[a] & \texttt{bnot [a], [b]} & \texttt{R[a] = \textasciitilde R[b]} \\
-			0 & 13 & 0x0I & R[a] & \texttt{arg [a], <imm>} & \texttt{R[a] = SP - 16 - 1 - Im} \\
-			1 & 0xI0 & 0x0I & R[dst] & \texttt{ldi [dst], <imm>} & \texttt{R[dst] = Im} \\
-			2 & 0xI0 & 0x0I & R[dst] & \texttt{ldui [dst], <imm-unsigned>} & \texttt{R[dst] = Im} \\
-			3 & 0xI0 & 0x0I & R[dst] & \texttt{ldri [dst], <imm>} & \texttt{R[dst] = mem[PC + Im]} \\
-			4 & R[b] & R[a] & R[dst] & \texttt{add [dst], [a], [b]} & \texttt{R[dst] = R[a] + R[b]} \\
-			5 & R[b] & R[a] & R[dst] & \texttt{sub [dst], [a], [b]} & \texttt{R[dst] = R[a] - R[b]} \\
-			6 & R[b] & R[a] & R[dst] & \texttt{mul [dst], [a], [b]} & \texttt{R[dst] = R[a] * R[b]} \\
-			7 & R[b] & R[a] & R[dst] & \texttt{div [dst], [a], [b]} & \texttt{R[dst] = R[a] / R[b]} \\
-			8 & R[b] & R[a] & R[dst] & \texttt{rem [dst], [a], [b]} & \texttt{R[dst] = R[a] \% R[b]} \\
-			9 & R[b] & R[a] & R[dst] & \texttt{band [dst], [a], [b]} & \texttt{R[dst] = R[a] \& R[b]} \\
-			10 & R[b] & R[a] & R[dst] & \texttt{bor [dst], [a], [b]} & \texttt{R[dst] = R[a] | R[b]} \\
-			11 & R[b] & R[a] & R[dst] & \texttt{bxor [dst], [a], [b]} & \texttt{R[dst] = R[a] $\wedge$ R[b]} \\
-			12 & R[b] & R[a] & R[dst] & \texttt{bshft [dst], [a], [b]} & \texttt{R[dst] = R[a] << R[b]} (Negative shifts right) \\
-			\hline
-		\end{tabular}
-	\end{footnotesize}
-	\caption{Available instruction list for the S/Proc provides a variety of commands.}
-	\label{table:instruction-table}
+    \centering
+    \begin{footnotesize}
+        \begin{tabular}{cccc|c|l}
+            \hline
+            \multicolumn{4}{c|}{Instruction Word} & Assembly & Description \\
+            opcode & arg0 & arg1 & arg2 & & \\
+            \hline
+            0 & 0 & 0 & 0 & \texttt{noop} & No Operation \\
+            0 & 0 & 0 & 1 & \texttt{inton} & Turn Interrupts On \\
+            0 & 0 & 0 & 2 & \texttt{intoff} & Turn Interrupts Off \\
+            0 & 0 & 0 & 3 & \texttt{ari} & Set Signed Arithmetic \\
+            0 & 0 & 0 & 4 & \texttt{aru} & Set Unsigned Arithmetic \\
+            0 & 0 & 0 & 5 & \texttt{reset} & \texttt{PC = Reset Vector}, \texttt{R[0-15] = 0} \\
+            0 & 0 & 0 & 6 & \texttt{pop} & \texttt{--SP} \\
+            0 & 0 & 0 & 7 & \texttt{ret} & \texttt{x = R[ret]} \\
+            {} & {} & {} & {} & {} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
+            {} & {} & {} & {} & {} & \texttt{R[ret] = x} \\
+            0 & 0 & 0 & 8 & \texttt{retint} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
+            0 & 0 & 1 & R[a] & \texttt{jmp [a]} & \texttt{PC = R[a]} \\
+            0 & 0 & 2 & R[a] & \texttt{jmpr [a]} & \texttt{PC += R[a]} \\
+            0 & 0 & 3 & R[a] & \texttt{push [a]} & \texttt{mem[SP++] = R[a]} \\
+            0 & 0 & 4 & R[a] & \texttt{popr [a]} & \texttt{R[a] = mem[--SP]} \\
+            0 & 0 & 5 & R[a] & \texttt{call [a]} & $\forall_{i \in [0 \rightarrow 15]}$
+             \texttt{mem[SP++] = R[i]}, \texttt{PC = R[a]} \\
+             0 & 0 & 6 & 0xI & \texttt{int <imm>} & Trigger software interrupt number \texttt{imm} \\
+             0 & 0 & 7 & R[a] & \texttt{intr [a]} & Trigger software interrupt number in \texttt{R[a]} \\
+             0 & 0 & 8 & R[a] & \texttt{tz [a]} & If \texttt{R[a] == 0} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+             0 & 0 & 9 & R[a] & \texttt{tnz [a]} & If \texttt{R[a] != 0} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+             0 & 0 & 10 & R[a] & \texttt{bool [a]} & If \texttt{R[a] != 0} \texttt{R[a] = 1}, Else \texttt{R[a] = 0} \\
+             0 & 0 & 11 & R[a] & \texttt{not [a]} & If \texttt{R[a] != 0} \texttt{R[a] = 0}, Else \texttt{R[a] = 1} \\
+             0 & 0 & 12 & R[a] & \texttt{ldn [a]} & \texttt{R[a] = mem[PC + 1]}, \texttt{PC += 2} \\
+             0 & 0 & 13 & R[a] & \texttt{neg [a]} & \texttt{R[a] = -R[a]} \\
+            0 & 1 & 0xI0 & 0x0I & \texttt{jmpri <imm>} & \texttt{PC += Im} \\
+            0 & 2 & R[src] & R[dst] & \texttt{ld [dst], [src]} & \texttt{R[dst] = mem[R[src]]} \\
+            0 & 3 & R[src] & R[dst] & \texttt{sav [dst], [src]} & \texttt{mem[R[dst]] = R[src]} \\
+            0 & 4 & R[src] & R[dst] & \texttt{ldr [dst], [src]} & \texttt{R[dst] = mem[PC + R[src]]} \\
+            0 & 5 & R[src] & R[dst] & \texttt{savr [dst], [src]} & \texttt{mem[PC + R[dst]] = R[src]} \\
+            0 & 6 & R[b] & R[a] & \texttt{copy [a], [b]} & \texttt{R[a] = R[b]} \\
+            0 & 7 & R[b] & R[a] & \texttt{tg [a], [b]} & If \texttt{R[a] > R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+            0 & 8 & R[b] & R[a] & \texttt{tge [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+            0 & 9 & R[b] & R[a] & \texttt{tl [a], [b]} & If \texttt{R[a] < R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+            0 & 10 & R[b] & R[a] & \texttt{tle [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+            0 & 11 & R[b] & R[a] & \texttt{teq [a], [b]} & If \texttt{R[a] == R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+            0 & 12 & R[b] & R[a] & \texttt{bnot [a], [b]} & \texttt{R[a] = \textasciitilde R[b]} \\
+            0 & 13 & 0x0I & R[a] & \texttt{arg [a], <imm>} & \texttt{R[a] = SP - 16 - 1 - Im} \\
+            1 & 0xI0 & 0x0I & R[dst] & \texttt{ldi [dst], <imm>} & \texttt{R[dst] = Im} \\
+            2 & 0xI0 & 0x0I & R[dst] & \texttt{ldui [dst], <imm-unsigned>} & \texttt{R[dst] = Im} \\
+            3 & 0xI0 & 0x0I & R[dst] & \texttt{ldri [dst], <imm>} & \texttt{R[dst] = mem[PC + Im]} \\
+            4 & R[b] & R[a] & R[dst] & \texttt{add [dst], [a], [b]} & \texttt{R[dst] = R[a] + R[b]} \\
+            5 & R[b] & R[a] & R[dst] & \texttt{sub [dst], [a], [b]} & \texttt{R[dst] = R[a] - R[b]} \\
+            6 & R[b] & R[a] & R[dst] & \texttt{mul [dst], [a], [b]} & \texttt{R[dst] = R[a] * R[b]} \\
+            7 & R[b] & R[a] & R[dst] & \texttt{div [dst], [a], [b]} & \texttt{R[dst] = R[a] / R[b]} \\
+            8 & R[b] & R[a] & R[dst] & \texttt{rem [dst], [a], [b]} & \texttt{R[dst] = R[a] \% R[b]} \\
+            9 & R[b] & R[a] & R[dst] & \texttt{band [dst], [a], [b]} & \texttt{R[dst] = R[a] \& R[b]} \\
+            10 & R[b] & R[a] & R[dst] & \texttt{bor [dst], [a], [b]} & \texttt{R[dst] = R[a] | R[b]} \\
+            11 & R[b] & R[a] & R[dst] & \texttt{bxor [dst], [a], [b]} & \texttt{R[dst] = R[a] $\wedge$ R[b]} \\
+            12 & R[b] & R[a] & R[dst] & \texttt{bshft [dst], [a], [b]} & \texttt{R[dst] = R[a] << R[b]} (Negative shifts right) \\
+            \hline
+        \end{tabular}
+    \end{footnotesize}
+    \caption{Available instruction list for the S/Proc provides a variety of commands.}
+    \label{table:instruction-table}
 \end{table}
 
 \pagebreak
@@ -216,42 +218,44 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 The assembler also has several commands available, detailed in Table \ref{table:assembler-commands}. Note that, for the \texttt{.loadtext} command, the text will be loaded in via the character map provided in Section \ref{sec:character-map}.
 
 \begin{table}[h!]
-	\centering
-	\begin{tabular}{l|l}
-		\hline
-		Command & Description \\
-		\hline
-		\texttt{:[label]} & Defines a new label associated with the current memory location \\
-		\texttt{.oper [offset]} & Changes the current assembly offset to the value provided \\
-		\texttt{.load [num]} & Loads the data value as either an unsigned word (if in hex or positive)\\
-		& or as a signed word (if negative) in the current memory location \\
-		\texttt{.loadloc [label]} & Loads the data index associated with the provided label into \\
-		& the current memory location \\
-		\texttt{.loadtext "[TEXT]"} & Loads the text into memory, starting at the current memory location, \\
-		& placing each character into the next subsequent memory location, with \\
-		& a null-terminator as copied into memory after the text value \\
-		\hline
-	\end{tabular}
-	\caption{Available assembler commands}
-	\label{table:assembler-commands}
+    \centering
+    \begin{tabular}{l|l}
+        \hline
+        Command & Description \\
+        \hline
+        \texttt{:[label]} & Defines a new label associated with the current memory location \\
+        \texttt{.oper [offset]} & Changes the current assembly offset to the value provided \\
+        \texttt{.load [num]} & Loads the data value as either an unsigned word (if in hex or positive)\\
+        & or as a signed word (if negative) in the current memory location \\
+        \texttt{.loadloc [label]} & Loads the data index associated with the provided label into \\
+        & the current memory location \\
+        \texttt{.loadtext "[TEXT]"} & Loads the text into memory, starting at the current memory location, \\
+        & placing each character into the next subsequent memory location, with \\
+        & a null-terminator as copied into memory after the text value \\
+        \hline
+    \end{tabular}
+    \caption{Available assembler commands}
+    \label{table:assembler-commands}
 \end{table}
 
 Reference names are available to link to the special register values, as listed in Table \ref{table:assembler-register-references}.
 
 \begin{table}[h!]
-	\centering
-	\begin{tabular}{l|cl}
-		\hline
-		Reference Name & Register & Description \\
-		\hline
-		\texttt{\$pc} & 0 & Program Counter \\
-		\texttt{\$sp} & 1 & Stack Pointer \\
-		\texttt{\$ret} & 2 & Return Value \\
-		\texttt{\$stat} & 3 & Status Flags \\
-		\hline
-	\end{tabular}
-	\caption{Assembler provides shortcuts for commonly-referenced register indices}
-	\label{table:assembler-register-references}
+    \centering
+    \begin{tabular}{l|cl}
+        \hline
+        Reference Name & Register & Description \\
+        \hline
+        \texttt{\$pc} & 0 & Program Counter \\
+        \texttt{\$stat} & 1 & Status Flags \\
+        \texttt{\$sp} & 2 & Stack Pointer \\
+        \texttt{\$spb} & 3 & Stack Pointer Base \\
+        \texttt{\$ret} & 4 & Return \\
+        \texttt{\$arg} & 5 & Argument Base \\
+        \hline
+    \end{tabular}
+    \caption{Assembler provides shortcuts for commonly-referenced register indices}
+    \label{table:assembler-register-references}
 \end{table}
 
 \pagebreak
@@ -268,47 +272,47 @@ S/Proc computers, by default, utilize the following character map. This is simil
 \newcommand{\charmapescape}[1]{\charmap{\texttt{\charslash#1}}}
 
 \begin{table}[h!]
-	\centering
-	\begin{tabular}{cc|cc|cc|cc}
-		\hline
-		Hex & Char & Hex & Char & Hex & Char & Hex & Char \\
-		\hline
-		00 & \charmapescape{0} NULL & 20 & Space & 40 & \charmap{@} & 60 & \charmap{`} \\
-		01 & {} & 21 & \charmap{!} & 41 & \charmap{A} & 61 & \charmap{a} \\
-		02 & {} & 22 & \charmap{"} & 42 & \charmap{B} & 62 & \charmap{b} \\
-		03 & {} & 23 & \charmap{\#} & 43 & \charmap{C} & 63 & \charmap{c} \\
-		04 & {} & 24 & \charmap{\$} & 44 & \charmap{D} & 64 & \charmap{d} \\
-		05 & {} & 25 & \charmap{\%} & 45 & \charmap{E} & 65 & \charmap{e} \\
-		06 & {} & 26 & \charmap{\&} & 46 & \charmap{F} & 66 & \charmap{f} \\
-		07 & {} & 27 & \charmap{\textquotesingle} & 47 & \charmap{G} & 67 & \charmap{g} \\
-		08 & {} & 28 & \charmap{(} & 48 & \charmap{H} & 68 & \charmap{h} \\
-		09 & {} & 29 & \charmap{)} & 49 & \charmap{I} & 69 & \charmap{i} \\
-		0A & \charmapescape{n} New Line & 2A & \charmap{*} & 4A & \charmap{J} & 6A & \charmap{j} \\
-		0B & {} & 2B & \charmap{+} & 4B & \charmap{K} & 6B & \charmap{k} \\
-		0C & {} & 2C & \charmap{,} & 4C & \charmap{L} & 6C & \charmap{l} \\
-		0D & {} & 2D & \charmap{-} & 4D & \charmap{M} & 6D & \charmap{m} \\
-		0E & {} & 2E & \charmap{.} & 4E & \charmap{N} & 6E & \charmap{n} \\
-		0F & {} & 2F & \charmap{/} & 4F & \charmap{O} & 6F & \charmap{o} \\
-		10 & {} & 30 & \charmap{0} & 50 & \charmap{P} & 70 & \charmap{p} \\
-		11 & {} & 31 & \charmap{1} & 51 & \charmap{Q} & 71 & \charmap{q} \\
-		12 & {} & 32 & \charmap{2} & 52 & \charmap{R} & 72 & \charmap{r} \\
-		13 & {} & 33 & \charmap{3} & 53 & \charmap{S} & 73 & \charmap{s} \\
-		14 & {} & 34 & \charmap{4} & 54 & \charmap{T} & 74 & \charmap{t} \\
-		15 & {} & 35 & \charmap{5} & 55 & \charmap{U} & 75 & \charmap{u} \\
-		16 & {} & 36 & \charmap{6} & 56 & \charmap{V} & 76 & \charmap{v} \\
-		17 & {} & 37 & \charmap{7} & 57 & \charmap{W} & 77 & \charmap{w} \\
-		18 & {} & 38 & \charmap{8} & 58 & \charmap{X} & 78 & \charmap{x} \\
-		19 & {} & 39 & \charmap{9} & 59 & \charmap{Y} & 79 & \charmap{y} \\
-		1A & {} & 3A & \charmap{:} & 5A & \charmap{Z} & 7A & \charmap{z} \\
-		1B & {} & 3B & \charmap{;} & 5B & \charmap{[} & 7B & \charmap{\{} \\
-		1C & {} & 3C & \charmap{<} & 5C & \charmap{\charslash} & 7C & \charmap{|} \\
-		1D & {} & 3D & \charmap{=} & 5D & \charmap{]} & 7D & \charmap{\}} \\
-		1E & {} & 3E & \charmap{>} & 5E & \charmap{\textasciicircum} & 7E & \charmap{\textasciitilde} \\
-		1F & {} & 3F & \charmap{?} & 5F & \charmap{\textunderscore} & 7F & {} \\
-		\hline
-	\end{tabular}
-	\caption{S/Proc character mapping}
-	\label{table:sproc-character-map}
+    \centering
+    \begin{tabular}{cc|cc|cc|cc}
+        \hline
+        Hex & Char & Hex & Char & Hex & Char & Hex & Char \\
+        \hline
+        00 & \charmapescape{0} NULL & 20 & Space & 40 & \charmap{@} & 60 & \charmap{`} \\
+        01 & {} & 21 & \charmap{!} & 41 & \charmap{A} & 61 & \charmap{a} \\
+        02 & {} & 22 & \charmap{"} & 42 & \charmap{B} & 62 & \charmap{b} \\
+        03 & {} & 23 & \charmap{\#} & 43 & \charmap{C} & 63 & \charmap{c} \\
+        04 & {} & 24 & \charmap{\$} & 44 & \charmap{D} & 64 & \charmap{d} \\
+        05 & {} & 25 & \charmap{\%} & 45 & \charmap{E} & 65 & \charmap{e} \\
+        06 & {} & 26 & \charmap{\&} & 46 & \charmap{F} & 66 & \charmap{f} \\
+        07 & {} & 27 & \charmap{\textquotesingle} & 47 & \charmap{G} & 67 & \charmap{g} \\
+        08 & {} & 28 & \charmap{(} & 48 & \charmap{H} & 68 & \charmap{h} \\
+        09 & {} & 29 & \charmap{)} & 49 & \charmap{I} & 69 & \charmap{i} \\
+        0A & \charmapescape{n} New Line & 2A & \charmap{*} & 4A & \charmap{J} & 6A & \charmap{j} \\
+        0B & {} & 2B & \charmap{+} & 4B & \charmap{K} & 6B & \charmap{k} \\
+        0C & {} & 2C & \charmap{,} & 4C & \charmap{L} & 6C & \charmap{l} \\
+        0D & {} & 2D & \charmap{-} & 4D & \charmap{M} & 6D & \charmap{m} \\
+        0E & {} & 2E & \charmap{.} & 4E & \charmap{N} & 6E & \charmap{n} \\
+        0F & {} & 2F & \charmap{/} & 4F & \charmap{O} & 6F & \charmap{o} \\
+        10 & {} & 30 & \charmap{0} & 50 & \charmap{P} & 70 & \charmap{p} \\
+        11 & {} & 31 & \charmap{1} & 51 & \charmap{Q} & 71 & \charmap{q} \\
+        12 & {} & 32 & \charmap{2} & 52 & \charmap{R} & 72 & \charmap{r} \\
+        13 & {} & 33 & \charmap{3} & 53 & \charmap{S} & 73 & \charmap{s} \\
+        14 & {} & 34 & \charmap{4} & 54 & \charmap{T} & 74 & \charmap{t} \\
+        15 & {} & 35 & \charmap{5} & 55 & \charmap{U} & 75 & \charmap{u} \\
+        16 & {} & 36 & \charmap{6} & 56 & \charmap{V} & 76 & \charmap{v} \\
+        17 & {} & 37 & \charmap{7} & 57 & \charmap{W} & 77 & \charmap{w} \\
+        18 & {} & 38 & \charmap{8} & 58 & \charmap{X} & 78 & \charmap{x} \\
+        19 & {} & 39 & \charmap{9} & 59 & \charmap{Y} & 79 & \charmap{y} \\
+        1A & {} & 3A & \charmap{:} & 5A & \charmap{Z} & 7A & \charmap{z} \\
+        1B & {} & 3B & \charmap{;} & 5B & \charmap{[} & 7B & \charmap{\{} \\
+        1C & {} & 3C & \charmap{<} & 5C & \charmap{\charslash} & 7C & \charmap{|} \\
+        1D & {} & 3D & \charmap{=} & 5D & \charmap{]} & 7D & \charmap{\}} \\
+        1E & {} & 3E & \charmap{>} & 5E & \charmap{\textasciicircum} & 7E & \charmap{\textasciitilde} \\
+        1F & {} & 3F & \charmap{?} & 5F & \charmap{\textunderscore} & 7F & {} \\
+        \hline
+    \end{tabular}
+    \caption{S/Proc character mapping}
+    \label{table:sproc-character-map}
 \end{table}
 
 \pagebreak
@@ -325,22 +329,22 @@ The serial input and output device is one of the simplest devices. It essentiall
 The current memory mapping structure for the serial input and output device is provided in Table \ref{table:dev-serial-io}.
 
 \begin{table}[h!]
-	\centering
-	\begin{tabular}{l|ll}
-		\hline
-		Offset & Read/Write & Usage \\
-		\hline
-		\texttt{0} & Read & Provides the current input queue size \\
-		\texttt{1} & Read & Pops and provides a word off the front of the input queue \\
-		& & If no data is available, will return \texttt{0} by default \\
-		\texttt{2} & Read & Provides the current output queue size \\
-		\texttt{3} & Write & Pushes a word onto the output queue \\
-		\texttt{4} & Write & Clears the input queue if the value written is nonzero \\
-		\texttt{5} & Write & Clears the output queue if the value written is nonzero \\
-		\hline
-	\end{tabular}
-	\caption{Serial Input and Output device provides a simple data structure to read and write data streams}
-	\label{table:dev-serial-io}
+    \centering
+    \begin{tabular}{l|ll}
+        \hline
+        Offset & Read/Write & Usage \\
+        \hline
+        \texttt{0} & Read & Provides the current input queue size \\
+        \texttt{1} & Read & Pops and provides a word off the front of the input queue \\
+        & & If no data is available, will return \texttt{0} by default \\
+        \texttt{2} & Read & Provides the current output queue size \\
+        \texttt{3} & Write & Pushes a word onto the output queue \\
+        \texttt{4} & Write & Clears the input queue if the value written is nonzero \\
+        \texttt{5} & Write & Clears the output queue if the value written is nonzero \\
+        \hline
+    \end{tabular}
+    \caption{Serial Input and Output device provides a simple data structure to read and write data streams}
+    \label{table:dev-serial-io}
 \end{table}
 
 \pagebreak
@@ -385,44 +389,44 @@ Note that, in this case, both functions and variables share the same namespace. 
 
 \begin{table}[h!]
 \begin{tabular}{rl}
-	Program & $\rightarrow$ \\
-	& \textlangle BaseStatement\textrangle \\
-	BaseStatement & $\rightarrow$ \\
-	& \textlangle BaseStatement\textrangle \textlangle BaseStatement\textrangle \\
-	& func \texttt{FunctionName}(\texttt{Variable}[, \texttt{Variable}\dots]) \{ \textlangle StatementList\textrangle \} \\
-	& static VarType \texttt{Variable}[ = \textlangle BaseExpression\textrangle]; \\
-	Statement & $\rightarrow$ \\
-	& \textlangle VarType\textrangle \texttt{Variable}[ = \textlangle BaseExpression\textrangle]; \\
-	& return; \\
-	& return \textlangle BaseExpression\textrangle; \\
-	& \textlangle BaseExpression\textrangle; \\
-	& \{ \textlangle StatementList\textrangle \} \\
-	& if (\textlangle BaseExpression\textrangle) \textlangle Statement\textrangle \\
-	& if (\textlangle BaseExpression\textrangle) \textlangle Statement\textrangle else \textlangle Statement\textrangle \\
-	& while (\textlangle BaseExpression\textrangle) \textlangle Statement\textrangle \\
-	StatementList & $\rightarrow$ \\
-	& \textlangle Statement\textrangle \\
-	& \textlangle Statement\textrangle \textlangle Statement\textrangle \\
-	BaseExpression & $\rightarrow$ \\
-	& \texttt{Variable} = \textlangle BaseExpression\textrangle; \\
-	& \textlangle Expression\textrangle \textlangle BinaryOp\textrangle \textlangle Expression\textrangle \\
-	& \textlangle Expression\textrangle := \textlangle BaseExpression\textrangle; \\
-	& \textlangle Expression\textrangle \\
-	Expression & $\rightarrow$ \\
-	& \texttt{Variable} \\
-	& \textlangle Literal\textrangle \\
-	& \textlangle UnaryOp\textrangle \textlangle Expression\textrangle \\
-	& \& \texttt{Variable} \\
-	& \texttt{FunctionName}([\textlangle BaseExpression\textrangle[, \textlangle BaseExpression\textrangle,\dots]]) \\
-	& (\textlangle BaseExpression\textrangle) \\
-	BinaryOp & $\rightarrow$  \\
-	& +, -, *, /, \textless, \textgreater, \textless=, \textgreater=, \&\&, \textbar\textbar, \&, \textbar, ==, !=\\
-	UnaryOp & $\rightarrow$ \\
-	& *, -, +, !, \textasciitilde \\
-	VarType & $\rightarrow$ \\
-	& auto \\
-	& auto[\textlangle WordLiteral\textrangle] \\
-	& [int, uint] \\
+    Program & $\rightarrow$ \\
+    & \textlangle BaseStatement\textrangle \\
+    BaseStatement & $\rightarrow$ \\
+    & \textlangle BaseStatement\textrangle \textlangle BaseStatement\textrangle \\
+    & func \texttt{FunctionName}(\texttt{Variable}[, \texttt{Variable}\dots]) \{ \textlangle StatementList\textrangle \} \\
+    & static VarType \texttt{Variable}[ = \textlangle BaseExpression\textrangle]; \\
+    Statement & $\rightarrow$ \\
+    & \textlangle VarType\textrangle \texttt{Variable}[ = \textlangle BaseExpression\textrangle]; \\
+    & return; \\
+    & return \textlangle BaseExpression\textrangle; \\
+    & \textlangle BaseExpression\textrangle; \\
+    & \{ \textlangle StatementList\textrangle \} \\
+    & if (\textlangle BaseExpression\textrangle) \textlangle Statement\textrangle \\
+    & if (\textlangle BaseExpression\textrangle) \textlangle Statement\textrangle else \textlangle Statement\textrangle \\
+    & while (\textlangle BaseExpression\textrangle) \textlangle Statement\textrangle \\
+    StatementList & $\rightarrow$ \\
+    & \textlangle Statement\textrangle \\
+    & \textlangle Statement\textrangle \textlangle Statement\textrangle \\
+    BaseExpression & $\rightarrow$ \\
+    & \texttt{Variable} = \textlangle BaseExpression\textrangle; \\
+    & \textlangle Expression\textrangle \textlangle BinaryOp\textrangle \textlangle Expression\textrangle \\
+    & \textlangle Expression\textrangle := \textlangle BaseExpression\textrangle; \\
+    & \textlangle Expression\textrangle \\
+    Expression & $\rightarrow$ \\
+    & \texttt{Variable} \\
+    & \textlangle Literal\textrangle \\
+    & \textlangle UnaryOp\textrangle \textlangle Expression\textrangle \\
+    & \& \texttt{Variable} \\
+    & \texttt{FunctionName}([\textlangle BaseExpression\textrangle[, \textlangle BaseExpression\textrangle,\dots]]) \\
+    & (\textlangle BaseExpression\textrangle) \\
+    BinaryOp & $\rightarrow$  \\
+    & +, -, *, /, \textless, \textgreater, \textless=, \textgreater=, \&\&, \textbar\textbar, \&, \textbar, ==, !=\\
+    UnaryOp & $\rightarrow$ \\
+    & *, -, +, !, \textasciitilde \\
+    VarType & $\rightarrow$ \\
+    & auto \\
+    & auto[\textlangle WordLiteral\textrangle] \\
+    & [int, uint] \\
 \end{tabular}
 \end{table}
 
@@ -438,10 +442,10 @@ Several tools can help in the development of S/Proc programs.
 One useful tool is \texttt{V/SProc}, which is a program that combines together a basic assembler, CPU emulator, and memory inspector into a single program. The main window can be seen in Figure \ref{fig:visual-sproc-main-page}.
 
 \begin{figure}[h!]
-	\centering
-	\includegraphics[width=5in]{images/visual-sproc.png}
-	\caption{Main window of \texttt{V/SProc} provides common tools for program writing}
-	\label{fig:visual-sproc-main-page}
+    \centering
+    \includegraphics[width=5in]{images/visual-sproc.png}
+    \caption{Main window of \texttt{V/SProc} provides common tools for program writing}
+    \label{fig:visual-sproc-main-page}
 \end{figure}
 
 

@@ -191,28 +191,18 @@ impl FromStr for Argument
         {
             let reg_str = &s[1..];
 
-            let reg_ind = if reg_str == "pc"
+            let reg_ind = match reg_str
             {
-                0
-            }
-            else if reg_str == "sp"
-            {
-                1
-            }
-            else if reg_str == "spb"
-            {
-                2
-            }
-            else if reg_str == "stat"
-            {
-                3
-            }
-            else
-            {
-                return Err(ParseArgumentError
+                "pc" => 0,
+                "stat" => 1,
+                "sp" => 2,
+                "spb" => 3,
+                "ret" => 4,
+                "arg" => 5,
+                _ => return Err(ParseArgumentError
                 {
                     val: ParseArgumentErrorEnum::Register(reg_str.to_string())
-                });
+                })
             };
 
             return Ok(Argument::SignedNumber(reg_ind));

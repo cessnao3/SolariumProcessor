@@ -4,6 +4,8 @@
 ; Move to the starting location
 .oper 0x20
 :start
+ldn $spb
+.load 0x400
 
 :register_reset
 ldri 5, addloc
