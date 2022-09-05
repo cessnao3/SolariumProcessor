@@ -30,10 +30,6 @@ impl SolariumProcessor
     /// Define the public overall initial data size
     pub const INIT_DATA_SIZE: usize = VECTOR_HW_HJW_OFFSET + VECTOR_HW_HJW_SIZE;
 
-    // Define the stack pointer offset and allowed size
-    pub const STACK_POINTER_OFFSET: usize = 0x400;
-    pub const STACK_POINTER_MAX_SIZE: usize = 0xC00;
-
     /// Creates a new CPU parameter
     pub fn new() -> SolariumProcessor
     {
@@ -116,26 +112,19 @@ impl SolariumProcessor
         let current_sp = self.get_sp_offset();
         let new_sp = current_sp + 1;
 
-        if new_sp > SolariumProcessor::STACK_POINTER_MAX_SIZE
-        {
-            return Err(SolariumError::StackOverflow);
-        }
-        else
-        {
-            self.registers.set(
-                Register::StackPointer,
-                MemoryWord::new(new_sp as u16));
+        self.registers.set(
+            Register::StackPointer,
+            MemoryWord::new(new_sp as u16));
 
-            return self.memory_map.set(
-                self.get_sp_address_for_offset(current_sp),
-                value);
-        }
+        return self.memory_map.set(
+            self.get_sp_address_for_offset(current_sp),
+            value);
     }
 
     /// Provide the resulting stack pointer address for the given offset
     fn get_sp_address_for_offset(&self, offset: usize) -> usize
     {
-        return SolariumProcessor::STACK_POINTER_OFFSET + offset;
+        return self.registers.get(Register::StackBase).get() as usize + offset;
     }
 
     /// Pops a value off of the stack and returns the result
@@ -309,14 +298,14 @@ impl SolariumProcessor
                     7 => // ret
                     {
                         // Save the return register
-                        let ret_register = self.registers.get(Register::ReturnValue);
+                        let ret_register = self.registers.get(Register::StackBase);
 
                         // Pop all register values
                         self.pop_all_registers()?;
 
                         // Copy the new return register value
                         self.registers.set(
-                            Register::ReturnValue,
+                            Register::StackBase,
                             ret_register);
 
                         // Set no PC increment so that we start at the first instruction value
@@ -625,7 +614,7 @@ impl SolariumProcessor
                         }
 
                         // Load the value at the stack pointer location into the current argument
-                        let mem_index = SolariumProcessor::STACK_POINTER_OFFSET + sp_val - sp_subtract;
+                        let mem_index = self.registers.get(Register::StackBase).get() as usize + sp_val - sp_subtract;
                         let mem_val = self.memory_map.get(mem_index)?;
 
                         self.registers.set(

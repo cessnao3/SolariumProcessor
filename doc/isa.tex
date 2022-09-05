@@ -42,13 +42,13 @@ There are 16 total registers present on the S/Proc. These are defined generally 
 		Register & Usage \\
 		\hline
 		R0 & Program Counter \\
-		R1 & Global Stack Pointer \\
-		R2 & Return Value \\
+		R1 & Stack Pointer \\
+		R2 & Stack Base \\
 		R3 & Processor Status Flags \\
 		R4-R15 & General Purpose Register \\
 		\hline
 	\end{tabular}
-	\caption{Outside of the program counter and global stack pointer, the registers within the S/Proc are all general-purpose.}
+	\caption{Registers 0 through 3 are reserved for system-level parameters. All remaining registers are general-purpose.}
 	\label{table:register-setup}
 \end{table}
 
@@ -112,7 +112,7 @@ On any reset, interrupts will be allowed by default.
 \subsection{The Stack}
 \label{sec:the-stack}
 
-The stack pointer provides an offset from the stack pointer starting location. By default, this is at memory location 0x400. The stack pointer may grow up to a size of 0xC00, or 3072, items. This provides a maximum stack address of 0x1000. If the stack pointer is ever popped such that its value would underflow 0 or would reach greater than the maximum allowed size, the processor will error and halt.
+The stack pointer provides an offset from the stack pointer starting location. The base of the stack is defined by the memory location in the stack base register. If the stack pointer is ever popped such that its value would underflow 0 or would reach greater than the maximum allowed size, the processor will error and halt.
 
 \subsection{Interrupts}
 

@@ -199,7 +199,7 @@ impl FromStr for Argument
             {
                 1
             }
-            else if reg_str == "ret"
+            else if reg_str == "spb"
             {
                 2
             }

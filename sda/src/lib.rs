@@ -750,7 +750,7 @@ mod tests
         let reg_shortcuts = vec![
             ("$pc", 0),
             ("$sp", 1),
-            ("$ret", 2)
+            ("$spb", 2)
         ];
 
         // Iterate over selected values
