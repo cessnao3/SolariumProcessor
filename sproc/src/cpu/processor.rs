@@ -298,14 +298,14 @@ impl SolariumProcessor
                     7 => // ret
                     {
                         // Save the return register
-                        let ret_register = self.registers.get(Register::StackBase);
+                        let ret_register = self.registers.get(Register::Return);
 
                         // Pop all register values
                         self.pop_all_registers()?;
 
                         // Copy the new return register value
                         self.registers.set(
-                            Register::StackBase,
+                            Register::Return,
                             ret_register);
 
                         // Set no PC increment so that we start at the first instruction value
