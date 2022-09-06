@@ -11,7 +11,7 @@ const VECTOR_SOFT_RESET: usize = 0x1;
 /// Defines the IRQ reset vector location
 const VECTOR_IRQ_SW_OFFSET: usize = 0x10;
 const VECTOR_IRQ_SW_SIZE: usize = 16;
-const VECTOR_HW_HJW_OFFSET: usize = 0x20 + VECTOR_IRQ_SW_SIZE;
+const VECTOR_HW_HJW_OFFSET: usize = 0x10 + VECTOR_IRQ_SW_SIZE;
 const VECTOR_HW_HJW_SIZE: usize = 16;
 
 
@@ -602,6 +602,12 @@ impl SolariumProcessor
                             pc_incr = 2;
                         }
                     },
+                    12 => // arg
+                    {
+                        self.registers.set(
+                            reg_a,
+                            self.memory_map.get(self.registers.get(Register::ArgumentBase).get() as usize + arg0 as usize)?);
+                    }
                     _ => // ERROR
                     {
                         return Err(SolariumError::InvalidInstruction(inst_word));

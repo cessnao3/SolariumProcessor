@@ -5,11 +5,11 @@
 .loadloc start_init
 
 ; Start software interrupt vectors
-.oper 0x2
+.oper 0x10
 .loadloc sw_int_0
 
 ; Start hardware interrupt vectors
-.oper 0x12
+.oper 0x20
 .loadloc hw_int_0
 
 ; Define the location for the serial device
@@ -66,6 +66,7 @@ add 15, 15, 13
 ; Load the argument value
 arg 6, 0
 
+
 :func_print_str_loop
 ld 7, 6
 ldi 8, 1
@@ -109,10 +110,12 @@ jmpri 2
 .loadloc input_prompt_text_str_1
 ldri 8, -1
 
+copy $arg, $spb
 push 7
 call 6
 pop
 
+copy $arg, $spb
 push 8
 call 6
 pop
@@ -124,7 +127,7 @@ inton
 
 ; Setup the counter variables
 ldi 6, 1
-ldi 3, 0
+ldi 8, 0
 ldi 15, 100
 int 0
 
@@ -139,9 +142,9 @@ ldri 4, target_value
 
 ; Perform the addition and check for reaching the target
 :loop
-add 3, 6, 3
+add 8, 6, 8
 int 0
-sub 5, 4, 3
+sub 5, 4, 8
 
 ; Jump back to the add instruction if the
 ; target minus current is greater than zero

@@ -169,7 +169,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
             0 & 0 & 0 & 8 & \texttt{retint} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
             0 & 0 & 1 & R[a] & \texttt{jmp [a]} & \texttt{PC = R[a]} \\
             0 & 0 & 2 & R[a] & \texttt{jmpr [a]} & \texttt{PC += R[a]} \\
-            0 & 0 & 3 & R[a] & \texttt{push [a]} & \texttt{mem[SP++] = R[a]} (Signed) \\
+            0 & 0 & 3 & R[a] & \texttt{push [a]} & \texttt{mem[SP++] = R[a]} \\
             0 & 0 & 4 & R[a] & \texttt{popr [a]} & \texttt{R[a] = mem[--SP]} \\
             0 & 0 & 5 & R[a] & \texttt{call [a]} & $\forall_{i \in [0 \rightarrow 15]}$
              \texttt{mem[SP++] = R[i]}; \texttt{PC = R[a]} \\
@@ -181,7 +181,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
              0 & 0 & 11 & R[a] & \texttt{not [a]} & If \texttt{R[a] != 0} \texttt{R[a] = 0}, Else \texttt{R[a] = 1} \\
              0 & 0 & 12 & R[a] & \texttt{ldn [a]} & \texttt{R[a] = mem[PC + 1]}, \texttt{PC += 2} \\
              0 & 0 & 13 & R[a] & \texttt{neg [a]} & \texttt{R[a] = -R[a]} \\
-            0 & 1 & 0xI0 & 0x0I & \texttt{jmpri <imm>} & \texttt{PC += Im} (Signed) \\
+            0 & 1 & 0xI0 & 0x0I & \texttt{jmpri <imm>} & \texttt{PC += Im} \\
             0 & 2 & R[src] & R[dst] & \texttt{ld [dst], [src]} & \texttt{R[dst] = mem[R[src]]} \\
             0 & 3 & R[src] & R[dst] & \texttt{sav [dst], [src]} & \texttt{mem[R[dst]] = R[src]} \\
             0 & 4 & R[src] & R[dst] & \texttt{ldr [dst], [src]} & \texttt{R[dst] = mem[PC + R[src]]} \\
@@ -192,6 +192,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
             0 & 9 & R[b] & R[a] & \texttt{tl [a], [b]} & If \texttt{R[a] < R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
             0 & 10 & R[b] & R[a] & \texttt{tle [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
             0 & 11 & R[b] & R[a] & \texttt{teq [a], [b]} & If \texttt{R[a] == R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+            0 & 12 & 0x0I & R[a] & \texttt{arg [a], <imm-unsigned>} & \texttt{R[a] = ARG + <imm-unsigned>} \\
             1 & 0xI0 & 0x0I & R[dst] & \texttt{ldi [dst], <imm>} & \texttt{R[dst] = Im} \\
             2 & 0xI0 & 0x0I & R[dst] & \texttt{ldui [dst], <imm-unsigned>} & \texttt{R[dst] = Im} \\
             3 & 0xI0 & 0x0I & R[dst] & \texttt{ldri [dst], <imm>} & \texttt{R[dst] = mem[PC + Im]} \\
