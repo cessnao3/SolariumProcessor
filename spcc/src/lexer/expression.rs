@@ -352,7 +352,7 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
                     Symbol::BitwiseNot =>
                     {
                         vec![
-                            format!("bnot {0:}, {0:}", register)
+                            format!("bnot {0:}", register)
                         ]
                     },
                     _ =>

@@ -9,9 +9,9 @@ const VECTOR_HARD_RESET: usize = 0x0;
 const VECTOR_SOFT_RESET: usize = 0x1;
 
 /// Defines the IRQ reset vector location
-const VECTOR_IRQ_SW_OFFSET: usize = 0x2;
+const VECTOR_IRQ_SW_OFFSET: usize = 0x10;
 const VECTOR_IRQ_SW_SIZE: usize = 16;
-const VECTOR_HW_HJW_OFFSET: usize = 0x2 + VECTOR_IRQ_SW_SIZE;
+const VECTOR_HW_HJW_OFFSET: usize = 0x20 + VECTOR_IRQ_SW_SIZE;
 const VECTOR_HW_HJW_SIZE: usize = 16;
 
 
@@ -87,7 +87,7 @@ impl SolariumProcessor
     fn get_pc_offset(&self, reg: Register) -> MemoryWord
     {
         let pc = self.registers.get(Register::ProgramCounter).get();
-        return MemoryWord::new((pc as i32 + self.registers.get(reg).get() as i32) as u16);
+        return MemoryWord::new((pc as i32 + self.registers.get(reg).get_signed() as i32) as u16);
     }
 
     /// Increments the program counter by the specified amount
@@ -481,6 +481,12 @@ impl SolariumProcessor
                             reg_a,
                             MemoryWord::new_signed(-self.registers.get(reg_a).get_signed()));
                     },
+                    14 => //bnot
+                    {
+                        self.registers.set(
+                            reg_a,
+                            MemoryWord::new(!self.registers.get(reg_a).get()));
+                    },
                     _ => // ERROR
                     {
                         return Err(SolariumError::InvalidInstruction(inst_word));
@@ -596,31 +602,6 @@ impl SolariumProcessor
                             pc_incr = 2;
                         }
                     },
-                    12 => //bnot
-                    {
-                        self.registers.set(
-                            reg_a,
-                            MemoryWord::new(!self.registers.get(reg_b).get()));
-                    },
-                    13 => // arg
-                    {
-                        // Define the backtrack values
-                        let sp_subtract = 16 + 1 + arg0 as usize;
-                        let sp_val = self.get_sp_offset();
-
-                        if sp_subtract > sp_val
-                        {
-                            return Err(SolariumError::StackUnderflow);
-                        }
-
-                        // Load the value at the stack pointer location into the current argument
-                        let mem_index = self.registers.get(Register::StackBase).get() as usize + sp_val - sp_subtract;
-                        let mem_val = self.memory_map.get(mem_index)?;
-
-                        self.registers.set(
-                            reg_a,
-                            mem_val);
-                    }
                     _ => // ERROR
                     {
                         return Err(SolariumError::InvalidInstruction(inst_word));

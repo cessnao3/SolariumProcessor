@@ -88,6 +88,9 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
         "neg".to_string(),
         Box::new(RegisterInstruction::new(13, 1)));
     instructions.insert(
+        "bnot".to_string(),
+        Box::new(RegisterInstruction::new(14, 1)));
+    instructions.insert(
         "jmpri".to_string(),
         Box::new(ImmediateSingleInstruction::new(1)));
     instructions.insert(
@@ -120,12 +123,6 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
     instructions.insert(
         "teq".to_string(),
         Box::new(RegisterInstruction::new(11, 2)));
-    instructions.insert(
-        "bnot".to_string(),
-        Box::new(RegisterInstruction::new(12, 2)));
-    instructions.insert(
-        "arg".to_string(),
-        Box::new(RegisterInstruction::new(13, 2)));
     instructions.insert(
         "ldi".to_string(),
         Box::new(ImmediateRegisterInstruction::new(1)));
