@@ -83,6 +83,9 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String>
 
     for (i, l_in) in lines.iter().enumerate()
     {
+        // Define the line number
+        let line_num = i + 1;
+
         // Cleanup the resulting string value and remove comments
         let l: &str = match l_in.find(";")
         {
@@ -99,14 +102,14 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String>
         // Check that the line matches the expected values
         if !VALID_LINE_REGEX.is_match(l)
         {
-            return Err(format!("line {0:} does not match the expected line format \"{1:}\"", i, l));
+            return Err(format!("line {0:} does not match the expected line format \"{1:}\"", line_num, l));
         }
 
         // Extract capture groups
         let capture_groups = match VALID_LINE_REGEX.captures(l)
         {
             Some(v) => v,
-            None => return Err(format!("line {0:} no command captures found for \"{1:}\"", i, l))
+            None => return Err(format!("line {0:} no command captures found for \"{1:}\"", line_num, l))
         };
 
         // Extract parameters
@@ -126,7 +129,7 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String>
                         .collect()
                     {
                         Ok(v) => v,
-                        Err(e) => return Err(format!("line {0:} {1:}", i, e.to_string()))
+                        Err(e) => return Err(format!("line {0:} {1:}", line_num, e.to_string()))
                     }
                     None => Vec::new()
                 }
@@ -146,7 +149,7 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String>
                 {
                     return Err(format!(
                         "line {0:} command {1:} only takes 1 argument",
-                        i,
+                        line_num,
                         command_type));
                 }
 
@@ -155,7 +158,7 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String>
                     Argument::UnsignedNumber(v) => *v as usize,
                     arg => return Err(format!(
                         "line {0:} command {1:} unable to parse {2:} as address",
-                        i,
+                        line_num,
                         command_type,
                         arg.to_string()))
                 };
@@ -164,7 +167,7 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String>
                 {
                     return Err(format!(
                         "line {0:} command {1:} new offset {2:} must be greater or equal to current offset {3:}",
-                        i,
+                        line_num,
                         command_type,
                         new_offset,
                         current_data_index));
@@ -184,7 +187,7 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String>
                 let value_to_load = match args[0].to_u16()
                 {
                     Ok(v) => v,
-                    Err(e) => return Err(format!("line {0:} {1:}", i, e))
+                    Err(e) => return Err(format!("line {0:} {1:}", line_num, e))
                 };
 
                 data_map.insert(
@@ -196,25 +199,27 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String>
             {
                 if args.len() != 1
                 {
-                    return Err(format!("line {0:} command {1:} only takes 1 argument", i, command_type));
+                    return Err(format!("line {0:} command {1:} only takes 1 argument", line_num, command_type));
                 }
 
                 let arg_label = match &args[0]
                 {
                     Argument::Label(label) => label.clone(),
-                    _ => return Err(format!("line {0:} command {1:} may only take a label input", i, command))
+                    _ => return Err(format!("line {0:} command {1:} may only take a label input", line_num, command))
                 };
 
                 data_map.insert(
                     current_data_index,
-                    LineValue::LoadLabelLoc(i, arg_label));
+                    LineValue::LoadLabelLoc(
+                        line_num,
+                        arg_label));
                 current_data_index += 1;
             }
             else if command_type == "loadtext"
             {
                 if args.len() != 1
                 {
-                    return Err(format!("line {0:} only one argument expected for {1:}", i, command_type))
+                    return Err(format!("line {0:} only one argument expected for {1:}", line_num, command_type))
                 }
                 else if let Argument::Text(text) = &args[0]
                 {
@@ -222,7 +227,7 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String>
                     let text_vals: Vec<MemoryWord> = match text.chars().map(|v| sproc::text::character_to_word(v)).collect()
                     {
                         Ok(v) => v,
-                        Err(e) => return Err(format!("line {0:} character error - {1:}", i, e.to_string()))
+                        Err(e) => return Err(format!("line {0:} character error - {1:}", line_num, e.to_string()))
                     };
 
                     // Insert all values in the text string
@@ -242,26 +247,26 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String>
                 }
                 else
                 {
-                    return Err(format!("line {0:} no text input provided", i));
+                    return Err(format!("line {0:} no text input provided", line_num));
                 }
             }
             else
             {
-                return Err(format!("line {0:} invalid command \"{1:}\" found", i, command_type));
+                return Err(format!("line {0:} invalid command \"{1:}\" found", line_num, command_type));
             }
         }
         else if first_char == ':'
         {
             if !args.is_empty()
             {
-                return Err(format!("line {0:} label types cannot have any arguments", i));
+                return Err(format!("line {0:} label types cannot have any arguments", line_num));
             }
 
             let label = &command[1..];
 
             if label_map.contains_key(label)
             {
-                return Err(format!("line {0:} label \"{1:}\" already exists", i, label));
+                return Err(format!("line {0:} label \"{1:}\" already exists", line_num, label));
             }
             else
             {
@@ -275,7 +280,7 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String>
             // Add the data values
             if data_map.contains_key(&current_data_index)
             {
-                return Err(format!("line {0:} offset {1:} already filled", i, current_data_index))
+                return Err(format!("line {0:} offset {1:} already filled", line_num, current_data_index))
             }
             else if current_data_index < MAX_ADDRESSABLE_VALUE
             {
@@ -285,13 +290,13 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String>
                         LineInformation::new(
                             command,
                             args,
-                            i,
+                            line_num,
                             current_data_index)));
                 current_data_index += 1;
             }
             else
             {
-                return Err(format!("line {0:} \"{1:}\" does not match expected syntax", i, l));
+                return Err(format!("line {0:} \"{1:}\" does not match expected syntax", line_num, l));
             }
         }
     }
