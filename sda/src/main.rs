@@ -7,28 +7,36 @@ use std::io::Write;
 
 use clap::Parser;
 
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+enum OutputType
+{
+    Binary,
+    C,
+    Hex
+}
+
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
    /// Filename of the input
    #[clap(short, long, value_parser)]
-   file: String,
+   input: String,
 
-   /// Provide Hex Output
-   #[clap(short, long, value_parser, default_value_t = false)]
-   binary_output: bool,
+   /// Determine output format
+   #[clap(short, long, value_enum, default_value_t = OutputType::Hex)]
+   format: OutputType,
 
-   /// Output File
+   /// Filename of the output, if desired
    #[clap(short, long, value_parser)]
-   output_file: Option<String>
+   output: Option<String>
 }
 
 fn main()
 {
     let args = Args::parse();
 
-    let lines = match std::fs::read_to_string(&args.file)
+    let lines = match std::fs::read_to_string(&args.input)
     {
         Ok(s) =>
         {
@@ -41,7 +49,7 @@ fn main()
         },
         Err(_) =>
         {
-            eprintln!("Unable to read input file {}", args.file);
+            eprintln!("Unable to read input file {}", args.input);
             std::process::exit(1);
         }
     };
@@ -51,30 +59,38 @@ fn main()
         Ok(v) => v,
         Err(e) =>
         {
-            eprintln!("Unable to assemble {} - {}", args.file, e);
+            eprintln!("Unable to assemble {} - {}", args.input, e);
             std::process::exit(1);
         }
     };
 
-    let byte_result = if args.binary_output
+    let byte_result = match args.format
     {
-        result
+        OutputType::Binary => result
             .iter()
             .map(|v| [(v & 0xF) as u8, ((v & 0xF0) >> 8) as u8])
             .flatten()
-            .collect::<Vec<_>>()
-    }
-    else
-    {
-        result
+            .collect::<Vec<_>>(),
+        OutputType::Hex => result
             .iter()
             .map(|v| format!("0x{:04X}", v))
             .collect::<Vec<_>>()
             .join("\n")
-            .into_bytes()
+            .into_bytes(),
+        OutputType::C =>
+        {
+            let mut inner: Vec<String> = Vec::new();
+            inner.push(format!("uint16_t data[] = {{"));
+            inner.extend(result
+                .iter()
+                .enumerate()
+                .map(|(i, v)| format!("    0x{:04X}{}", v, if i + 1 == result.len() { "" } else { "," })));
+            inner.push(format!("}};\n"));
+            inner.join("\n").into_bytes()
+        }
     };
 
-    if let Some(output_file) = args.output_file
+    if let Some(output_file) = args.output
     {
         match std::fs::write(
             &output_file,
