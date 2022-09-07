@@ -80,6 +80,7 @@ fn main()
         OutputType::C =>
         {
             let mut inner: Vec<String> = Vec::new();
+            inner.push(format!("size_t data_size = {};", result.len()));
             inner.push(format!("uint16_t data[] = {{"));
             inner.extend(result
                 .iter()
