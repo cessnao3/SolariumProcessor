@@ -200,11 +200,21 @@ impl SolariumProcessor
     /// Pushes all register values onto the stack
     fn push_all_registers(&mut self) -> Result<(), SolariumError>
     {
+        // Base Addr
+        let base_sp = self.get_sp_offset();
+        let base_addr = self.get_sp_address_for_offset(base_sp);
+
         // Push all the existing register values
         for i in 0..Self::NUM_REGISTERS
         {
-            self.push_sp(self.registers.get(Register::GP(i)))?;
+            self.memory_map.set(
+                base_addr + i,
+                self.registers.get(Register::GP(i)))?;
         }
+
+        self.registers.set(
+            Register::StackPointer,
+            MemoryWord::new((base_sp + Self::NUM_REGISTERS) as u16));
 
         return Ok(());
     }
@@ -212,12 +222,21 @@ impl SolariumProcessor
     /// Pops all register values from the stack back into the register values
     fn pop_all_registers(&mut self) -> Result<(), SolariumError>
     {
+        let current_sp_offset = self.get_sp_offset();
+
+        if current_sp_offset < Self::NUM_REGISTERS
+        {
+            return Err(SolariumError::StackUnderflow);
+        }
+
+        let mem_val_base = self.get_sp_address_for_offset(current_sp_offset - Self::NUM_REGISTERS);
+
         for i in 0..Self::NUM_REGISTERS
         {
-            let mem_val = self.pop_sp()?;
+            let mem_val = self.memory_map.get(mem_val_base + i)?;
 
             self.registers.set(
-                Register::GP(Self::NUM_REGISTERS - 1 - i),
+                Register::GP(i),
                 mem_val);
         }
 
