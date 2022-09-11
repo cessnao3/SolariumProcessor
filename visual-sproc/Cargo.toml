@@ -11,3 +11,7 @@ sproc = { path = "../sproc", version = "*" }
 sda = { path = "../sda", version = "*" }
 spcc = { path = "../spcc", version = "*" }
 fltk = { version = "1.3" }
+
+[profile.release]
+lto = true
+strip = true
