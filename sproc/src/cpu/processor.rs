@@ -52,9 +52,9 @@ impl SolariumProcessor
     }
 
     /// Adds a segment to the memory map if possible
-    pub fn memory_add_segment(&mut self, seg: Rc<RefCell<dyn MemorySegment>>) -> Result<(), SolariumError>
+    pub fn memory_add_segment(&mut self, base: usize, seg: Rc<RefCell<dyn MemorySegment>>) -> Result<(), SolariumError>
     {
-        return self.memory_map.add_segment(seg);
+        return self.memory_map.add_segment(base, seg);
     }
 
     /// Obtains the requested location in memory, without altering the devie state

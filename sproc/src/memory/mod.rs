@@ -16,24 +16,21 @@ pub const MEM_MAX_SIZE: usize = (2usize).pow(BITS_PER_WORD as u32);
 pub trait MemorySegment
 {
     /// Provides the word at the requested memory location
-    fn get(&self, ind: usize) -> Result<MemoryWord, SolariumError>;
+    fn get(&self, offset: usize) -> Result<MemoryWord, SolariumError>;
 
     /// Provides the word at the requested memory location without modifying the device state
-    fn inspect(&self, ind: usize) -> Result<MemoryWord, SolariumError>;
+    fn inspect(&self, offset: usize) -> Result<MemoryWord, SolariumError>;
 
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
-    fn set(&mut self, ind: usize, data: MemoryWord) -> Result<(), SolariumError>;
+    fn set(&mut self, offset: usize, data: MemoryWord) -> Result<(), SolariumError>;
 
     /// Resets the memory segment
     fn reset(&mut self);
 
-    /// Provides the starting address of the memory segment
-    fn start_address(&self) -> usize;
-
     /// Provides the length of the memory segment
-    fn address_len(&self) -> usize;
+    fn len(&self) -> usize;
 
     /// Determines if the given memory index is within the memory segment
-    fn within(&self, ind: usize) -> bool;
+    fn within(&self, offset: usize) -> bool;
 }

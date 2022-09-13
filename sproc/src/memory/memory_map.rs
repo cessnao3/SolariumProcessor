@@ -8,7 +8,7 @@ use super::MemorySegment;
 /// Defines the overarching memory mapping structure
 pub struct MemoryMap
 {
-    memory_map: Vec<Rc<RefCell<dyn MemorySegment>>>
+    memory_map: Vec<(usize, Rc<RefCell<dyn MemorySegment>>)>
 }
 
 impl MemoryMap
@@ -24,11 +24,11 @@ impl MemoryMap
 
     /// Adds a new memory segment to the memory map, returning an error
     /// if it could not be added
-    pub fn add_segment(&mut self, segment: Rc<RefCell<dyn MemorySegment>>) -> Result<(), SolariumError>
+    pub fn add_segment(&mut self, base: usize, segment: Rc<RefCell<dyn MemorySegment>>) -> Result<(), SolariumError>
     {
         // Extract the start and ending indices
-        let start_ind = segment.borrow().start_address();
-        let end_ind = start_ind + segment.borrow().address_len();
+        let start_ind = base;
+        let end_ind = start_ind + segment.borrow().len();
 
         // Ensure that the segment is valid
         if start_ind >= end_ind
@@ -37,10 +37,10 @@ impl MemoryMap
         }
 
         // Check that the new segment will fit within the provided other segments
-        for seg in self.memory_map.iter()
+        for (seg_base, seg) in self.memory_map.iter()
         {
-            let seg_start = seg.borrow().start_address();
-            let seg_end = seg_start + seg.borrow().address_len();
+            let seg_start = *seg_base;
+            let seg_end = seg_start + seg.borrow().len();
 
             let all_below = seg_start < start_ind && seg_end <= start_ind;
             let all_above = seg_start >= end_ind && seg_end > end_ind;
@@ -51,8 +51,14 @@ impl MemoryMap
             }
         }
 
+        // Check that the top address is less than the maximum address
+        if base >= super::MEM_MAX_SIZE || end_ind > super::MEM_MAX_SIZE
+        {
+            return Err(SolariumError::InvalidMemoryAccess(end_ind));
+        }
+
         // Add the segment if all else passes
-        self.memory_map.push(segment);
+        self.memory_map.push((base, segment));
         return Ok(());
     }
 
@@ -61,7 +67,7 @@ impl MemoryMap
     {
         return match self.segment_for_index(ind)
         {
-            Some(seg) => seg.borrow().get(ind),
+            Some((seg, offset)) => seg.borrow().get(offset),
             None => Err(SolariumError::InvalidMemoryAccess(ind))
         };
     }
@@ -71,7 +77,7 @@ impl MemoryMap
     {
         return match self.segment_for_index(ind)
         {
-            Some(seg) => seg.borrow().inspect(ind),
+            Some((seg, offset)) => seg.borrow().inspect(offset),
             None => Err(SolariumError::InvalidMemoryAccess(ind))
         };
     }
@@ -82,19 +88,26 @@ impl MemoryMap
     {
         return match self.segment_for_index(ind)
         {
-            Some(seg) => seg.borrow_mut().set(ind, data),
+            Some((seg, offset)) => seg.borrow_mut().set(offset, data),
             None => Err(SolariumError::InvalidMemoryAccess(ind))
         };
     }
 
     /// Provides the memory segment that contains the given memory location
-    fn segment_for_index(&self, ind: usize) -> Option<&Rc<RefCell<dyn MemorySegment>>>
+    fn segment_for_index(&self, ind: usize) -> Option<(&Rc<RefCell<dyn MemorySegment>>, usize)>
     {
-        for seg in self.memory_map.iter()
+        for (seg_base, seg) in self.memory_map.iter()
         {
-            if seg.borrow().within(ind)
+            if *seg_base > ind
             {
-                return Some(seg);
+                continue;
+            }
+
+            let ind_offset = ind - seg_base;
+
+            if seg.borrow().within(ind_offset)
+            {
+                return Some((seg, ind_offset));
             }
         }
 
@@ -104,7 +117,7 @@ impl MemoryMap
     /// resets all contained memory segments
     pub fn reset(&mut self)
     {
-        for seg in self.memory_map.iter()
+        for (_, seg) in self.memory_map.iter()
         {
             seg.borrow_mut().reset();
         }
@@ -147,9 +160,7 @@ mod tests
 
         // Initialize the map
         let mut map = MemoryMap::new();
-        let add_result = map.add_segment(Rc::new(RefCell::new(ReadWriteSegment::new(
-            base,
-            size))));
+        let add_result = map.add_segment(base, Rc::new(RefCell::new(ReadWriteSegment::new(size))));
 
         assert!(add_result.is_ok());
 
@@ -206,9 +217,9 @@ mod tests
             {
                 match map.segment_for_index(i)
                 {
-                    Some(seg) =>
+                    Some((seg, offset)) =>
                     {
-                        let seg_val = seg.borrow().get(i);
+                        let seg_val = seg.borrow().get(offset);
 
                         assert!(seg_val.is_ok());
                         assert_eq!(seg_val.unwrap().get(), set_val);
@@ -221,9 +232,9 @@ mod tests
             {
                 match map.segment_for_index(i)
                 {
-                    Some(seg) =>
+                    Some((seg, offset)) =>
                     {
-                        let seg_val = seg.borrow().get(i);
+                        let seg_val = seg.borrow().get(offset);
 
                         assert!(seg_val.is_ok());
                         assert_eq!(seg_val.unwrap().get(), set_val);
@@ -247,8 +258,7 @@ mod tests
 
         // Initialize the map
         let mut map = MemoryMap::new();
-        let add_result = map.add_segment(Rc::new(RefCell::new(ReadOnlySegment::new(
-            base,
+        let add_result = map.add_segment(base, Rc::new(RefCell::new(ReadOnlySegment::new(
             (0..size).map(|i| MemoryWord::new(calc_func(i))).collect()))));
 
         assert!(add_result.is_ok());
@@ -298,9 +308,9 @@ mod tests
             {
                 match map.segment_for_index(i)
                 {
-                    Some(seg) =>
+                    Some((seg, offset)) =>
                     {
-                        let seg_val = seg.borrow().get(i);
+                        let seg_val = seg.borrow().get(offset);
 
                         assert!(seg_val.is_ok());
                         assert_eq!(seg_val.unwrap().get(), calc_func(i - base));
@@ -313,9 +323,9 @@ mod tests
             {
                 match map.segment_for_index(i)
                 {
-                    Some(seg) =>
+                    Some((seg, offset)) =>
                     {
-                        let seg_val = seg.borrow().get(i);
+                        let seg_val = seg.borrow().get(offset);
 
                         assert!(seg_val.is_ok());
                         assert_eq!(seg_val.unwrap().get(), calc_func(i - base));

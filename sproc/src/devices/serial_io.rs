@@ -3,14 +3,13 @@ use std::collections::VecDeque;
 
 use super::SolariumDevice;
 
-use crate::memory::{MemorySegment, MEM_MAX_SIZE};
+use crate::memory::MemorySegment;
 use crate::common::{MemoryWord, SolariumDeviceError, SolariumError};
 
 /// Provides a memory serial I/O memory-mapped device
 pub struct SerialInputOutputDevice
 {
     /// Provides the base address for the input device
-    base_address: usize,
     input_queue: RefCell<VecDeque<MemoryWord>>,
     output_queue: VecDeque<MemoryWord>,
     buffer_size: usize
@@ -29,19 +28,11 @@ impl SerialInputOutputDevice
     const OFFSET_INPUT_RESET_OUT: usize = 5;
 
     /// Constructs a new serial device
-    pub fn new(base_address: usize, buffer_size: usize) -> SerialInputOutputDevice
+    pub fn new(buffer_size: usize) -> SerialInputOutputDevice
     {
-        // Define the top address
-        let top_address = base_address + Self::DEVICE_MEM_SIZE;
-
-        // Assert that the memory values are okay and within bounds
-        assert!(top_address > base_address);
-        assert!(top_address <= MEM_MAX_SIZE);
-
         // Construct the serial device output
         return Self
         {
-            base_address,
             input_queue: RefCell::new(VecDeque::new()),
             output_queue: VecDeque::new(),
             buffer_size
@@ -80,27 +71,15 @@ impl SerialInputOutputDevice
         return self.output_queue.pop_front();
     }
 
-    fn get_offset(&self, ind: usize) -> Result<usize, SolariumError>
-    {
-        // Return error if not within the selected index
-        if !self.within(ind)
-        {
-            return Err(SolariumError::InvalidMemoryAccess(ind));
-        }
-
-        // Determine the base offset value
-        return Ok(ind - self.base_address);
-    }
-
-    fn common_get(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    fn common_get(&self, offset: usize) -> Result<MemoryWord, SolariumError>
     {
         // Use the offset values to determine the action to take
-        return match self.get_offset(ind)?
+        return match offset
         {
             Self::OFFSET_INPUT_SIZE => Ok(MemoryWord::new(self.input_queue.borrow().len() as u16)),
             Self::OFFSET_OUTPUT_SIZE => Ok(MemoryWord::new(self.output_queue.len() as u16)),
             Self::OFFSET_OUTPUT_SET => Ok(MemoryWord::new(0)),
-            _ => Err(SolariumError::InvalidMemoryAccess(ind))
+            _ => Err(SolariumError::InvalidMemoryAccess(offset))
         };
     }
 }
@@ -108,10 +87,10 @@ impl SerialInputOutputDevice
 impl MemorySegment for SerialInputOutputDevice
 {
     /// Provides the word at the requested memory location
-    fn get(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    fn get(&self, offset: usize) -> Result<MemoryWord, SolariumError>
     {
         // Use the offset values to determine the action to take
-        return match self.get_offset(ind)?
+        return match offset
         {
             Self::OFFSET_INPUT_GET =>
             {
@@ -121,15 +100,15 @@ impl MemorySegment for SerialInputOutputDevice
                     None => Ok(MemoryWord::new(0))
                 }
             },
-            _ => self.common_get(ind)
+            _ => self.common_get(offset)
         };
     }
 
     /// Provides the word at the requested memory location without affecting the device state
-    fn inspect(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    fn inspect(&self, offset: usize) -> Result<MemoryWord, SolariumError>
     {
         // Use the offset values to determine the action to take
-        return match self.get_offset(ind)?
+        return match offset
         {
             Self::OFFSET_INPUT_GET =>
             {
@@ -139,22 +118,21 @@ impl MemorySegment for SerialInputOutputDevice
                     None => Ok(MemoryWord::new(0))
                 }
             },
-            _ => self.common_get(ind)
+            _ => self.common_get(offset)
         };
     }
 
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
-    fn set(&mut self, ind: usize, data: MemoryWord) -> Result<(), SolariumError>
+    fn set(&mut self, offset: usize, data: MemoryWord) -> Result<(), SolariumError>
     {
         // Return error if not within the given offset value
-        if !self.within(ind)
+        if !self.within(offset)
         {
-            return Err(SolariumError::InvalidMemoryAccess(ind))
+            return Err(SolariumError::InvalidMemoryAccess(offset))
         }
 
         // Extract the offset and match based on the result
-        let offset = ind - self.base_address;
         return match offset
         {
             Self::OFFSET_OUTPUT_SET =>
@@ -166,7 +144,7 @@ impl MemorySegment for SerialInputOutputDevice
                 }
                 else
                 {
-                    Err(SolariumError::DeviceError(self.base_address, SolariumDeviceError::BufferFull))
+                    Err(SolariumError::DeviceError(0, SolariumDeviceError::BufferFull))
                 }
             },
             Self::OFFSET_INPUT_RESET_IN =>
@@ -185,7 +163,7 @@ impl MemorySegment for SerialInputOutputDevice
                 }
                 Ok(())
             },
-            _ => Err(SolariumError::InvalidMemoryWrite(ind))
+            _ => Err(SolariumError::InvalidMemoryWrite(offset))
         }
     }
 
@@ -196,22 +174,16 @@ impl MemorySegment for SerialInputOutputDevice
         self.output_queue.clear();
     }
 
-    /// Provides the starting address of the memory segment
-    fn start_address(&self) -> usize
-    {
-        return self.base_address;
-    }
-
     /// Provides the length of the memory segment
-    fn address_len(&self) -> usize
+    fn len(&self) -> usize
     {
         return Self::DEVICE_MEM_SIZE;
     }
 
     /// Determines if the given memory index is within the memory segment
-    fn within(&self, ind: usize) -> bool
+    fn within(&self, offset: usize) -> bool
     {
-        return ind >= self.base_address && ind < self.base_address + self.address_len();
+        return offset < self.len();
     }
 }
 

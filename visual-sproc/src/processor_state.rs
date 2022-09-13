@@ -35,7 +35,7 @@ impl ProcessorStatusStruct
             regs_updated: false,
             step_error: false,
             last_assembly: Vec::new(),
-            serial_io_dev: Rc::new(RefCell::new(SerialInputOutputDevice::new(Self::DEVICE_START_IND, usize::MAX))),
+            serial_io_dev: Rc::new(RefCell::new(SerialInputOutputDevice::new(usize::MAX))),
             msg_queue: Vec::new()
         };
 
@@ -60,17 +60,17 @@ impl ProcessorStatusStruct
 
         assert!(Self::DEVICE_START_IND < MEM_MAX_SIZE);
 
-        match self.cpu.memory_add_segment(Rc::new(RefCell::new(ReadOnlySegment::new(0, reset_vec_data))))
+        match self.cpu.memory_add_segment(0, Rc::new(RefCell::new(ReadOnlySegment::new(reset_vec_data))))
         {
             Ok(()) => (),
             Err(e) => panic!("{0:}", e.to_string())
         };
-        match self.cpu.memory_add_segment(Rc::new(RefCell::new(ReadWriteSegment::new(INIT_RO_LEN, Self::DEVICE_START_IND - INIT_RO_LEN))))
+        match self.cpu.memory_add_segment(INIT_RO_LEN, Rc::new(RefCell::new(ReadWriteSegment::new(Self::DEVICE_START_IND - INIT_RO_LEN))))
         {
             Ok(()) => (),
             Err(e) => panic!("{0:}", e.to_string())
         };
-        match self.cpu.memory_add_segment(self.serial_io_dev.clone())
+        match self.cpu.memory_add_segment(Self::DEVICE_START_IND, self.serial_io_dev.clone())
         {
             Ok(()) => (),
             Err(e) => panic!("{0:}", e.to_string())
