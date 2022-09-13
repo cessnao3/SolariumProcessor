@@ -79,12 +79,8 @@ impl SerialInputOutputDevice
     {
         return self.output_queue.pop_front();
     }
-}
 
-impl MemorySegment for SerialInputOutputDevice
-{
-    /// Provides the word at the requested memory location
-    fn get(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    fn get_offset(&self, ind: usize) -> Result<usize, SolariumError>
     {
         // Return error if not within the selected index
         if !self.within(ind)
@@ -93,12 +89,30 @@ impl MemorySegment for SerialInputOutputDevice
         }
 
         // Determine the base offset value
-        let offset = ind - self.base_address;
+        return Ok(ind - self.base_address);
+    }
 
+    fn common_get(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    {
         // Use the offset values to determine the action to take
-        return match offset
+        return match self.get_offset(ind)?
         {
             Self::OFFSET_INPUT_SIZE => Ok(MemoryWord::new(self.input_queue.borrow().len() as u16)),
+            Self::OFFSET_OUTPUT_SIZE => Ok(MemoryWord::new(self.output_queue.len() as u16)),
+            Self::OFFSET_OUTPUT_SET => Ok(MemoryWord::new(0)),
+            _ => Err(SolariumError::InvalidMemoryAccess(ind))
+        };
+    }
+}
+
+impl MemorySegment for SerialInputOutputDevice
+{
+    /// Provides the word at the requested memory location
+    fn get(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    {
+        // Use the offset values to determine the action to take
+        return match self.get_offset(ind)?
+        {
             Self::OFFSET_INPUT_GET =>
             {
                 match self.input_queue.borrow_mut().pop_front()
@@ -107,28 +121,16 @@ impl MemorySegment for SerialInputOutputDevice
                     None => Ok(MemoryWord::new(0))
                 }
             },
-            Self::OFFSET_OUTPUT_SIZE => Ok(MemoryWord::new(self.output_queue.len() as u16)),
-            Self::OFFSET_OUTPUT_SET => Ok(MemoryWord::new(0)),
-            _ => Err(SolariumError::InvalidMemoryAccess(ind))
+            _ => self.common_get(ind)
         };
     }
 
     /// Provides the word at the requested memory location without affecting the device state
-    fn get_view(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    fn inspect(&self, ind: usize) -> Result<MemoryWord, SolariumError>
     {
-        // Return error if not within the selected index
-        if !self.within(ind)
-        {
-            return Err(SolariumError::InvalidMemoryAccess(ind));
-        }
-
-        // Determine the base offset value
-        let offset = ind - self.base_address;
-
         // Use the offset values to determine the action to take
-        return match offset
+        return match self.get_offset(ind)?
         {
-            Self::OFFSET_INPUT_SIZE => Ok(MemoryWord::new(self.input_queue.borrow().len() as u16)),
             Self::OFFSET_INPUT_GET =>
             {
                 match self.input_queue.borrow().front()
@@ -137,9 +139,7 @@ impl MemorySegment for SerialInputOutputDevice
                     None => Ok(MemoryWord::new(0))
                 }
             },
-            Self::OFFSET_OUTPUT_SIZE => Ok(MemoryWord::new(self.output_queue.len() as u16)),
-            Self::OFFSET_OUTPUT_SET => Ok(MemoryWord::new(0)),
-            _ => Err(SolariumError::InvalidMemoryAccess(ind))
+            _ => self.common_get(ind)
         };
     }
 

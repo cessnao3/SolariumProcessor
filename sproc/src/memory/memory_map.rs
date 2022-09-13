@@ -67,11 +67,11 @@ impl MemoryMap
     }
 
     /// Provides the word at the requested memory location without affecting the device state
-    pub fn get_view(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    pub fn inspect(&self, ind: usize) -> Result<MemoryWord, SolariumError>
     {
         return match self.segment_for_index(ind)
         {
-            Some(seg) => seg.borrow().get_view(ind),
+            Some(seg) => seg.borrow().inspect(ind),
             None => Err(SolariumError::InvalidMemoryAccess(ind))
         };
     }

@@ -191,7 +191,7 @@ impl ProcessorStatusStruct
     pub fn send_memory_to_queue(&mut self)
     {
         let mem_vec: Vec<MemoryWord> = (0..MEM_MAX_SIZE).map(|i| {
-            return match self.cpu.memory_get(i)
+            return match self.cpu.memory_inspect(i)
             {
                 Ok(v) => v,
                 Err(_) => MemoryWord::new(0)

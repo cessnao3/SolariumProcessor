@@ -58,9 +58,9 @@ impl SolariumProcessor
     }
 
     /// Obtains the requested location in memory, without altering the devie state
-    pub fn memory_get(&self, addr: usize) -> Result<MemoryWord, SolariumError>
+    pub fn memory_inspect(&self, addr: usize) -> Result<MemoryWord, SolariumError>
     {
-        return self.memory_map.get_view(addr);
+        return self.memory_map.inspect(addr);
     }
 
     /// Sets the provided memory value in the address requested

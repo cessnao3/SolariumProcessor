@@ -52,7 +52,7 @@ impl MemorySegment for ReadWriteSegment
     }
 
     /// Provides the word at the requested memory location without affecting the device state
-    fn get_view(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    fn inspect(&self, ind: usize) -> Result<MemoryWord, SolariumError>
     {
         return self.get(ind);
     }
