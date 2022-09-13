@@ -76,6 +76,12 @@ impl ProcessorStatusStruct
             Err(e) => panic!("{0:}", e.to_string())
         };
 
+        match self.cpu.device_add(self.serial_io_dev.clone())
+        {
+            Ok(()) => (),
+            Err(e) => panic!("{}", e.to_string())
+        };
+
         if self.cpu.hard_reset().is_err()
         {
             panic!("Unable to hard-reset CPU");

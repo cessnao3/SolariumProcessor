@@ -1,4 +1,5 @@
 use crate::common::{MemoryWord, SolariumError, InstructionData};
+use crate::devices::{SolariumDevice, DeviceAction};
 use crate::memory::{MemoryMap, MemorySegment, self};
 
 use super::registers::{Register, RegisterManager, StatusFlag};
@@ -22,7 +23,8 @@ const VECTOR_HW_HJW_SIZE: usize = 16;
 pub struct SolariumProcessor
 {
     memory_map: MemoryMap,
-    registers: RegisterManager
+    registers: RegisterManager,
+    devices: Vec<Rc<RefCell<dyn SolariumDevice>>>
 }
 
 impl SolariumProcessor
@@ -40,7 +42,8 @@ impl SolariumProcessor
         let mut cpu = SolariumProcessor
         {
             memory_map: MemoryMap::new(),
-            registers: RegisterManager::new()
+            registers: RegisterManager::new(),
+            devices: Vec::new()
         };
 
         // Initiate the reset and return
@@ -73,6 +76,13 @@ impl SolariumProcessor
     pub fn get_register_state(&self) -> [MemoryWord; RegisterManager::NUM_REGISTERS]
     {
         return self.registers.get_state();
+    }
+
+    /// Adds a device to the Solarium device parameters
+    pub fn device_add(&mut self, dev: Rc<RefCell<dyn SolariumDevice>>) -> Result<(), SolariumError>
+    {
+        self.devices.push(dev);
+        return Ok(());
     }
 
     /// Provides common functionality between soft and hard reset vectors, while providing
@@ -838,6 +848,27 @@ impl SolariumProcessor
 
         // Increment the program counter
         self.increment_pc(pc_incr)?;
+
+        // Define an action queue
+        let mut dev_action_queue: Vec<DeviceAction> = Vec::new();
+
+        // Check for any actions
+        for dev in self.devices.iter()
+        {
+            if let Some(action) = dev.borrow_mut().on_step()
+            {
+                dev_action_queue.push(action);
+            }
+        }
+
+        // Perform requested actiosn
+        for action in dev_action_queue
+        {
+            match action
+            {
+                DeviceAction::CallInterrupt(num) => { self.hardware_interrupt(num)?; }
+            }
+        }
 
         // Return success
         return Ok(());

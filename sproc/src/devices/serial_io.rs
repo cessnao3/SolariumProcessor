@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
 
-use super::SolariumDevice;
+use super::{SolariumDevice, DeviceAction};
 
 use crate::memory::MemorySegment;
 use crate::common::{MemoryWord, SolariumDeviceError, SolariumError};
@@ -189,8 +189,8 @@ impl MemorySegment for SerialInputOutputDevice
 
 impl SolariumDevice for SerialInputOutputDevice
 {
-    fn on_step(&mut self)
+    fn on_step(&mut self) -> Option<DeviceAction>
     {
-        // Do Nothing
+        return None;
     }
 }
