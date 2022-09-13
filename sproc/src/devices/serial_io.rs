@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
 
+use super::SolariumDevice;
+
 use crate::memory::{MemorySegment, MEM_MAX_SIZE};
 use crate::common::{MemoryWord, SolariumDeviceError, SolariumError};
 
@@ -112,7 +114,7 @@ impl MemorySegment for SerialInputOutputDevice
     }
 
     /// Provides the word at the requested memory location without affecting the device state
-    fn get_debug(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    fn get_view(&self, ind: usize) -> Result<MemoryWord, SolariumError>
     {
         // Return error if not within the selected index
         if !self.within(ind)
@@ -210,5 +212,13 @@ impl MemorySegment for SerialInputOutputDevice
     fn within(&self, ind: usize) -> bool
     {
         return ind >= self.base_address && ind < self.base_address + self.address_len();
+    }
+}
+
+impl SolariumDevice for SerialInputOutputDevice
+{
+    fn on_step(&mut self)
+    {
+        // Do Nothing
     }
 }

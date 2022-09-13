@@ -85,7 +85,10 @@ pub enum SolariumError
     ShiftError(usize),
     CharacterToWord(char),
     WordToCharacter(MemoryWord),
-    DeviceError(usize, SolariumDeviceError)
+    DeviceError(usize, SolariumDeviceError),
+    RegisterIndexError(usize),
+    StartEndIndexMismatch(usize, usize),
+    SegmentOverlap(usize, usize)
 }
 
 impl ToString for SolariumError
@@ -106,7 +109,10 @@ impl ToString for SolariumError
             SolariumError::StackUnderflow => "stack underflow".to_string(),
             SolariumError::CharacterToWord(c) => format!("unable to convert {0:02X} to word", *c as u8),
             SolariumError::WordToCharacter(word) => format!("unable to convert {0:04X} to character", word.get()),
-            SolariumError::DeviceError(base_addr, err) => format!("device {0:} error: {1:}", base_addr, err.to_string())
+            SolariumError::DeviceError(base_addr, err) => format!("device {0:} error: {1:}", base_addr, err.to_string()),
+            SolariumError::RegisterIndexError(ind) => format!("register {0:} exceeds the register size", ind),
+            SolariumError::StartEndIndexMismatch(start_index, end_index) => format!("segment starting index {0:} is >= ending index {1:}", start_index, end_index),
+            SolariumError::SegmentOverlap(start_index, end_index) => format!("segment from [{0:}, {1:}) overlaps with other segments", start_index, end_index)
         }
     }
 }

@@ -46,7 +46,8 @@ impl ProcessorStatusStruct
 
     pub fn reset(&mut self)
     {
-        self.cpu.memory_map.clear();
+        self.cpu = SolariumProcessor::new();
+
         self.serial_io_dev.borrow_mut().reset();
         self.step_error = false;
 
@@ -59,23 +60,26 @@ impl ProcessorStatusStruct
 
         assert!(Self::DEVICE_START_IND < MEM_MAX_SIZE);
 
-        match self.cpu.memory_map.add_segment(Rc::new(RefCell::new(ReadOnlySegment::new(0, reset_vec_data))))
+        match self.cpu.memory_add_segment(Rc::new(RefCell::new(ReadOnlySegment::new(0, reset_vec_data))))
         {
             Ok(()) => (),
-            Err(e) => panic!("{0:}", e)
+            Err(e) => panic!("{0:}", e.to_string())
         };
-        match self.cpu.memory_map.add_segment(Rc::new(RefCell::new(ReadWriteSegment::new(INIT_RO_LEN, Self::DEVICE_START_IND - INIT_RO_LEN))))
+        match self.cpu.memory_add_segment(Rc::new(RefCell::new(ReadWriteSegment::new(INIT_RO_LEN, Self::DEVICE_START_IND - INIT_RO_LEN))))
         {
             Ok(()) => (),
-            Err(e) => panic!("{0:}", e)
+            Err(e) => panic!("{0:}", e.to_string())
         };
-        match self.cpu.memory_map.add_segment(self.serial_io_dev.clone())
+        match self.cpu.memory_add_segment(self.serial_io_dev.clone())
         {
             Ok(()) => (),
-            Err(e) => panic!("{0:}", e)
+            Err(e) => panic!("{0:}", e.to_string())
         };
 
-        self.cpu.hard_reset();
+        if self.cpu.hard_reset().is_err()
+        {
+            panic!("Unable to hard-reset CPU");
+        }
 
         for (i, val) in self.last_assembly.iter().enumerate()
         {
@@ -84,7 +88,7 @@ impl ProcessorStatusStruct
                 continue;
             }
 
-            match self.cpu.memory_map.set(i, *val)
+            match self.cpu.memory_set(i, *val)
             {
                 Ok(()) => (),
                 Err(e) => panic!("error on memory set: {0:}", e.to_string())
@@ -96,7 +100,10 @@ impl ProcessorStatusStruct
 
     pub fn soft_reset(&mut self)
     {
-        self.cpu.soft_reset();
+        if self.cpu.soft_reset().is_err()
+        {
+            panic!("Unable to soft-reset CPU");
+        }
         self.update_regs();
         self.step_error = false;
     }
@@ -143,9 +150,10 @@ impl ProcessorStatusStruct
 
     pub fn update_regs(&mut self)
     {
-        for i in 0..SolariumProcessor::NUM_REGISTERS
+        let reg_state = self.cpu.get_register_state();
+        for (i, word) in reg_state.iter().enumerate()
         {
-            self.regs[i] = self.cpu.get_register_value(i).get();
+            self.regs[i] = word.get();
         }
         self.regs_updated = true;
     }
@@ -183,7 +191,7 @@ impl ProcessorStatusStruct
     pub fn send_memory_to_queue(&mut self)
     {
         let mem_vec: Vec<MemoryWord> = (0..MEM_MAX_SIZE).map(|i| {
-            return match self.cpu.memory_map.get_debug(i)
+            return match self.cpu.memory_get(i)
             {
                 Ok(v) => v,
                 Err(_) => MemoryWord::new(0)

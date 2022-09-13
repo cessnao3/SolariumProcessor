@@ -24,7 +24,7 @@ impl MemoryMap
 
     /// Adds a new memory segment to the memory map, returning an error
     /// if it could not be added
-    pub fn add_segment(&mut self, segment: Rc<RefCell<dyn MemorySegment>>) -> Result<(), String>
+    pub fn add_segment(&mut self, segment: Rc<RefCell<dyn MemorySegment>>) -> Result<(), SolariumError>
     {
         // Extract the start and ending indices
         let start_ind = segment.borrow().start_address();
@@ -33,7 +33,7 @@ impl MemoryMap
         // Ensure that the segment is valid
         if start_ind >= end_ind
         {
-            return Err(format!("segment starting index {0:} is >= ending index {1:}", start_ind, end_ind));
+            return Err(SolariumError::StartEndIndexMismatch(start_ind, end_ind));
         }
 
         // Check that the new segment will fit within the provided other segments
@@ -47,7 +47,7 @@ impl MemoryMap
 
             if !(all_above || all_below)
             {
-                return Err(format!("segment from [{0:}, {1:}) intersects with other segments", start_ind, end_ind));
+                return Err(SolariumError::SegmentOverlap(start_ind, end_ind));
             }
         }
 
@@ -67,11 +67,11 @@ impl MemoryMap
     }
 
     /// Provides the word at the requested memory location without affecting the device state
-    pub fn get_debug(&self, ind: usize) -> Result<MemoryWord, SolariumError>
+    pub fn get_view(&self, ind: usize) -> Result<MemoryWord, SolariumError>
     {
         return match self.segment_for_index(ind)
         {
-            Some(seg) => seg.borrow().get_debug(ind),
+            Some(seg) => seg.borrow().get_view(ind),
             None => Err(SolariumError::InvalidMemoryAccess(ind))
         };
     }

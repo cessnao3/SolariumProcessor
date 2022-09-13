@@ -1,4 +1,4 @@
-use crate::common::MemoryWord;
+use crate::common::{MemoryWord, SolariumError};
 
 #[derive(Clone, Copy)]
 /// Defines the enumeration for available registers
@@ -15,22 +15,6 @@ pub enum Register
 
 impl Register
 {
-    /// Defines the number of registers available in the processor
-    pub const NUM_REGISTERS: usize = 16;
-
-    /// Provides a General-Purpose register from a given index
-    pub fn from_index(ind: usize) -> Register
-    {
-        if ind < Self::NUM_REGISTERS
-        {
-            return Register::GP(ind);
-        }
-        else
-        {
-            panic!("unable to create a register from index {0:}", ind);
-        }
-    }
-
     /// Converts the enumeration types to an index for a registry array
     pub fn to_index(&self) -> usize
     {
@@ -46,15 +30,7 @@ impl Register
             Register::GP(ind) => *ind
         };
 
-        // Check for the index values
-        if ind < Self::NUM_REGISTERS
-        {
-            return ind;
-        }
-        else
-        {
-            panic!("Register index is greater than available processor registers");
-        }
+        return ind;
     }
 }
 
@@ -94,18 +70,28 @@ impl ToString for StatusFlag
 /// Defines a register manager to maintain register values
 pub struct RegisterManager
 {
-    registers: [MemoryWord; Register::NUM_REGISTERS]
+    registers: [MemoryWord; RegisterManager::NUM_REGISTERS]
 }
 
 impl RegisterManager
 {
+    /// Defines the number of registers available in the processor
+    pub const NUM_REGISTERS: usize = 16;
+
+
     /// Creates a new register manager
     pub fn new() -> RegisterManager
     {
         return RegisterManager
         {
-            registers: [MemoryWord::new(0); Register::NUM_REGISTERS]
+            registers: [MemoryWord::new(0); RegisterManager::NUM_REGISTERS]
         };
+    }
+
+    /// Provides the current state of the register values
+    pub fn get_state(&self) -> [MemoryWord; RegisterManager::NUM_REGISTERS]
+    {
+        return self.registers;
     }
 
     /// Resets all registers to a known, zero, state
@@ -118,43 +104,59 @@ impl RegisterManager
     }
 
     /// Gets the selected register value
-    pub fn get(&self, register: Register) -> MemoryWord
+    pub fn get(&self, register: Register) -> Result<MemoryWord, SolariumError>
     {
-        return self.registers[register.to_index()];
+        let ind = register.to_index();
+
+        if ind < RegisterManager::NUM_REGISTERS
+        {
+            return Ok(self.registers[register.to_index()]);
+        }
+        else
+        {
+            return Err(SolariumError::RegisterIndexError(ind));
+        }
     }
 
     /// Sets the selecteed register value
-    pub fn set(&mut self, register: Register, value: MemoryWord) -> bool
+    pub fn set(&mut self, register: Register, value: MemoryWord) -> Result<(), SolariumError>
     {
         let reg_ind = register.to_index();
-        self.registers[reg_ind] = value;
-        return true;
+        if reg_ind < Self::NUM_REGISTERS
+        {
+            self.registers[reg_ind] = value;
+            return Ok(());
+        }
+        else
+        {
+            return Err(SolariumError::RegisterIndexError(reg_ind));
+        }
     }
 
     /// Sets the given flag for the processor status flags
-    pub fn set_flag(&mut self, flag: StatusFlag)
+    pub fn set_flag(&mut self, flag: StatusFlag) -> Result<(), SolariumError>
     {
-        let last_val = self.get(Register::StatusFlags);
+        let last_val = self.get(Register::StatusFlags)?;
         let new_val = MemoryWord::new(last_val.get() | flag.get_mask().get());
-        self.set(
+        return self.set(
             Register::StatusFlags,
             new_val);
     }
 
     /// Clears the given flag to the processor status
-    pub fn clear_flag(&mut self, flag: StatusFlag)
+    pub fn clear_flag(&mut self, flag: StatusFlag) -> Result<(), SolariumError>
     {
-        let last_val = self.get(Register::StatusFlags);
+        let last_val = self.get(Register::StatusFlags)?;
         let new_val = MemoryWord::new(last_val.get() & !flag.get_mask().get());
-        self.set(
+        return self.set(
             Register::StatusFlags,
             new_val);
     }
 
     /// Gets the value of the given processor status flags
-    pub fn get_flag(&self, flag: StatusFlag) -> bool
+    pub fn get_flag(&self, flag: StatusFlag) -> Result<bool, SolariumError>
     {
-        return (self.get(Register::StatusFlags).get() & flag.get_mask().get()) != 0;
+        return Ok((self.get(Register::StatusFlags)?.get() & flag.get_mask().get()) != 0);
     }
 }
 
@@ -173,13 +175,13 @@ mod tests
         };
 
         // Add the register indices
-        for i in registers.len()..Register::NUM_REGISTERS
+        for i in registers.len()..RegisterManager::NUM_REGISTERS
         {
             registers.push(Register::GP(i));
         }
 
         // Ensure the resulting value is correct
-        assert!(registers.len() == Register::NUM_REGISTERS);
+        assert!(registers.len() == RegisterManager::NUM_REGISTERS);
 
         // Return the register vector
         return registers;
@@ -199,10 +201,15 @@ mod tests
             for v in 0..1000
             {
                 // Set the register manager, and then ensure that the output result matches
-                register_manager.set(
+                let set_res = register_manager.set(
                     *register,
                     MemoryWord::new(v));
-                assert_eq!(register_manager.get(*register), MemoryWord::new(v));
+
+                assert!(set_res.is_ok());
+
+                let get_res = register_manager.get(*register);
+                assert!(get_res.is_ok());
+                assert_eq!(get_res.unwrap(), MemoryWord::new(v));
             }
         }
     }
@@ -215,16 +222,17 @@ mod tests
         let mut register_manager = RegisterManager::new();
 
         // Add a value to each register
-        for i in 0..Register::NUM_REGISTERS
+        for i in 0..RegisterManager::NUM_REGISTERS
         {
-            register_manager.set(Register::GP(i), MemoryWord::new(i as u16));
+            assert!(register_manager.set(Register::GP(i), MemoryWord::new(i as u16)).is_ok());
         }
 
         // Ensure that we can get the resulting value out
-        for i in 0..Register::NUM_REGISTERS
+        for i in 0..RegisterManager::NUM_REGISTERS
         {
             let val = register_manager.get(Register::GP(i));
-            assert_eq!(val, MemoryWord::new(i as u16));
+            assert!(val.is_ok());
+            assert_eq!(val.unwrap(), MemoryWord::new(i as u16));
         }
     }
 }
