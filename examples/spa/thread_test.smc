@@ -1,0 +1,88 @@
+.loadloc program_start
+.loadloc program_start
+
+.oper 0x400
+:stack_pointer_base
+
+.oper 0x600
+:thread_1_sp_base
+
+.oper 0x800
+:thread_2_sp_base
+
+.oper 0x3000
+
+:init_thread
+
+; Load useful parameters to registers
+ldi 7, 1
+ldi 10, 0
+ldi 11, 16
+
+; Load the main start location into register 8
+ldr 8, $arg
+
+; Increment and load the stack location into register 9
+add $arg, $arg, 7
+ldr 9, $arg
+
+; Push PC (R0) to the new stack
+savr 9, 8
+add 9, 9, 7
+
+; Push Flags (R3) to the new stack
+copy 9, $stat
+add 9, 9, 7
+
+; Push SP (R2) to the new stack
+savr 9, 11
+add 9, 9, 7
+
+; Push SPB (R3) to the new stack
+savr 9, 8
+add 9, 9, 7
+
+; Push return and argument registers (R4, R5)
+savr 9, 10
+add 9, 9, 7
+savr 9, 10
+
+ret
+
+.oper 0x4000
+:program_start
+
+ldn $spb
+.loadloc stack_pointer_base
+
+; Start to init thread 1
+ldn 10
+.loadloc thread_1_main
+ldn 11
+.loadloc thread_1_sp_base
+ldn 12
+.loadloc init_thread
+
+add $arg, $sp, $spb
+push 10
+push 11
+call 12
+pop
+pop
+
+ldn 10
+.loadloc thread_2_main
+ldn 11
+.loadloc thread_2_sp_base
+
+push 10
+push 11
+call 12
+pop
+pop
+
+.oper 0x6000
+:thread_1_main
+
+.oper 0x8000
+:thread_2_main

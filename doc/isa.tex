@@ -42,11 +42,11 @@ There are 16 total registers present on the S/Proc. These are defined generally 
         Register & Usage \\
         \hline
         R0 & Program Counter \\
-        R1 & Stack Pointer \\
-        R2 & Stack Base \\
-        R3 & Processor Status Flags \\
+        R1 & Processor Status Flags \\
+        R2 & Stack Pointer \\
+        R3 & Stack Base \\
         R4 & Return Register \\
-        R5 & Argument Register \\
+        R5 & Argument Base Register \\
         R6-R15 & General Purpose Register \\
         \hline
     \end{tabular}
@@ -356,19 +356,19 @@ The following list some simple example programs that can be run on the S/Proc.
 
 The program listed in Listing \ref{listing:example-counter} provides a basic counter. A target value is placed in register four, and the value in register three is incremented from 0 to the target value in register four by adding one to the register each loop. Once the target value has been reached and register three is equal to register four, the program halts by entering an infinite loop.
 
-\lstinputlisting[caption={Limited counter program}, label={listing:example-counter}]{../examples/counter.smc}
+\lstinputlisting[caption={Limited counter program}, label={listing:example-counter}]{../examples/spa/counter.smc}
 
 \subsection{Infinite Counter}
 
 Listing \ref{listing:example-infinite-counter} makes use of some additional functionality, including the use of the register reference names, to test register reset functionality. It also modifies the program counter outside of the standard jump command.
 
-\lstinputlisting[caption={Infinite counter program with register reference names}, label={listing:example-infinite-counter}]{../examples/infinite_counter.smc}
+\lstinputlisting[caption={Infinite counter program with register reference names}, label={listing:example-infinite-counter}]{../examples/spa/infinite_counter.smc}
 
 \subsection{Hello World}
 
 Listing  \ref{listing:hello-world} provides a program that will infinitely write "hello, world" to the serial device, expected to be memory-mapped into the S/Proc at \texttt{0xA000}. This makes use of the \texttt{.loadtext} command, which loads the text, and an additional null-terminator at the end, directly into memory. It also makes use of a print-string function call to handle printing string values to the serial output devices.
 
-\lstinputlisting[caption={Infinite "hello, world!" program}, label={listing:hello-world}]{../examples/hello_world.smc}
+\lstinputlisting[caption={Infinite "hello, world!" program}, label={listing:hello-world}]{../examples/spa/hello_world.smc}
 
 \pagebreak
 
@@ -376,7 +376,7 @@ Listing  \ref{listing:hello-world} provides a program that will infinitely write
 
 Listing \ref{listing:serial-echo} provides a serial echo program, which echos any text provided by the default serial input device back out via the serial echo device. This serial device is expected to be provided at the starting location \texttt{0xA000}.
 
-\lstinputlisting[caption={Serial echo program reads in text characters and immediately outputs via the output device}, label={listing:serial-echo}]{../examples/serial_echo.smc}
+\lstinputlisting[caption={Serial echo program reads in text characters and immediately outputs via the output device}, label={listing:serial-echo}]{../examples/spa/serial_echo.smc}
 
 \pagebreak
 
