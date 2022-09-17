@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use super::messages::GuiMessage;
 
 use sproc::cpu::SolariumProcessor;
-use sproc::devices::SerialInputOutputDevice;
+use sproc::devices::{SerialInputOutputDevice, InterruptClockDevice};
 use sproc::memory::{MEM_MAX_SIZE, MemorySegment, ReadOnlySegment, ReadWriteSegment};
 use sproc::common::MemoryWord;
 
@@ -81,6 +81,12 @@ impl ProcessorStatusStruct
             Ok(()) => (),
             Err(e) => panic!("{}", e.to_string())
         };
+
+        match self.cpu.device_add(Rc::new(RefCell::new(InterruptClockDevice::new(1000, 0))))
+        {
+            Ok(()) => (),
+            Err(e) => panic!("{}", e.to_string())
+        }
 
         if self.cpu.hard_reset().is_err()
         {
