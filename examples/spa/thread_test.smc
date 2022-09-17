@@ -1,6 +1,9 @@
 .loadloc program_start
 .loadloc program_start
 
+.oper 0x20
+.loadloc hw_int_0
+
 .oper 0x400
 :stack_pointer_base
 
@@ -9,6 +12,11 @@
 
 .oper 0x800
 :thread_2_sp_base
+
+.oper 0x2000
+:global_num_threads
+.load 0
+:global_thread_pc_stack
 
 .oper 0x3000
 
@@ -20,34 +28,51 @@ ldi 10, 0
 ldi 11, 16
 
 ; Load the main start location into register 8
-ldr 8, $arg
+copy 8, $arg
 
 ; Increment and load the stack location into register 9
 add $arg, $arg, 7
-ldr 9, $arg
+copy 9, $arg
+
+; Save the stack location to the global PC stack
+ldn 13
+.loadloc global_num_threads
+ld 14, 13
+
+ldn 12
+.loadloc global_thread_pc_stack
+add 12, 12, 14
+sav 12, 9
+
+add 14, 14, 7
+sav 13, 14
 
 ; Push PC (R0) to the new stack
-savr 9, 8
+sav 9, 8
 add 9, 9, 7
 
 ; Push Flags (R3) to the new stack
-copy 9, $stat
+sav 9, $stat
 add 9, 9, 7
 
 ; Push SP (R2) to the new stack
-savr 9, 11
+sav 9, 11
 add 9, 9, 7
 
 ; Push SPB (R3) to the new stack
-savr 9, 8
+sav 9, 8
 add 9, 9, 7
 
 ; Push return and argument registers (R4, R5)
-savr 9, 10
+sav 9, 10
 add 9, 9, 7
-savr 9, 10
+sav 9, 10
 
 ret
+
+:hw_int_0
+
+retint
 
 .oper 0x4000
 :program_start
@@ -83,6 +108,8 @@ pop
 
 .oper 0x6000
 :thread_1_main
+jmpri -1
 
 .oper 0x8000
 :thread_2_main
+jmpri -1
