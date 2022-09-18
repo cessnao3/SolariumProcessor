@@ -51,7 +51,7 @@ sav 13, 14
 sav 9, 8
 add 9, 9, 7
 
-; Push Flags (R3) to the new stack
+; Push Flags (R1) to the new stack
 sav 9, $stat
 add 9, 9, 7
 

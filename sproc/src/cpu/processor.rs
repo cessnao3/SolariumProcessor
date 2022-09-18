@@ -293,6 +293,9 @@ impl SolariumProcessor
         // Extract the different argument types
         let inst = InstructionData::new(inst_word);
 
+        // Check whether execution should be stopped
+        let mut request_stop = false;
+
         // Define a function to combine two arguments into an item
         fn get_immediate_value_signed(
             arg_high: u8,
@@ -372,6 +375,10 @@ impl SolariumProcessor
                         // Set no PC increment to ensure that we don't loose track of the current value
                         pc_incr = 0;
                     },
+                    9 => // halt
+                    {
+                        request_stop = true;
+                    }
                     _ => // ERROR
                     {
                         return Err(SolariumError::InvalidInstruction(inst_word));
@@ -861,13 +868,19 @@ impl SolariumProcessor
             }
         }
 
-        // Perform requested actiosn
+        // Perform requested actions
         for action in dev_action_queue
         {
             match action
             {
                 DeviceAction::CallInterrupt(num) => { self.hardware_interrupt(num)?; }
             }
+        }
+
+        // Request stop if needed
+        if request_stop
+        {
+            return Err(SolariumError::StopRequested);
         }
 
         // Return success

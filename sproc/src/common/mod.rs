@@ -88,7 +88,8 @@ pub enum SolariumError
     DeviceError(usize, SolariumDeviceError),
     RegisterIndexError(usize),
     StartEndIndexMismatch(usize, usize),
-    SegmentOverlap(usize, usize)
+    SegmentOverlap(usize, usize),
+    StopRequested
 }
 
 impl ToString for SolariumError
@@ -112,7 +113,8 @@ impl ToString for SolariumError
             SolariumError::DeviceError(base_addr, err) => format!("device {0:} error: {1:}", base_addr, err.to_string()),
             SolariumError::RegisterIndexError(ind) => format!("register {0:} exceeds the register size", ind),
             SolariumError::StartEndIndexMismatch(start_index, end_index) => format!("segment starting index {0:} is >= ending index {1:}", start_index, end_index),
-            SolariumError::SegmentOverlap(start_index, end_index) => format!("segment from [{0:}, {1:}) overlaps with other segments", start_index, end_index)
+            SolariumError::SegmentOverlap(start_index, end_index) => format!("segment from [{0:}, {1:}) overlaps with other segments", start_index, end_index),
+            SolariumError::StopRequested => format!("stop requested")
         }
     }
 }

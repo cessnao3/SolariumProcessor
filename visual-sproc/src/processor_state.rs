@@ -6,7 +6,7 @@ use super::messages::GuiMessage;
 use sproc::cpu::SolariumProcessor;
 use sproc::devices::{SerialInputOutputDevice, InterruptClockDevice};
 use sproc::memory::{MEM_MAX_SIZE, MemorySegment, ReadOnlySegment, ReadWriteSegment};
-use sproc::common::MemoryWord;
+use sproc::common::{MemoryWord, SolariumError};
 
 
 pub type RegisterArray = [u16; SolariumProcessor::NUM_REGISTERS];
@@ -19,6 +19,7 @@ pub struct ProcessorStatusStruct
     step_error: bool,
     last_assembly: Vec::<MemoryWord>,
     serial_io_dev: Rc<RefCell<SerialInputOutputDevice>>,
+    stop_request: bool,
     pub msg_queue: Vec<GuiMessage>
 }
 
@@ -36,7 +37,8 @@ impl ProcessorStatusStruct
             step_error: false,
             last_assembly: Vec::new(),
             serial_io_dev: Rc::new(RefCell::new(SerialInputOutputDevice::new(usize::MAX))),
-            msg_queue: Vec::new()
+            msg_queue: Vec::new(),
+            stop_request: false
         };
 
         stat.reset();
@@ -145,11 +147,15 @@ impl ProcessorStatusStruct
 
     pub fn step(&mut self)
     {
-        if !self.step_error
+        if !self.step_error && !self.stop_request
         {
             match self.cpu.step()
             {
                 Ok(()) => (),
+                Err(SolariumError::StopRequested) =>
+                {
+                    self.stop_request = true
+                },
                 Err(e) =>
                 {
                     self.msg_queue.push(GuiMessage::LogMessage(e.to_string()));
@@ -158,6 +164,16 @@ impl ProcessorStatusStruct
             }
             self.update_regs();
         }
+    }
+
+    pub fn get_stop_request(&self) -> bool
+    {
+        return self.stop_request;
+    }
+
+    pub fn clear_stop_request(&mut self)
+    {
+        self.stop_request = false;
     }
 
     pub fn update_regs(&mut self)

@@ -32,6 +32,7 @@ pub fn run_scpu_thread(
                 {
                     ThreadMessage::Start =>
                     {
+                        cpu_stat.clear_stop_request();
                         step_cpu = true;
                     },
                     ThreadMessage::Stop =>
@@ -41,6 +42,7 @@ pub fn run_scpu_thread(
                     },
                     ThreadMessage::Reset =>
                     {
+                        cpu_stat.clear_stop_request();
                         step_cpu = false;
                         cpu_stat.soft_reset();
                         update_memory = true;
@@ -57,6 +59,7 @@ pub fn run_scpu_thread(
                     },
                     ThreadMessage::Step =>
                     {
+                        cpu_stat.clear_stop_request();
                         cpu_stat.step();
                         update_memory = true;
                     },
@@ -84,7 +87,7 @@ pub fn run_scpu_thread(
             };
         }
 
-        if step_cpu
+        if step_cpu && !cpu_stat.get_stop_request()
         {
             let inner_repeat_count = step_repeat_count;
 

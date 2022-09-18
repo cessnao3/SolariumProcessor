@@ -418,7 +418,8 @@ mod tests
             ("reset", 5),
             ("pop", 6),
             ("ret", 7),
-            ("retint", 8)
+            ("retint", 8),
+            ("halt", 9)
         ];
 
         let binary_result = assemble(&line_test.iter().map(|v| v.0).collect::<Vec<_>>());
@@ -702,12 +703,12 @@ mod tests
         // Determine the expected values
         let mut expected_result = HashMap::<usize, u16>::new();
         expected_result.insert(0, 0x20);
-        expected_result.insert(0x20, 0xC2);
+        expected_result.insert(0x20, 0xC3);
         expected_result.insert(0x21, 0x0400);
         expected_result.insert(0x22, 0x3095);
         expected_result.insert(0x23, 0x4500);
         expected_result.insert(0x24, 0x5);
-        expected_result.insert(0x25, 0x1161);
+        expected_result.insert(0x25, 0x1162);
         expected_result.insert(0x26, 0x1218);
         expected_result.insert(0x27, 0x1016);
         expected_result.insert(0x28, 0x1007);
@@ -753,9 +754,9 @@ mod tests
         // Define the shortcuts to test
         let reg_shortcuts = vec![
             ("$pc", 0),
-            ("$sp", 1),
-            ("$spb", 2),
-            ("$stat", 3),
+            ("$stat", 1),
+            ("$sp", 2),
+            ("$spb", 3),
             ("$ret", 4),
             ("$arg", 5)
         ];

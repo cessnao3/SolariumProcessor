@@ -49,6 +49,9 @@ pub fn get_instruction_map() -> HashMap::<String, Box<dyn ToInstructionData>>
         "retint".to_string(),
         Box::new(SingleInstruction::new(8)));
     instructions.insert(
+        "halt".to_string(),
+        Box::new(SingleInstruction::new(9)));
+    instructions.insert(
         "jmp".to_string(),
         Box::new(RegisterInstruction::new(1, 1)));
     instructions.insert(
