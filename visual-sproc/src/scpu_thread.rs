@@ -87,7 +87,12 @@ pub fn run_scpu_thread(
             };
         }
 
-        if step_cpu && !cpu_stat.get_stop_request()
+        if cpu_stat.get_stop_request()
+        {
+            step_cpu = false;
+        }
+
+        if step_cpu
         {
             let inner_repeat_count = step_repeat_count;
 
