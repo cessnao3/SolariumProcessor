@@ -4,6 +4,13 @@
 .oper 0x20
 .loadloc hw_int_0
 
+.oper 0x100
+:global_num_threads
+.load 0
+:global_current_thread
+.load 0
+:global_thread_pc_stack
+
 .oper 0x400
 :stack_pointer_base
 
@@ -12,11 +19,6 @@
 
 .oper 0x800
 :thread_2_sp_base
-
-.oper 0x2000
-:global_num_threads
-.load 0
-:global_thread_pc_stack
 
 .oper 0x3000
 
@@ -34,6 +36,9 @@ ld 8, $arg
 add $arg, $arg, 7
 ld 9, $arg
 
+; Copy the base SP into a register with the ending location
+add 11, 9, 11
+
 ; Save the stack location to the global PC stack
 ldn 13
 .loadloc global_num_threads
@@ -42,7 +47,7 @@ ld 14, 13
 ldn 12
 .loadloc global_thread_pc_stack
 add 12, 12, 14
-sav 12, 9
+sav 12, 11
 
 add 14, 14, 7
 sav 13, 14
@@ -56,7 +61,6 @@ sav 9, $stat
 add 9, 9, 7
 
 ; Push SP (R2) to the new stack
-add 11, 8, 11
 sav 9, 11
 add 9, 9, 7
 
@@ -72,6 +76,29 @@ ret
 
 :hw_int_0
 
+; Load constants
+ldn 9
+.loadloc global_current_thread
+ld 10, 9
+ldn 11
+.loadloc global_num_threads
+ld 11, 11
+ldn 12
+.loadloc global_thread_pc_stack
+
+; Save the current stack
+add 13, 12, 10
+sav 13, $sp
+
+; Increment to the next stack
+ldi 14, 1
+add 10, 10, 14
+rem 10, 10, 11
+add 13, 12, 10
+ld $sp, 13
+sav 9, 10
+
+; Resume the next thread
 retint
 
 .oper 0x4000
@@ -107,9 +134,7 @@ pop
 pop
 
 ldn $sp
-.loadloc thread_1_sp_base
-ldi 8, $sp
-add $sp, $sp, 8
+.loadloc global_thread_pc_stack
 ld $sp, $sp
 halt
 retint
@@ -122,13 +147,17 @@ jmpri temp_loc
 
 .oper 0x6000
 :thread_1_main
+inton
+:thread_1_loop
 noop
 noop
 noop
-jmpri thread_1_main
+jmpri thread_1_loop
 
 .oper 0x8000
 :thread_2_main
+inton
+:thread_2_loop
 noop
 noop
-jmpri thread_2_main
+jmpri thread_2_loop

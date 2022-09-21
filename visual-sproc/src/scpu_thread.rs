@@ -90,6 +90,7 @@ pub fn run_scpu_thread(
         if cpu_stat.get_stop_request()
         {
             step_cpu = false;
+            update_memory = true;
         }
 
         if step_cpu

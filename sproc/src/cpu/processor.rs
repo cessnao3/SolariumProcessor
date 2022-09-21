@@ -268,6 +268,10 @@ impl SolariumProcessor
                 mem_val)?;
         }
 
+        self.registers.set(
+            Register::StackPointer,
+            MemoryWord::new(mem_val_base as u16))?;
+
         return Ok(());
     }
 
