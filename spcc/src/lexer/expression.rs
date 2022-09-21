@@ -238,8 +238,13 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
                         break;
                     }
 
-                    // Check for comma if needed
-                    if num_args > 0
+                    // Add the SP copy to ARG if the first argument is provided
+                    // Otherwise, check for comma if needed
+                    if num_args == 0
+                    {
+                        assembly.push(format!("copy $arg, $sp"));
+                    }
+                    else
                     {
                         // Read the comma
                         match iter.next()
@@ -259,7 +264,6 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
                     // Increment the argument count
                     num_args += 1;
                 }
-
 
                 // Check for the output function
                 let func_var = scopes.get_variable(&name)?;
