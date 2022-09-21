@@ -23,141 +23,234 @@
 .oper 0x3000
 
 :init_thread
+; args (start_loc, stack_ptr_loc)
+    ; Load useful parameters to registers
+    ldi 7, 1
+    ldi 10, 0
+    ldi 11, 16
 
-; Load useful parameters to registers
-ldi 7, 1
-ldi 10, 0
-ldi 11, 16
+    ; Load the main start location into register 8
+    ld 8, $arg
 
-; Load the main start location into register 8
-ld 8, $arg
+    ; Increment and load the stack location into register 9
+    add $arg, $arg, 7
+    ld 9, $arg
 
-; Increment and load the stack location into register 9
-add $arg, $arg, 7
-ld 9, $arg
+    ; Copy the base SP into a register with the ending location
+    add 11, 9, 11
 
-; Copy the base SP into a register with the ending location
-add 11, 9, 11
+    ; Save the stack location to the global PC stack
+    ldn 13
+    .loadloc global_num_threads
+    ld 14, 13
 
-; Save the stack location to the global PC stack
-ldn 13
-.loadloc global_num_threads
-ld 14, 13
+    ldn 12
+    .loadloc global_thread_pc_stack
+    add 12, 12, 14
+    sav 12, 11
 
-ldn 12
-.loadloc global_thread_pc_stack
-add 12, 12, 14
-sav 12, 11
+    add 14, 14, 7
+    sav 13, 14
 
-add 14, 14, 7
-sav 13, 14
+    ; Push PC (R0) to the new stack
+    sav 9, 8
+    add 9, 9, 7
 
-; Push PC (R0) to the new stack
-sav 9, 8
-add 9, 9, 7
+    ; Push Flags (R1) to the new stack
+    sav 9, $stat
+    add 9, 9, 7
 
-; Push Flags (R1) to the new stack
-sav 9, $stat
-add 9, 9, 7
+    ; Push SP (R2) to the new stack
+    sav 9, 11
+    add 9, 9, 7
 
-; Push SP (R2) to the new stack
-sav 9, 11
-add 9, 9, 7
+    ; Push SPB (R3) to the new stack
+    add 9, 9, 7
 
-; Push SPB (R3) to the new stack
-add 9, 9, 7
+    ; Push return and argument registers (R4, R5)
+    sav 9, 10
+    add 9, 9, 7
+    sav 9, 10
 
-; Push return and argument registers (R4, R5)
-sav 9, 10
-add 9, 9, 7
-sav 9, 10
-
-ret
+    ret
 
 :hw_int_0
+    ; Write Switch
+    ldn 9
+    .loadloc msg_switch
+    ldn 10
+    .loadloc func_print_str
 
-; Load constants
-ldn 9
-.loadloc global_current_thread
-ld 10, 9
-ldn 11
-.loadloc global_num_threads
-ld 11, 11
-ldn 12
-.loadloc global_thread_pc_stack
+    copy $arg, $sp
+    push 9
+    call 10
+    pop
 
-; Save the current stack
-add 13, 12, 10
-sav 13, $sp
+    ; Load constants
+    ldn 9
+    .loadloc global_current_thread
+    ld 10, 9
+    ldn 11
+    .loadloc global_num_threads
+    ld 11, 11
+    ldn 12
+    .loadloc global_thread_pc_stack
 
-; Increment to the next stack
-ldi 14, 1
-add 10, 10, 14
-rem 10, 10, 11
-add 13, 12, 10
-ld $sp, 13
-sav 9, 10
+    ; Save the current stack
+    add 13, 12, 10
+    sav 13, $sp
 
-; Resume the next thread
-retint
+    ; Increment to the next stack
+    ldi 14, 1
+    add 10, 10, 14
+    rem 10, 10, 11
+    add 13, 12, 10
+    ld $sp, 13
+    sav 9, 10
+
+    ; Resume the next thread
+    retint
+
+; Define the location for the serial device
+:dev_serial_loc
+    .load 0xA000
+
+:msg_init
+.loadtext "Starting Program..."
+
+:msg_switch
+.loadtext "Switching Task"
+
+:msg_task_a
+.loadtext "TSK_A"
+
+:msg_task_b
+.loadtext "TSK_B"
+
+:func_print_str
+    ldn 13
+    .loadloc dev_serial_loc
+    ld 13, 13
+
+    ; Mark the location to write serial values to
+    ldi 15, 3
+    add 15, 15, 13
+
+    ; Load the argument value
+    arg 6, 0
+
+    :func_print_str_loop
+        ld 7, 6
+        ldi 8, 1
+        tz 7
+        jmpri func_print_str_end
+        sav 15, 7
+        add 6, 8, 6
+        jmpri func_print_str_loop
+
+    :func_print_str_end
+    ldi 7, 10
+    sav 15, 7
+    ret
+
+
 
 .oper 0x4000
 :program_start
+    ldn $sp
+    .loadloc stack_pointer_base
 
-ldn $sp
-.loadloc stack_pointer_base
+    ; Start to init thread 1
+    ldn 10
+    .loadloc thread_1_main
+    ldn 11
+    .loadloc thread_1_sp_base
+    ldn 12
+    .loadloc init_thread
 
-; Start to init thread 1
-ldn 10
-.loadloc thread_1_main
-ldn 11
-.loadloc thread_1_sp_base
-ldn 12
-.loadloc init_thread
+    copy $arg, $sp
+    push 10
+    push 11
+    call 12
+    pop
+    pop
 
-copy $arg, $sp
-push 10
-push 11
-call 12
-pop
-pop
+    ldn 10
+    .loadloc thread_2_main
+    ldn 11
+    .loadloc thread_2_sp_base
 
-ldn 10
-.loadloc thread_2_main
-ldn 11
-.loadloc thread_2_sp_base
+    push 10
+    push 11
+    call 12
+    pop
+    pop
 
-push 10
-push 11
-call 12
-pop
-pop
+    ldn 10
+    .loadloc msg_init
+    ldn 11
+    .loadloc func_print_str
+    push 10
+    call 11
+    pop
 
-ldn $sp
-.loadloc global_thread_pc_stack
-ld $sp, $sp
-halt
-retint
-
-:temp_loc
-noop
-noop
-noop
-jmpri temp_loc
+    ldn $sp
+    .loadloc global_thread_pc_stack
+    ld $sp, $sp
+    retint
 
 .oper 0x6000
 :thread_1_main
-inton
-:thread_1_loop
-noop
-noop
-noop
-jmpri thread_1_loop
+    inton
+    :thread_1_loop
+        ldn 10
+        .load 50
+        ldi 11, 1
+        ldn 12
+        .loadloc func_print_str
+        ldn 13
+        .loadloc msg_task_a
+
+        :thread_1_loop_loop
+            sub 10, 10, 11
+            tz 10
+            jmpri thread_1_loop_loop_end
+            jmpri thread_1_loop_loop
+        :thread_1_loop_loop_end
+
+        intoff
+        copy $arg, $sp
+        push 13
+        call 12
+        pop
+        inton
+
+        jmpri thread_1_loop
 
 .oper 0x8000
 :thread_2_main
-inton
-:thread_2_loop
-noop
-noop
-jmpri thread_2_loop
+    inton
+    :thread_2_loop
+        ldn 10
+        .load 50
+        ldi 11, 1
+        ldn 12
+        .loadloc func_print_str
+        ldn 13
+        .loadloc msg_task_b
+
+        :thread_2_loop_loop
+            sub 10, 10, 11
+            tz 10
+            jmpri thread_2_loop_loop_end
+            jmpri thread_2_loop_loop
+        :thread_2_loop_loop_end
+
+        intoff
+        copy $arg, $sp
+        push 13
+        call 12
+        pop
+        inton
+
+        jmpri thread_2_loop
