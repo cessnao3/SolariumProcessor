@@ -14,7 +14,7 @@ retint
 
 .oper 0x4000
 :program_start
-ldn $spb
+ldn $sp
 .load 0x400
 ldn 13
 .load 0xA000

@@ -677,7 +677,7 @@ mod tests
             "; Move to the starting location",
             ".oper 0x20",
             ":start",
-            "ldn $spb",
+            "ldn $sp",
             ".load 0x400",
             "",
             ":register_reset",
@@ -703,7 +703,7 @@ mod tests
         // Determine the expected values
         let mut expected_result = HashMap::<usize, u16>::new();
         expected_result.insert(0, 0x20);
-        expected_result.insert(0x20, 0xC3);
+        expected_result.insert(0x20, 0xC2);
         expected_result.insert(0x21, 0x0400);
         expected_result.insert(0x22, 0x3095);
         expected_result.insert(0x23, 0x4500);
@@ -756,7 +756,6 @@ mod tests
             ("$pc", 0),
             ("$stat", 1),
             ("$sp", 2),
-            ("$spb", 3),
             ("$ret", 4),
             ("$arg", 5)
         ];

@@ -28,9 +28,9 @@ pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String>
     let stack_pointer_offset = 0x400;
     program.extend(vec![
         "; Load and call the main function".to_string(),
-        format!("ldn $spb"),
+        format!("ldn $sp"),
         format!(".load {0:}", stack_pointer_offset),
-        format!("copy {0:}, $spb", REG_FRAME_SP_BASE),
+        format!("copy {0:}, $sp", REG_FRAME_SP_BASE),
         format!("ldn 5"),
         ".loadloc main_entry_point".to_string(),
         "call 5".to_string(),

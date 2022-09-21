@@ -6,7 +6,6 @@ pub enum Register
 {
     ProgramCounter,
     StackPointer,
-    StackBase,
     StatusFlags,
     Return,
     ArgumentBase,
@@ -24,7 +23,6 @@ impl Register
             Register::ProgramCounter => 0,
             Register::StatusFlags => 1,
             Register::StackPointer => 2,
-            Register::StackBase => 3,
             Register::Return => 4,
             Register::ArgumentBase => 5,
             Register::GP(ind) => *ind

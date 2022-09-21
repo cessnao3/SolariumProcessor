@@ -4,7 +4,7 @@
 ; Move to the starting location
 .oper 0x20
 :start
-ldn $spb
+ldn $sp
 .load 0x400
 
 :register_reset

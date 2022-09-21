@@ -7,7 +7,7 @@
 ; Define the starting location
 .oper 0x1000
 :start
-ldn $spb
+ldn $sp
 .load 0x400
 
 ; Load the string location into memory

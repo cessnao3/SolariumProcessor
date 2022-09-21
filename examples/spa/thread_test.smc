@@ -28,11 +28,11 @@ ldi 10, 0
 ldi 11, 16
 
 ; Load the main start location into register 8
-copy 8, $arg
+ld 8, $arg
 
 ; Increment and load the stack location into register 9
 add $arg, $arg, 7
-copy 9, $arg
+ld 9, $arg
 
 ; Save the stack location to the global PC stack
 ldn 13
@@ -56,11 +56,11 @@ sav 9, $stat
 add 9, 9, 7
 
 ; Push SP (R2) to the new stack
+add 11, 8, 11
 sav 9, 11
 add 9, 9, 7
 
 ; Push SPB (R3) to the new stack
-sav 9, 8
 add 9, 9, 7
 
 ; Push return and argument registers (R4, R5)
@@ -77,7 +77,7 @@ retint
 .oper 0x4000
 :program_start
 
-ldn $spb
+ldn $sp
 .loadloc stack_pointer_base
 
 ; Start to init thread 1
@@ -88,7 +88,7 @@ ldn 11
 ldn 12
 .loadloc init_thread
 
-add $arg, $sp, $spb
+copy $arg, $sp
 push 10
 push 11
 call 12
@@ -106,10 +106,29 @@ call 12
 pop
 pop
 
+ldn $sp
+.loadloc thread_1_sp_base
+ldi 8, $sp
+add $sp, $sp, 8
+ld $sp, $sp
+halt
+retint
+
+:temp_loc
+noop
+noop
+noop
+jmpri temp_loc
+
 .oper 0x6000
 :thread_1_main
-jmpri -1
+noop
+noop
+noop
+jmpri thread_1_main
 
 .oper 0x8000
 :thread_2_main
-jmpri -1
+noop
+noop
+jmpri thread_2_main

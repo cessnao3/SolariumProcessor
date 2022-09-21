@@ -44,7 +44,7 @@ There are 16 total registers present on the S/Proc. These are defined generally 
         R0 & Program Counter \\
         R1 & Processor Status Flags \\
         R2 & Stack Pointer \\
-        R3 & Stack Base \\
+        R3 & {} \\
         R4 & Return Register \\
         R5 & Argument Base Register \\
         R6-R15 & General Purpose Register \\
@@ -54,9 +54,9 @@ There are 16 total registers present on the S/Proc. These are defined generally 
     \label{table:register-setup}
 \end{table}
 
-The program counter indicates the next instruction to be read. At the beginning of the processor cycle, the instruction at the memory address of the program counter is read in and processed. Then, the program counter is incremented at the end of each instruction cycle. If this value is needed to be modified, it is recommended to use the absolute jump instruction, \texttt{jmp}, or the relative jump instruction, \texttt{jmpr}.
+The program counter indicates the next instruction to be read. At the beginning of the processor cycle, the instruction at the memory address of the program counter is read in and processed. Then, the program counter is incremented at the end of each instruction cycle. If this value is needed to be modified, it is recommended to use the absolute jump instruction, \texttt{jmp}, or the relative jump instruction, \texttt{jmpr}, as opposed to writing directly to the register. This will automatically account for the increment at the end of the instruction cycle.
 
-The global stack pointer maintains the global stack, as defined in Section \ref{sec:the-stack}. This provides the offset from the stack's base address right off-the-end of the current stack contents. Thus, when the stack is empty, it points to the stack base address, and when the stack is completely full it points to the memory location just above the last stack entry, or the base address plus the stack size. This value should not be edited by-hand to maintain the consistency of the program execution, but is instead modified by the stack instructions \texttt{push}, \texttt{pop}, \texttt{popr}, \texttt{call}, \texttt{ret}, \texttt{retint}, and \texttt{int}, as well as hardware interrupts.
+The global stack pointer maintains the global stack, as defined in Section \ref{sec:the-stack}. This provides the absolute address of the current stack location. Thus, when the stack is empty, it points to the stack base address, and when the stack is completely full it points to the memory location just above the last stack entry, or the base address plus the stack size. This value should not be edited by-hand to maintain the consistency of the program execution, but is instead modified by the stack instructions \texttt{push}, \texttt{pop}, \texttt{popr}, \texttt{call}, \texttt{ret}, \texttt{retint}, and \texttt{int}, as well as hardware interrupts. This should be loaded by the init program by assembly, however, to provide the default base location for the stack.
 
 The return value instruction is intended to store the result of a function call, made using the \texttt{call} instruction. When the processor status flags are replaced with the caller's flags after the \texttt{ret} instruction is called, the return value is the only register that remains unchanged.
 
@@ -114,7 +114,7 @@ On any reset, interrupts will be allowed by default.
 \subsection{The Stack}
 \label{sec:the-stack}
 
-The stack pointer provides an offset from the stack pointer starting location. The base of the stack is defined by the memory location in the stack base register. If the stack pointer is ever popped such that its value would underflow 0 or would reach greater than the maximum allowed size, the processor will error and halt.
+The stack pointer provides the absolute address of the stack pointer. The pointer points to the memory location just above the current stack location. If the stack is empty, the stack pointer points to the base address. Note that the base address is user-selectable, and there are no protections for stack under or overflow conditions, outside of wrapping around the minimum or maximum memory address, where the processor will error and halt.
 
 \subsection{Interrupts}
 
@@ -249,7 +249,6 @@ Reference names are available to link to the special register values, as listed 
         \texttt{\$pc} & 0 & Program Counter \\
         \texttt{\$stat} & 1 & Status Flags \\
         \texttt{\$sp} & 2 & Stack Pointer \\
-        \texttt{\$spb} & 3 & Stack Pointer Base \\
         \texttt{\$ret} & 4 & Return \\
         \texttt{\$arg} & 5 & Argument Base \\
         \hline

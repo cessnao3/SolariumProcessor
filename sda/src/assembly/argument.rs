@@ -196,7 +196,6 @@ impl FromStr for Argument
                 "pc" => 0,
                 "stat" => 1,
                 "sp" => 2,
-                "spb" => 3,
                 "ret" => 4,
                 "arg" => 5,
                 _ => return Err(ParseArgumentError

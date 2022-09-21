@@ -91,7 +91,7 @@ ret
 ; Define the starting location
 .oper 0x4000
 :start_init
-ldn $spb
+ldn $sp
 .load 0x400
 
 ; Disable interrupts while the init text is printing
@@ -110,12 +110,12 @@ jmpri 2
 .loadloc input_prompt_text_str_1
 ldri 8, -1
 
-copy $arg, $spb
+copy $arg, $sp
 push 7
 call 6
 pop
 
-copy $arg, $spb
+copy $arg, $sp
 push 8
 call 6
 pop

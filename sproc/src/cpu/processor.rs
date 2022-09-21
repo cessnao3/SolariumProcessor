@@ -135,7 +135,7 @@ impl SolariumProcessor
     }
 
     /// Obtains the current value of the stack pointer offset from the initial stack location
-    fn get_sp_offset(&self) -> Result<usize, SolariumError>
+    fn get_stack_pointer(&self) -> Result<usize, SolariumError>
     {
         return Ok(self.registers.get(Register::StackPointer)?.get() as usize);
     }
@@ -143,7 +143,7 @@ impl SolariumProcessor
     /// Pushes a value onto the stack
     fn push_sp(&mut self, value: MemoryWord) -> Result<(), SolariumError>
     {
-        let current_sp = self.get_sp_offset()?;
+        let current_sp = self.get_stack_pointer()?;
         let new_sp = current_sp + 1;
 
         self.registers.set(
@@ -151,14 +151,8 @@ impl SolariumProcessor
             MemoryWord::new(new_sp as u16))?;
 
         return self.memory_map.set(
-            self.get_sp_address_for_offset(current_sp)?,
+            current_sp,
             value);
-    }
-
-    /// Provide the resulting stack pointer address for the given offset
-    fn get_sp_address_for_offset(&self, offset: usize) -> Result<usize, SolariumError>
-    {
-        return Ok(self.registers.get(Register::StackBase)?.get() as usize + offset);
     }
 
     /// Pops a value off of the stack and returns the result
@@ -170,7 +164,7 @@ impl SolariumProcessor
         // Subtract one from the stack pointer
         self.registers.set(
             Register::StackPointer,
-            MemoryWord::new(self.get_sp_offset()? as u16 - 1))?;
+            MemoryWord::new(self.get_stack_pointer()? as u16 - 1))?;
 
         // Return the result
         return Ok(ret_val);
@@ -179,13 +173,14 @@ impl SolariumProcessor
     /// Peeks at the value currently on the top of the stack
     fn peek_sp(&self) -> Result<MemoryWord, SolariumError>
     {
-        if self.get_sp_offset()? == 0
+        let sp = self.get_stack_pointer()?;
+        if sp == 0
         {
             return Err(SolariumError::StackUnderflow);
         }
         else
         {
-            return self.memory_map.get(self.get_sp_address_for_offset(self.get_sp_offset()? - 1)?);
+            return self.memory_map.get(sp - 1);
         }
     }
 
@@ -235,20 +230,19 @@ impl SolariumProcessor
     fn push_all_registers(&mut self) -> Result<(), SolariumError>
     {
         // Base Addr
-        let base_sp = self.get_sp_offset()?;
-        let base_addr = self.get_sp_address_for_offset(base_sp)?;
+        let current_sp = self.get_stack_pointer()?;
 
         // Push all the existing register values
         for i in 0..RegisterManager::NUM_REGISTERS
         {
             self.memory_map.set(
-                base_addr + i,
+                current_sp + i,
                 self.registers.get(Register::GP(i))?)?;
         }
 
         self.registers.set(
             Register::StackPointer,
-            MemoryWord::new((base_sp + RegisterManager::NUM_REGISTERS) as u16))?;
+            MemoryWord::new((current_sp + RegisterManager::NUM_REGISTERS) as u16))?;
 
         return Ok(());
     }
@@ -256,14 +250,14 @@ impl SolariumProcessor
     /// Pops all register values from the stack back into the register values
     fn pop_all_registers(&mut self) -> Result<(), SolariumError>
     {
-        let current_sp_offset = self.get_sp_offset()?;
+        let current_sp = self.get_stack_pointer()?;
 
-        if current_sp_offset < RegisterManager::NUM_REGISTERS
+        if current_sp < RegisterManager::NUM_REGISTERS
         {
             return Err(SolariumError::StackUnderflow);
         }
 
-        let mem_val_base = self.get_sp_address_for_offset(current_sp_offset - RegisterManager::NUM_REGISTERS)?;
+        let mem_val_base = current_sp - RegisterManager::NUM_REGISTERS;
 
         for i in 0..RegisterManager::NUM_REGISTERS
         {
@@ -792,46 +786,16 @@ impl SolariumProcessor
 
                         let arith_func = match opcode
                         {
-                            4 => // add
-                            {
-                                fun_add
-                            },
-                            5 => //sub
-                            {
-                                fun_sub
-                            },
-                            6 => // mul
-                            {
-                                fun_mul
-                            },
-                            7 => // div
-                            {
-                                fun_div
-                            },
-                            8 => // rem
-                            {
-                                fun_rem
-                            },
-                            9 => // band
-                            {
-                                fun_band
-                            }
-                            10 => // bor
-                            {
-                                fun_bor
-                            }
-                            11 => //bxor
-                            {
-                                fun_bxor
-                            }
-                            12 => // bshft
-                            {
-                                fun_bshft
-                            },
-                            _ => // ERROR
-                            {
-                                panic!();
-                            }
+                            4 => fun_add,
+                            5 => fun_sub,
+                            6 => fun_mul,
+                            7 => fun_div,
+                            8 => fun_rem,
+                            9 => fun_band,
+                            10 => fun_bor,
+                            11 => fun_bxor,
+                            12 => fun_bshft,
+                            _ => panic!()
                         };
 
                         let val_a = self.registers.get(Register::GP(arg1 as usize))?;
