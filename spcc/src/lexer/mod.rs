@@ -11,7 +11,7 @@ mod token_iter;
 mod program;
 
 use self::common::ScopeManager;
-use self::common::REG_FRAME_SP_BASE;
+use self::common::REG_FRAME_SP_VALUE;
 use self::statement::read_base_statement;
 use self::token_iter::TokenIter;
 use self::program::ProgramSection;
@@ -30,7 +30,7 @@ pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String>
         "; Load and call the main function".to_string(),
         format!("ldn $sp"),
         format!(".load {0:}", stack_pointer_offset),
-        format!("copy {0:}, $sp", REG_FRAME_SP_BASE),
+        format!("copy {0:}, $sp", REG_FRAME_SP_VALUE),
         format!("ldn 5"),
         ".loadloc main_entry_point".to_string(),
         "call 5".to_string(),

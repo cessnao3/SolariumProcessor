@@ -130,7 +130,6 @@ impl NamedMemoryValue for Variable
         return vec![
             format!("ldn {0:}", register),
             format!(".load {0:}", self.offset),
-            format!("add {0:}, {0:}, {1:}", register, REG_FRAME_SP_BASE),
             format!("add {0:}, {0:}, {1:}", register, REG_FRAME_SP_VALUE)
         ];
     }
