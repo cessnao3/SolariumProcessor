@@ -47,8 +47,8 @@ impl StatusFlag
     {
         return MemoryWord::new(match self
         {
-            StatusFlag::InterruptEnable => (1 << 0),
-            StatusFlag::SignedArithmetic => (1 << 1)
+            StatusFlag::InterruptEnable => 1 << 0,
+            StatusFlag::SignedArithmetic => 1 << 1
         });
     }
 }
