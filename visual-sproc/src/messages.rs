@@ -3,25 +3,6 @@ use sproc::common::MemoryWord;
 use super::processor_state::RegisterArray;
 
 #[derive(Clone, Copy)]
-pub struct SerialBuffer
-{
-    pub ptr: *mut Vec<char>
-}
-unsafe impl Send for SerialBuffer {}
-unsafe impl Sync for SerialBuffer {}
-
-impl SerialBuffer
-{
-    pub fn from_box(b: Box<Vec<char>>) -> SerialBuffer
-    {
-        return Self
-        {
-            ptr: Box::into_raw(b)
-        };
-    }
-}
-
-#[derive(Clone, Copy)]
 pub enum FltkMessage
 {
     Step,
@@ -33,7 +14,7 @@ pub enum FltkMessage
     CompileToText,
     Tick,
     SetSpeed(f64),
-    SerialInput(SerialBuffer),
+    SerialInput,
     HardwareInterrupt(usize),
     FileLoadError
 }

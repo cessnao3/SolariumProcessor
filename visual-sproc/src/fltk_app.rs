@@ -5,7 +5,7 @@ use fltk::prelude::*;
 use fltk::table::{Table, TableRowSelectMode, TableContext};
 use fltk::{app::*, draw, button::*, dialog::*, window::*, text::*, group::*, frame::*, valuator::*};
 
-use super::messages::{ThreadMessage, GuiMessage, FltkMessage, SerialBuffer};
+use super::messages::{ThreadMessage, GuiMessage, FltkMessage};
 
 use super::fltk_registers::setup_register_group;
 
@@ -28,7 +28,7 @@ fn get_app_icon() -> PngImage
 
 fn get_default_text() -> String
 {
-    let text_bytes = include_bytes!("../../examples/spa/thread_test.smc");
+    let text_bytes = include_bytes!("../../examples/spa/default.smc");
     return match std::str::from_utf8(text_bytes)
     {
         Ok(v) => v.to_string(),
@@ -115,6 +115,11 @@ pub fn setup_and_run_app(
     let shared_table_memory = Rc::new(RefCell::new(Vec::<MemoryWord>::new()));
     shared_table_memory.borrow_mut().resize(MEM_MAX_SIZE, MemoryWord::new(0));
 
+    // Add helpers for serial input
+    let serial_input_queue = Vec::<Vec::<char>>::new();
+    let serial_input_queue = Mutex::new(serial_input_queue);
+    let serial_input_queue = Arc::new(serial_input_queue);
+
     // Define the memory group values
     let mut serial_output;
     let mut serial_input;
@@ -192,49 +197,63 @@ pub fn setup_and_run_app(
 
         serial_input = Input::default();
         memory_group.set_size(&mut serial_input, 28);
-        serial_input.handle(move |input, event|
+
         {
-            if event == Event::KeyDown
+            let serial_input_queue_clone = serial_input_queue.clone();
+            serial_input.handle(move |input, event|
             {
-                if event_key() == Key::Enter
+                if event == Event::KeyDown
                 {
-                    let mut input_string = input.value();
-                    input_string.push('\n');
+                    if event_key() == Key::Enter
+                    {
+                        let mut input_string = input.value();
+                        input_string.push('\n');
 
-                    let box_char = Box::new(input_string.chars().collect::<Vec<_>>());
-                    fltk_sender.send(FltkMessage::SerialInput(SerialBuffer::from_box(box_char)));
+                        if let Ok(mut m) = serial_input_queue_clone.lock()
+                        {
+                            m.push(input_string.chars().collect::<Vec<_>>());
+                        }
 
-                    input.set_value("");
+                        fltk_sender.send(FltkMessage::SerialInput);
 
-                    return true;
+                        input.set_value("");
+
+                        return true;
+                    }
                 }
-            }
-            return false;
-        });
+                return false;
+            });
+        }
 
         // Set the load input from file
         let mut serial_file_load_button = Button::default().with_label("Load File");
         memory_group.set_size(&mut serial_file_load_button, 20);
 
-        serial_file_load_button.set_callback(move |_|
         {
-            let mut file_browser = NativeFileChooser::new(FileDialogType::BrowseFile);
-            file_browser.show();
-
-            let path: PathBuf = file_browser.filename();
-
-            let str_vals = match std::fs::read_to_string(path)
+            let serial_input_queue_clone = serial_input_queue.clone();
+            serial_file_load_button.set_callback(move |_|
             {
-                Ok(v) => v,
-                Err(_) => {
-                    fltk_sender.send(FltkMessage::FileLoadError);
-                    return;
-                }
-            };
+                let mut file_browser = NativeFileChooser::new(FileDialogType::BrowseFile);
+                file_browser.show();
 
-            let box_char = Box::new(str_vals.replace('\r', "").chars().collect::<Vec<_>>());
-            fltk_sender.send(FltkMessage::SerialInput(SerialBuffer::from_box(box_char)));
-        });
+                let path: PathBuf = file_browser.filename();
+
+                let str_vals = match std::fs::read_to_string(path)
+                {
+                    Ok(v) => v,
+                    Err(_) => {
+                        fltk_sender.send(FltkMessage::FileLoadError);
+                        return;
+                    }
+                };
+
+                if let Ok(mut m) = serial_input_queue_clone.lock()
+                {
+                    m.push(str_vals.replace('\r', "").chars().collect::<Vec<_>>());
+                }
+                fltk_sender.send(FltkMessage::SerialInput);
+            });
+        }
 
         memory_group.set_margin(10);
         memory_group.end();
@@ -423,10 +442,22 @@ pub fn setup_and_run_app(
                 {
                     msg_to_send = Some(ThreadMessage::HardwareInterrupt(int_val));
                 },
-                FltkMessage::SerialInput(c) =>
+                FltkMessage::SerialInput =>
                 {
-                    let data = unsafe { Box::from_raw(c.ptr) };
-                    msg_to_send = Some(ThreadMessage::SerialInput(data));
+                    let data;
+                    if let Ok(mut m) = serial_input_queue.lock()
+                    {
+                        data = m.pop();
+                    }
+                    else
+                    {
+                        data = None;
+                    }
+
+                    if let Some(cv) = data
+                    {
+                        msg_to_send = Some(ThreadMessage::SerialInput(Box::new(cv)));
+                    }
                 },
                 FltkMessage::FileLoadError =>
                 {
