@@ -8,7 +8,6 @@ use sproc::devices::{SerialInputOutputDevice, InterruptClockDevice};
 use sproc::memory::{MEM_MAX_SIZE, MemorySegment, ReadOnlySegment, ReadWriteSegment};
 use sproc::common::{MemoryWord, SolariumError};
 
-
 pub type RegisterArray = [u16; SolariumProcessor::NUM_REGISTERS];
 
 pub struct ProcessorStatusStruct
@@ -17,7 +16,7 @@ pub struct ProcessorStatusStruct
     regs: RegisterArray,
     regs_updated: bool,
     step_error: bool,
-    last_assembly: Vec::<MemoryWord>,
+    last_assembly: Vec<MemoryWord>,
     serial_io_dev: Rc<RefCell<SerialInputOutputDevice>>,
     stop_request: bool,
     pub msg_queue: Vec<GuiMessage>
