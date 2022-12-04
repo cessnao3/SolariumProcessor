@@ -1,70 +1,50 @@
 use crate::tokenizer::Token;
 
-pub struct TokenIter
-{
+pub struct TokenIter {
     list: Vec<Token>,
     current: usize,
-    started: bool
+    started: bool,
 }
 
-impl TokenIter
-{
-    pub fn new(tokens: Vec<Token>) -> TokenIter
-    {
-        return Self
-        {
+impl TokenIter {
+    pub fn new(tokens: Vec<Token>) -> TokenIter {
+        return Self {
             list: tokens,
             current: 0,
-            started: false
+            started: false,
         };
     }
 
-    pub fn next(&mut self) -> Option<Token>
-    {
-        if !self.started
-        {
+    pub fn next(&mut self) -> Option<Token> {
+        if !self.started {
             self.started = true;
-        }
-        else if self.current < self.list.len()
-        {
+        } else if self.current < self.list.len() {
             self.current += 1;
         }
 
         return self.get_index_val(self.current);
     }
 
-    pub fn last(&self) -> Option<Token>
-    {
-        if !self.started
-        {
+    pub fn last(&self) -> Option<Token> {
+        if !self.started {
             return None;
-        }
-        else
-        {
+        } else {
             return self.get_index_val(self.current);
         }
     }
 
-    pub fn peek(&self) -> Option<Token>
-    {
-        if !self.started
-        {
+    pub fn peek(&self) -> Option<Token> {
+        if !self.started {
             return self.get_index_val(self.current);
-        }
-        else
-        {
+        } else {
             return self.get_index_val(self.current + 1);
         }
     }
 
-    fn get_index_val(&self, ind: usize) -> Option<Token>
-    {
-        if ind < self.list.len()
-        {
+    fn get_index_val(&self, ind: usize) -> Option<Token> {
+        if ind < self.list.len() {
             return Some(self.list[ind].clone());
-        }
-        else
-        {
+        } else {
             return None;
         }
     }

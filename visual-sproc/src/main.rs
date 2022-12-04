@@ -1,18 +1,17 @@
-mod processor_state;
 mod messages;
+mod processor_state;
 mod scpu_thread;
 
 mod fltk_app;
 mod fltk_registers;
 
-use std::thread;
 use std::sync::mpsc;
+use std::thread;
 
-use scpu_thread::run_scpu_thread;
 use fltk_app::setup_and_run_app;
+use scpu_thread::run_scpu_thread;
 
-fn main()
-{
+fn main() {
     // Define the CPU Thread join handle
     let cpu_thread;
 
@@ -27,15 +26,12 @@ fn main()
         });
 
         // Run the main application
-        setup_and_run_app(
-            gui_to_thread_tx,
-            thread_to_gui_rx);
+        setup_and_run_app(gui_to_thread_tx, thread_to_gui_rx);
     }
 
     // Wait for thread to exit
-    match cpu_thread.join()
-    {
+    match cpu_thread.join() {
         Ok(()) => (),
-        Err(_) => eprintln!("error joining to thread")
+        Err(_) => eprintln!("error joining to thread"),
     }
 }

@@ -12,13 +12,11 @@ mod program;
 
 use self::common::ScopeManager;
 use self::common::REG_FRAME_SP_VALUE;
+use self::program::ProgramSection;
 use self::statement::read_base_statement;
 use self::token_iter::TokenIter;
-use self::program::ProgramSection;
 
-
-pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String>
-{
+pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String> {
     let mut token_iter = TokenIter::new(tokens.clone());
 
     let mut scopes = ScopeManager::new();
@@ -35,18 +33,17 @@ pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String>
         ".loadloc main_entry_point".to_string(),
         "call 5".to_string(),
         "; Infinite Loop Ending Program".to_string(),
-        "jmpri 0".to_string()]);
+        "jmpri 0".to_string(),
+    ]);
 
     // Define the scope results
     program.extend(scopes.add_scope());
 
-    loop
-    {
-        match read_base_statement(&mut token_iter, &mut scopes)
-        {
+    loop {
+        match read_base_statement(&mut token_iter, &mut scopes) {
             Ok(Some(v)) => program.append(v),
             Ok(None) => break,
-            Err(e) => return Err(e)
+            Err(e) => return Err(e),
         };
     }
 
@@ -57,11 +54,23 @@ pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String>
         ".load 0x2000".to_string(),
         ".load 0x2000".to_string(),
         "; Program Start".to_string(),
-        ".oper 0x2000".to_string()
+        ".oper 0x2000".to_string(),
     ]);
 
-    resulting_instructions.extend(program.get_static_assembly().iter().map(|v| v.clone()).collect::<Vec<_>>());
-    resulting_instructions.extend(program.get_primary_assembly().iter().map(|v| v.clone()).collect::<Vec<_>>());
+    resulting_instructions.extend(
+        program
+            .get_static_assembly()
+            .iter()
+            .map(|v| v.clone())
+            .collect::<Vec<_>>(),
+    );
+    resulting_instructions.extend(
+        program
+            .get_primary_assembly()
+            .iter()
+            .map(|v| v.clone())
+            .collect::<Vec<_>>(),
+    );
 
     return Ok(resulting_instructions);
 }

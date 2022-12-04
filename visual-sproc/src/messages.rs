@@ -3,8 +3,7 @@ use sproc::common::MemoryWord;
 use super::processor_state::RegisterArray;
 
 #[derive(Clone, Copy)]
-pub enum FltkMessage
-{
+pub enum FltkMessage {
     Step,
     Start,
     Stop,
@@ -16,12 +15,11 @@ pub enum FltkMessage
     SetSpeed(f64),
     SerialInput,
     HardwareInterrupt(usize),
-    FileLoadError
+    FileLoadError,
 }
 
 #[derive(Clone)]
-pub enum ThreadMessage
-{
+pub enum ThreadMessage {
     SetMemory(Vec<MemoryWord>),
     Start,
     Stop,
@@ -29,14 +27,13 @@ pub enum ThreadMessage
     Step,
     SetSpeed(f64),
     SerialInput(Box<Vec<char>>),
-    HardwareInterrupt(usize)
+    HardwareInterrupt(usize),
 }
 
 #[derive(Clone)]
-pub enum GuiMessage
-{
+pub enum GuiMessage {
     UpdateRegisters(RegisterArray),
     UpdateMemory(Vec<MemoryWord>),
     SerialOutput(char),
-    LogMessage(String)
+    LogMessage(String),
 }

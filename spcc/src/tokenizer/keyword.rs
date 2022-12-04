@@ -1,8 +1,7 @@
 use crate::tokenizer::utils::is_separator;
 
 #[derive(Debug, Copy, Clone)]
-pub enum Keyword
-{
+pub enum Keyword {
     If,
     Else,
     While,
@@ -11,15 +10,12 @@ pub enum Keyword
     Const,
     Auto,
     Extern,
-    Return
+    Return,
 }
 
-impl ToString for Keyword
-{
-    fn to_string(&self) -> String
-    {
-        return (match self
-        {
+impl ToString for Keyword {
+    fn to_string(&self) -> String {
+        return (match self {
             Keyword::If => "if",
             Keyword::Else => "else",
             Keyword::While => "while",
@@ -28,15 +24,14 @@ impl ToString for Keyword
             Keyword::Const => "const",
             Keyword::Auto => "auto",
             Keyword::Extern => "extern",
-            Keyword::Return => "return"
-        }).to_string();
+            Keyword::Return => "return",
+        })
+        .to_string();
     }
 }
 
-impl Keyword
-{
-    fn enum_iter() -> &'static [Keyword]
-    {
+impl Keyword {
+    fn enum_iter() -> &'static [Keyword] {
         static VALUES: [Keyword; 9] = [
             Keyword::If,
             Keyword::Else,
@@ -46,32 +41,27 @@ impl Keyword
             Keyword::Const,
             Keyword::Auto,
             Keyword::Extern,
-            Keyword::Return
+            Keyword::Return,
         ];
 
         return &VALUES;
     }
 
-    pub fn try_match_keyword(input: &str) -> Option<(Keyword, usize)>
-    {
-        fn matches_keyword(input: &str, keyword: &str) -> bool
-        {
+    pub fn try_match_keyword(input: &str) -> Option<(Keyword, usize)> {
+        fn matches_keyword(input: &str, keyword: &str) -> bool {
             // Ensure that the input length is long enough
-            if input.len() < keyword.len()
-            {
+            if input.len() < keyword.len() {
                 return false;
             }
 
             // Ensure that all characters in the string are valid
-            if &input[0..keyword.len()] != keyword
-            {
+            if &input[0..keyword.len()] != keyword {
                 return false;
             }
 
             // If there is another character, it must be a separator
             let char_vec: Vec<char> = input.chars().collect();
-            if input.len() > keyword.len() && !is_separator(char_vec[keyword.len()])
-            {
+            if input.len() > keyword.len() && !is_separator(char_vec[keyword.len()]) {
                 return false;
             }
 
@@ -81,15 +71,11 @@ impl Keyword
 
         let keyword_vals: Vec<Keyword> = Keyword::enum_iter().iter().map(|v| *v).collect();
 
-        let keyword_checks: Vec<(Keyword, String)> = keyword_vals
-            .iter()
-            .map(|v| (*v, v.to_string()))
-            .collect();
+        let keyword_checks: Vec<(Keyword, String)> =
+            keyword_vals.iter().map(|v| (*v, v.to_string())).collect();
 
-        for (key, key_str) in keyword_checks
-        {
-            if matches_keyword(input, &key_str)
-            {
+        for (key, key_str) in keyword_checks {
+            if matches_keyword(input, &key_str) {
                 return Some((key, key_str.len()));
             }
         }

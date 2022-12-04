@@ -1,6 +1,5 @@
 #[derive(Clone, Copy)]
-pub enum Symbol
-{
+pub enum Symbol {
     Plus,
     Minus,
     Star,
@@ -29,15 +28,12 @@ pub enum Symbol
     BitwiseOr,
     ShiftLeft,
     ShiftRight,
-    Comma
+    Comma,
 }
 
-impl ToString for Symbol
-{
-    fn to_string(&self) -> String
-    {
-        return (match self
-        {
+impl ToString for Symbol {
+    fn to_string(&self) -> String {
+        return (match self {
             Symbol::Plus => "+",
             Symbol::Minus => "-",
             Symbol::Star => "*",
@@ -66,15 +62,14 @@ impl ToString for Symbol
             Symbol::ShiftRight => ">>",
             Symbol::Comma => ",",
             Symbol::OpenBracket => "[",
-            Symbol::CloseBracket => "]"
-        }).to_string();
+            Symbol::CloseBracket => "]",
+        })
+        .to_string();
     }
 }
 
-impl Symbol
-{
-    fn enum_iter() -> &'static [Symbol]
-    {
+impl Symbol {
+    fn enum_iter() -> &'static [Symbol] {
         static VALUES: [Symbol; 29] = [
             Symbol::Plus,
             Symbol::Minus,
@@ -104,46 +99,34 @@ impl Symbol
             Symbol::BitwiseOr,
             Symbol::Comma,
             Symbol::ShiftLeft,
-            Symbol::ShiftRight
+            Symbol::ShiftRight,
         ];
 
         return &VALUES;
     }
 
-    pub fn get_symbol_list() -> Vec<(String, Symbol)>
-    {
+    pub fn get_symbol_list() -> Vec<(String, Symbol)> {
         let mut symbol_list: Vec<Symbol> = Symbol::enum_iter().iter().map(|v| *v).collect();
 
         symbol_list.sort_by(|a, b| {
             let a_s = a.to_string();
             let b_s = b.to_string();
 
-            return if a_s.len() == b_s.len()
-            {
+            return if a_s.len() == b_s.len() {
                 std::cmp::Ordering::Equal
-            }
-            else if a_s.len() > b_s.len()
-            {
+            } else if a_s.len() > b_s.len() {
                 std::cmp::Ordering::Less
-            }
-            else
-            {
+            } else {
                 std::cmp::Ordering::Greater
             };
         });
 
-        return symbol_list
-            .iter()
-            .map(|v| (v.to_string(), *v))
-            .collect();
+        return symbol_list.iter().map(|v| (v.to_string(), *v)).collect();
     }
 
-    pub fn try_match_symbol(input: &str) -> Option<(Symbol, usize)>
-    {
-        for (symbol_text, symbol) in &Symbol::get_symbol_list()
-        {
-            if input.len() >= symbol_text.len() && &input[0..symbol_text.len()] == *symbol_text
-            {
+    pub fn try_match_symbol(input: &str) -> Option<(Symbol, usize)> {
+        for (symbol_text, symbol) in &Symbol::get_symbol_list() {
+            if input.len() >= symbol_text.len() && &input[0..symbol_text.len()] == *symbol_text {
                 return Some((*symbol, symbol_text.len()));
             }
         }

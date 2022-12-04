@@ -1,22 +1,18 @@
-use crate::tokenizer::tokenize;
 use crate::lexer::lexer;
+use crate::tokenizer::tokenize;
 
-pub fn compile(text: &str) -> Result<Vec<String>, String>
-{
-    let tokens = match tokenize(text)
-    {
+pub fn compile(text: &str) -> Result<Vec<String>, String> {
+    let tokens = match tokenize(text) {
         Ok(v) => v,
-        Err(e) => return Err(format!("Tokenizer Error: {0:}", e))
+        Err(e) => return Err(format!("Tokenizer Error: {0:}", e)),
     };
 
     let assembly_result;
 
-    match lexer(tokens)
-    {
-        Ok(v) =>
-        {
+    match lexer(tokens) {
+        Ok(v) => {
             assembly_result = Ok(v);
-        },
+        }
         Err(e) => {
             println!("Error: {0:}", e);
             assembly_result = Err(e);

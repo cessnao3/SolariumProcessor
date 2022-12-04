@@ -2,75 +2,67 @@ use fltk::enums::{Align, Color, Event, Font, FrameType, Key};
 use fltk::image::PngImage;
 use fltk::input::Input;
 use fltk::prelude::*;
-use fltk::table::{Table, TableRowSelectMode, TableContext};
-use fltk::{app::*, draw, button::*, dialog::*, window::*, text::*, group::*, frame::*, valuator::*};
+use fltk::table::{Table, TableContext, TableRowSelectMode};
+use fltk::{
+    app::*, button::*, dialog::*, draw, frame::*, group::*, text::*, valuator::*, window::*,
+};
 
-use super::messages::{ThreadMessage, GuiMessage, FltkMessage};
+use super::messages::{FltkMessage, GuiMessage, ThreadMessage};
 
 use super::fltk_registers::setup_register_group;
 
+use sda::assemble;
 use sproc::common::MemoryWord;
 use sproc::memory::MEM_MAX_SIZE;
-use sda::assemble;
 
 use spcc;
 
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{mpsc, Arc, Mutex};
 
-fn get_app_icon() -> PngImage
-{
+fn get_app_icon() -> PngImage {
     let logo_bytes = include_bytes!("../../doc/images/logo.png");
     return PngImage::from_data(logo_bytes).unwrap();
 }
 
-fn get_default_text() -> String
-{
+fn get_default_text() -> String {
     let text_bytes = include_bytes!("../../examples/spa/default.smc");
-    return match std::str::from_utf8(text_bytes)
-    {
+    return match std::str::from_utf8(text_bytes) {
         Ok(v) => v.to_string(),
-        Err(e) => panic!("UTF-8 Error: {0:}", e.to_string())
+        Err(e) => panic!("UTF-8 Error: {0:}", e.to_string()),
     };
 }
 
 #[derive(Debug, Clone, Copy)]
-struct TickTimerState
-{
+struct TickTimerState {
     pub tick_running: bool,
-    pub thread_exit: bool
+    pub thread_exit: bool,
 }
 
-impl TickTimerState
-{
-    pub fn new() -> Self
-    {
-        return Self
-        {
+impl TickTimerState {
+    pub fn new() -> Self {
+        return Self {
             tick_running: false,
-            thread_exit: false
+            thread_exit: false,
         };
     }
 }
 
 pub fn setup_and_run_app(
     gui_to_thread_tx: mpsc::Sender<ThreadMessage>,
-    thread_to_gui_rx: mpsc::Receiver<GuiMessage>)
-{
+    thread_to_gui_rx: mpsc::Receiver<GuiMessage>,
+) {
     // Define the window values
     let app = App::default();
 
     // Initialize FLTK Senders
     let (fltk_sender, fltk_receiver) = channel::<FltkMessage>();
 
-    let mut main_window = Window::default()
-        .with_size(1100, 600)
-        .with_label("V/SProc");
+    let mut main_window = Window::default().with_size(1100, 600).with_label("V/SProc");
 
-    main_window.handle(move |_, event|
-    {
+    main_window.handle(move |_, event| {
         return event == Event::KeyDown && event_key() == Key::Escape;
     });
 
@@ -113,10 +105,12 @@ pub fn setup_and_run_app(
 
     // Define the memory Values
     let shared_table_memory = Rc::new(RefCell::new(Vec::<MemoryWord>::new()));
-    shared_table_memory.borrow_mut().resize(MEM_MAX_SIZE, MemoryWord::new(0));
+    shared_table_memory
+        .borrow_mut()
+        .resize(MEM_MAX_SIZE, MemoryWord::new(0));
 
     // Add helpers for serial input
-    let serial_input_queue = Vec::<Vec::<char>>::new();
+    let serial_input_queue = Vec::<Vec<char>>::new();
     let serial_input_queue = Mutex::new(serial_input_queue);
     let serial_input_queue = Arc::new(serial_input_queue);
 
@@ -147,43 +141,64 @@ pub fn setup_and_run_app(
         memory_table.set_cols(num_cols);
         memory_table.set_col_width_all(64);
         memory_table.set_row_height_all(18);
-        memory_table.draw_cell(
-            move |_, ctx, row, col, x, y, width, height|
-            {
-                match ctx
-                {
-                    TableContext::StartPage => draw::set_font(Font::Helvetica, 14),
-                    TableContext::ColHeader =>
-                    {
-                        draw::push_clip(x, y, width, height);
-                        draw::draw_box(FrameType::ThinUpBox, x, y, width, height, Color::FrameDefault);
-                        draw::set_draw_color(Color::Black);
-                        draw::draw_text2(&format!("{0:}", col), x, y, width, height, Align::Center);
-                        draw::pop_clip();
-                    },
-                    TableContext::RowHeader =>
-                    {
-                        draw::push_clip(x, y, width, height);
-                        draw::draw_box(FrameType::ThinUpBox, x, y, width, height, Color::FrameDefault);
-                        draw::set_draw_color(Color::Black);
-                        draw::draw_text2(&format!("{0:04X}", row * num_cols), x, y, width, height, Align::Center);
-                        draw::pop_clip();
-                    },
-                    TableContext::Cell =>
-                    {
-                        let index_val = (row * num_cols + col) as usize;
-                        let val = inner_memory.borrow()[index_val];
-                        draw::push_clip(x, y, width, height);
-                        draw::draw_rect_fill(x, y, width, height, Color::White);
-                        draw::draw_box(FrameType::ThinDownFrame, x, y, width, height, Color::Black);
-                        draw::set_draw_color(Color::Black);
-                        draw::draw_text2(&format!("{0:04X}", val.get()), x, y, width, height, Align::Center);
-                        draw::pop_clip();
-                    },
-                    _ => ()
-                };
-            }
-        );
+        memory_table.draw_cell(move |_, ctx, row, col, x, y, width, height| {
+            match ctx {
+                TableContext::StartPage => draw::set_font(Font::Helvetica, 14),
+                TableContext::ColHeader => {
+                    draw::push_clip(x, y, width, height);
+                    draw::draw_box(
+                        FrameType::ThinUpBox,
+                        x,
+                        y,
+                        width,
+                        height,
+                        Color::FrameDefault,
+                    );
+                    draw::set_draw_color(Color::Black);
+                    draw::draw_text2(&format!("{0:}", col), x, y, width, height, Align::Center);
+                    draw::pop_clip();
+                }
+                TableContext::RowHeader => {
+                    draw::push_clip(x, y, width, height);
+                    draw::draw_box(
+                        FrameType::ThinUpBox,
+                        x,
+                        y,
+                        width,
+                        height,
+                        Color::FrameDefault,
+                    );
+                    draw::set_draw_color(Color::Black);
+                    draw::draw_text2(
+                        &format!("{0:04X}", row * num_cols),
+                        x,
+                        y,
+                        width,
+                        height,
+                        Align::Center,
+                    );
+                    draw::pop_clip();
+                }
+                TableContext::Cell => {
+                    let index_val = (row * num_cols + col) as usize;
+                    let val = inner_memory.borrow()[index_val];
+                    draw::push_clip(x, y, width, height);
+                    draw::draw_rect_fill(x, y, width, height, Color::White);
+                    draw::draw_box(FrameType::ThinDownFrame, x, y, width, height, Color::Black);
+                    draw::set_draw_color(Color::Black);
+                    draw::draw_text2(
+                        &format!("{0:04X}", val.get()),
+                        x,
+                        y,
+                        width,
+                        height,
+                        Align::Center,
+                    );
+                    draw::pop_clip();
+                }
+                _ => (),
+            };
+        });
         memory_table.end();
 
         let mut serial_label = Frame::default().with_label("Serial Output");
@@ -200,17 +215,13 @@ pub fn setup_and_run_app(
 
         {
             let serial_input_queue_clone = serial_input_queue.clone();
-            serial_input.handle(move |input, event|
-            {
-                if event == Event::KeyDown
-                {
-                    if event_key() == Key::Enter
-                    {
+            serial_input.handle(move |input, event| {
+                if event == Event::KeyDown {
+                    if event_key() == Key::Enter {
                         let mut input_string = input.value();
                         input_string.push('\n');
 
-                        if let Ok(mut m) = serial_input_queue_clone.lock()
-                        {
+                        if let Ok(mut m) = serial_input_queue_clone.lock() {
                             m.push(input_string.chars().collect::<Vec<_>>());
                         }
 
@@ -231,15 +242,13 @@ pub fn setup_and_run_app(
 
         {
             let serial_input_queue_clone = serial_input_queue.clone();
-            serial_file_load_button.set_callback(move |_|
-            {
+            serial_file_load_button.set_callback(move |_| {
                 let mut file_browser = NativeFileChooser::new(FileDialogType::BrowseFile);
                 file_browser.show();
 
                 let path: PathBuf = file_browser.filename();
 
-                let str_vals = match std::fs::read_to_string(path)
-                {
+                let str_vals = match std::fs::read_to_string(path) {
                     Ok(v) => v,
                     Err(_) => {
                         fltk_sender.send(FltkMessage::FileLoadError);
@@ -247,8 +256,7 @@ pub fn setup_and_run_app(
                     }
                 };
 
-                if let Ok(mut m) = serial_input_queue_clone.lock()
-                {
+                if let Ok(mut m) = serial_input_queue_clone.lock() {
                     m.push(str_vals.replace('\r', "").chars().collect::<Vec<_>>());
                 }
                 fltk_sender.send(FltkMessage::SerialInput);
@@ -296,8 +304,7 @@ pub fn setup_and_run_app(
         speed_slider.set_minimum(1.0);
         speed_slider.set_value(1.0);
         speed_slider.set_precision(1);
-        speed_slider.set_callback(move |v|
-        {
+        speed_slider.set_callback(move |v| {
             fltk_sender.send(FltkMessage::SetSpeed((10.0f64).powf(v.value())));
         });
 
@@ -334,76 +341,59 @@ pub fn setup_and_run_app(
     let mut serial_output_queue: Vec<char> = Vec::new();
 
     // Create a thread timer callback
-    let tick_thread_state = Arc::<Mutex::<TickTimerState>>::new(Mutex::<TickTimerState>::new(TickTimerState::new()));
+    let tick_thread_state =
+        Arc::<Mutex<TickTimerState>>::new(Mutex::<TickTimerState>::new(TickTimerState::new()));
     let tick_thread_join;
     {
         let thread_arc = tick_thread_state.clone();
 
-        tick_thread_join = std::thread::spawn(move || {
-            loop
-            {
-                match thread_arc.lock()
-                {
-                    Ok(mut v) =>
-                    {
-                        if v.thread_exit
-                        {
-                            break;
-                        }
+        tick_thread_join = std::thread::spawn(move || loop {
+            match thread_arc.lock() {
+                Ok(mut v) => {
+                    if v.thread_exit {
+                        break;
+                    }
 
-                        if !v.tick_running
-                        {
-                            fltk_sender.send(FltkMessage::Tick);
-                            v.tick_running = true;
-                        }
-                    },
-                    Err(_) => panic!("Tick Thread Exited!")
-                };
-                std::thread::sleep(std::time::Duration::from_secs_f64(1.0 / 30.0));
-            }
+                    if !v.tick_running {
+                        fltk_sender.send(FltkMessage::Tick);
+                        v.tick_running = true;
+                    }
+                }
+                Err(_) => panic!("Tick Thread Exited!"),
+            };
+            std::thread::sleep(std::time::Duration::from_secs_f64(1.0 / 30.0));
         });
     }
 
-    while app.wait()
-    {
+    while app.wait() {
         let mut thread_exit = false;
 
-        for _ in 0..10000
-        {
-            match thread_to_gui_rx.try_recv()
-            {
-                Ok(msg) =>
-                {
-                    match msg
-                    {
-                        GuiMessage::UpdateRegisters(regs) =>
-                        {
-                            for i in 0..regs.len()
-                            {
-                                register_labels[i].buffer().unwrap().set_text(&format!("{0:04X}", regs[i]));
-                            }
-                        },
-                        GuiMessage::LogMessage(err) =>
-                        {
-                            message_queue.push(err);
-                        },
-                        GuiMessage::UpdateMemory(new_memory_vals) =>
-                        {
-                            for (ind, val) in new_memory_vals.iter().enumerate()
-                            {
-                                shared_table_memory.borrow_mut()[ind].set(val.get());
-                            }
-                            memory_table.redraw();
-                        },
-                        GuiMessage::SerialOutput(c) =>
-                        {
-                            serial_output_queue.push(c);
+        for _ in 0..10000 {
+            match thread_to_gui_rx.try_recv() {
+                Ok(msg) => match msg {
+                    GuiMessage::UpdateRegisters(regs) => {
+                        for i in 0..regs.len() {
+                            register_labels[i]
+                                .buffer()
+                                .unwrap()
+                                .set_text(&format!("{0:04X}", regs[i]));
                         }
+                    }
+                    GuiMessage::LogMessage(err) => {
+                        message_queue.push(err);
+                    }
+                    GuiMessage::UpdateMemory(new_memory_vals) => {
+                        for (ind, val) in new_memory_vals.iter().enumerate() {
+                            shared_table_memory.borrow_mut()[ind].set(val.get());
+                        }
+                        memory_table.redraw();
+                    }
+                    GuiMessage::SerialOutput(c) => {
+                        serial_output_queue.push(c);
                     }
                 },
                 Err(mpsc::TryRecvError::Empty) => break,
-                Err(mpsc::TryRecvError::Disconnected) =>
-                {
+                Err(mpsc::TryRecvError::Disconnected) => {
                     alert_default("thread exit error!");
                     thread_exit = true;
                     break;
@@ -411,123 +401,99 @@ pub fn setup_and_run_app(
             }
         }
 
-        if thread_exit
-        {
+        if thread_exit {
             break;
         }
 
         let mut msg_to_send = None;
 
-        if let Some(msg) = fltk_receiver.recv()
-        {
-            match msg
-            {
-                FltkMessage::Step =>
-                {
+        if let Some(msg) = fltk_receiver.recv() {
+            match msg {
+                FltkMessage::Step => {
                     msg_to_send = Some(ThreadMessage::Step);
-                },
-                FltkMessage::Start =>
-                {
+                }
+                FltkMessage::Start => {
                     msg_to_send = Some(ThreadMessage::Start);
-                },
-                FltkMessage::Stop =>
-                {
+                }
+                FltkMessage::Stop => {
                     msg_to_send = Some(ThreadMessage::Stop);
-                },
-                FltkMessage::Reset =>
-                {
+                }
+                FltkMessage::Reset => {
                     msg_to_send = Some(ThreadMessage::Reset);
-                },
-                FltkMessage::HardwareInterrupt(int_val) =>
-                {
+                }
+                FltkMessage::HardwareInterrupt(int_val) => {
                     msg_to_send = Some(ThreadMessage::HardwareInterrupt(int_val));
-                },
-                FltkMessage::SerialInput =>
-                {
+                }
+                FltkMessage::SerialInput => {
                     let data;
-                    if let Ok(mut m) = serial_input_queue.lock()
-                    {
+                    if let Ok(mut m) = serial_input_queue.lock() {
                         data = m.pop();
-                    }
-                    else
-                    {
+                    } else {
                         data = None;
                     }
 
-                    if let Some(cv) = data
-                    {
+                    if let Some(cv) = data {
                         msg_to_send = Some(ThreadMessage::SerialInput(Box::new(cv)));
                     }
-                },
-                FltkMessage::FileLoadError =>
-                {
+                }
+                FltkMessage::FileLoadError => {
                     message_queue.push("Unable to load file".to_string());
-                },
-                FltkMessage::Assemble | FltkMessage::Compile | FltkMessage::CompileToText =>
-                {
-                    match code_editor.buffer()
-                    {
-                        Some(mut v) =>
-                        {
+                }
+                FltkMessage::Assemble | FltkMessage::Compile | FltkMessage::CompileToText => {
+                    match code_editor.buffer() {
+                        Some(mut v) => {
                             let editor_text = v.text();
 
-                            let lines_opt = match msg
-                            {
-                                FltkMessage::Assemble => Some(editor_text.split('\n').map(|v| v.to_string()).collect()),
+                            let lines_opt = match msg {
+                                FltkMessage::Assemble => {
+                                    Some(editor_text.split('\n').map(|v| v.to_string()).collect())
+                                }
                                 FltkMessage::Compile | FltkMessage::CompileToText => {
-                                    match spcc::compile(&editor_text)
-                                    {
+                                    match spcc::compile(&editor_text) {
                                         Ok(s) => Some(s),
                                         Err(e) => {
                                             message_queue.push(e);
                                             None
                                         }
                                     }
-                                },
-                                _ => panic!("unexpected message provided")
+                                }
+                                _ => panic!("unexpected message provided"),
                             };
 
-                            if let Some(lines) = lines_opt
-                            {
-                                match msg
-                                {
-                                    FltkMessage::CompileToText =>
-                                    {
+                            if let Some(lines) = lines_opt {
+                                match msg {
+                                    FltkMessage::CompileToText => {
                                         v.set_text(&lines.join("\n"));
                                     }
-                                    _ => ()
+                                    _ => (),
                                 }
 
-                                let assembled_binary = assemble(&lines.iter().map(|v| v.as_str()).collect::<Vec<_>>());
+                                let assembled_binary =
+                                    assemble(&lines.iter().map(|v| v.as_str()).collect::<Vec<_>>());
 
-                                match assembled_binary
-                                {
-                                    Ok(v) =>
-                                    {
-                                        msg_to_send = Some(ThreadMessage::SetMemory(v.iter().map(|v| MemoryWord::new(*v)).collect()));
-                                    },
-                                    Err(e) =>
-                                    {
+                                match assembled_binary {
+                                    Ok(v) => {
+                                        msg_to_send = Some(ThreadMessage::SetMemory(
+                                            v.iter().map(|v| MemoryWord::new(*v)).collect(),
+                                        ));
+                                    }
+                                    Err(e) => {
                                         message_queue.push(e);
                                     }
                                 };
                             }
-                        },
-                        None =>
-                        {
+                        }
+                        None => {
                             alert_default("Unable to get assembly text buffer");
                         }
                     };
                     serial_output.buffer().unwrap().set_text("");
-                },
-                FltkMessage::SetSpeed(new_speed) =>
-                {
+                }
+                FltkMessage::SetSpeed(new_speed) => {
                     msg_to_send = Some(ThreadMessage::SetSpeed(new_speed));
-                },
-                FltkMessage::Tick =>
-                {
-                    if let Ok(mut v) = tick_thread_state.lock()
-                    {
+                }
+                FltkMessage::Tick => {
+                    if let Ok(mut v) = tick_thread_state.lock() {
                         v.tick_running = false;
                     }
                 }
@@ -535,51 +501,53 @@ pub fn setup_and_run_app(
         }
 
         // Add all log message values
-        for msg in message_queue.iter()
-        {
+        for msg in message_queue.iter() {
             // Add the text
-            log_text_display.buffer().unwrap().append(&format!("{0:}\n", msg));
+            log_text_display
+                .buffer()
+                .unwrap()
+                .append(&format!("{0:}\n", msg));
 
             // Scroll to end
-            let num_lines = log_text_display.buffer().unwrap().text().split("\n").count();
+            let num_lines = log_text_display
+                .buffer()
+                .unwrap()
+                .text()
+                .split("\n")
+                .count();
             log_text_display.scroll(num_lines as i32, 0);
         }
         message_queue.clear();
 
         // Add the serial output values
-        if !serial_output_queue.is_empty()
-        {
-            serial_output.buffer().unwrap().append(&serial_output_queue.iter().collect::<String>());
+        if !serial_output_queue.is_empty() {
+            serial_output
+                .buffer()
+                .unwrap()
+                .append(&serial_output_queue.iter().collect::<String>());
             serial_output_queue.clear();
         }
 
         // Send messages
-        match msg_to_send
-        {
-            Some(msg) =>
-            {
-                match gui_to_thread_tx.send(msg)
-                {
-                    Ok(()) => (),
-                    Err(e) =>
-                    {
-                        alert_default(&format!("unable to send message to thread - {0:}", e));
-                    }
+        match msg_to_send {
+            Some(msg) => match gui_to_thread_tx.send(msg) {
+                Ok(()) => (),
+                Err(e) => {
+                    alert_default(&format!("unable to send message to thread - {0:}", e));
                 }
             },
-            None => ()
+            None => (),
         }
     }
 
     // Exit the timer thread
-    if let Ok(mut v) = tick_thread_state.lock()
-    {
+    if let Ok(mut v) = tick_thread_state.lock() {
         v.thread_exit = true;
-    }
-    else
-    {
+    } else {
         panic!("Unable to acquire mutex");
     }
 
-    tick_thread_join.join().expect("couldn't join thread result");
+    tick_thread_join
+        .join()
+        .expect("couldn't join thread result");
 }

@@ -1,37 +1,36 @@
 use super::common::*;
 
-use crate::tokenizer::{Token, Symbol};
 use super::token_iter::TokenIter;
+use crate::tokenizer::{Symbol, Token};
 
-pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: usize, register_spare: usize) -> Result<Vec<String>, String>
-{
-    if let Some(init_token) = iter.peek()
-    {
+pub fn read_base_expression(
+    iter: &mut TokenIter,
+    scopes: &mut ScopeManager,
+    register: usize,
+    register_spare: usize,
+) -> Result<Vec<String>, String> {
+    if let Some(init_token) = iter.peek() {
         // Provide the assembly values
         let mut assembly = Vec::new();
 
         // Check for an initial variable name (for assignment, etc)
-        if let Token::VariableName(name) = init_token
-        {
+        if let Token::VariableName(name) = init_token {
             // Read the first token and the variable name
             iter.next();
 
-            let var = match scopes.get_variable(&name)
-            {
+            let var = match scopes.get_variable(&name) {
                 Ok(v) => v,
-                Err(e) => return Err(e)
+                Err(e) => return Err(e),
             };
 
-            if let Some(Token::Symbol(Symbol::Assignment)) = iter.peek()
-            {
+            if let Some(Token::Symbol(Symbol::Assignment)) = iter.peek() {
                 // Clear the assignment operator
                 iter.next();
 
                 // Get the results of the following expression
-                match read_base_expression(iter, scopes, register, register_spare)
-                {
+                match read_base_expression(iter, scopes, register, register_spare) {
                     Ok(v) => assembly.extend(v),
-                    Err(e) => return Err(e)
+                    Err(e) => return Err(e),
                 };
 
                 // Assign the variable result
@@ -39,18 +38,13 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
 
                 // Return the current assembly to prevent additional binary expressions from causing problems
                 return Ok(assembly);
-            }
-            else
-            {
+            } else {
                 assembly.extend(var.load_value_to_register(register, register_spare));
             }
-        }
-        else
-        {
-            match read_expression(iter, scopes, register, register_spare)
-            {
+        } else {
+            match read_expression(iter, scopes, register, register_spare) {
                 Ok(v) => assembly.extend(v),
-                Err(e) => return Err(e)
+                Err(e) => return Err(e),
             };
         }
 
@@ -58,32 +52,27 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
         let mut post_load_instruction = Vec::new();
         let mut can_be_base_expression = false;
 
-        match iter.peek()
-        {
-            Some(Token::Symbol(symb)) => match symb
-            {
-                Symbol::AddressAssignment =>
-                {
+        match iter.peek() {
+            Some(Token::Symbol(symb)) => match symb {
+                Symbol::AddressAssignment => {
                     post_load_instruction = vec![
                         format!("sav {0:}, {1:}", register, register_spare),
-                        format!("copy {0:}, {1:}", register, register_spare)
+                        format!("copy {0:}, {1:}", register, register_spare),
                     ];
                     can_be_base_expression = true;
-                },
-                Symbol::Plus |
-                Symbol::Minus |
-                Symbol::Star |
-                Symbol::Divide |
-                Symbol::Modulus |
-                Symbol::BitwiseAnd |
-                Symbol::BitwiseOr |
-                Symbol::BooleanAnd |
-                Symbol::BooleanOr |
-                Symbol::ShiftLeft |
-                Symbol::ShiftRight =>
-                {
-                    let arith_inst = match symb
-                    {
+                }
+                Symbol::Plus
+                | Symbol::Minus
+                | Symbol::Star
+                | Symbol::Divide
+                | Symbol::Modulus
+                | Symbol::BitwiseAnd
+                | Symbol::BitwiseOr
+                | Symbol::BooleanAnd
+                | Symbol::BooleanOr
+                | Symbol::ShiftLeft
+                | Symbol::ShiftRight => {
+                    let arith_inst = match symb {
                         Symbol::Plus => "add",
                         Symbol::Minus => "sub",
                         Symbol::Star => "mul",
@@ -94,43 +83,41 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
                         Symbol::BooleanAnd => "band",
                         Symbol::BooleanOr => "bor",
                         Symbol::ShiftLeft | Symbol::ShiftRight => "bshft",
-                        _ => panic!()
+                        _ => panic!(),
                     };
 
-                    match symb
-                    {
-                        Symbol::ShiftRight => post_load_instruction.push(format!("neg {0:}", register_spare)),
-                        _ => ()
+                    match symb {
+                        Symbol::ShiftRight => {
+                            post_load_instruction.push(format!("neg {0:}", register_spare))
+                        }
+                        _ => (),
                     };
 
-                    post_load_instruction.push(format!("{0:} {1:}, {1:}, {2:}", arith_inst, register, register_spare));
+                    post_load_instruction.push(format!(
+                        "{0:} {1:}, {1:}, {2:}",
+                        arith_inst, register, register_spare
+                    ));
 
-                    match symb
-                    {
-                        Symbol::BooleanAnd |
-                        Symbol::BooleanOr =>
-                        {
+                    match symb {
+                        Symbol::BooleanAnd | Symbol::BooleanOr => {
                             post_load_instruction.push(format!("bool {0:}", register))
                         }
-                        _ => ()
+                        _ => (),
                     }
-                },
-                Symbol::Greater |
-                Symbol::Less |
-                Symbol::GreaterEqual |
-                Symbol::LessEqual |
-                Symbol::Equal |
-                Symbol::NotEqual =>
-                {
-                    let test_inst = match symb
-                    {
+                }
+                Symbol::Greater
+                | Symbol::Less
+                | Symbol::GreaterEqual
+                | Symbol::LessEqual
+                | Symbol::Equal
+                | Symbol::NotEqual => {
+                    let test_inst = match symb {
                         Symbol::Greater => "tg",
                         Symbol::GreaterEqual => "tge",
                         Symbol::Less => "tl",
                         Symbol::LessEqual => "tle",
-                        Symbol::Equal |
-                        Symbol::NotEqual => "teq",
-                        _ => panic!()
+                        Symbol::Equal | Symbol::NotEqual => "teq",
+                        _ => panic!(),
                     };
 
                     post_load_instruction.extend(vec![
@@ -138,24 +125,22 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
                         "jmpri 3".to_string(),
                         format!("ldi {0:}, 0", register),
                         "jmpri 2".to_string(),
-                        format!("ldi {0:}, 1", register)
+                        format!("ldi {0:}, 1", register),
                     ]);
 
-                    let post_inst_boolean = match symb
-                    {
+                    let post_inst_boolean = match symb {
                         Symbol::NotEqual => "not",
-                        _ => "bool"
+                        _ => "bool",
                     };
 
                     post_load_instruction.push(format!("{0:} {1:}", post_inst_boolean, register));
-                },
-                _ => ()
+                }
+                _ => (),
             },
-            _ => ()
+            _ => (),
         };
 
-        if post_load_instruction.len() > 0
-        {
+        if post_load_instruction.len() > 0 {
             // Consume the next value
             iter.next();
 
@@ -163,20 +148,15 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
             assembly.push(format!("push {0:}", register));
 
             // Read the right-hand of the expression
-            if can_be_base_expression
-            {
-                match read_base_expression(iter, scopes, register, register_spare)
-                {
+            if can_be_base_expression {
+                match read_base_expression(iter, scopes, register, register_spare) {
                     Ok(v) => assembly.extend(v),
-                    Err(e) => return Err(e)
+                    Err(e) => return Err(e),
                 };
-            }
-            else
-            {
-                match read_expression(iter, scopes, register, register_spare)
-                {
+            } else {
+                match read_expression(iter, scopes, register, register_spare) {
                     Ok(v) => assembly.extend(v),
-                    Err(e) => return Err(e)
+                    Err(e) => return Err(e),
                 };
             }
 
@@ -190,73 +170,83 @@ pub fn read_base_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, reg
 
         // Return the assembly result
         return Ok(assembly);
-    }
-    else
-    {
+    } else {
         return Err(format!("unexpected end of token stream"));
     }
 }
 
-fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: usize, register_spare: usize) -> Result<Vec<String>, String>
-{
+fn read_expression(
+    iter: &mut TokenIter,
+    scopes: &mut ScopeManager,
+    register: usize,
+    register_spare: usize,
+) -> Result<Vec<String>, String> {
     let mut assembly = Vec::new();
 
-    if let Some(init_token) = iter.next()
-    {
-        match init_token
-        {
-            Token::WordLiteral(val) =>
-            {
+    if let Some(init_token) = iter.next() {
+        match init_token {
+            Token::WordLiteral(val) => {
                 assembly.extend(vec![
                     format!("ldn {0:}", register),
                     format!(".load {0:}", val),
                 ]);
-            },
-            Token::VariableName(name) =>
-            {
-                assembly.extend(scopes.get_variable(&name)?.load_value_to_register(register, register_spare));
-            },
-            Token::FunctionName(name) =>
-            {
+            }
+            Token::VariableName(name) => {
+                assembly.extend(
+                    scopes
+                        .get_variable(&name)?
+                        .load_value_to_register(register, register_spare),
+                );
+            }
+            Token::FunctionName(name) => {
                 // Check for the open paren
-                match iter.next()
-                {
+                match iter.next() {
                     Some(Token::Symbol(Symbol::OpenParen)) => (),
-                    Some(tok) => return Err(format!("expected (, but found {0:}, after function call", tok.to_string())),
-                    _ => return Err("unexpected end of stream found".to_string())
+                    Some(tok) => {
+                        return Err(format!(
+                            "expected (, but found {0:}, after function call",
+                            tok.to_string()
+                        ))
+                    }
+                    _ => return Err("unexpected end of stream found".to_string()),
                 }
 
                 // Loop through to read each of the input arguments
                 let mut num_args = 0usize;
 
-                loop
-                {
+                loop {
                     // Break on close paren
-                    if let Some(Token::Symbol(Symbol::CloseParen)) = iter.peek()
-                    {
+                    if let Some(Token::Symbol(Symbol::CloseParen)) = iter.peek() {
                         iter.next();
                         break;
                     }
 
                     // Add the SP copy to ARG if the first argument is provided
                     // Otherwise, check for comma if needed
-                    if num_args == 0
-                    {
+                    if num_args == 0 {
                         assembly.push(format!("copy $arg, $sp"));
-                    }
-                    else
-                    {
+                    } else {
                         // Read the comma
-                        match iter.next()
-                        {
+                        match iter.next() {
                             Some(Token::Symbol(Symbol::Comma)) => (),
-                            Some(tok) => return Err(format!("comma must follow expression in function {0:} call, found {1:}", name, tok.to_string())),
-                            None => return Err("unexpected end of stream found".to_string())
+                            Some(tok) => {
+                                return Err(format!(
+                                "comma must follow expression in function {0:} call, found {1:}",
+                                name,
+                                tok.to_string()
+                            ))
+                            }
+                            None => return Err("unexpected end of stream found".to_string()),
                         };
                     }
 
                     // Read the expression
-                    assembly.extend(read_base_expression(iter, scopes, register, register_spare)?);
+                    assembly.extend(read_base_expression(
+                        iter,
+                        scopes,
+                        register,
+                        register_spare,
+                    )?);
 
                     // Push the result to the stack
                     assembly.push(format!("push {0:}", register));
@@ -273,95 +263,82 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
                 assembly.push(format!("call {0:}", register));
 
                 // Pop the resulting stack values
-                for _ in 0..num_args
-                {
+                for _ in 0..num_args {
                     assembly.push("pop".to_string());
                 }
 
                 // Copy the return address into the expected register
                 assembly.push(format!("copy {0:}, $ret", register));
-            },
-            Token::Symbol(Symbol::OpenParen) =>
-            {
-                assembly.extend(read_base_expression(iter, scopes, register, register_spare)?);
+            }
+            Token::Symbol(Symbol::OpenParen) => {
+                assembly.extend(read_base_expression(
+                    iter,
+                    scopes,
+                    register,
+                    register_spare,
+                )?);
 
                 let next_token = iter.next();
 
-                if let Some(Token::Symbol(Symbol::CloseParen)) = next_token
-                {
+                if let Some(Token::Symbol(Symbol::CloseParen)) = next_token {
                     // Do nothing
-                }
-                else if let Some(tok) = next_token
-                {
-                    return Err(format!("expected closing paren - found {0:}", tok.to_string()));
-                }
-                else
-                {
+                } else if let Some(tok) = next_token {
+                    return Err(format!(
+                        "expected closing paren - found {0:}",
+                        tok.to_string()
+                    ));
+                } else {
                     return Err("unexpected end of stream".to_string());
                 }
-            },
-            Token::Symbol(Symbol::BitwiseAnd) =>
-            {
-                if let Some(Token::VariableName(varname)) = iter.next()
-                {
-                    assembly.extend(scopes.get_variable(&varname)?.load_address_to_register(register));
-                }
-                else
-                {
-                    return Err(format!("the next symbol for the address-of must be a variable name"));
+            }
+            Token::Symbol(Symbol::BitwiseAnd) => {
+                if let Some(Token::VariableName(varname)) = iter.next() {
+                    assembly.extend(
+                        scopes
+                            .get_variable(&varname)?
+                            .load_address_to_register(register),
+                    );
+                } else {
+                    return Err(format!(
+                        "the next symbol for the address-of must be a variable name"
+                    ));
                 }
             }
-            Token::Symbol(Symbol::Plus) |
-            Token::Symbol(Symbol::Minus) |
-            Token::Symbol(Symbol::Star) |
-            Token::Symbol(Symbol::BooleanNot) |
-            Token::Symbol(Symbol::BitwiseNot) =>
-            {
+            Token::Symbol(Symbol::Plus)
+            | Token::Symbol(Symbol::Minus)
+            | Token::Symbol(Symbol::Star)
+            | Token::Symbol(Symbol::BooleanNot)
+            | Token::Symbol(Symbol::BitwiseNot) => {
                 let symb;
-                if let Token::Symbol(s) = init_token
-                {
+                if let Token::Symbol(s) = init_token {
                     symb = s;
-                }
-                else
-                {
+                } else {
                     panic!();
                 }
 
                 // Determine instructions that must be run on the resulting data values
-                let post_load_vec = match symb
-                {
-                    Symbol::Plus =>
-                    {
-                        Vec::new()
-                    },
-                    Symbol::Minus =>
-                    {
+                let post_load_vec = match symb {
+                    Symbol::Plus => Vec::new(),
+                    Symbol::Minus => {
                         vec![
                             format!("ldi {0:}, -1", register_spare),
-                            format!("mul {0:}, {0:}, {1:}", register, register_spare)
+                            format!("mul {0:}, {0:}, {1:}", register, register_spare),
                         ]
-                    },
-                    Symbol::Star =>
-                    {
-                        vec![
-                            format!("ld {0:}, {0:}", register)
-                        ]
-                    },
-                    Symbol::BooleanNot =>
-                    {
-                        vec![
-                            format!("not {0:}", register)
-                        ]
-                    },
-                    Symbol::BitwiseNot =>
-                    {
-                        vec![
-                            format!("bnot {0:}", register)
-                        ]
-                    },
-                    _ =>
-                    {
-                        return Err(format!("unexpected use of symbol {0:} in expression", symb.to_string()));
+                    }
+                    Symbol::Star => {
+                        vec![format!("ld {0:}, {0:}", register)]
+                    }
+                    Symbol::BooleanNot => {
+                        vec![format!("not {0:}", register)]
+                    }
+                    Symbol::BitwiseNot => {
+                        vec![format!("bnot {0:}", register)]
+                    }
+                    _ => {
+                        return Err(format!(
+                            "unexpected use of symbol {0:} in expression",
+                            symb.to_string()
+                        ));
                     }
                 };
 
@@ -369,11 +346,14 @@ fn read_expression(iter: &mut TokenIter, scopes: &mut ScopeManager, register: us
                 assembly.extend(read_expression(iter, scopes, register, register_spare)?);
                 assembly.extend(post_load_vec);
             }
-            _ => return Err(format!("unexpected token {0:} found in expression", init_token.to_string()))
+            _ => {
+                return Err(format!(
+                    "unexpected token {0:} found in expression",
+                    init_token.to_string()
+                ))
+            }
         };
-    }
-    else
-    {
+    } else {
         return Err(format!("unexpected end of token stream"));
     }
 

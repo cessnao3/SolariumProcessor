@@ -1,25 +1,22 @@
 use fltk::prelude::*;
 
 use fltk::enums::Align;
-use fltk::text::{TextDisplay, TextBuffer};
-use fltk::group::Flex;
 use fltk::frame::Frame;
+use fltk::group::Flex;
+use fltk::text::{TextBuffer, TextDisplay};
 
 use sproc::cpu::SolariumProcessor;
 
-pub fn setup_register_group(parent: &mut Flex) -> Vec<TextDisplay>
-{
+pub fn setup_register_group(parent: &mut Flex) -> Vec<TextDisplay> {
     let mut column_group = Flex::default_fill().column();
 
     let mut displays = Vec::new();
 
     assert!(SolariumProcessor::NUM_REGISTERS % 2 == 0);
 
-    for i in 0..SolariumProcessor::NUM_REGISTERS / 2
-    {
-        let v = add_register_row(&mut column_group, i*2, i*2 + 1);
-        for disp in v
-        {
+    for i in 0..SolariumProcessor::NUM_REGISTERS / 2 {
+        let v = add_register_row(&mut column_group, i * 2, i * 2 + 1);
+        for disp in v {
             displays.push(disp);
         }
     }
@@ -31,8 +28,7 @@ pub fn setup_register_group(parent: &mut Flex) -> Vec<TextDisplay>
     return displays;
 }
 
-fn add_register_row(parent: &mut Flex, reg0_ind: usize, reg1_ind: usize) -> Vec<TextDisplay>
-{
+fn add_register_row(parent: &mut Flex, reg0_ind: usize, reg1_ind: usize) -> Vec<TextDisplay> {
     let mut displays = Vec::new();
     let mut row_group = Flex::default_fill().row();
 
@@ -46,8 +42,7 @@ fn add_register_row(parent: &mut Flex, reg0_ind: usize, reg1_ind: usize) -> Vec<
     return displays;
 }
 
-fn setup_register_display(parent: &mut Flex, index: usize) -> TextDisplay
-{
+fn setup_register_display(parent: &mut Flex, index: usize) -> TextDisplay {
     let mut label = Frame::default().with_label(&format!("R{0:}", index));
     let mut text_display = TextDisplay::default().with_align(Align::BottomRight);
 

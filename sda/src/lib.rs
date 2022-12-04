@@ -1,6 +1,6 @@
 mod assembler;
 
-mod instructions;
 mod assembly;
+mod instructions;
 
 pub use assembler::assemble;

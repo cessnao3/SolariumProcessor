@@ -1,10 +1,8 @@
 mod compiler;
-mod tokenizer;
 mod lexer;
+mod tokenizer;
 
 pub use crate::compiler::compile;
 
 #[cfg(test)]
-mod tests
-{
-}
+mod tests {}

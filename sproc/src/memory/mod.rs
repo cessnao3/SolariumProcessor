@@ -1,20 +1,19 @@
 mod memory_map;
-mod segment_rw;
 mod segment_ro;
+mod segment_rw;
 
 use crate::common::{MemoryWord, SolariumError};
 
-pub use self::memory_map::MemoryMap as MemoryMap;
-pub use self::segment_rw::ReadWriteSegment as ReadWriteSegment;
-pub use self::segment_ro::ReadOnlySegment as ReadOnlySegment;
+pub use self::memory_map::MemoryMap;
+pub use self::segment_ro::ReadOnlySegment;
+pub use self::segment_rw::ReadWriteSegment;
 
 /// Define the maximum possible size
 pub const BITS_PER_WORD: usize = 16usize;
 pub const MEM_MAX_SIZE: usize = (2usize).pow(BITS_PER_WORD as u32);
 
 /// Provides a trait for memory segments to implement
-pub trait MemorySegment
-{
+pub trait MemorySegment {
     /// Provides the word at the requested memory location
     fn get(&self, offset: usize) -> Result<MemoryWord, SolariumError>;
 

@@ -17,8 +17,7 @@ static INSTRUCTION_REGEX_STR: &str = r"([\w]+)";
 static LABEL_REGEX_STR: &str = r"(:[\w][\w\d_]*)";
 static COMMAND_REGEX_STR: &str = r"(\.[\w]+)";
 
-lazy_static!
-{
+lazy_static! {
     // Turn resulting values into regex values
     pub static ref ARG_REGISTER_REGEX: Regex = Regex::new(&format!(
         "^{0:}$",
