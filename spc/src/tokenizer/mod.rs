@@ -1,4 +1,4 @@
-struct Token {
+pub struct Token {
     pub value: String,
     pub line: usize,
     pub column: usize,
