@@ -1,3 +1,42 @@
+pub enum TokenValue {
+    Name(String),
+    Symbol(String),
+    Keyword(String),
+    Number(String),
+    CharacterLiteral(String)
+}
+
+const KEYWORDS: [&str; 7] = [
+    "while",
+    "fn",
+    "as",
+    "if",
+    "else",
+    "var",
+    "sizeof",
+];
+
+const SYMBOLS: [&str; 18] = [ // TODO - Generate this list from existing parameters?
+    "<",
+    ">",
+    "=",
+    ">=",
+    "<=",
+    "==",
+    "!=",
+    "!",
+    "*",
+    "&",
+    "{",
+    "}",
+    "(",
+    ")",
+    ",",
+    ".",
+    "[", // ??
+    "]", // ??
+];
+
 pub struct Token {
     pub value: String,
     pub line: usize,

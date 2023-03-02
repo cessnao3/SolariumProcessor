@@ -6,18 +6,45 @@ mod expressions;
 mod statement;
 mod types;
 
+pub struct StatusState {
+    signed_ops: bool
+}
+
+impl StatusState {
+    pub fn new() -> Self {
+        Self { signed_ops: false }
+    }
+}
+
 pub struct CompilerState {
     local_asm: Vec<String>,
     static_asm: Vec<String>,
-    processor_state: u16,
+    processor_state: StatusState,
     guid_count: u64,
     types: HashMap<String, TypeInfo>
 }
 
 impl CompilerState {
-    fn flag_state_for_math(&self) -> String {
-        "".to_string()
+    pub fn new() -> Self {
+        let mut state = Self {
+            local_asm: Vec::new(),
+            static_asm: Vec::new(),
+            processor_state: StatusState::new(),
+            guid_count: 0,
+            types: HashMap::new()
+        };
+
+        for t in TypeInfo::get_default_types() {
+            let old = state.types.insert(t.name.to_string(), t);
+            if old.is_some() {
+                panic!("duplicate default name provided for type!");
+            }
+        }
+
+        state
     }
+
+
 }
 
 struct CompilerError {

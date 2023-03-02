@@ -146,7 +146,7 @@ Note that, if a vector has a value of zero, that interrupt vector is considered 
 
 \section{Instructions and Assembly Code}
 
-All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field. \todo{combine left/right shift?} \todo{add load reg = base + offset?} \todo{keep bxor?}
+All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field. \todo{combine left/right shift?} \todo{add load reg = base + offset?} \todo{keep bxor?} \todo{Make set/clear flags a generic "set" and "clear" flag instruction with an argument?}
 
 \begin{table}[h!]
     \centering
@@ -154,7 +154,10 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
         \begin{tabular}{cccc|c|l}
             \hline
             \multicolumn{4}{c|}{Instruction Word} & Assembly & Description \\
-            opcode & arg0 & arg1 & arg2 & & \\
+            opcode & arg2 & arg1 & arg0 & & \\
+            {} & opcode & arg1 & arg0 & & \\
+            {} & {} & opcode & arg0 & & \\
+            {} & {} & {} & opcode & & \\
             \hline
             0 & 0 & 0 & 0 & \texttt{noop} & No Operation \\
             0 & 0 & 0 & 1 & \texttt{inton} & Turn Interrupts On \\
@@ -325,7 +328,7 @@ Devices are memory-mapped in the SolariumProcessor. This means that reading or w
 
 The serial input and output device is one of the simplest devices. It essentially consists of a device two queues, one for input, and another for output. Each of these queues has an internal buffer size of 256 words. If any words are attempted to be added to the queue once either queue is full, no additional data is read and that data is lost.
 
-The current memory mapping structure for the serial input and output device is provided in Table \ref{table:dev-serial-io}.
+The current memory mapping structure for the serial input and output device is provided in Table \ref{table:dev-serial-io}. \todo{Create the ability for devices to access full memory map, for things like async writing?}
 
 \begin{table}[h!]
     \centering
