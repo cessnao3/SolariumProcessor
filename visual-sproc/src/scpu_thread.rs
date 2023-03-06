@@ -120,7 +120,7 @@ pub fn run_scpu_thread(
             }
         }
 
-        if cpu_stat.msg_queue.len() > 0 {
+        if !cpu_stat.msg_queue.is_empty() {
             cpu_stat.msg_queue.clear();
         }
 

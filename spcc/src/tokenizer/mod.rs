@@ -38,7 +38,7 @@ fn next_token(line: &str) -> Result<Option<(Token, usize)>, String> {
     for (i, c) in line.chars().enumerate() {
         // Check for ascii
         if !c.is_ascii() {
-            return Err(format!("Only ASCII characters are allowed"));
+            return Err("Only ASCII characters are allowed".to_string());
         }
 
         // Define the current reference val
@@ -89,7 +89,7 @@ fn next_token(line: &str) -> Result<Option<(Token, usize)>, String> {
         }
     }
 
-    return Ok(None);
+    Ok(None)
 }
 
 pub fn tokenize(line: &str) -> Result<Vec<Token>, String> {
@@ -107,7 +107,7 @@ pub fn tokenize(line: &str) -> Result<Vec<Token>, String> {
         };
     }
 
-    return Ok(tokens);
+    Ok(tokens)
 }
 
 fn try_clear_comment(input: &str) -> Option<usize> {
@@ -123,5 +123,5 @@ fn try_clear_comment(input: &str) -> Option<usize> {
         }
     }
 
-    return Some(len);
+    Some(len)
 }

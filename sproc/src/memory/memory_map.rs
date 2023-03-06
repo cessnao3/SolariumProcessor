@@ -13,9 +13,9 @@ pub struct MemoryMap {
 impl MemoryMap {
     /// Generates a new, empty, memory mapping
     pub fn new() -> MemoryMap {
-        return MemoryMap {
+        MemoryMap {
             memory_map: Vec::new(),
-        };
+        }
     }
 
     /// Adds a new memory segment to the memory map, returning an error
@@ -54,32 +54,32 @@ impl MemoryMap {
 
         // Add the segment if all else passes
         self.memory_map.push((base, segment));
-        return Ok(());
+        Ok(())
     }
 
     /// Gets the value in memory for a particular location
     pub fn get(&self, ind: usize) -> Result<MemoryWord, SolariumError> {
-        return match self.segment_for_index(ind) {
+        match self.segment_for_index(ind) {
             Some((seg, offset)) => seg.borrow().get(offset),
             None => Err(SolariumError::InvalidMemoryAccess(ind)),
-        };
+        }
     }
 
     /// Provides the word at the requested memory location without affecting the device state
     pub fn inspect(&self, ind: usize) -> Result<MemoryWord, SolariumError> {
-        return match self.segment_for_index(ind) {
+        match self.segment_for_index(ind) {
             Some((seg, offset)) => seg.borrow().inspect(offset),
             None => Err(SolariumError::InvalidMemoryAccess(ind)),
-        };
+        }
     }
 
     /// Sets the value in memory for a particular memory location
     /// Returns true if the value was able to be set; otherwise returns false
     pub fn set(&mut self, ind: usize, data: MemoryWord) -> Result<(), SolariumError> {
-        return match self.segment_for_index(ind) {
+        match self.segment_for_index(ind) {
             Some((seg, offset)) => seg.borrow_mut().set(offset, data),
             None => Err(SolariumError::InvalidMemoryAccess(ind)),
-        };
+        }
     }
 
     /// Provides the memory segment that contains the given memory location
@@ -96,7 +96,7 @@ impl MemoryMap {
             }
         }
 
-        return None;
+        None
     }
 
     /// resets all contained memory segments
@@ -109,6 +109,12 @@ impl MemoryMap {
     /// clears all data from the memory map
     pub fn clear(&mut self) {
         self.memory_map.clear();
+    }
+}
+
+impl Default for MemoryMap {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -181,29 +187,19 @@ mod tests {
             }
 
             // Check the immutable segment value
-            {
-                match map.segment_for_index(i) {
-                    Some((seg, offset)) => {
-                        let seg_val = seg.borrow().get(offset);
+            if let Some((seg, offset)) = map.segment_for_index(i) {
+                let seg_val = seg.borrow().get(offset);
 
-                        assert!(seg_val.is_ok());
-                        assert_eq!(seg_val.unwrap().get(), set_val);
-                    }
-                    None => (),
-                }
+                assert!(seg_val.is_ok());
+                assert_eq!(seg_val.unwrap().get(), set_val);
             }
 
             // Check the mutable segment value
-            {
-                match map.segment_for_index(i) {
-                    Some((seg, offset)) => {
-                        let seg_val = seg.borrow().get(offset);
+            if let Some((seg, offset)) = map.segment_for_index(i) {
+                let seg_val = seg.borrow().get(offset);
 
-                        assert!(seg_val.is_ok());
-                        assert_eq!(seg_val.unwrap().get(), set_val);
-                    }
-                    None => (),
-                }
+                assert!(seg_val.is_ok());
+                assert_eq!(seg_val.unwrap().get(), set_val);
             }
         }
     }
@@ -263,29 +259,19 @@ mod tests {
             }
 
             // Check the immutable segment value
-            {
-                match map.segment_for_index(i) {
-                    Some((seg, offset)) => {
-                        let seg_val = seg.borrow().get(offset);
+            if let Some((seg, offset)) = map.segment_for_index(i) {
+                let seg_val = seg.borrow().get(offset);
 
-                        assert!(seg_val.is_ok());
-                        assert_eq!(seg_val.unwrap().get(), calc_func(i - base));
-                    }
-                    None => (),
-                }
+                assert!(seg_val.is_ok());
+                assert_eq!(seg_val.unwrap().get(), calc_func(i - base));
             }
 
             // Check the mutable segment value
-            {
-                match map.segment_for_index(i) {
-                    Some((seg, offset)) => {
-                        let seg_val = seg.borrow().get(offset);
+            if let Some((seg, offset)) = map.segment_for_index(i) {
+                let seg_val = seg.borrow().get(offset);
 
-                        assert!(seg_val.is_ok());
-                        assert_eq!(seg_val.unwrap().get(), calc_func(i - base));
-                    }
-                    None => (),
-                }
+                assert!(seg_val.is_ok());
+                assert_eq!(seg_val.unwrap().get(), calc_func(i - base));
             }
         }
     }

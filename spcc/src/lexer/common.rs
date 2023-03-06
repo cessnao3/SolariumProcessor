@@ -36,13 +36,13 @@ struct Scope {
 
 impl Scope {
     pub fn new(id: usize) -> Scope {
-        return Self {
+        Self {
             id,
             variables: HashMap::new(),
             stack_offset: 0,
             init_stack_offset: 0,
             function_end_label: None,
-        };
+        }
     }
 }
 
@@ -53,10 +53,10 @@ pub struct ScopeManager {
 
 impl ScopeManager {
     pub fn new() -> ScopeManager {
-        return Self {
+        Self {
             scopes: Vec::new(),
             gen_index: 0,
-        };
+        }
     }
 
     pub fn add_scope(&mut self) -> Vec<String> {
@@ -72,7 +72,7 @@ impl ScopeManager {
 
         self.scopes.push(next_scope);
 
-        return rvec;
+        rvec
     }
 
     pub fn add_function_scope(&mut self, end_label: &str) -> Vec<String> {
@@ -80,21 +80,21 @@ impl ScopeManager {
         self.scopes.last_mut().unwrap().function_end_label = Some(end_label.to_string());
         assembly.push(format!("copy {0:}, $sp", REG_FRAME_SP_VALUE));
         assembly.push(";".to_string());
-        return assembly;
+        assembly
     }
 
     fn pop_scope_assembly(&self, s: &Scope) -> Vec<String> {
         let mut assembly = vec![format!("; popping scope {0:}", s.id)];
 
         assembly.extend((s.init_stack_offset..s.stack_offset).map(|_| "pop".to_string()));
-        assembly.push(format!(";"));
-        return assembly;
+        assembly.push(";".to_string());
+        assembly
     }
 
     pub fn pop_scope(&mut self) -> Vec<String> {
         let assembly = self.pop_scope_assembly(self.scopes.last().unwrap());
         self.scopes.remove(self.scopes.len() - 1);
-        return assembly;
+        assembly
     }
 
     pub fn assembly_to_pop_for_return(&self) -> Vec<String> {
@@ -117,15 +117,14 @@ impl ScopeManager {
         for i in pop_scope_inds {
             assembly.extend(self.pop_scope_assembly(&self.scopes[i]));
         }
-        return assembly;
+        assembly
     }
 
     pub fn get_variable(&self, name: &str) -> Result<Rc<dyn NamedMemoryValue>, String> {
         for s in self.scopes.iter().rev() {
-            match s.variables.get(name) {
-                Some(v) => return Ok(v.clone()),
-                None => (),
-            };
+            if let Some(v) = s.variables.get(name) {
+                return Ok(v.clone());
+            }
         }
 
         return Err(format!(
@@ -148,7 +147,7 @@ impl ScopeManager {
                     Ok(())
                 }
             }
-            None => Err(format!("no scope available")),
+            None => Err("no scope available".to_string()),
         };
     }
 
@@ -159,17 +158,17 @@ impl ScopeManager {
             }
         }
 
-        return None;
+        None
     }
 
     pub fn generate_index(&mut self) -> usize {
         let last = self.gen_index;
         self.gen_index += 1;
-        return last;
+        last
     }
 
     pub fn get_stack_offset(&self) -> usize {
-        return self.scopes.last().unwrap().stack_offset;
+        self.scopes.last().unwrap().stack_offset
     }
 
     pub fn add_stack_offset(&mut self, incr: usize) {

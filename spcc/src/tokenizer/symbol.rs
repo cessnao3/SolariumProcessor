@@ -33,7 +33,7 @@ pub enum Symbol {
 
 impl ToString for Symbol {
     fn to_string(&self) -> String {
-        return (match self {
+        match self {
             Symbol::Plus => "+",
             Symbol::Minus => "-",
             Symbol::Star => "*",
@@ -63,8 +63,8 @@ impl ToString for Symbol {
             Symbol::Comma => ",",
             Symbol::OpenBracket => "[",
             Symbol::CloseBracket => "]",
-        })
-        .to_string();
+        }
+        .to_string()
     }
 }
 
@@ -102,23 +102,17 @@ impl Symbol {
             Symbol::ShiftRight,
         ];
 
-        return &VALUES;
+        &VALUES
     }
 
     pub fn get_symbol_list() -> Vec<(String, Symbol)> {
-        let mut symbol_list: Vec<Symbol> = Symbol::enum_iter().iter().map(|v| *v).collect();
+        let mut symbol_list = Symbol::enum_iter().to_vec();
 
         symbol_list.sort_by(|a, b| {
             let a_s = a.to_string();
             let b_s = b.to_string();
 
-            return if a_s.len() == b_s.len() {
-                std::cmp::Ordering::Equal
-            } else if a_s.len() > b_s.len() {
-                std::cmp::Ordering::Less
-            } else {
-                std::cmp::Ordering::Greater
-            };
+            b_s.len().cmp(&a_s.len())
         });
 
         return symbol_list.iter().map(|v| (v.to_string(), *v)).collect();
@@ -126,11 +120,11 @@ impl Symbol {
 
     pub fn try_match_symbol(input: &str) -> Option<(Symbol, usize)> {
         for (symbol_text, symbol) in &Symbol::get_symbol_list() {
-            if input.len() >= symbol_text.len() && &input[0..symbol_text.len()] == *symbol_text {
+            if input.len() >= symbol_text.len() && input[0..symbol_text.len()] == *symbol_text {
                 return Some((*symbol, symbol_text.len()));
             }
         }
 
-        return None;
+        None
     }
 }

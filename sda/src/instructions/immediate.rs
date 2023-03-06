@@ -8,16 +8,16 @@ struct ImmedateByteValues {
 }
 
 impl ImmedateByteValues {
-    pub fn new(val: u8) -> ImmedateByteValues {
-        return ImmedateByteValues { val };
+    pub fn new(val: u8) -> Self {
+        Self { val }
     }
 
     pub fn get_low_nybble(&self) -> u8 {
-        return self.val & 0xF;
+        self.val & 0xF
     }
 
     pub fn get_high_nybble(&self) -> u8 {
-        return (self.val & 0xF0) >> 4;
+        (self.val & 0xF0) >> 4
     }
 }
 
@@ -28,12 +28,12 @@ pub struct ImmediateSingleInstruction {
 
 impl ImmediateSingleInstruction {
     pub fn new(opcode: u8) -> ImmediateSingleInstruction {
-        return ImmediateSingleInstruction { opcode };
+        ImmediateSingleInstruction { opcode }
     }
 }
 
 impl ToInstructionData for ImmediateSingleInstruction {
-    fn to_instruction_data(&self, args: &Vec<Argument>) -> Result<InstructionData, String> {
+    fn to_instruction_data(&self, args: &[Argument]) -> Result<InstructionData, String> {
         if args.len() != 1 {
             return Err(format!(
                 "instruction expected a 1 argument, got {0:}",
@@ -46,12 +46,12 @@ impl ToInstructionData for ImmediateSingleInstruction {
             Err(e) => return Err(e),
         };
 
-        return Ok(InstructionData {
+        Ok(InstructionData {
             opcode: 0,
             arg0: self.opcode,
             arg1: immediate_val.get_high_nybble(),
             arg2: immediate_val.get_low_nybble(),
-        });
+        })
     }
 }
 
@@ -61,13 +61,13 @@ pub struct ImmediateRegisterInstruction {
 }
 
 impl ImmediateRegisterInstruction {
-    pub fn new(opcode: u8) -> ImmediateRegisterInstruction {
-        return ImmediateRegisterInstruction { opcode };
+    pub fn new(opcode: u8) -> Self {
+        Self { opcode }
     }
 }
 
 impl ToInstructionData for ImmediateRegisterInstruction {
-    fn to_instruction_data(&self, args: &Vec<Argument>) -> Result<InstructionData, String> {
+    fn to_instruction_data(&self, args: &[Argument]) -> Result<InstructionData, String> {
         if args.len() != 2 {
             return Err(format!(
                 "instruction expected 2 arguments, got {0:}",
@@ -85,11 +85,11 @@ impl ToInstructionData for ImmediateRegisterInstruction {
             Err(e) => return Err(e),
         };
 
-        return Ok(InstructionData {
+        Ok(InstructionData {
             opcode: self.opcode,
             arg0: immediate_val.get_high_nybble(),
             arg1: immediate_val.get_low_nybble(),
             arg2: reg,
-        });
+        })
     }
 }

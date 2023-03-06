@@ -13,7 +13,7 @@ use crate::assembly::argument::Argument;
 use sproc::common::InstructionData;
 
 pub trait ToInstructionData {
-    fn to_instruction_data(&self, args: &Vec<Argument>) -> Result<InstructionData, String>;
+    fn to_instruction_data(&self, args: &[Argument]) -> Result<InstructionData, String>;
 }
 
 pub fn get_instruction_map() -> HashMap<String, Box<dyn ToInstructionData>> {
@@ -92,5 +92,5 @@ pub fn get_instruction_map() -> HashMap<String, Box<dyn ToInstructionData>> {
         Box::new(RegisterInstruction::new(12, 3)),
     );
 
-    return instructions;
+    instructions
 }

@@ -37,8 +37,7 @@ fn main() {
     let lines = match std::fs::read_to_string(&args.input) {
         Ok(s) => s
             .split('\n')
-            .map(|i| i.split('\r'))
-            .flatten()
+            .flat_map(|i| i.split('\r'))
             .map(|i| i.to_string())
             .collect::<Vec<_>>(),
         Err(_) => {
@@ -58,8 +57,7 @@ fn main() {
     let byte_result = match args.format {
         OutputType::Binary => result
             .iter()
-            .map(|v| [(v & 0xF) as u8, ((v & 0xF0) >> 8) as u8])
-            .flatten()
+            .flat_map(|v| [(v & 0xF) as u8, ((v & 0xF0) >> 8) as u8])
             .collect::<Vec<_>>(),
         OutputType::Hex => result
             .iter()
@@ -70,7 +68,7 @@ fn main() {
         OutputType::C => {
             let mut inner: Vec<String> = Vec::new();
             inner.push(format!("size_t data_size = {};", result.len()));
-            inner.push(format!("uint16_t data[] = {{"));
+            inner.push("uint16_t data[] = {{".to_string());
             inner.extend(result.iter().enumerate().map(|(i, v)| {
                 format!(
                     "    0x{:04X}{}",
@@ -78,7 +76,7 @@ fn main() {
                     if i + 1 == result.len() { "" } else { "," }
                 )
             }));
-            inner.push(format!("}};\n"));
+            inner.push("}};\n".to_string());
             inner.join("\n").into_bytes()
         }
     };
@@ -87,7 +85,7 @@ fn main() {
         match std::fs::write(&output_file, byte_result) {
             Ok(()) => (),
             Err(e) => {
-                eprintln!("Unable to write to {} - {}", output_file, e.to_string());
+                eprintln!("Unable to write to {} - {}", output_file, e);
                 std::process::exit(1);
             }
         }
@@ -95,7 +93,7 @@ fn main() {
         match std::io::stdout().write_all(&byte_result) {
             Ok(()) => (),
             Err(e) => {
-                eprintln!("Unable to write to stdout - {}", e.to_string());
+                eprintln!("Unable to write to stdout - {}", e);
                 std::process::exit(1);
             }
         }

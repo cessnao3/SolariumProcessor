@@ -7,11 +7,11 @@ pub struct StringLiteral {
 
 impl StringLiteral {
     pub fn new(s: String) -> StringLiteral {
-        return Self { val: s };
+        Self { val: s }
     }
 
     pub fn try_string_literal(input: &str) -> Option<(StringLiteral, usize)> {
-        if input.len() == 0 {
+        if input.is_empty() {
             return None;
         }
 
@@ -60,9 +60,9 @@ impl StringLiteral {
 
         if finished {
             let s = char_vec.iter().collect();
-            return Some((StringLiteral::new(s), skip_val));
+            Some((StringLiteral::new(s), skip_val))
         } else {
-            return None;
+            None
         }
     }
 }
@@ -79,6 +79,6 @@ impl ToString for StringLiteral {
             sval = sval.replace(from, to);
         }
 
-        return sval;
+        sval
     }
 }

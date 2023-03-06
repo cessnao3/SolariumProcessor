@@ -26,7 +26,7 @@ pub enum ThreadMessage {
     Reset,
     Step,
     SetSpeed(f64),
-    SerialInput(Box<Vec<char>>),
+    SerialInput(Vec<char>),
     HardwareInterrupt(usize),
 }
 

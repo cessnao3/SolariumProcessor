@@ -29,12 +29,12 @@ impl LineInformation {
         line_number: usize,
         data_index: usize,
     ) -> LineInformation {
-        return Self {
+        Self {
             instruction,
             arguments,
             line_number,
             data_index,
-        };
+        }
     }
 
     pub fn update_arguments_for_labels(
@@ -56,7 +56,7 @@ impl LineInformation {
                     a => a.clone(),
                 };
 
-                return Ok(new_arg);
+                Ok(new_arg)
             })
             .collect();
     }
@@ -75,7 +75,7 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String> {
         let line_num = i + 1;
 
         // Cleanup the resulting string value and remove comments
-        let l: &str = match l_in.find(";") {
+        let l: &str = match l_in.find(';') {
             Some(len) => &l_in[..len],
             None => l_in,
         }
@@ -212,7 +212,7 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String> {
                     // Construct memory words from the text values
                     let text_vals: Vec<MemoryWord> = match text
                         .chars()
-                        .map(|v| sproc::text::character_to_word(v))
+                        .map(sproc::text::character_to_word)
                         .collect()
                     {
                         Ok(v) => v,
@@ -263,26 +263,24 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String> {
             }
         } else {
             // Add the data values
-            if data_map.contains_key(&current_data_index) {
-                return Err(format!(
-                    "line {0:} offset {1:} already filled",
-                    line_num, current_data_index
-                ));
-            } else if current_data_index < MAX_ADDRESSABLE_VALUE {
-                data_map.insert(
-                    current_data_index,
-                    LineValue::Assembly(LineInformation::new(
+            if let std::collections::hash_map::Entry::Vacant(e) = data_map.entry(current_data_index) {
+                if current_data_index < MAX_ADDRESSABLE_VALUE {
+                    e.insert(LineValue::Assembly(LineInformation::new(
                         command,
                         args,
                         line_num,
                         current_data_index,
-                    )),
-                );
-                current_data_index += 1;
+                    )));
+                } else {
+                    return Err(format!(
+                        "line {0:} \"{1:}\" does not match expected syntax",
+                        line_num, l
+                    ));
+                }
             } else {
                 return Err(format!(
-                    "line {0:} \"{1:}\" does not match expected syntax",
-                    line_num, l
+                    "line {0:} offset {1:} already filled",
+                    line_num, current_data_index
                 ));
             }
         }
@@ -342,7 +340,7 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String> {
         };
     }
 
-    return Ok(data_vec);
+    Ok(data_vec)
 }
 
 #[cfg(test)]
@@ -757,7 +755,7 @@ mod tests {
                     .map(|_| "0".to_string())
                     .collect::<Vec<String>>()
                     .join(", ");
-                let line_val = format!("{0:} {1:}", inst.to_string(), arg_vals);
+                let line_val = format!("{0:} {1:}", inst, arg_vals);
 
                 let lines = vec![line_val.trim()];
 
@@ -779,16 +777,13 @@ mod tests {
 
         let expected_output: Vec<u16>;
         {
-            let mut expected_words = match text_val
+            let mut expected_words: Vec<_> = match text_val
                 .chars()
-                .map(|v| sproc::text::character_to_word(v))
+                .map(sproc::text::character_to_word)
                 .collect()
             {
                 Ok(v) => v,
-                Err(_) => {
-                    assert!(false);
-                    Vec::new()
-                }
+                Err(e) => panic!("{}", e.to_string())
             };
             expected_words.push(MemoryWord::new(0));
 

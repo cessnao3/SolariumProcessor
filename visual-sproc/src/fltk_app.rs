@@ -15,8 +15,6 @@ use sda::assemble;
 use sproc::common::MemoryWord;
 use sproc::memory::MEM_MAX_SIZE;
 
-use spcc;
-
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -24,15 +22,15 @@ use std::sync::{mpsc, Arc, Mutex};
 
 fn get_app_icon() -> PngImage {
     let logo_bytes = include_bytes!("../../doc/images/logo.png");
-    return PngImage::from_data(logo_bytes).unwrap();
+    PngImage::from_data(logo_bytes).unwrap()
 }
 
 fn get_default_text() -> String {
     let text_bytes = include_bytes!("../../examples/spa/default.smc");
-    return match std::str::from_utf8(text_bytes) {
+    match std::str::from_utf8(text_bytes) {
         Ok(v) => v.to_string(),
-        Err(e) => panic!("UTF-8 Error: {0:}", e.to_string()),
-    };
+        Err(e) => panic!("UTF-8 Error: {0:}", e),
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -43,10 +41,10 @@ struct TickTimerState {
 
 impl TickTimerState {
     pub fn new() -> Self {
-        return Self {
+        Self {
             tick_running: false,
             thread_exit: false,
-        };
+        }
     }
 }
 
@@ -63,7 +61,7 @@ pub fn setup_and_run_app(
     let mut main_window = Window::default().with_size(1100, 600).with_label("V/SProc");
 
     main_window.handle(move |_, event| {
-        return event == Event::KeyDown && event_key() == Key::Escape;
+        event == Event::KeyDown && event_key() == Key::Escape
     });
 
     main_window.set_icon(Some(get_app_icon()));
@@ -76,8 +74,8 @@ pub fn setup_and_run_app(
     {
         let mut editor_group = Flex::default_fill().column();
 
-        let mut editor_label = Frame::default().with_label("Code Editor");
-        editor_group.set_size(&mut editor_label, 20);
+        let editor_label = Frame::default().with_label("Code Editor");
+        editor_group.set_size(&editor_label, 20);
 
         code_editor = TextEditor::default();
         code_editor.set_buffer(TextBuffer::default());
@@ -97,7 +95,7 @@ pub fn setup_and_run_app(
         button_group.set_margin(5);
         button_group.end();
 
-        editor_group.set_size(&mut button_group, 50);
+        editor_group.set_size(&button_group, 50);
         editor_group.set_margin(10);
 
         editor_group.end();
@@ -121,8 +119,8 @@ pub fn setup_and_run_app(
     {
         let mut memory_group = Flex::default_fill().column();
 
-        let mut memory_label = Frame::default().with_label("Memory");
-        memory_group.set_size(&mut memory_label, 20);
+        let memory_label = Frame::default().with_label("Memory");
+        memory_group.set_size(&memory_label, 20);
 
         let inner_memory = shared_table_memory.clone();
 
@@ -201,44 +199,43 @@ pub fn setup_and_run_app(
         });
         memory_table.end();
 
-        let mut serial_label = Frame::default().with_label("Serial Output");
-        memory_group.set_size(&mut serial_label, 20);
+        let serial_label = Frame::default().with_label("Serial Output");
+        memory_group.set_size(&serial_label, 20);
 
         serial_output = TextDisplay::default();
         serial_output.set_buffer(TextBuffer::default());
 
-        let mut serial_input_label = Frame::default().with_label("Serial Input");
-        memory_group.set_size(&mut serial_input_label, 20);
+        let serial_input_label = Frame::default().with_label("Serial Input");
+        memory_group.set_size(&serial_input_label, 20);
 
         serial_input = Input::default();
-        memory_group.set_size(&mut serial_input, 28);
+        memory_group.set_size(&serial_input, 28);
 
         {
             let serial_input_queue_clone = serial_input_queue.clone();
             serial_input.handle(move |input, event| {
-                if event == Event::KeyDown {
-                    if event_key() == Key::Enter {
-                        let mut input_string = input.value();
-                        input_string.push('\n');
+                if event == Event::KeyDown && event_key() == Key::Enter {
+                    let mut input_string = input.value();
+                    input_string.push('\n');
 
-                        if let Ok(mut m) = serial_input_queue_clone.lock() {
-                            m.push(input_string.chars().collect::<Vec<_>>());
-                        }
-
-                        fltk_sender.send(FltkMessage::SerialInput);
-
-                        input.set_value("");
-
-                        return true;
+                    if let Ok(mut m) = serial_input_queue_clone.lock() {
+                        m.push(input_string.chars().collect::<Vec<_>>());
                     }
+
+                    fltk_sender.send(FltkMessage::SerialInput);
+
+                    input.set_value("");
+
+                    return true;
                 }
-                return false;
+
+                false
             });
         }
 
         // Set the load input from file
         let mut serial_file_load_button = Button::default().with_label("Load File");
-        memory_group.set_size(&mut serial_file_load_button, 20);
+        memory_group.set_size(&serial_file_load_button, 20);
 
         {
             let serial_input_queue_clone = serial_input_queue.clone();
@@ -278,7 +275,7 @@ pub fn setup_and_run_app(
     let register_labels;
     {
         // Add a simple step initiation button
-        let mut button_group = Flex::default_fill().row();
+        let button_group = Flex::default_fill().row();
 
         let mut step_button = Button::default().with_label("STEP");
         step_button.emit(fltk_sender, FltkMessage::Step);
@@ -296,7 +293,7 @@ pub fn setup_and_run_app(
         hardware_irq_button.emit(fltk_sender, FltkMessage::HardwareInterrupt(0));
 
         button_group.end();
-        register_group.set_size(&mut button_group, 40);
+        register_group.set_size(&button_group, 40);
 
         // Define the speed slider
         let mut speed_slider = HorValueSlider::default().with_label("Speed");
@@ -308,14 +305,14 @@ pub fn setup_and_run_app(
             fltk_sender.send(FltkMessage::SetSpeed((10.0f64).powf(v.value())));
         });
 
-        register_group.set_size(&mut speed_slider, 25);
+        register_group.set_size(&speed_slider, 25);
 
-        let mut slider_frame = Frame::default();
-        register_group.set_size(&mut slider_frame, 25);
+        let slider_frame = Frame::default();
+        register_group.set_size(&slider_frame, 25);
 
         // Define the registers and perform the initial update values
-        let mut register_frame_label = Frame::default().with_label("Registers");
-        register_group.set_size(&mut register_frame_label, 30);
+        let register_frame_label = Frame::default().with_label("Registers");
+        register_group.set_size(&register_frame_label, 30);
 
         register_labels = setup_register_group(&mut register_group);
 
@@ -328,7 +325,7 @@ pub fn setup_and_run_app(
     register_group.end();
     register_group.set_margin(10);
 
-    main_group.set_size(&mut register_group, 350);
+    main_group.set_size(&register_group, 350);
 
     main_group.end();
 
@@ -433,7 +430,7 @@ pub fn setup_and_run_app(
                     }
 
                     if let Some(cv) = data {
-                        msg_to_send = Some(ThreadMessage::SerialInput(Box::new(cv)));
+                        msg_to_send = Some(ThreadMessage::SerialInput(cv));
                     }
                 }
                 FltkMessage::FileLoadError => {
@@ -461,11 +458,8 @@ pub fn setup_and_run_app(
                             };
 
                             if let Some(lines) = lines_opt {
-                                match msg {
-                                    FltkMessage::CompileToText => {
-                                        v.set_text(&lines.join("\n"));
-                                    }
-                                    _ => (),
+                                if let FltkMessage::CompileToText = msg {
+                                    v.set_text(&lines.join("\n"));
                                 }
 
                                 let assembled_binary =
@@ -513,7 +507,7 @@ pub fn setup_and_run_app(
                 .buffer()
                 .unwrap()
                 .text()
-                .split("\n")
+                .split('\n')
                 .count();
             log_text_display.scroll(num_lines as i32, 0);
         }
@@ -529,14 +523,10 @@ pub fn setup_and_run_app(
         }
 
         // Send messages
-        match msg_to_send {
-            Some(msg) => match gui_to_thread_tx.send(msg) {
-                Ok(()) => (),
-                Err(e) => {
-                    alert_default(&format!("unable to send message to thread - {0:}", e));
-                }
-            },
-            None => (),
+        if let Some(msg) = msg_to_send {
+            if let Err(e) = gui_to_thread_tx.send(msg) {
+                alert_default(&format!("unable to send message to thread - {0:}", e));
+            }
         }
     }
 

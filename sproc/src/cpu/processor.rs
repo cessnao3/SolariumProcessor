@@ -41,10 +41,10 @@ impl SolariumProcessor {
         };
 
         // Initiate the reset and return
-        return match cpu.hard_reset() {
+        match cpu.hard_reset() {
             Ok(()) => cpu,
             Err(e) => panic!("Unable to reset the cpu - {}", e.to_string()),
-        };
+        }
     }
 
     /// Adds a segment to the memory map if possible
@@ -53,22 +53,22 @@ impl SolariumProcessor {
         base: usize,
         seg: Rc<RefCell<dyn MemorySegment>>,
     ) -> Result<(), SolariumError> {
-        return self.memory_map.add_segment(base, seg);
+        self.memory_map.add_segment(base, seg)
     }
 
     /// Obtains the requested location in memory, without altering the devie state
     pub fn memory_inspect(&self, addr: usize) -> Result<MemoryWord, SolariumError> {
-        return self.memory_map.inspect(addr);
+        self.memory_map.inspect(addr)
     }
 
     /// Sets the provided memory value in the address requested
     pub fn memory_set(&mut self, addr: usize, data: MemoryWord) -> Result<(), SolariumError> {
-        return self.memory_map.set(addr, data);
+        self.memory_map.set(addr, data)
     }
 
     /// Provides an array containing the register states
     pub fn get_register_state(&self) -> [MemoryWord; RegisterManager::NUM_REGISTERS] {
-        return self.registers.get_state();
+        self.registers.get_state()
     }
 
     /// Adds a device to the Solarium device parameters
@@ -77,7 +77,7 @@ impl SolariumProcessor {
         dev: Rc<RefCell<dyn SolariumDevice>>,
     ) -> Result<(), SolariumError> {
         self.devices.push(dev);
-        return Ok(());
+        Ok(())
     }
 
     /// Provides common functionality between soft and hard reset vectors, while providing
@@ -90,42 +90,42 @@ impl SolariumProcessor {
         };
 
         self.registers.reset();
-        return self.registers.set(Register::ProgramCounter, reset_loc);
+        self.registers.set(Register::ProgramCounter, reset_loc)
     }
 
     /// Resets the CPU and memory to a known state as a hard-reset
     pub fn hard_reset(&mut self) -> Result<(), SolariumError> {
         self.inner_reset(VECTOR_HARD_RESET)?;
         self.memory_map.reset();
-        return Ok(());
+        Ok(())
     }
 
     /// Sofr-resets only the registers, but leaves the memory values intact
     pub fn soft_reset(&mut self) -> Result<(), SolariumError> {
         self.inner_reset(VECTOR_SOFT_RESET)?;
-        return Ok(());
+        Ok(())
     }
 
     /// Obtains the current program counter offset
     fn get_pc_offset(&self, reg: Register) -> Result<MemoryWord, SolariumError> {
         let pc = self.registers.get(Register::ProgramCounter)?.get();
-        return Ok(MemoryWord::new(
+        Ok(MemoryWord::new(
             (pc as i32 + self.registers.get(reg)?.get_signed() as i32) as u16,
-        ));
+        ))
     }
 
     /// Increments the program counter by the specified amount
     fn increment_pc(&mut self, pc_incr: i32) -> Result<(), SolariumError> {
         let pc = self.registers.get(Register::ProgramCounter)?.get();
         let new_pc = (pc as i32 + pc_incr) as u16;
-        return self
+        self
             .registers
-            .set(Register::ProgramCounter, MemoryWord::new(new_pc));
+            .set(Register::ProgramCounter, MemoryWord::new(new_pc))
     }
 
     /// Obtains the current value of the stack pointer offset from the initial stack location
     fn get_stack_pointer(&self) -> Result<usize, SolariumError> {
-        return Ok(self.registers.get(Register::StackPointer)?.get() as usize);
+        Ok(self.registers.get(Register::StackPointer)?.get() as usize)
     }
 
     /// Pushes a value onto the stack
@@ -136,7 +136,7 @@ impl SolariumProcessor {
         self.registers
             .set(Register::StackPointer, MemoryWord::new(new_sp as u16))?;
 
-        return self.memory_map.set(current_sp, value);
+        self.memory_map.set(current_sp, value)
     }
 
     /// Pops a value off of the stack and returns the result
@@ -151,16 +151,16 @@ impl SolariumProcessor {
         )?;
 
         // Return the result
-        return Ok(ret_val);
+        Ok(ret_val)
     }
 
     /// Peeks at the value currently on the top of the stack
     fn peek_sp(&self) -> Result<MemoryWord, SolariumError> {
         let sp = self.get_stack_pointer()?;
         if sp == 0 {
-            return Err(SolariumError::StackUnderflow);
+            Err(SolariumError::StackUnderflow)
         } else {
-            return self.memory_map.get(sp - 1);
+            self.memory_map.get(sp - 1)
         }
     }
 
@@ -171,7 +171,7 @@ impl SolariumProcessor {
         }
 
         // Call the interrupt and return the result
-        return self.call_interrupt(VECTOR_HW_HJW_OFFSET + hw_irq_num);
+        self.call_interrupt(VECTOR_HW_HJW_OFFSET + hw_irq_num)
     }
 
     /// Calls the interrupt at the provided interrupt vector if interrupts are enabled
@@ -196,7 +196,7 @@ impl SolariumProcessor {
         self.registers.set(Register::ProgramCounter, new_pc)?;
 
         // Return true if the interrupt was called
-        return Ok(true);
+        Ok(true)
     }
 
     /// Pushes all register values onto the stack
@@ -215,7 +215,7 @@ impl SolariumProcessor {
             MemoryWord::new((current_sp + RegisterManager::NUM_REGISTERS) as u16),
         )?;
 
-        return Ok(());
+        Ok(())
     }
 
     /// Pops all register values from the stack back into the register values
@@ -237,7 +237,7 @@ impl SolariumProcessor {
         self.registers
             .set(Register::StackPointer, MemoryWord::new(mem_val_base as u16))?;
 
-        return Ok(());
+        Ok(())
     }
 
     /// Step the CPU
@@ -262,13 +262,13 @@ impl SolariumProcessor {
         fn get_immediate_value_signed(arg_high: u8, arg_low: u8) -> MemoryWord {
             assert!(arg_low & 0xF == arg_low);
             assert!(arg_high & 0xF == arg_high);
-            return MemoryWord::new(((((arg_high << 4) | arg_low) as i8) as i16) as u16);
+            MemoryWord::new(((((arg_high << 4) | arg_low) as i8) as i16) as u16)
         }
 
         fn get_immediate_value_unsigned(arg_high: u8, arg_low: u8) -> MemoryWord {
             assert!(arg_low & 0xF == arg_low);
             assert!(arg_high & 0xF == arg_high);
-            return MemoryWord::new(((arg_high << 4) | arg_low) as u16);
+            MemoryWord::new(((arg_high << 4) | arg_low) as u16)
         }
 
         // Switch based on opcode
@@ -280,11 +280,7 @@ impl SolariumProcessor {
                 arg2: opcode,
             } => {
                 match opcode {
-                    0 =>
-                    // noop
-                    {
-                        ()
-                    }
+                    0 => (), // noop
                     1 =>
                     // inton
                     {
@@ -405,7 +401,7 @@ impl SolariumProcessor {
                     {
                         // Determine the interrupt vector value
                         let int_offset = if opcode == 6 {
-                            reg_a.to_index()
+                            reg_a.get_index()
                         } else if opcode == 7 {
                             self.registers.get(reg_a)?.get() as usize
                         } else {
@@ -689,7 +685,7 @@ impl SolariumProcessor {
                                 val.overflowing_shr((-shift_count) as u32)
                             };
 
-                            return Ok(MemoryWord::new(new_val.0));
+                            Ok(MemoryWord::new(new_val.0))
                         };
 
                         if self.registers.get_flag(StatusFlag::SignedArithmetic)? {
@@ -710,20 +706,20 @@ impl SolariumProcessor {
                             };
                             fun_div = |a, b| {
                                 if b.get() == 0 {
-                                    return Err(SolariumError::DivideByZero);
+                                    Err(SolariumError::DivideByZero)
                                 } else {
-                                    return Ok(MemoryWord::new_signed(
+                                    Ok(MemoryWord::new_signed(
                                         a.get_signed().wrapping_div(b.get_signed()),
-                                    ));
+                                    ))
                                 }
                             };
                             fun_rem = |a, b| {
                                 if b.get() == 0 {
-                                    return Err(SolariumError::ModByZero);
+                                    Err(SolariumError::ModByZero)
                                 } else {
-                                    return Ok(MemoryWord::new_signed(
+                                    Ok(MemoryWord::new_signed(
                                         a.get_signed().wrapping_rem(b.get_signed()),
-                                    ));
+                                    ))
                                 }
                             };
                         } else {
@@ -732,16 +728,16 @@ impl SolariumProcessor {
                             fun_mul = |a, b| Ok(MemoryWord::new(a.get().wrapping_mul(b.get())));
                             fun_div = |a, b| {
                                 if b.get() == 0 {
-                                    return Err(SolariumError::DivideByZero);
+                                    Err(SolariumError::DivideByZero)
                                 } else {
-                                    return Ok(MemoryWord::new(a.get().wrapping_div(b.get())));
+                                    Ok(MemoryWord::new(a.get().wrapping_div(b.get())))
                                 }
                             };
                             fun_rem = |a, b| {
                                 if b.get() == 0 {
-                                    return Err(SolariumError::ModByZero);
+                                    Err(SolariumError::ModByZero)
                                 } else {
-                                    return Ok(MemoryWord::new(a.get().wrapping_rem(b.get())));
+                                    Ok(MemoryWord::new(a.get().wrapping_rem(b.get())))
                                 }
                             };
                         }
@@ -800,6 +796,12 @@ impl SolariumProcessor {
         }
 
         // Return success
-        return Ok(());
+        Ok(())
+    }
+}
+
+impl Default for SolariumProcessor {
+    fn default() -> Self {
+        Self::new()
     }
 }

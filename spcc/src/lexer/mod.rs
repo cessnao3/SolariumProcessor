@@ -17,7 +17,7 @@ use self::statement::read_base_statement;
 use self::token_iter::TokenIter;
 
 pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String> {
-    let mut token_iter = TokenIter::new(tokens.clone());
+    let mut token_iter = TokenIter::new(tokens);
 
     let mut scopes = ScopeManager::new();
 
@@ -60,17 +60,13 @@ pub fn lexer(tokens: Vec<Token>) -> Result<Vec<String>, String> {
     resulting_instructions.extend(
         program
             .get_static_assembly()
-            .iter()
-            .map(|v| v.clone())
-            .collect::<Vec<_>>(),
+            .to_vec(),
     );
     resulting_instructions.extend(
         program
             .get_primary_assembly()
-            .iter()
-            .map(|v| v.clone())
-            .collect::<Vec<_>>(),
+            .to_vec()
     );
 
-    return Ok(resulting_instructions);
+    Ok(resulting_instructions)
 }

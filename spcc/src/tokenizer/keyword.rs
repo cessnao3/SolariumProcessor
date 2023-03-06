@@ -15,7 +15,7 @@ pub enum Keyword {
 
 impl ToString for Keyword {
     fn to_string(&self) -> String {
-        return (match self {
+        match self {
             Keyword::If => "if",
             Keyword::Else => "else",
             Keyword::While => "while",
@@ -25,8 +25,8 @@ impl ToString for Keyword {
             Keyword::Auto => "auto",
             Keyword::Extern => "extern",
             Keyword::Return => "return",
-        })
-        .to_string();
+        }
+        .to_string()
     }
 }
 
@@ -44,7 +44,7 @@ impl Keyword {
             Keyword::Return,
         ];
 
-        return &VALUES;
+        &VALUES
     }
 
     pub fn try_match_keyword(input: &str) -> Option<(Keyword, usize)> {
@@ -66,11 +66,10 @@ impl Keyword {
             }
 
             // Return true if all else succeeds
-            return true;
+            true
         }
 
-        let keyword_vals: Vec<Keyword> = Keyword::enum_iter().iter().map(|v| *v).collect();
-
+        let keyword_vals = Keyword::enum_iter().to_vec();
         let keyword_checks: Vec<(Keyword, String)> =
             keyword_vals.iter().map(|v| (*v, v.to_string())).collect();
 
@@ -80,6 +79,6 @@ impl Keyword {
             }
         }
 
-        return None;
+        None
     }
 }

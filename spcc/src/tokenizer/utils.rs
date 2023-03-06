@@ -11,5 +11,5 @@ pub fn is_separator(c: char) -> bool {
             .collect();
     }
 
-    return c.is_ascii_whitespace() || SEPARATOR_CHARS.contains(&c);
+    c.is_ascii_whitespace() || SEPARATOR_CHARS.contains(&c)
 }

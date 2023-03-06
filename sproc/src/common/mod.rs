@@ -10,22 +10,22 @@ pub struct MemoryWord {
 impl MemoryWord {
     /// Constructs a new memory value
     pub fn new(val: u16) -> MemoryWord {
-        return Self { value: val };
+        Self { value: val }
     }
 
     /// Constructs a new memory value
     pub fn new_signed(val: i16) -> MemoryWord {
-        return Self { value: val as u16 };
+        Self { value: val as u16 }
     }
 
     /// Gets the current value
     pub fn get(&self) -> u16 {
-        return self.value;
+        self.value
     }
 
     /// Gets the current value as a signed integer
     pub fn get_signed(&self) -> i16 {
-        return self.value as i16;
+        self.value as i16
     }
 
     /// Sets a new value
@@ -36,7 +36,7 @@ impl MemoryWord {
 
 impl ToString for MemoryWord {
     fn to_string(&self) -> String {
-        return self.value.to_string();
+        self.value.to_string()
     }
 }
 
@@ -44,10 +44,10 @@ impl FromStr for MemoryWord {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        return match s.parse::<u16>() {
+        match s.parse::<u16>() {
             Ok(v) => Ok(MemoryWord::new(v)),
             Err(e) => Err(e),
-        };
+        }
     }
 }
 
@@ -118,7 +118,7 @@ impl ToString for SolariumError {
                 "segment from [{0:}, {1:}) overlaps with other segments",
                 start_index, end_index
             ),
-            SolariumError::StopRequested => format!("stop requested"),
+            SolariumError::StopRequested => "stop requested".to_string(),
         };
     }
 }
@@ -131,9 +131,9 @@ pub enum SolariumDeviceError {
 
 impl ToString for SolariumDeviceError {
     fn to_string(&self) -> String {
-        return match self {
+        match self {
             SolariumDeviceError::BufferFull => "device buffer is full".to_string(),
-        };
+        }
     }
 }
 
@@ -155,19 +155,19 @@ impl InstructionData {
         let opcode = ((inst_val & 0xF000) >> 12) as u8;
         let arg0 = ((inst_val & 0x0F00) >> 8) as u8;
         let arg1 = ((inst_val & 0x00F0) >> 4) as u8;
-        let arg2 = ((inst_val & 0x000F) >> 0) as u8;
+        let arg2 = (inst_val & 0x000F) as u8;
 
         assert!(opcode & 0xF == opcode);
         assert!(arg0 & 0xF == arg0);
         assert!(arg1 & 0xF == arg1);
         assert!(arg2 & 0xF == arg2);
 
-        return Self {
+        Self {
             opcode,
             arg0,
             arg1,
             arg2,
-        };
+        }
     }
 
     /// Combines the instruction components into their word values
@@ -177,9 +177,9 @@ impl InstructionData {
         assert!(self.arg1 & 0xF == self.arg1);
         assert!(self.arg2 & 0xF == self.arg2);
 
-        return ((self.opcode as u16) << 12)
+        ((self.opcode as u16) << 12)
             | ((self.arg0 as u16) << 8)
             | ((self.arg1 as u16) << 4)
-            | (self.arg2 as u16);
+            | (self.arg2 as u16)
     }
 }

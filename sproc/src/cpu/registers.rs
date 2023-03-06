@@ -13,7 +13,7 @@ pub enum Register {
 
 impl Register {
     /// Converts the enumeration types to an index for a registry array
-    pub fn to_index(&self) -> usize {
+    pub fn get_index(&self) -> usize {
         // Determine the index
         let ind: usize = match self {
             Register::ProgramCounter => 0,
@@ -24,7 +24,7 @@ impl Register {
             Register::GP(ind) => *ind,
         };
 
-        return ind;
+        ind
     }
 }
 
@@ -38,19 +38,19 @@ pub enum StatusFlag {
 impl StatusFlag {
     /// Provides the mask required to set the flag with a bitwise-or
     pub fn get_mask(&self) -> MemoryWord {
-        return MemoryWord::new(match self {
+        MemoryWord::new(match self {
             StatusFlag::InterruptEnable => 1 << 0,
             StatusFlag::SignedArithmetic => 1 << 1,
-        });
+        })
     }
 }
 
 impl ToString for StatusFlag {
     fn to_string(&self) -> String {
-        return match self {
+        match self {
             StatusFlag::InterruptEnable => "I".to_string(),
             StatusFlag::SignedArithmetic => "U".to_string(),
-        };
+        }
     }
 }
 
@@ -65,14 +65,14 @@ impl RegisterManager {
 
     /// Creates a new register manager
     pub fn new() -> RegisterManager {
-        return RegisterManager {
+        RegisterManager {
             registers: [MemoryWord::new(0); RegisterManager::NUM_REGISTERS],
-        };
+        }
     }
 
     /// Provides the current state of the register values
     pub fn get_state(&self) -> [MemoryWord; RegisterManager::NUM_REGISTERS] {
-        return self.registers;
+        self.registers
     }
 
     /// Resets all registers to a known, zero, state
@@ -84,23 +84,23 @@ impl RegisterManager {
 
     /// Gets the selected register value
     pub fn get(&self, register: Register) -> Result<MemoryWord, SolariumError> {
-        let ind = register.to_index();
+        let ind = register.get_index();
 
         if ind < RegisterManager::NUM_REGISTERS {
-            return Ok(self.registers[register.to_index()]);
+            Ok(self.registers[register.get_index()])
         } else {
-            return Err(SolariumError::RegisterIndexError(ind));
+            Err(SolariumError::RegisterIndexError(ind))
         }
     }
 
     /// Sets the selecteed register value
     pub fn set(&mut self, register: Register, value: MemoryWord) -> Result<(), SolariumError> {
-        let reg_ind = register.to_index();
+        let reg_ind = register.get_index();
         if reg_ind < Self::NUM_REGISTERS {
             self.registers[reg_ind] = value;
-            return Ok(());
+            Ok(())
         } else {
-            return Err(SolariumError::RegisterIndexError(reg_ind));
+            Err(SolariumError::RegisterIndexError(reg_ind))
         }
     }
 
@@ -108,19 +108,19 @@ impl RegisterManager {
     pub fn set_flag(&mut self, flag: StatusFlag) -> Result<(), SolariumError> {
         let last_val = self.get(Register::StatusFlags)?;
         let new_val = MemoryWord::new(last_val.get() | flag.get_mask().get());
-        return self.set(Register::StatusFlags, new_val);
+        self.set(Register::StatusFlags, new_val)
     }
 
     /// Clears the given flag to the processor status
     pub fn clear_flag(&mut self, flag: StatusFlag) -> Result<(), SolariumError> {
         let last_val = self.get(Register::StatusFlags)?;
         let new_val = MemoryWord::new(last_val.get() & !flag.get_mask().get());
-        return self.set(Register::StatusFlags, new_val);
+        self.set(Register::StatusFlags, new_val)
     }
 
     /// Gets the value of the given processor status flags
     pub fn get_flag(&self, flag: StatusFlag) -> Result<bool, SolariumError> {
-        return Ok((self.get(Register::StatusFlags)?.get() & flag.get_mask().get()) != 0);
+        Ok((self.get(Register::StatusFlags)?.get() & flag.get_mask().get()) != 0)
     }
 }
 
@@ -142,7 +142,7 @@ mod tests {
         assert!(registers.len() == RegisterManager::NUM_REGISTERS);
 
         // Return the register vector
-        return registers;
+        registers
     }
 
     #[test]

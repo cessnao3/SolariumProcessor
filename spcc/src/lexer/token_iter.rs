@@ -8,11 +8,11 @@ pub struct TokenIter {
 
 impl TokenIter {
     pub fn new(tokens: Vec<Token>) -> TokenIter {
-        return Self {
+        Self {
             list: tokens,
             current: 0,
             started: false,
-        };
+        }
     }
 
     pub fn next(&mut self) -> Option<Token> {
@@ -22,30 +22,30 @@ impl TokenIter {
             self.current += 1;
         }
 
-        return self.get_index_val(self.current);
+        self.get_index_val(self.current)
     }
 
     pub fn last(&self) -> Option<Token> {
         if !self.started {
-            return None;
+            None
         } else {
-            return self.get_index_val(self.current);
+            self.get_index_val(self.current)
         }
     }
 
     pub fn peek(&self) -> Option<Token> {
         if !self.started {
-            return self.get_index_val(self.current);
+            self.get_index_val(self.current)
         } else {
-            return self.get_index_val(self.current + 1);
+            self.get_index_val(self.current + 1)
         }
     }
 
     fn get_index_val(&self, ind: usize) -> Option<Token> {
         if ind < self.list.len() {
-            return Some(self.list[ind].clone());
+            Some(self.list[ind].clone())
         } else {
-            return None;
+            None
         }
     }
 }

@@ -2,8 +2,8 @@ use crate::common::{MemoryWord, SolariumError};
 
 /// Converts an input character into a memory-word supported by the SProc
 pub fn character_to_word(c: char) -> Result<MemoryWord, SolariumError> {
-    const NULL: u8 = '\0' as u8;
-    const NEWLINE: u8 = '\n' as u8;
+    const NULL: u8 = b'\0';
+    const NEWLINE: u8 = b'\n';
 
     let char_val: u8 = match c as u8 {
         NULL => 0x00,
@@ -12,7 +12,7 @@ pub fn character_to_word(c: char) -> Result<MemoryWord, SolariumError> {
         _ => return Err(SolariumError::CharacterToWord(c)),
     };
 
-    return Ok(MemoryWord::new(char_val as u16));
+    Ok(MemoryWord::new(char_val as u16))
 }
 
 /// Converts a memory word into a text character
@@ -24,5 +24,5 @@ pub fn word_to_character(word: MemoryWord) -> Result<char, SolariumError> {
         _ => return Err(SolariumError::WordToCharacter(word)),
     };
 
-    return Ok(char_val);
+    Ok(char_val)
 }

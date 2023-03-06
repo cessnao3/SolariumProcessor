@@ -1,11 +1,11 @@
 fn char_is_hex(c: char) -> bool {
     const HEX_CHARS: [char; 6] = ['A', 'B', 'C', 'D', 'E', 'F'];
 
-    return c.is_numeric() || HEX_CHARS.contains(&c.to_ascii_uppercase());
+    c.is_numeric() || HEX_CHARS.contains(&c.to_ascii_uppercase())
 }
 
 pub fn try_match_integer_literal(input: &str) -> Option<(u16, usize)> {
-    if input.len() == 0 {
+    if input.is_empty() {
         return None;
     }
 
@@ -45,13 +45,11 @@ pub fn try_match_integer_literal(input: &str) -> Option<(u16, usize)> {
             current += 1;
         }
 
-        let word_parse_result;
-
-        if is_hex {
-            word_parse_result = u16::from_str_radix(&input[2..current], 16);
+        let word_parse_result = if is_hex {
+            u16::from_str_radix(&input[2..current], 16)
         } else {
-            word_parse_result = input[0..current].parse::<u16>();
-        }
+            input[0..current].parse::<u16>()
+        };
 
         return match word_parse_result {
             Ok(v) => Some((v, current)),
@@ -59,5 +57,5 @@ pub fn try_match_integer_literal(input: &str) -> Option<(u16, usize)> {
         };
     }
 
-    return None;
+    None
 }

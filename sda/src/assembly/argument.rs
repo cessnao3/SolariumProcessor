@@ -82,12 +82,12 @@ impl Argument {
         };
 
         if reg_val & 0xF == reg_val {
-            return Ok(reg_val);
+            Ok(reg_val)
         } else {
-            return Err(format!(
+            Err(format!(
                 "register value {0:} exceeds number of registers",
                 reg_val
-            ));
+            ))
         }
     }
 }
@@ -108,30 +108,30 @@ impl FromStr for Argument {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if ARG_NUMBER_REGEX.is_match(s) {
-            if s.chars().next().unwrap() == '-' {
-                return match s.parse::<i32>() {
+            if s.starts_with('-') {
+                match s.parse::<i32>() {
                     Ok(v) => Ok(Argument::SignedNumber(v)),
                     Err(e) => Err(ParseArgumentError {
                         val: ParseArgumentErrorEnum::Integer(e),
                     }),
-                };
+                }
             } else {
-                return match s.parse::<u32>() {
+                match s.parse::<u32>() {
                     Ok(v) => Ok(Argument::UnsignedNumber(v)),
                     Err(e) => Err(ParseArgumentError {
                         val: ParseArgumentErrorEnum::Integer(e),
                     }),
-                };
+                }
             }
         } else if ARG_HEX_REGEX.is_match(s) {
-            return match u32::from_str_radix(&s[2..], 16) {
+            match u32::from_str_radix(&s[2..], 16) {
                 Ok(v) => Ok(Argument::UnsignedNumber(v)),
                 Err(e) => Err(ParseArgumentError {
                     val: ParseArgumentErrorEnum::Integer(e),
                 }),
-            };
+            }
         } else if ARG_LABEL_REGEX.is_match(s) {
-            return Ok(Argument::Label(s.to_string()));
+            Ok(Argument::Label(s.to_string()))
         } else if ARG_REGISTER_REGEX.is_match(s) {
             let reg_str = &s[1..];
 
@@ -148,7 +148,7 @@ impl FromStr for Argument {
                 }
             };
 
-            return Ok(Argument::SignedNumber(reg_ind));
+            Ok(Argument::SignedNumber(reg_ind))
         } else {
             panic!();
         }

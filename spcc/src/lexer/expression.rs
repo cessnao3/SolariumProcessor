@@ -52,8 +52,8 @@ pub fn read_base_expression(
         let mut post_load_instruction = Vec::new();
         let mut can_be_base_expression = false;
 
-        match iter.peek() {
-            Some(Token::Symbol(symb)) => match symb {
+        if let Some(Token::Symbol(symb)) = iter.peek() {
+            match symb {
                 Symbol::AddressAssignment => {
                     post_load_instruction = vec![
                         format!("sav {0:}, {1:}", register, register_spare),
@@ -86,12 +86,9 @@ pub fn read_base_expression(
                         _ => panic!(),
                     };
 
-                    match symb {
-                        Symbol::ShiftRight => {
-                            post_load_instruction.push(format!("neg {0:}", register_spare))
-                        }
-                        _ => (),
-                    };
+                    if let Symbol::ShiftRight = symb {
+                        post_load_instruction.push(format!("neg {0:}", register_spare));
+                    }
 
                     post_load_instruction.push(format!(
                         "{0:} {1:}, {1:}, {2:}",
@@ -136,11 +133,10 @@ pub fn read_base_expression(
                     post_load_instruction.push(format!("{0:} {1:}", post_inst_boolean, register));
                 }
                 _ => (),
-            },
-            _ => (),
+            }
         };
 
-        if post_load_instruction.len() > 0 {
+        if !post_load_instruction.is_empty() {
             // Consume the next value
             iter.next();
 
@@ -169,9 +165,9 @@ pub fn read_base_expression(
         }
 
         // Return the assembly result
-        return Ok(assembly);
+        Ok(assembly)
     } else {
-        return Err(format!("unexpected end of token stream"));
+        Err("unexpected end of token stream".to_string())
     }
 }
 
@@ -224,7 +220,7 @@ fn read_expression(
                     // Add the SP copy to ARG if the first argument is provided
                     // Otherwise, check for comma if needed
                     if num_args == 0 {
-                        assembly.push(format!("copy $arg, $sp"));
+                        assembly.push("copy $arg, $sp".to_string());
                     } else {
                         // Read the comma
                         match iter.next() {
@@ -299,9 +295,7 @@ fn read_expression(
                             .load_address_to_register(register),
                     );
                 } else {
-                    return Err(format!(
-                        "the next symbol for the address-of must be a variable name"
-                    ));
+                    return Err("the next symbol for the address-of must be a variable name".to_string());
                 }
             }
             Token::Symbol(Symbol::Plus)
@@ -354,8 +348,8 @@ fn read_expression(
             }
         };
     } else {
-        return Err(format!("unexpected end of token stream"));
+        return Err("unexpected end of token stream".to_string());
     }
 
-    return Ok(assembly);
+    Ok(assembly)
 }

@@ -28,16 +28,16 @@ impl SerialInputOutputDevice {
     /// Constructs a new serial device
     pub fn new(buffer_size: usize) -> SerialInputOutputDevice {
         // Construct the serial device output
-        return Self {
+        Self {
             input_queue: RefCell::new(VecDeque::new()),
             output_queue: VecDeque::new(),
             buffer_size,
-        };
+        }
     }
 
     /// Determines if there is output in the queue
     pub fn has_output(&self) -> bool {
-        return !self.output_queue.is_empty();
+        !self.output_queue.is_empty()
     }
 
     /// Determines if there is input in the queue
@@ -49,15 +49,15 @@ impl SerialInputOutputDevice {
     pub fn push_input(&mut self, val: MemoryWord) -> bool {
         if self.input_queue.borrow().len() < self.buffer_size {
             self.input_queue.borrow_mut().push_back(val);
-            return true;
+            true
         } else {
-            return false;
+            false
         }
     }
 
     /// Pops the output value from the output queue and returns
     pub fn pop_output(&mut self) -> Option<MemoryWord> {
-        return self.output_queue.pop_front();
+        self.output_queue.pop_front()
     }
 
     fn common_get(&self, offset: usize) -> Result<MemoryWord, SolariumError> {
@@ -141,17 +141,12 @@ impl MemorySegment for SerialInputOutputDevice {
 
     /// Provides the length of the memory segment
     fn len(&self) -> usize {
-        return Self::DEVICE_MEM_SIZE;
-    }
-
-    /// Determines if the given memory index is within the memory segment
-    fn within(&self, offset: usize) -> bool {
-        return offset < self.len();
+        Self::DEVICE_MEM_SIZE
     }
 }
 
 impl SolariumDevice for SerialInputOutputDevice {
     fn on_step(&mut self) -> Option<DeviceAction> {
-        return None;
+        None
     }
 }

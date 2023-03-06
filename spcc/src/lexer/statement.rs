@@ -27,7 +27,7 @@ fn read_statement(
     if let Some(tok) = iter.peek() {
         first_token = tok;
     } else {
-        return Err(format!("unexpected end of stream found"));
+        return Err("unexpected end of stream found".to_string());
     }
 
     match first_token {
@@ -51,9 +51,7 @@ fn read_statement(
             if let Some(Token::Symbol(Symbol::OpenParen)) = iter.next() {
                 // Clear open paren
             } else {
-                return Err(format!(
-                    "while loop definition expects ( for the expression start"
-                ));
+                return Err("while loop definition expects ( for the expression start".to_string());
             }
 
             // Define the while label
@@ -71,9 +69,7 @@ fn read_statement(
             if let Some(Token::Symbol(Symbol::CloseParen)) = iter.next() {
                 // Clear open paren
             } else {
-                return Err(format!(
-                    "while loop definition expects ) for expression end"
-                ));
+                return Err("while loop definition expects ) for expression end".to_string());
             }
 
             // Determine where to jump
@@ -112,9 +108,7 @@ fn read_statement(
             if let Some(Token::Symbol(Symbol::OpenParen)) = iter.next() {
                 // Clear open paren
             } else {
-                return Err(format!(
-                    "if loop definition expects ( for the expression start"
-                ));
+                return Err("if loop definition expects ( for the expression start".to_string());
             }
 
             // Define the if label
@@ -130,9 +124,7 @@ fn read_statement(
             if let Some(Token::Symbol(Symbol::CloseParen)) = iter.next() {
                 // Clear open paren
             } else {
-                return Err(format!(
-                    "while loop definition expects ) for expression end"
-                ));
+                return Err("while loop definition expects ) for expression end".to_string());
             }
 
             // Define the resulting jumps
@@ -220,13 +212,13 @@ fn read_statement(
             if let Some(Token::Symbol(Symbol::Semicolon)) = iter.next() {
                 // Do Nothing
             } else {
-                return Err(format!("expected semicolon at the end of the expression"));
+                return Err("expected semicolon at the end of the expression".to_string());
             }
         }
     }
 
     // Return the resulting values
-    return Ok(program);
+    Ok(program)
 }
 
 fn read_variable_def(
@@ -251,7 +243,7 @@ fn read_variable_def(
                 "no valid variable type provided, found {0:}",
                 t.to_string()
             )),
-            None => Err(format!("unexpected end of token stream")),
+            None => Err("unexpected end of token stream".to_string()),
         };
     }
 
@@ -283,7 +275,7 @@ fn read_variable_def(
 
     // Check the variable name
     if let Some(Token::VariableName(name)) = iter.next() {
-        variable_name = name.clone();
+        variable_name = name;
 
         match variable_type {
             VariableType::Static => {
@@ -321,7 +313,7 @@ fn read_variable_def(
             Err(e) => return Err(e),
         };
     } else {
-        return Err(format!("expected name for variable definition"));
+        return Err("expected name for variable definition".to_string());
     }
 
     // Read the assignment operator if present for initial value
@@ -349,24 +341,24 @@ fn read_variable_def(
         // Check for final semicolon
         if let Some(Token::Symbol(Symbol::Semicolon)) = iter.next() {
             // Skip the closing assignment operator
-            return Ok(program);
+            Ok(program)
         } else {
-            return Err(match iter.last() {
+            Err(match iter.last() {
                 Some(t) => format!("expected closing semicolon, found {0:}", t.to_string()),
-                None => format!("unexpected end of token stream"),
-            });
+                None => "unexpected end of token stream".to_string(),
+            })
         }
     } else if let Some(Token::Symbol(Symbol::Semicolon)) = next_val {
         // Return as-is
-        return Ok(program);
+        Ok(program)
     } else {
-        return Err(match next_val {
+        Err(match next_val {
             Some(t) => format!(
                 "unexpected symbol {0:} found, expected assignment or semicolon",
                 t.to_string()
             ),
-            None => format!("unexpected end of token stream"),
-        });
+            None => "unexpected end of token stream".to_string(),
+        })
     }
 }
 
@@ -387,16 +379,14 @@ pub fn read_base_statement(
                 if let Some(Token::FunctionName(name)) = iter.next() {
                     function_name = name;
                 } else {
-                    return Err(format!("function definition expects a function name"));
+                    return Err("function definition expects a function name".to_string());
                 }
 
                 // Read the list of variables
                 if let Some(Token::Symbol(Symbol::OpenParen)) = iter.next() {
                     // Clear open paren
                 } else {
-                    return Err(format!(
-                        "function definition expects ( for the function list"
-                    ));
+                    return Err("function definition expects ( for the function list".to_string());
                 }
 
                 // Define the variable name list
@@ -417,7 +407,7 @@ pub fn read_base_statement(
                     } else if let Some(tok) = iter.peek() {
                         return Err(format!("unexpected token {0:} found", tok.to_string()));
                     } else {
-                        return Err(format!("unexpected end of stream found"));
+                        return Err("unexpected end of stream found".to_string());
                     }
                 }
 
@@ -425,7 +415,7 @@ pub fn read_base_statement(
                 if let Some(Token::Symbol(Symbol::OpenBrace)) = iter.peek() {
                     // Do Nothing
                 } else {
-                    return Err(format!("no new scope provided"));
+                    return Err("no new scope provided".to_string());
                 }
 
                 // Determine the function label
@@ -438,13 +428,13 @@ pub fn read_base_statement(
                     function_name,
                     scopes.generate_index()
                 );
-                program.push_static(format!("jmpri 2"));
+                program.push_static("jmpri 2".to_string());
                 program.push_static(format!(":{0:}", variable_label));
                 program.push_static(format!(".loadloc {0:}_start", function_label));
 
                 let variable_value = Rc::new(StaticVariable::new(&function_name, &variable_label));
 
-                scopes.add_variable(&function_name, variable_value.clone())?;
+                scopes.add_variable(&function_name, variable_value)?;
 
                 // Determine the function label
                 let function_label_end = format!("{0:}_end", function_label);
@@ -453,7 +443,7 @@ pub fn read_base_statement(
                 program.push(format!("; {0:}({1:})", function_name, varnames.join(", ")));
                 program.push(format!(":{0:}_start", function_label));
                 if function_name == "main" {
-                    program.push(format!(":main_entry_point"));
+                    program.push(":main_entry_point".to_string());
                 }
 
                 // Define the new scope list and add offset values
@@ -488,9 +478,9 @@ pub fn read_base_statement(
             }
         }
 
-        return Ok(Some(program));
+        Ok(Some(program))
     } else {
-        return Ok(None);
+        Ok(None)
     }
 }
 
@@ -522,5 +512,5 @@ fn read_statement_brackets(
     iter.next();
 
     // Return the successful assembly
-    return Ok(program);
+    Ok(program)
 }

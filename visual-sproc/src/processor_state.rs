@@ -38,7 +38,7 @@ impl ProcessorStatusStruct {
 
         stat.reset();
 
-        return stat;
+        stat
     }
 
     pub fn reset(&mut self) {
@@ -59,8 +59,6 @@ impl ProcessorStatusStruct {
             })
             .collect();
         assert!(reset_vec_data.len() == INIT_RO_LEN);
-
-        assert!(Self::DEVICE_START_IND < MEM_MAX_SIZE);
 
         match self.cpu.memory_add_segment(
             0,
@@ -158,7 +156,7 @@ impl ProcessorStatusStruct {
     }
 
     pub fn get_stop_request(&self) -> bool {
-        return self.stop_request;
+        self.stop_request
     }
 
     pub fn clear_stop_request(&mut self) {
@@ -174,7 +172,7 @@ impl ProcessorStatusStruct {
     }
 
     pub fn has_step_error(&self) -> bool {
-        return self.step_error;
+        self.step_error
     }
 
     pub fn load_data(&mut self, data: Vec<MemoryWord>) {
@@ -202,10 +200,10 @@ impl ProcessorStatusStruct {
     pub fn send_memory_to_queue(&mut self) {
         let mem_vec: Vec<MemoryWord> = (0..MEM_MAX_SIZE)
             .map(|i| {
-                return match self.cpu.memory_inspect(i) {
+                match self.cpu.memory_inspect(i) {
                     Ok(v) => v,
                     Err(_) => MemoryWord::new(0),
-                };
+                }
             })
             .collect();
 

@@ -30,6 +30,13 @@ pub trait MemorySegment {
     /// Provides the length of the memory segment
     fn len(&self) -> usize;
 
+    /// Returns true if the memory segment has 0 length
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Determines if the given memory index is within the memory segment
-    fn within(&self, offset: usize) -> bool;
+    fn within(&self, offset: usize) -> bool {
+        offset < self.len()
+    }
 }

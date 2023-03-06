@@ -11,29 +11,29 @@ impl ReadOnlySegment {
     /// Defines a new memory segment with empty data, zero, in each memory location
     pub fn new(data: Vec<MemoryWord>) -> Self {
         // Create the memory segment
-        return Self { data };
+        Self { data }
     }
 }
 
 impl MemorySegment for ReadOnlySegment {
     /// Provides the word at the requested memory location
     fn get(&self, offset: usize) -> Result<MemoryWord, SolariumError> {
-        return if self.within(offset) {
+        if self.within(offset) {
             Ok(self.data[offset])
         } else {
             Err(SolariumError::InvalidMemoryAccess(offset))
-        };
+        }
     }
 
     /// Provides the word at the requested memory location without affecting the device state
     fn inspect(&self, offset: usize) -> Result<MemoryWord, SolariumError> {
-        return self.get(offset);
+        self.get(offset)
     }
 
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
     fn set(&mut self, offset: usize, _: MemoryWord) -> Result<(), SolariumError> {
-        return Err(SolariumError::InvalidMemoryWrite(offset));
+        Err(SolariumError::InvalidMemoryWrite(offset))
     }
 
     /// Resets the memory segment
@@ -43,12 +43,7 @@ impl MemorySegment for ReadOnlySegment {
 
     /// Provides the length of the memory segment
     fn len(&self) -> usize {
-        return self.data.len();
-    }
-
-    /// Determines if the given memory index is within the memory segment
-    fn within(&self, offset: usize) -> bool {
-        return offset < self.len();
+        self.data.len()
     }
 }
 
@@ -85,7 +80,7 @@ mod tests {
     fn get_default_test_segment() -> ReadOnlySegment {
         let size = 1024;
 
-        return ReadOnlySegment::new((0..size).map(|_| MemoryWord::new(0)).collect());
+        ReadOnlySegment::new((0..size).map(|_| MemoryWord::new(0)).collect())
     }
 
     /// Test setting a memory location above the top address
@@ -114,7 +109,7 @@ mod tests {
 
         for i in 0..size {
             let success = mem.set(i, MemoryWord::new((i + 1) as u16));
-            assert_eq!(success.is_err(), true);
+            assert!(success.is_err());
         }
 
         for i in 0..MEM_MAX_SIZE {
@@ -125,8 +120,7 @@ mod tests {
             assert_eq!(val.is_ok(), should_be_within);
             assert_eq!(val.is_err(), !should_be_within);
 
-            if val.is_ok() {
-                let mem_val = val.unwrap();
+            if let Ok(mem_val) = val {
                 assert_eq!(mem_val.get() as usize, i + 1);
             }
         }

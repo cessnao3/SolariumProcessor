@@ -3,11 +3,7 @@ pub fn try_match_name(input: &str) -> Option<(String, usize)> {
     for (i, c) in input.chars().enumerate() {
         if i == 0 && !c.is_alphabetic() {
             break;
-        } else if c.is_alphabetic() {
-            // Pass
-        } else if c.is_numeric() {
-            // Pass
-        } else if c == '_' {
+        } else if c.is_alphabetic() || c.is_numeric() || c == '_' {
             // Pass
         } else {
             break;
@@ -17,8 +13,8 @@ pub fn try_match_name(input: &str) -> Option<(String, usize)> {
     }
 
     if length == 0 {
-        return None;
+        None
     } else {
-        return Some((input[0..length].to_string(), length));
+        Some((input[0..length].to_string(), length))
     }
 }
