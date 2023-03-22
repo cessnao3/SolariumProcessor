@@ -6,6 +6,59 @@ pub enum TokenValue {
     CharacterLiteral(String)
 }
 
+enum Keyword {
+    While,
+    Function,
+    As,
+    If,
+    Else,
+    Var,
+    Sizeof
+}
+
+impl ToString for Keyword {
+    fn to_string(&self) -> String {
+        match self {
+            Self::While => "while",
+            Self::Function => "fun",
+            Self::As => "as",
+            Self::If => "if",
+            Self::Else => "else",
+            Self::Var => "var",
+            Self::Sizeof => "sizeof"
+        }.to_string()
+    }
+}
+
+impl Keyword {
+    fn try_parse(in_str: &str) -> Option<&str> {
+        let mut last_index = None;
+        let mut keyword = None;
+
+        let keyword_vals = vec![
+            Keyword::While,
+            Keyword::Function,
+            Keyword::As,
+            Keyword::If,
+            Keyword::Else,
+            Keyword::Var,
+            Keyword::Sizeof
+        ];
+
+        for k in keyword_vals.iter() {
+            if in_str.starts_with(&k.to_string()) {
+                keyword = Some(k);
+                last_index = Some(k.to_string().len());
+                break;
+            }
+        }
+
+        let remaining = &in_str[last_index?..];
+
+        // TODO - Ensure that the next character is a valid space or separator character
+    }
+}
+
 const KEYWORDS: [&str; 7] = [
     "while",
     "fn",
