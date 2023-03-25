@@ -127,10 +127,10 @@ impl ScopeManager {
             }
         }
 
-        return Err(format!(
+        Err(format!(
             "no variable named {0:} found in any available scopes",
             name
-        ));
+        ))
     }
 
     pub fn add_variable(

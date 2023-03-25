@@ -210,20 +210,17 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String> {
                     ));
                 } else if let Argument::Text(text) = &args[0] {
                     // Construct memory words from the text values
-                    let text_vals: Vec<MemoryWord> = match text
-                        .chars()
-                        .map(sproc::text::character_to_word)
-                        .collect()
-                    {
-                        Ok(v) => v,
-                        Err(e) => {
-                            return Err(format!(
-                                "line {0:} character error - {1:}",
-                                line_num,
-                                e.to_string()
-                            ))
-                        }
-                    };
+                    let text_vals: Vec<MemoryWord> =
+                        match text.chars().map(sproc::text::character_to_word).collect() {
+                            Ok(v) => v,
+                            Err(e) => {
+                                return Err(format!(
+                                    "line {0:} character error - {1:}",
+                                    line_num,
+                                    e.to_string()
+                                ))
+                            }
+                        };
 
                     // Insert all values in the text string
                     for val in text_vals {
@@ -263,7 +260,8 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String> {
             }
         } else {
             // Add the data values
-            if let std::collections::hash_map::Entry::Vacant(e) = data_map.entry(current_data_index) {
+            if let std::collections::hash_map::Entry::Vacant(e) = data_map.entry(current_data_index)
+            {
                 if current_data_index < MAX_ADDRESSABLE_VALUE {
                     e.insert(LineValue::Assembly(LineInformation::new(
                         command,
@@ -783,7 +781,7 @@ mod tests {
                 .collect()
             {
                 Ok(v) => v,
-                Err(e) => panic!("{}", e.to_string())
+                Err(e) => panic!("{}", e.to_string()),
             };
             expected_words.push(MemoryWord::new(0));
 

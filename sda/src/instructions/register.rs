@@ -41,7 +41,7 @@ impl ToInstructionData for RegisterInstruction {
                         Ok(v) => v,
                         Err(s) => return Err(s),
                     }
-                },
+                }
                 _ => (),
             }
         }

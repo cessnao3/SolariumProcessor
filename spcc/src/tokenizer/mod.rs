@@ -23,14 +23,14 @@ pub enum Token {
 
 impl ToString for Token {
     fn to_string(&self) -> String {
-        return match self {
+        match self {
             Token::Keyword(k) => format!("Keyword({0:})", k.to_string()),
             Token::Symbol(s) => format!("Symbol({0:})", s.to_string()),
             Token::WordLiteral(v) => format!("WordLiteral({0:})", v),
             Token::VariableName(n) => format!("VarName({0:})", n),
             Token::FunctionName(n) => format!("FuncName({0:})", n),
             Token::StringLiteral(s) => format!("String(\"{0:}\")", s.to_string()),
-        };
+        }
     }
 }
 

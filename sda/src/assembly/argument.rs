@@ -13,12 +13,12 @@ pub struct ParseArgumentError {
 
 impl ToString for ParseArgumentError {
     fn to_string(&self) -> String {
-        return match &self.val {
+        match &self.val {
             ParseArgumentErrorEnum::Integer(v) => v.to_string(),
             ParseArgumentErrorEnum::Register(v) => {
                 format!("unable to convert {0:} to register index", v)
             }
-        };
+        }
     }
 }
 
@@ -32,7 +32,7 @@ pub enum Argument {
 
 impl Argument {
     pub fn to_u16(&self) -> Result<u16, String> {
-        return match &self {
+        match &self {
             Argument::UnsignedNumber(v) => {
                 let uval = *v as u16;
                 if uval as u32 == *v {
@@ -50,11 +50,11 @@ impl Argument {
                 }
             }
             _ => Err(format!("unable to convert {0:} to u16", self.to_string())),
-        };
+        }
     }
 
     pub fn to_u8(&self) -> Result<u8, String> {
-        return match &self {
+        match &self {
             Argument::UnsignedNumber(v) => {
                 let uval = *v as u8;
                 if uval as u32 == *v {
@@ -72,7 +72,7 @@ impl Argument {
                 }
             }
             _ => Err(format!("unable to convert {0:} to u8", self.to_string())),
-        };
+        }
     }
 
     pub fn to_register_val(&self) -> Result<u8, String> {

@@ -75,7 +75,7 @@ pub enum SolariumError {
 
 impl ToString for SolariumError {
     fn to_string(&self) -> String {
-        return match self {
+        match self {
             SolariumError::None => "none".to_string(),
             SolariumError::DivideByZero => "divide-by-zero".to_string(),
             SolariumError::InvalidInstruction(inst) => {
@@ -119,7 +119,7 @@ impl ToString for SolariumError {
                 start_index, end_index
             ),
             SolariumError::StopRequested => "stop requested".to_string(),
-        };
+        }
     }
 }
 

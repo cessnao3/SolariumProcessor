@@ -1,5 +1,3 @@
-use std::fmt::Binary;
-
 use crate::components::{CodeComponent, CompilerError, CompilerState, types::TypeInfo};
 
 use super::Expression;

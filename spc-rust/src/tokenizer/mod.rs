@@ -56,6 +56,7 @@ impl Keyword {
         let remaining = &in_str[last_index?..];
 
         // TODO - Ensure that the next character is a valid space or separator character
+        Some("")
     }
 }
 

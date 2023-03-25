@@ -1,4 +1,4 @@
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
 #[derive(Clone, Debug)]
 pub struct StringLiteral {
@@ -69,10 +69,9 @@ impl StringLiteral {
 
 impl ToString for StringLiteral {
     fn to_string(&self) -> String {
-        lazy_static! {
-            static ref REPLACE_VALS: Vec<(&'static str, &'static str)> =
-                vec![("\\", "\\\\"), ("\n", "\\n"), ("\r", "\\r"), ("\"", "\\\"")];
-        }
+        static REPLACE_VALS: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
+                vec![("\\", "\\\\"), ("\n", "\\n"), ("\r", "\\r"), ("\"", "\\\"")]
+        });
 
         let mut sval = self.val.clone();
         for (from, to) in REPLACE_VALS.iter() {

@@ -7,7 +7,7 @@ pub fn compile(text: &str) -> Result<Vec<String>, String> {
         Err(e) => return Err(format!("Tokenizer Error: {0:}", e)),
     };
 
-    let assembly_result = match lexer(tokens) {
+    match lexer(tokens) {
         Ok(v) => {
             Ok(v)
         }
@@ -15,7 +15,5 @@ pub fn compile(text: &str) -> Result<Vec<String>, String> {
             println!("Error: {0:}", e);
             Err(e)
         }
-    };
-
-    assembly_result
+    }
 }
