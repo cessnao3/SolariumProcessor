@@ -1,6 +1,26 @@
-fn ret_type func_name(a, b, c)
+#asm
+#asm
+#asm
+
+def var_name: var_type;
+def array_name: var_type[SIZE];
+
+struct type_name
 {
-    def var_type var_name;
+    var1: type1;
+    var2: type2;
+}
+
+asmfn asm_func(a, b, c): ret_type
+{
+    asm
+    asm
+    asm
+}
+
+fn func_name(a, b, c): ret_type
+{
+    def var_name: var_type;
     var_name = expression;
 
     if (a = 3) {
@@ -19,6 +39,6 @@ fn ret_type func_name(a, b, c)
 // Types are checked at compile time
 // Conversions are provided -> no automatic conversions
 
-fn void main() {
+fn main(): void {
 
 }
