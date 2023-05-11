@@ -1,3 +1,6 @@
+use once_cell::sync::OnceCell;
+use super::types::SpType;
+
 pub struct CompilerState {
     pub signed_airthmetic: bool,
     pub functions: Vec<Box<dyn Function>>,
@@ -48,26 +51,41 @@ pub trait CodeComponent {
     fn generate_code(&self, state: &mut CompilerState);
 }
 
-pub struct SpType {
-    name: String,
-    size: usize
+pub struct Literal {
+    words: Vec<u16>,
+    var_type: Box<SpType>
 }
 
-impl SpType {
-    pub fn new(name: &str, size: usize) -> Self {
-        Self {
-            name: name.to_string(),
-            size
-        }
+impl Constant {
+
+}
+
+impl Into<Constant> for u16 {
+    fn into(self) -> Constant {
+
     }
 }
 
-pub trait Variable {
-    fn get_address(&self) -> u16;
-    fn get_type(&self) -> SpType;
+impl Into<Constant> for i16 {
 }
 
-pub trait Function {
+impl Into<Constant> for &str {
+    fn into(self) -> Constant {
+    }
+}
+
+pub trait Expression {
+    fn get_type(&self) -> Box<SpType>;
+}
+
+pub trait Addressable {
     fn get_address(&self) -> u16;
+}
+
+pub trait Variable: Addressable + Expression {
+
+}
+
+pub trait Function: Addressable {
     fn get_input_parameters(&self) -> Vec<(String, SpType)>;
 }
