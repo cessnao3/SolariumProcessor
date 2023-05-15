@@ -1,5 +1,5 @@
 use once_cell::sync::OnceCell;
-use super::types::SpType;
+use super::types::{SpType, BuiltinTypes};
 
 pub struct CompilerState {
     pub signed_airthmetic: bool,
@@ -33,9 +33,9 @@ impl CompilerState {
             functions: Vec::new(),
             scopes: vec![Scope::new()],
             types: vec![
-                SpType::new("i16", 1),
-                SpType::new("u16", 1),
-                SpType::new("void", 1),
+                SpType::Primitive{ name: "void".to_string(), base: BuiltinTypes::U16 },
+                SpType::Primitive{ name: "u16".to_string(), base: BuiltinTypes::U16 },
+                SpType::Primitive{ name: "i16".to_string(), base: BuiltinTypes::I16 },
             ]
         }
     }
@@ -56,22 +56,34 @@ pub struct Literal {
     var_type: Box<SpType>
 }
 
-impl Constant {
+impl Literal {
 
 }
 
-impl Into<Constant> for u16 {
-    fn into(self) -> Constant {
-
+impl From<Literal> for u16 {
+    fn from(value: Literal) -> Self {
+        return value.words[0];
     }
 }
 
-impl Into<Constant> for i16 {
+impl From<Literal> for i16 {
+    fn from(value: Literal) -> Self {
+        return value.words[0] as i16;
+    }
 }
 
-impl Into<Constant> for &str {
-    fn into(self) -> Constant {
+impl From<Literal> for String {
+    fn from(value: Literal) -> Self {
+        return value.words.iter()
+            .map(|v| (*v as u8) as char)
+            .collect::<String>();
     }
+}
+
+pub trait Statement {
+}
+
+pub trait BaseStatement {
 }
 
 pub trait Expression {

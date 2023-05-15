@@ -13,7 +13,7 @@ impl ToString for BuiltinTypes {
 }
 
 pub enum SpType {
-    Primitive{ base: BuiltinTypes },
+    Primitive{ name: String, base: BuiltinTypes },
     Array{ base: Box<SpType>, size: usize },
     Struct{ name: String, fields: Vec<(String, Box<SpType>)> },
     Pointer{ base: Box<SpType> }
@@ -22,8 +22,8 @@ pub enum SpType {
 impl ToString for SpType {
     fn to_string(&self) -> String {
         match self {
-            Self::Primitive{ base: t } => t.to_string(),
-            Self::Array{ base, .. } => format!("{}[{}]", base.to_string(), s),
+            Self::Primitive{ name: n, .. } => n.to_string(),
+            Self::Array{ base, .. } => format!("{}[{}]", base.to_string(), base.to_string()),
             Self::Struct{ name, .. } => name.to_string(),
             Self::Pointer{ base, .. } => format!("{}*", base.to_string())
         }
