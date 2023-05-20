@@ -42,11 +42,13 @@ pub fn parse(s: &str) -> Result<(), String> {
             "asmfn" => parse_asmfn_statement(remaining, &mut state),
             "const" => parse_var_statement(remaining, &mut state, true),
             "var" => parse_var_statement(remaining, &mut state, false),
+            "//" => parse_comment(s),
+            "/*" => parse_comment_block(s),
             word => return Err(format!("unknown start of base expression {word}"))
         };
     }
 
-    return Ok(());
+    Ok(())
 }
 
 fn parse_fn_statement<'a>(s: &'a str, state: &mut ParserState) -> &'a str {
@@ -59,4 +61,21 @@ fn parse_asmfn_statement<'a>(s: &'a str, state: &mut ParserState) -> &'a str {
 
 fn parse_var_statement<'a>(s: &'a str, state: &mut ParserState, constant: bool) -> &'a str {
     panic!("not implemented");
+}
+
+fn parse_comment(s: &str) -> &str {
+    if let Some(i) = s.find('\n') {
+        &s[i+1..]
+    }
+    else {
+        ""
+    }
+}
+
+fn parse_comment_block(s: &str) -> &str {
+    if let Some(i) = s.find("*/") {
+        &s[i+1..]
+    } else {
+        ""
+    }
 }

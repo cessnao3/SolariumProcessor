@@ -1,7 +1,3 @@
-#asm
-#asm
-#asm
-
 def var_name: var_type;
 def array_name: var_type[SIZE];
 
