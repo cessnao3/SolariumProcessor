@@ -1,13 +1,20 @@
+use std::char::ParseCharError;
 use std::collections::HashMap;
 use std::fmt::Display;
 
 use super::components::BaseStatement;
 use super::types::SpType;
 
-static KEY_FN: &str = "fn";
-static KEY_ASM_FN: &str = "asmfn";
-static KEY_CONST: &str = "const";
-static KEY_DEF: &str = "def";
+pub fn is_valid_name(s: &str) -> bool {
+    // Ensure that the first character is alphabetic and that the only characters are ascii-alphanumeric/_/-
+    if !s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        false
+    } else if let Some(c) = s.chars().next() {
+        c.is_ascii_alphabetic()
+    } else {
+        false
+    }
+}
 
 pub fn parse(s: &str) -> Result<(), ParseError> {
     // Define the state
@@ -27,6 +34,7 @@ pub fn parse(s: &str) -> Result<(), ParseError> {
             "fn" => parse_fn_statement(remaining, &mut state)?,
             "asmfn" => parse_asmfn_statement(remaining, &mut state)?,
             "def" => parse_def_statement(remaining, &mut state)?,
+            "struct" => parse_struct_statement(remaining, &mut state)?,
             "//" => skip_to_next_line(s)?,
             "/*" => skip_to_end_of_comment_block(s)?,
             word => return Err(ParseError::new(0, 0, &format!("unknown start of base expression {word}"))),
@@ -44,9 +52,85 @@ fn parse_asmfn_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a 
     panic!("not implemented");
 }
 
+fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a str, ParseError> {
+    // Find open brace
+    let struct_name;
+    let fields_string;
+    let remaining;
+    
+    if let Some(open_ind) = s.find(s) {
+        struct_name = s[..open_ind].trim();
+        
+        if let Some(close_ind) = s.find("}") {
+            if close_ind < open_ind {
+                return Err(ParseError::new(0, 0, "struct unexpected closing brace before open brace"));
+            }
+            
+            fields_string = s[open_ind+1..close_ind].trim();
+            remaining = s[close_ind+1..].trim_start();
+        } else {
+            return Err(ParseError::new(0, 0, "no closing brace found"));
+        }
+        
+        if !SpType::is_valid_name(struct_name) {
+            return Err(ParseError::new(0, 0, &format!("struct name `{struct_name}` is not a valid type name")));
+        }
+    } else {
+        return Err(ParseError::new(0, 0, "unable to find open brace for struct definition"));
+    }
+    
+    let fields = fields_string
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.split_once(':'))
+        .collect::<Option<Vec<_>>();
+        
+    if fields.is_none() {
+        return Err(ParseError::new(0, 0, &format!("unable to parse field entries for {struct_name}")));
+    }
+    
+    let fields = fields.unwrap();
+    
+    if fields.is_empty() {
+        return Err(ParseCharError::new(0, 0, &format!("no fields provided for {struct_name}")));
+    }
+    
+    fn to_field_entry(e: (&str, &str), parser: &ParserState) -> Result<(String, Box<SpType>), ParseError> {
+        if !is_valid_name(e.0) {
+            Err(ParseError::new(0, 0, &format!("field `{}` is not a valid name", e.0)))
+        }
+        else if let Some(t) = parser.get_type(e.1) {
+            Ok((e.0.to_string(), t.clone()))
+        } else {
+            Err(ParseError::new(0, 0, &format!("no type `{}` found for field `{}`", e.1, e.0)))
+        }
+    }
+    
+    let fields_parsed = fields
+        .into()
+        .map(to_field_entry)
+        .collect::<Result<Vec<_>, _>()?;
+    
+    let type_val = SpType::Struct {
+        name: struct_name.to_string(),
+        fields: fields_parsed,
+    };
+    
+    if state.get_type(tstruct_name).is_some() {
+        
+    }
+    
+    Ok(remaining)
+}
+
 fn parse_def_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a str, ParseError> {
     if let Some(type_split) = s.find(':') {
         let name = s[..type_split].trim();
+        
+        if !is_valid_name(name) {
+            return Err(ParseError::new(0, 0, &format!("variable name `{name}` not valid")));
+        }
 
         let end_ind = s.find(';').unwrap();
 
@@ -73,7 +157,7 @@ fn parse_def_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a st
 
         println!("Defining type {name} as type {}", t.to_string());
 
-        Ok(&s[end_ind+1..])
+        Ok(s[end_ind+1..].trim_start())
     } else {
         Err(ParseError::new(0, 0, "no type provided in statement!"))
     }

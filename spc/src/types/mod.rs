@@ -22,6 +22,19 @@ pub enum SpType {
     Constant{ base: Box<SpType> },
 }
 
+impl SpType {
+    pub fn is_valid_name(s: &str) -> bool {
+        // Ensure that the first character is alphabetic and that the only characters are ascii-alphanumeric/_/-
+        if !s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+            false
+        } else if let Some(c) = s.chars().next() {
+               c.is_ascii_alphabetic()
+        } else {
+            false
+        }
+    }
+}
+
 impl ToString for SpType {
     fn to_string(&self) -> String {
         match self {
