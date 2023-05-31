@@ -1,4 +1,3 @@
-use std::char::ParseCharError;
 use std::collections::HashMap;
 use std::fmt::Display;
 
@@ -61,7 +60,7 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
     if let Some(open_ind) = s.find(s) {
         struct_name = s[..open_ind].trim();
 
-        if let Some(close_ind) = s.find("}") {
+        if let Some(close_ind) = s.find('}') {
             if close_ind < open_ind {
                 return Err(ParseError::new(0, 0, "struct unexpected closing brace before open brace"));
             }
