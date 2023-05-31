@@ -44,7 +44,7 @@ There are 16 total registers present on the S/Proc. These are defined generally 
         R0 & Program Counter \\
         R1 & Processor Status Flags \\
         R2 & Stack Pointer \\
-        R3 & {} \\
+        R3 & Excess / Overflow \\
         R4 & Return Register \\
         R5 & Argument Base Register \\
         R6-R15 & General Purpose Register \\
@@ -146,7 +146,7 @@ Note that, if a vector has a value of zero, that interrupt vector is considered 
 
 \section{Instructions and Assembly Code}
 
-All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field. \todo{combine left/right shift?} \todo{add load reg = base + offset?} \todo{keep bxor?} \todo{Make set/clear flags a generic "set" and "clear" flag instruction with an argument?}
+All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field. \todo{Update Assembler!} \todo{Update SProc}
 
 \begin{table}[h!]
     \centering
@@ -162,15 +162,13 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
             0 & 0 & 0 & 0 & \texttt{noop} & No Operation \\
             0 & 0 & 0 & 1 & \texttt{inton} & Turn Interrupts On \\
             0 & 0 & 0 & 2 & \texttt{intoff} & Turn Interrupts Off \\
-            0 & 0 & 0 & 3 & \texttt{ari} & Set Signed Arithmetic \\
-            0 & 0 & 0 & 4 & \texttt{aru} & Set Unsigned Arithmetic \\
-            0 & 0 & 0 & 5 & \texttt{reset} & \texttt{PC = Reset Vector}, \texttt{R[0-15] = 0} \\
-            0 & 0 & 0 & 6 & \texttt{pop} & \texttt{--SP} \\
-            0 & 0 & 0 & 7 & \texttt{ret} & \texttt{x = R[ret]} \\
+            0 & 0 & 0 & 3 & \texttt{reset} & \texttt{PC = Reset Vector}, \texttt{R[0-15] = 0} \\
+            0 & 0 & 0 & 4 & \texttt{pop} & \texttt{--SP} \\
+            0 & 0 & 0 & 5 & \texttt{ret} & \texttt{x = R[ret]} \\
             {} & {} & {} & {} & {} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
             {} & {} & {} & {} & {} & \texttt{R[ret] = x} \\
-            0 & 0 & 0 & 8 & \texttt{retint} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
-            0 & 0 & 0 & 9 & \texttt{halt} & Stop Program Execution \\
+            0 & 0 & 0 & 6 & \texttt{retint} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
+            0 & 0 & 0 & 7 & \texttt{halt} & Stop Program Execution \\
             0 & 0 & 1 & R[a] & \texttt{jmp [a]} & \texttt{PC = R[a]} \\
             0 & 0 & 2 & R[a] & \texttt{jmpr [a]} & \texttt{PC += R[a]} \\
             0 & 0 & 3 & R[a] & \texttt{push [a]} & \texttt{mem[SP++] = R[a]} \\
@@ -192,23 +190,26 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
             0 & 5 & R[src] & R[dst] & \texttt{savr [dst], [src]} & \texttt{mem[PC + R[dst]] = R[src]} \\
             0 & 6 & R[b] & R[a] & \texttt{copy [a], [b]} & \texttt{R[a] = R[b]} \\
             0 & 7 & R[b] & R[a] & \texttt{tg [a], [b]} & If \texttt{R[a] > R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
-            0 & 8 & R[b] & R[a] & \texttt{tge [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+            0 & 8 & R[b] & R[a] & \texttt{tgs [a], [b]} & If \texttt{R[a] > R[b]} (signed) \texttt{PC += 1}, Else \texttt{PC += 2} \\
             0 & 9 & R[b] & R[a] & \texttt{tl [a], [b]} & If \texttt{R[a] < R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
-            0 & 10 & R[b] & R[a] & \texttt{tle [a], [b]} & If \texttt{R[a] >= R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+            0 & 10 & R[b] & R[a] & \texttt{tls [a], [b]} & If \texttt{R[a] >= R[b]} (signed) \texttt{PC += 1}, Else \texttt{PC += 2} \\
             0 & 11 & R[b] & R[a] & \texttt{teq [a], [b]} & If \texttt{R[a] == R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
             0 & 12 & 0x0I & R[a] & \texttt{arg [a], <imm-unsigned>} & \texttt{R[a] = ARG + <imm-unsigned>} \\
             1 & 0xI0 & 0x0I & R[dst] & \texttt{ldi [dst], <imm>} & \texttt{R[dst] = Im} \\
-            2 & 0xI0 & 0x0I & R[dst] & \texttt{ldui [dst], <imm-unsigned>} & \texttt{R[dst] = Im} \\
-            3 & 0xI0 & 0x0I & R[dst] & \texttt{ldri [dst], <imm>} & \texttt{R[dst] = mem[PC + Im]} \\
-            4 & R[b] & R[a] & R[dst] & \texttt{add [dst], [a], [b]} & \texttt{R[dst] = R[a] + R[b]} \\
-            5 & R[b] & R[a] & R[dst] & \texttt{sub [dst], [a], [b]} & \texttt{R[dst] = R[a] - R[b]} \\
-            6 & R[b] & R[a] & R[dst] & \texttt{mul [dst], [a], [b]} & \texttt{R[dst] = R[a] * R[b]} \\
-            7 & R[b] & R[a] & R[dst] & \texttt{div [dst], [a], [b]} & \texttt{R[dst] = R[a] / R[b]} \\
-            8 & R[b] & R[a] & R[dst] & \texttt{rem [dst], [a], [b]} & \texttt{R[dst] = R[a] \% R[b]} \\
-            9 & R[b] & R[a] & R[dst] & \texttt{band [dst], [a], [b]} & \texttt{R[dst] = R[a] \& R[b]} \\
-            10 & R[b] & R[a] & R[dst] & \texttt{bor [dst], [a], [b]} & \texttt{R[dst] = R[a] | R[b]} \\
-            11 & R[b] & R[a] & R[dst] & \texttt{bxor [dst], [a], [b]} & \texttt{R[dst] = R[a] $\wedge$ R[b]} \\
-            12 & R[b] & R[a] & R[dst] & \texttt{bshft [dst], [a], [b]} & \texttt{R[dst] = R[a] << R[b]} (Negative shifts right) \\
+            2 & 0xI0 & 0x0I & R[dst] & \texttt{ldri [dst], <imm>} & \texttt{R[dst] = mem[PC + Im]} \\
+            3 & R[b] & R[a] & R[dst] & \texttt{add [dst], [a], [b]} & \texttt{R[dst] = R[a] + R[b]} \\
+            4 & R[b] & R[a] & R[dst] & \texttt{sub [dst], [a], [b]} & \texttt{R[dst] = R[a] - R[b]} \\
+            5 & R[b] & R[a] & R[dst] & \texttt{mul [dst], [a], [b]} & \texttt{R[dst] = R[a] * R[b]} \\
+            6 & R[b] & R[a] & R[dst] & \texttt{div [dst], [a], [b]} & \texttt{R[dst] = R[a] / R[b]} \\
+            7 & R[b] & R[a] & R[dst] & \texttt{mod [dst], [a], [b]} & \texttt{R[dst] = R[a] \% R[b]} \\
+            8 & R[b] & R[a] & R[dst] & \texttt{muls [dst], [a], [b]} & \texttt{R[dst] = R[a] * R[b]} (signed) \\
+            9 & R[b] & R[a] & R[dst] & \texttt{divs [dst], [a], [b]} & \texttt{R[dst] = R[a] / R[b]} (signed) \\
+            10 & R[b] & R[a] & R[dst] & \texttt{mods [dst], [a], [b]} & \texttt{R[dst] = R[a] \% R[b]} (signed) \\
+            11 & R[b] & R[a] & R[dst] & \texttt{band [dst], [a], [b]} & \texttt{R[dst] = R[a] \& R[b]} \\
+            12 & R[b] & R[a] & R[dst] & \texttt{bor [dst], [a], [b]} & \texttt{R[dst] = R[a] | R[b]} \\
+            13 & R[b] & R[a] & R[dst] & \texttt{bxor [dst], [a], [b]} & \texttt{R[dst] = R[a] $\wedge$ R[b]} \\
+            14 & R[b] & R[a] & R[dst] & \texttt{bshft [dst], [a], [b]} & \texttt{R[dst] = R[a] << R[b]} (Negative shifts right) \\
+            15 & R[b] & R[a] & R[dst] & \texttt{ashft [dst], [a], [b]} & \texttt{R[dst] = R[a] <<< R[b]} (Negative shifts right) \\
             \hline
         \end{tabular}
     \end{footnotesize}

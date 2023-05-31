@@ -5,6 +5,7 @@ use crate::memory::{self, MemoryMap, MemorySegment};
 use super::registers::{Register, RegisterManager, StatusFlag};
 
 use std::cell::RefCell;
+use std::ops::Shl;
 use std::rc::Rc;
 
 /// Defines the reset vector location
@@ -297,16 +298,6 @@ impl SolariumProcessor {
                         self.soft_reset()?;
                         pc_incr = 0;
                     }
-                    4 =>
-                    // ari
-                    {
-                        self.registers.set_flag(StatusFlag::SignedArithmetic)?;
-                    }
-                    5 =>
-                    // aru
-                    {
-                        self.registers.clear_flag(StatusFlag::SignedArithmetic)?;
-                    }
                     6 =>
                     // pop
                     {
@@ -553,53 +544,21 @@ impl SolariumProcessor {
                     7..=11 =>
                     // tg, tge, tl, tle, teq
                     {
-                        let fun_tg: fn(MemoryWord, MemoryWord) -> bool;
-                        let fun_tge: fn(MemoryWord, MemoryWord) -> bool;
-                        let fun_tl: fn(MemoryWord, MemoryWord) -> bool;
-                        let fun_tle: fn(MemoryWord, MemoryWord) -> bool;
-                        let fun_teq: fn(MemoryWord, MemoryWord) -> bool = |a, b| a.get() == b.get();
+                        type BoolFun = fn(MemoryWord, MemoryWord) -> bool;
 
-                        if self.registers.get_flag(StatusFlag::SignedArithmetic)? {
-                            fun_tg = |a, b| a.get_signed() > b.get_signed();
-                            fun_tge = |a, b| a.get_signed() >= b.get_signed();
-                            fun_tl = |a, b| a.get_signed() < b.get_signed();
-                            fun_tle = |a, b| a.get_signed() <= b.get_signed();
-                        } else {
-                            fun_tg = |a, b| a.get() > b.get();
-                            fun_tge = |a, b| a.get() >= b.get();
-                            fun_tl = |a, b| a.get() < b.get();
-                            fun_tle = |a, b| a.get() <= b.get();
-                        }
+                        let fun_tg: BoolFun = |a, b| a.get() > b.get();
+                        let fun_tgs: BoolFun = |a, b| a.get_signed() > b.get_signed();
+                        let fun_tl: BoolFun = |a, b| a.get() < b.get();
+                        let fun_tls: BoolFun = |a, b| a.get_signed() <= b.get_signed();
+                        let fun_teq: BoolFun = |a, b| a.get() == b.get();
 
                         let test_function = match opcode {
-                            7 =>
-                            // tg
-                            {
-                                fun_tg
-                            }
-                            8 =>
-                            //tge
-                            {
-                                fun_tge
-                            }
-                            9 =>
-                            // tl
-                            {
-                                fun_tl
-                            }
-                            10 =>
-                            // tle
-                            {
-                                fun_tle
-                            }
-                            11 =>
-                            // teq
-                            {
-                                fun_teq
-                            }
-                            _ => {
-                                panic!();
-                            }
+                            7 => fun_tg,
+                            8 => fun_tgs,
+                            9 => fun_tl,
+                            10 => fun_tls,
+                            11 => fun_teq,
+                            _ => panic!(),
                         };
 
                         let word_a = self.registers.get(reg_a)?;
@@ -661,17 +620,23 @@ impl SolariumProcessor {
                         self.registers.set(Register::GP(arg2 as usize), mem_val)?;
                     }
                     opcode if opcode <= 12 => {
-                        type ArithFun =
-                            fn(MemoryWord, MemoryWord) -> Result<MemoryWord, SolariumError>;
+                        // Function that takes in two memory values and returns two memory words,
+                        // one for the primary destination, and the other for the overflow register
+                        type ArithResult = Result<(MemoryWord, MemoryWord), SolariumError>;
+                        type ArithFun = fn(MemoryWord, MemoryWord) -> ArithResult;
+
+                        fn single_function(w: MemoryWord) -> ArithResult {
+                            Ok((w, MemoryWord::new(0)))
+                        }
 
                         let fun_add: ArithFun;
                         let fun_sub: ArithFun;
                         let fun_mul: ArithFun;
                         let fun_div: ArithFun;
-                        let fun_rem: ArithFun;
-                        let fun_band: ArithFun = |a, b| Ok(MemoryWord::new(a.get() & b.get()));
-                        let fun_bor: ArithFun = |a, b| Ok(MemoryWord::new(a.get() | b.get()));
-                        let fun_bxor: ArithFun = |a, b| Ok(MemoryWord::new(a.get() ^ b.get()));
+                        let fun_mod: ArithFun;
+                        let fun_band: ArithFun = |a, b| single_function(MemoryWord::new(a.get() & b.get()));
+                        let fun_bor: ArithFun = |a, b| single_function(MemoryWord::new(a.get() | b.get()));
+                        let fun_bxor: ArithFun = |a, b| single_function(MemoryWord::new(a.get() ^ b.get()));
                         let fun_bshft: ArithFun = |a, b| {
                             let shift_count = b.get_signed();
                             if shift_count.abs() >= memory::BITS_PER_WORD as i16 {
@@ -713,7 +678,7 @@ impl SolariumProcessor {
                                     ))
                                 }
                             };
-                            fun_rem = |a, b| {
+                            fun_mod = |a, b| {
                                 if b.get() == 0 {
                                     Err(SolariumError::ModByZero)
                                 } else {
@@ -733,7 +698,7 @@ impl SolariumProcessor {
                                     Ok(MemoryWord::new(a.get().wrapping_div(b.get())))
                                 }
                             };
-                            fun_rem = |a, b| {
+                            fun_mod = |a, b| {
                                 if b.get() == 0 {
                                     Err(SolariumError::ModByZero)
                                 } else {
@@ -747,7 +712,7 @@ impl SolariumProcessor {
                             5 => fun_sub,
                             6 => fun_mul,
                             7 => fun_div,
-                            8 => fun_rem,
+                            8 => fun_mod,
                             9 => fun_band,
                             10 => fun_bor,
                             11 => fun_bxor,

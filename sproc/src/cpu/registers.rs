@@ -6,6 +6,7 @@ pub enum Register {
     ProgramCounter,
     StackPointer,
     StatusFlags,
+    Excess,
     Return,
     ArgumentBase,
     GP(usize),
@@ -19,6 +20,7 @@ impl Register {
             Register::ProgramCounter => 0,
             Register::StatusFlags => 1,
             Register::StackPointer => 2,
+            Register::Excess => 3,
             Register::Return => 4,
             Register::ArgumentBase => 5,
             Register::GP(ind) => *ind,
@@ -32,7 +34,6 @@ impl Register {
 #[derive(Clone, Copy, Debug)]
 pub enum StatusFlag {
     InterruptEnable,
-    SignedArithmetic,
 }
 
 impl StatusFlag {
@@ -40,7 +41,6 @@ impl StatusFlag {
     pub fn get_mask(&self) -> MemoryWord {
         MemoryWord::new(match self {
             StatusFlag::InterruptEnable => 1 << 0,
-            StatusFlag::SignedArithmetic => 1 << 1,
         })
     }
 }
@@ -49,7 +49,6 @@ impl ToString for StatusFlag {
     fn to_string(&self) -> String {
         match self {
             StatusFlag::InterruptEnable => "I".to_string(),
-            StatusFlag::SignedArithmetic => "U".to_string(),
         }
     }
 }
