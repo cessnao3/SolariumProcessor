@@ -297,12 +297,12 @@ impl SolariumProcessor {
                         self.soft_reset()?;
                         pc_incr = 0;
                     }
-                    6 =>
+                    4 =>
                     // pop
                     {
                         self.pop_sp()?;
                     }
-                    7 =>
+                    5 =>
                     // ret
                     {
                         // Save the return register
@@ -317,7 +317,7 @@ impl SolariumProcessor {
                         // Set no PC increment so that we start at the first instruction value
                         pc_incr = 0;
                     }
-                    8 =>
+                    6 =>
                     // retint
                     {
                         // Pop all register values
@@ -326,7 +326,7 @@ impl SolariumProcessor {
                         // Set no PC increment to ensure that we don't loose track of the current value
                         pc_incr = 0;
                     }
-                    9 =>
+                    7 =>
                     // halt
                     {
                         request_stop = true;
