@@ -5,7 +5,6 @@ use crate::memory::{self, MemoryMap, MemorySegment};
 use super::registers::{Register, RegisterManager, StatusFlag};
 
 use std::cell::RefCell;
-use std::ops::Shl;
 use std::rc::Rc;
 
 /// Defines the reset vector location
@@ -624,109 +623,111 @@ impl SolariumProcessor {
                         // one for the primary destination, and the other for the overflow register
                         type ArithResult = Result<(MemoryWord, MemoryWord), SolariumError>;
                         type ArithFun = fn(MemoryWord, MemoryWord) -> ArithResult;
+                        type ArithU32Func = fn(u32, u32) -> u32;
+                        type ArithI32Func = fn(i32, i32) -> i32;
+                        type BitU16Func = fn(u16, u16) -> u16;
 
-                        fn single_function(w: MemoryWord) -> ArithResult {
-                            Ok((w, MemoryWord::new(0)))
+                        fn bitwise_function(a: MemoryWord, b: MemoryWord, f: BitU16Func) -> ArithResult {
+                            let r = f(a.get(), b.get());
+                            Ok((MemoryWord::new(r), MemoryWord::new(0)))
+                        }
+                        
+                        fn u32_to_result(x: u32) -> ArithResult {
+                            let sum = (x & 0xFFFF) as u16;
+                            let extra = ((x >> 16) & 0xFFFF) as u16;
+                            
+                            Ok((MemoryWord::new(sum), MemoryWord::new(extra)))
+                        }
+                        
+                        fn arith_func(a: MemoryWord, b: MemoryWord, f: ArithU32Func) -> ArithResult {
+                            u32_to_result(f(a.get() as u32, b.get() as u32))
+                        }
+                        
+                        fn arith_div0_func(a: MemoryWord, b: MemoryWord, f: ArithU32Func) -> ArithResult {
+                            match b.get() {
+                                0 => Err(SolariumError::DivideByZero),
+                                _ => arith_func(a, b, f)
+                            }
+                        }
+                        
+                        fn arith_func_s(a: MemoryWord, b: MemoryWord, f: ArithI32Func) -> ArithResult {
+                            u32_to_result(f(a.get_signed() as i32, b.get_signed() as i32) as u32)
+                        }
+                        
+                        fn arith_div0_func_s(a: MemoryWord, b: MemoryWord, f: ArithI32Func) -> ArithResult {
+                            match b.get() {
+                                0 => Err(SolariumError::DivideByZero),
+                                _ => arith_func_s(a, b, f)
+                            }
                         }
 
-                        let fun_add: ArithFun;
-                        let fun_sub: ArithFun;
-                        let fun_mul: ArithFun;
-                        let fun_div: ArithFun;
-                        let fun_mod: ArithFun;
-                        let fun_band: ArithFun = |a, b| single_function(MemoryWord::new(a.get() & b.get()));
-                        let fun_bor: ArithFun = |a, b| single_function(MemoryWord::new(a.get() | b.get()));
-                        let fun_bxor: ArithFun = |a, b| single_function(MemoryWord::new(a.get() ^ b.get()));
+                        let fun_add: ArithFun = |a, b| arith_func(a, b, |x, y| x.wrapping_add(y));
+                        let fun_sub: ArithFun = |a, b| arith_func(a, b, |x, y| x.wrapping_sub(y));
+                        let fun_mul: ArithFun = |a, b| arith_func(a, b, |x, y| x.wrapping_mul(y));
+                        let fun_div: ArithFun = |a, b| arith_div0_func(a, b, |x, y| x.wrapping_div(y));
+                        let fun_mod: ArithFun = |a, b| arith_div0_func(a, b, |x, y| x.wrapping_rem(y));
+                        let fun_muls: ArithFun = |a, b| arith_func_s(a, b, |x, y| x.wrapping_mul(y));
+                        let fun_divs: ArithFun = |a, b| arith_div0_func_s(a, b, |x, y| x.wrapping_div(y));
+                        let fun_mods: ArithFun = |a, b| arith_div0_func_s(a, b, |x, y| x.wrapping_rem(y));
+                        let fun_band: ArithFun = |a, b| bitwise_function(a, b, |x, y| x & y);
+                        let fun_bor: ArithFun = |a, b| bitwise_function(a, b, |x, y| x | y);
+                        let fun_bxor: ArithFun = |a, b| bitwise_function(a, b, |x, y| x ^ y);
                         let fun_bshft: ArithFun = |a, b| {
                             let shift_count = b.get_signed();
                             if shift_count.abs() >= memory::BITS_PER_WORD as i16 {
                                 return Err(SolariumError::ShiftError(shift_count as usize));
                             }
 
-                            let val = a.get();
+                            let val = a.get() as u32;
                             let new_val = if shift_count >= 0 {
                                 val.overflowing_shl(shift_count as u32)
                             } else {
                                 val.overflowing_shr((-shift_count) as u32)
                             };
 
-                            Ok(MemoryWord::new(new_val.0))
+                            u32_to_result(new_val.0)
+                        };
+                        let fun_ashft: ArithFun = |a, b| {
+                            let shift_count = b.get_signed();
+                            if shift_count.abs() >= memory::BITS_PER_WORD as i16 {
+                                return Err(SolariumError::ShiftError(shift_count as usize));
+                            }
+
+                            let val = a.get() as i32;
+                            let new_val = if shift_count >= 0 {
+                                val.overflowing_shl(shift_count as u32)
+                            } else {
+                                val.overflowing_shr((-shift_count) as u32)
+                            };
+
+                            u32_to_result(new_val.0 as u32)
                         };
 
-                        if self.registers.get_flag(StatusFlag::SignedArithmetic)? {
-                            fun_add = |a, b| {
-                                Ok(MemoryWord::new_signed(
-                                    a.get_signed().wrapping_add(b.get_signed()),
-                                ))
-                            };
-                            fun_sub = |a, b| {
-                                Ok(MemoryWord::new_signed(
-                                    a.get_signed().wrapping_sub(b.get_signed()),
-                                ))
-                            };
-                            fun_mul = |a, b| {
-                                Ok(MemoryWord::new_signed(
-                                    a.get_signed().wrapping_mul(b.get_signed()),
-                                ))
-                            };
-                            fun_div = |a, b| {
-                                if b.get() == 0 {
-                                    Err(SolariumError::DivideByZero)
-                                } else {
-                                    Ok(MemoryWord::new_signed(
-                                        a.get_signed().wrapping_div(b.get_signed()),
-                                    ))
-                                }
-                            };
-                            fun_mod = |a, b| {
-                                if b.get() == 0 {
-                                    Err(SolariumError::ModByZero)
-                                } else {
-                                    Ok(MemoryWord::new_signed(
-                                        a.get_signed().wrapping_rem(b.get_signed()),
-                                    ))
-                                }
-                            };
-                        } else {
-                            fun_add = |a, b| Ok(MemoryWord::new(a.get().wrapping_add(b.get())));
-                            fun_sub = |a, b| Ok(MemoryWord::new(a.get().wrapping_sub(b.get())));
-                            fun_mul = |a, b| Ok(MemoryWord::new(a.get().wrapping_mul(b.get())));
-                            fun_div = |a, b| {
-                                if b.get() == 0 {
-                                    Err(SolariumError::DivideByZero)
-                                } else {
-                                    Ok(MemoryWord::new(a.get().wrapping_div(b.get())))
-                                }
-                            };
-                            fun_mod = |a, b| {
-                                if b.get() == 0 {
-                                    Err(SolariumError::ModByZero)
-                                } else {
-                                    Ok(MemoryWord::new(a.get().wrapping_rem(b.get())))
-                                }
-                            };
-                        }
-
                         let arith_func = match opcode {
-                            4 => fun_add,
-                            5 => fun_sub,
-                            6 => fun_mul,
-                            7 => fun_div,
-                            8 => fun_mod,
-                            9 => fun_band,
-                            10 => fun_bor,
-                            11 => fun_bxor,
-                            12 => fun_bshft,
+                            3 => fun_add,
+                            4 => fun_sub,
+                            5 => fun_mul,
+                            6 => fun_div,
+                            7 => fun_mod,
+                            8 => fun_muls,
+                            9 => fun_divs,
+                            10 => fun_mods,
+                            11 => fun_band,
+                            12 => fun_bor,
+                            13 => fun_bxor,
+                            14 => fun_bshft,
+                            15 => fun_ashft,
                             _ => panic!(),
                         };
 
                         let val_a = self.registers.get(Register::GP(arg1 as usize))?;
                         let val_b = self.registers.get(Register::GP(arg0 as usize))?;
 
-                        let result = arith_func(val_a, val_b)?;
+                        let (result, extra) = arith_func(val_a, val_b)?;
 
                         let reg_dest = Register::GP(arg2 as usize);
                         self.registers.set(reg_dest, result)?;
+                        self.registers.set(Register::Excess, extra)?;
                     }
                     _ => return Err(SolariumError::InvalidInstruction(inst_word)),
                 }
