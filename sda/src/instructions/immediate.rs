@@ -1,6 +1,6 @@
 use super::{InstructionData, ToInstructionData};
 
-use crate::assembly::argument::Argument;
+use crate::assembly::{argument::Argument, error::AssemblerError};
 
 #[derive(Copy, Clone)]
 struct ImmedateByteValues {
@@ -33,17 +33,14 @@ impl ImmediateSingleInstruction {
 }
 
 impl ToInstructionData for ImmediateSingleInstruction {
-    fn to_instruction_data(&self, args: &[Argument]) -> Result<InstructionData, String> {
+    fn to_instruction_data(&self, args: &[Argument]) -> Result<InstructionData, AssemblerError> {
         if args.len() != 1 {
-            return Err(format!(
-                "instruction expected a 1 argument, got {0:}",
-                args.len()
-            ));
+            return Err(AssemblerError::ArgumentCount { expected: 1, actual: args.len() });
         }
 
         let immediate_val = match args[0].to_u8() {
             Ok(v) => ImmedateByteValues::new(v),
-            Err(e) => return Err(e),
+            Err(e) => return Err(AssemblerError::ArgumentError(e)),
         };
 
         Ok(InstructionData {
@@ -67,29 +64,26 @@ impl ImmediateRegisterInstruction {
 }
 
 impl ToInstructionData for ImmediateRegisterInstruction {
-    fn to_instruction_data(&self, args: &[Argument]) -> Result<InstructionData, String> {
+    fn to_instruction_data(&self, args: &[Argument]) -> Result<InstructionData, AssemblerError> {
         if args.len() != 2 {
-            return Err(format!(
-                "instruction expected 2 arguments, got {0:}",
-                args.len()
-            ));
+            return Err(AssemblerError::ArgumentCount { expected: 2, actual: args.len() });
         }
 
         let reg = match args[0].to_register_val() {
             Ok(v) => v,
-            Err(s) => return Err(s),
+            Err(s) => return Err(AssemblerError::ArgumentError(s)),
         };
 
         let immediate_val = match args[1].to_u8() {
             Ok(v) => ImmedateByteValues::new(v),
-            Err(e) => return Err(e),
+            Err(e) => return Err(AssemblerError::ArgumentError(e)),
         };
 
         Ok(InstructionData {
             opcode: self.opcode,
             arg0: immediate_val.get_high_nybble(),
             arg1: immediate_val.get_low_nybble(),
-            arg2: reg,
+            arg2: reg.get_index() as u8,
         })
     }
 }

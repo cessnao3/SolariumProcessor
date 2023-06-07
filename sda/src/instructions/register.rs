@@ -1,6 +1,7 @@
 use super::{InstructionData, ToInstructionData};
 
 use crate::assembly::argument::Argument;
+use crate::assembly::error::AssemblerError;
 
 const NUM_DATA_VALS: usize = 4;
 
@@ -18,14 +19,9 @@ impl RegisterInstruction {
 }
 
 impl ToInstructionData for RegisterInstruction {
-    fn to_instruction_data(&self, args: &[Argument]) -> Result<InstructionData, String> {
+    fn to_instruction_data(&self, args: &[Argument]) -> Result<InstructionData, AssemblerError> {
         if args.len() != self.num_regs {
-            return Err(format!(
-                "instruction expected {0:} argument{1:}, got {2:}",
-                self.num_regs,
-                if !args.is_empty() { "s" } else { "" },
-                args.len()
-            ));
+            return Err(AssemblerError::ArgumentCount { expected: self.num_regs, actual: args.len() });
         }
 
         assert!(!args.is_empty());
@@ -38,8 +34,8 @@ impl ToInstructionData for RegisterInstruction {
                 std::cmp::Ordering::Equal => nybbles[i] = self.opcode,
                 std::cmp::Ordering::Less => {
                     nybbles[i] = match args[i].to_register_val() {
-                        Ok(v) => v,
-                        Err(s) => return Err(s),
+                        Ok(v) => v.get_index() as u8,
+                        Err(s) => return Err(AssemblerError::ArgumentError(s)),
                     }
                 }
                 _ => (),

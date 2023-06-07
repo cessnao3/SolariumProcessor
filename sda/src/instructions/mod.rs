@@ -9,11 +9,11 @@ use register::RegisterInstruction;
 use single::SingleInstruction;
 
 use crate::assembly::argument::Argument;
+use crate::assembly::error::AssemblerError;
 
 use sproc::common::InstructionData;
-
 pub trait ToInstructionData {
-    fn to_instruction_data(&self, args: &[Argument]) -> Result<InstructionData, String>;
+    fn to_instruction_data(&self, args: &[Argument]) -> Result<InstructionData, AssemblerError>;
 }
 
 pub fn get_instruction_map() -> HashMap<String, Box<dyn ToInstructionData>> {
@@ -22,13 +22,11 @@ pub fn get_instruction_map() -> HashMap<String, Box<dyn ToInstructionData>> {
     instructions.insert("noop".to_string(), Box::new(SingleInstruction::new(0)));
     instructions.insert("inton".to_string(), Box::new(SingleInstruction::new(1)));
     instructions.insert("intoff".to_string(), Box::new(SingleInstruction::new(2)));
-    instructions.insert("ari".to_string(), Box::new(SingleInstruction::new(3)));
-    instructions.insert("aru".to_string(), Box::new(SingleInstruction::new(4)));
-    instructions.insert("reset".to_string(), Box::new(SingleInstruction::new(5)));
-    instructions.insert("pop".to_string(), Box::new(SingleInstruction::new(6)));
-    instructions.insert("ret".to_string(), Box::new(SingleInstruction::new(7)));
-    instructions.insert("retint".to_string(), Box::new(SingleInstruction::new(8)));
-    instructions.insert("halt".to_string(), Box::new(SingleInstruction::new(9)));
+    instructions.insert("reset".to_string(), Box::new(SingleInstruction::new(3)));
+    instructions.insert("pop".to_string(), Box::new(SingleInstruction::new(4)));
+    instructions.insert("ret".to_string(), Box::new(SingleInstruction::new(5)));
+    instructions.insert("retint".to_string(), Box::new(SingleInstruction::new(6)));
+    instructions.insert("halt".to_string(), Box::new(SingleInstruction::new(7)));
     instructions.insert("jmp".to_string(), Box::new(RegisterInstruction::new(1, 1)));
     instructions.insert("jmpr".to_string(), Box::new(RegisterInstruction::new(2, 1)));
     instructions.insert("push".to_string(), Box::new(RegisterInstruction::new(3, 1)));

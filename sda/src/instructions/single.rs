@@ -1,6 +1,6 @@
 use super::{InstructionData, ToInstructionData};
 
-use crate::assembly::argument::Argument;
+use crate::assembly::{argument::Argument, error::AssemblerError};
 
 #[derive(Clone, Copy)]
 pub struct SingleInstruction {
@@ -14,12 +14,9 @@ impl SingleInstruction {
 }
 
 impl ToInstructionData for SingleInstruction {
-    fn to_instruction_data(&self, args: &[Argument]) -> Result<InstructionData, String> {
+    fn to_instruction_data(&self, args: &[Argument]) -> Result<InstructionData, AssemblerError> {
         if !args.is_empty() {
-            return Err(format!(
-                "instruction expected no arguments, got {0:}",
-                args.len()
-            ));
+            return Err(AssemblerError::ArgumentCount { expected: 0, actual: args.len() });
         }
 
         Ok(InstructionData {

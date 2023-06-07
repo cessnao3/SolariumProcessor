@@ -171,15 +171,18 @@ impl InstructionData {
     }
 
     /// Combines the instruction components into their word values
-    pub fn combine(&self) -> u16 {
+    pub fn combine(&self) -> MemoryWord {
         assert!(self.opcode & 0xF == self.opcode);
         assert!(self.arg0 & 0xF == self.arg0);
         assert!(self.arg1 & 0xF == self.arg1);
         assert!(self.arg2 & 0xF == self.arg2);
 
-        ((self.opcode as u16) << 12)
+        let mw =
+            ((self.opcode as u16) << 12)
             | ((self.arg0 as u16) << 8)
             | ((self.arg1 as u16) << 4)
-            | (self.arg2 as u16)
+            | (self.arg2 as u16);
+
+        return MemoryWord::new(mw);
     }
 }

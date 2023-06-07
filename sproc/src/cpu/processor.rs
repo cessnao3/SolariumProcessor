@@ -2,7 +2,7 @@ use crate::common::{InstructionData, MemoryWord, SolariumError};
 use crate::devices::{DeviceAction, SolariumDevice};
 use crate::memory::{self, MemoryMap, MemorySegment};
 
-use super::registers::{Register, RegisterManager, StatusFlag};
+use super::registers::{RegisterManager, Register, StatusFlag};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -716,7 +716,6 @@ impl SolariumProcessor {
                         self.registers.set(reg_dest, result)?;
                         self.registers.set(Register::Excess, excess)?;
                     }
-                    _ => return Err(SolariumError::InvalidInstruction(inst_word)),
                 }
             }
         };

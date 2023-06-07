@@ -122,7 +122,7 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String> {
                     .collect()
                 {
                     Ok(v) => v,
-                    Err(e) => return Err(format!("line {0:} {1:}", line_num, e.to_string())),
+                    Err(e) => return Err(format!("line {line_num} {e}")),
                 },
                 None => Vec::new(),
             },
@@ -145,12 +145,7 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String> {
                 let new_offset = match &args[0] {
                     Argument::UnsignedNumber(v) => *v as usize,
                     arg => {
-                        return Err(format!(
-                            "line {0:} command {1:} unable to parse {2:} as address",
-                            line_num,
-                            command_type,
-                            arg.to_string()
-                        ))
+                        return Err(format!("line {line_num} command {command_type} unable to parse {arg} as address"))
                     }
                 };
 
@@ -323,7 +318,7 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String> {
                     }
                 };
 
-                inst_data.combine()
+                inst_data.combine().get()
             }
             LineValue::LoadLabelLoc(line_number, label) => match label_map.get(&label) {
                 Some(v) => *v as u16,
