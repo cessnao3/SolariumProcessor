@@ -1,14 +1,31 @@
 use std::collections::HashMap;
 
-use crate::assembly::argument::Argument;
-use crate::assembly::error::AssemblerError;
+pub use crate::argument::{Argument, ArgumentError};
 
+use once_cell::sync::Lazy;
 use sproc::common::{InstructionData, InstructionError};
 
 use sproc::cpu::Register;
 
+#[derive(Clone, Debug)]
+pub enum OpcodeParseError {
+    ArgumentCount { expected: usize, actual: usize },
+    ArgumentError(ArgumentError),
+}
+
+impl std::fmt::Display for OpcodeParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ArgumentCount { expected, actual } => write!(f, "opcode expected {expected} arguments, got {actual}"),
+            Self::ArgumentError(e) => write!(f, "{e}"),
+        }
+    }
+}
+
 pub trait AssemblyOpcode {
     fn to_instruction(&self) -> Result<InstructionData, InstructionError>;
+
+    fn to_assembly_text(&self) -> String;
 }
 
 macro_rules! NoArgInstruction {
@@ -20,13 +37,17 @@ macro_rules! NoArgInstruction {
             fn to_instruction(&self) -> Result<InstructionData, InstructionError> {
                 InstructionData::new_arg0($opcode)
             }
+
+            fn to_assembly_text(&self) -> String {
+                format!("{}", stringify!($inst_name).to_lowercase())
+            }
         }
 
         impl TryFrom<&[Argument]> for $inst_name {
-            type Error = AssemblerError;
+            type Error = OpcodeParseError;
             fn try_from(args: &[Argument]) -> Result<Self, Self::Error> {
                 if args.len() != 0 {
-                    Err(crate::assembly::error::AssemblerError::ArgumentCount { expected: 0, actual: args.len() })
+                    Err(OpcodeParseError::ArgumentCount { expected: 0, actual: args.len() })
                 } else {
                     Ok(Self { })
                 }
@@ -52,17 +73,21 @@ macro_rules! SingleReg {
             fn to_instruction(&self) -> Result<InstructionData, InstructionError> {
                 InstructionData::new_arg1($opcode, u8::from(self.reg))
             }
+
+            fn to_assembly_text(&self) -> String {
+                format!("{} {}", stringify!($inst_name).to_lowercase(), self.reg)
+            }
         }
 
         impl TryFrom<&[Argument]> for $inst_name {
-            type Error = AssemblerError;
+            type Error = OpcodeParseError;
             fn try_from(args: &[Argument]) -> Result<Self, Self::Error> {
                 if args.len() != 1 {
-                    Err(crate::assembly::error::AssemblerError::ArgumentCount { expected: 1, actual: args.len() })
+                    Err(OpcodeParseError::ArgumentCount { expected: 1, actual: args.len() })
                 } else {
                     let reg = match args[0].to_register_val() {
                         Ok(v) => v,
-                        Err(e) => return Err(AssemblerError::ArgumentError(e)),
+                        Err(e) => return Err(OpcodeParseError::ArgumentError(e)),
                     };
 
                     Ok(Self {
@@ -92,22 +117,26 @@ macro_rules! DoubleReg {
             fn to_instruction(&self) -> Result<InstructionData, InstructionError> {
                 InstructionData::new_arg2($opcode, u8::from(self.reg_b), u8::from(self.reg_a))
             }
+
+            fn to_assembly_text(&self) -> String {
+                format!("{} {}, {}", stringify!($inst_name).to_lowercase(), self.reg_a, self.reg_b)
+            }
         }
 
         impl TryFrom<&[Argument]> for $inst_name {
-            type Error = AssemblerError;
+            type Error = OpcodeParseError;
             fn try_from(args: &[Argument]) -> Result<Self, Self::Error> {
                 if args.len() != 2 {
-                    Err(crate::assembly::error::AssemblerError::ArgumentCount { expected: 2, actual: args.len() })
+                    Err(OpcodeParseError::ArgumentCount { expected: 2, actual: args.len() })
                 } else {
                     let reg_a = match args[0].to_register_val() {
                         Ok(v) => v,
-                        Err(e) => return Err(AssemblerError::ArgumentError(e)),
+                        Err(e) => return Err(OpcodeParseError::ArgumentError(e)),
                     };
 
                     let reg_b = match args[1].to_register_val() {
                         Ok(v) => v,
-                        Err(e) => return Err(AssemblerError::ArgumentError(e)),
+                        Err(e) => return Err(OpcodeParseError::ArgumentError(e)),
                     };
 
                     Ok(Self {
@@ -139,27 +168,31 @@ macro_rules! TripleReg {
             fn to_instruction(&self) -> Result<InstructionData, InstructionError> {
                 InstructionData::new($opcode, u8::from(self.reg_b), u8::from(self.reg_a), u8::from(self.reg_dst))
             }
+
+            fn to_assembly_text(&self) -> String {
+                format!("{} {}, {}, {}", stringify!($inst_name).to_lowercase(), self.reg_dst, self.reg_a, self.reg_b)
+            }
         }
 
         impl TryFrom<&[Argument]> for $inst_name {
-            type Error = AssemblerError;
+            type Error = OpcodeParseError;
             fn try_from(args: &[Argument]) -> Result<Self, Self::Error> {
                 if args.len() != 3 {
-                    Err(crate::assembly::error::AssemblerError::ArgumentCount { expected: 3, actual: args.len() })
+                    Err(OpcodeParseError::ArgumentCount { expected: 3, actual: args.len() })
                 } else {
                     let reg_dst = match args[0].to_register_val() {
                         Ok(v) => v,
-                        Err(e) => return Err(AssemblerError::ArgumentError(e)),
+                        Err(e) => return Err(OpcodeParseError::ArgumentError(e)),
                     };
 
                     let reg_a = match args[1].to_register_val() {
                         Ok(v) => v,
-                        Err(e) => return Err(AssemblerError::ArgumentError(e)),
+                        Err(e) => return Err(OpcodeParseError::ArgumentError(e)),
                     };
 
                     let reg_b = match args[2].to_register_val() {
                         Ok(v) => v,
-                        Err(e) => return Err(AssemblerError::ArgumentError(e)),
+                        Err(e) => return Err(OpcodeParseError::ArgumentError(e)),
                     };
 
                     Ok(Self {
@@ -192,22 +225,26 @@ macro_rules! ImmediateReg {
                 let imm = ImmedateByteValues::from(self.immediate);
                 InstructionData::new($opcode, imm.get_high_nybble(), imm.get_low_nybble(), u8::from(self.reg_dst))
             }
+
+            fn to_assembly_text(&self) -> String {
+                format!("{} {}, {}", stringify!($inst_name).to_lowercase(), self.reg_dst, self.immediate)
+            }
         }
 
         impl TryFrom<&[Argument]> for $inst_name {
-            type Error = AssemblerError;
+            type Error = OpcodeParseError;
             fn try_from(args: &[Argument]) -> Result<Self, Self::Error> {
                 if args.len() != 2 {
-                    Err(crate::assembly::error::AssemblerError::ArgumentCount { expected: 2, actual: args.len() })
+                    Err(OpcodeParseError::ArgumentCount { expected: 2, actual: args.len() })
                 } else {
                     let reg_dst = match args[0].to_register_val() {
                         Ok(v) => v,
-                        Err(e) => return Err(AssemblerError::ArgumentError(e)),
+                        Err(e) => return Err(OpcodeParseError::ArgumentError(e)),
                     };
 
                     let immediate = match args[1].to_u8() {
                         Ok(v) => v as i8,
-                        Err(e) => return Err(AssemblerError::ArgumentError(e)),
+                        Err(e) => return Err(OpcodeParseError::ArgumentError(e)),
                     };
 
                     Ok(Self {
@@ -289,17 +326,21 @@ impl AssemblyOpcode for Jmpri {
         let imm = ImmedateByteValues::from(self.immediate);
         InstructionData::new_arg2(1, imm.get_high_nybble(), imm.get_low_nybble())
     }
+
+    fn to_assembly_text(&self) -> String {
+        format!("{} {}", stringify!($inst_name).to_lowercase(), self.immediate)
+    }
 }
 
 impl TryFrom<&[Argument]> for Jmpri {
-    type Error = AssemblerError;
+    type Error = OpcodeParseError;
     fn try_from(args: &[Argument]) -> Result<Self, Self::Error> {
         if args.len() != 1 {
-            Err(AssemblerError::ArgumentCount { expected: 1, actual: args.len() })
+            Err(OpcodeParseError::ArgumentCount { expected: 1, actual: args.len() })
         } else {
             let val = match args[0].to_u8() {
                 Ok(v) => v as i8,
-                Err(e) => return Err(AssemblerError::ArgumentError(e)),
+                Err(e) => return Err(OpcodeParseError::ArgumentError(e)),
             };
 
             Ok(Self { immediate: val })
@@ -319,10 +360,10 @@ DoubleReg!(4, Ldr);
 DoubleReg!(5, Savr);
 DoubleReg!(6, Cpy);
 DoubleReg!(7, Tg);
-DoubleReg!(8, Tge);
+DoubleReg!(8, Tgs);
 DoubleReg!(9, Tl);
-DoubleReg!(10, Tle);
-DoubleReg!(11, Teg);
+DoubleReg!(10, Tls);
+DoubleReg!(11, Teq);
 
 #[derive(Copy, Clone)]
 pub struct Arg {
@@ -334,22 +375,26 @@ impl AssemblyOpcode for Arg {
     fn to_instruction(&self) -> Result<InstructionData, InstructionError> {
         InstructionData::new_arg2(12, self.arg, u8::from(self.reg))
     }
+
+    fn to_assembly_text(&self) -> String {
+        format!("{} {}, {}", stringify!($inst_name).to_lowercase(), self.reg, self.arg)
+    }
 }
 
 impl TryFrom<&[Argument]> for Arg {
-    type Error = AssemblerError;
+    type Error = OpcodeParseError;
     fn try_from(args: &[Argument]) -> Result<Self, Self::Error> {
         if args.len() != 2 {
-            Err(AssemblerError::ArgumentCount { expected: 2, actual: args.len() })
+            Err(OpcodeParseError::ArgumentCount { expected: 2, actual: args.len() })
         } else {
             let reg = match args[0].to_register_val() {
                 Ok(v) => v,
-                Err(e) => return Err(AssemblerError::ArgumentError(e)),
+                Err(e) => return Err(OpcodeParseError::ArgumentError(e)),
             };
 
             let arg = match args[1].to_u8() {
                 Ok(v) => v,
-                Err(e) => return Err(AssemblerError::ArgumentError(e)),
+                Err(e) => return Err(OpcodeParseError::ArgumentError(e)),
             };
 
             Ok(Self { reg, arg })
@@ -379,17 +424,20 @@ TripleReg!(13, Bxor);
 TripleReg!(14, Bshft);
 TripleReg!(15, Ashft);
 
-type AssemblyResult = Result<Box<dyn AssemblyOpcode>, AssemblerError>;
+pub type AssemblyResult = Result<Box<dyn AssemblyOpcode>, OpcodeParseError>;
 
-fn inst_transformation<T: AssemblyOpcode + 'static>(val: Result<T, AssemblerError>) -> AssemblyResult {
+fn inst_transformation<T: AssemblyOpcode + 'static>(val: Result<T, OpcodeParseError>) -> AssemblyResult {
     match val {
         Ok(v) => Ok(Box::new(v) as Box<dyn AssemblyOpcode>),
         Err(e) => Err(e),
     }
 }
 
-pub fn get_instruction_map() -> HashMap<String, fn(&[Argument]) -> AssemblyResult> {
-    let mut instructions: HashMap<String, fn(&[Argument]) -> AssemblyResult> = HashMap::new();
+pub type InstructionFunction = fn(&[Argument]) -> AssemblyResult;
+type InstructionMap = HashMap<String, InstructionFunction>;
+
+pub static INSTRUCTION_MAP: Lazy<InstructionMap> = Lazy::new(|| {
+    let mut instructions: InstructionMap = HashMap::new();
 
     macro_rules! add_inst {
         ( $name: ident ) => {
@@ -428,10 +476,10 @@ pub fn get_instruction_map() -> HashMap<String, fn(&[Argument]) -> AssemblyResul
     add_inst!(Savr);
     add_inst!(Cpy);
     add_inst!(Tg);
-    add_inst!(Tge);
+    add_inst!(Tgs);
     add_inst!(Tl);
-    add_inst!(Tle);
-    add_inst!(Teg);
+    add_inst!(Tls);
+    add_inst!(Teq);
     add_inst!(Arg);
 
     add_inst!(Ldi);
@@ -451,4 +499,4 @@ pub fn get_instruction_map() -> HashMap<String, fn(&[Argument]) -> AssemblyResul
     add_inst!(Ashft);
 
     instructions
-}
+});

@@ -3,9 +3,14 @@ name = "sda"
 version = "0.1.0"
 authors = ["Ian O'Rourke <cessna.ian@gmail.com>"]
 edition = "2021"
+crate-type = ["lib", "cdylib"]
 
 [dependencies]
 regex = "1.5"
 once_cell = "1.17.1"
 sproc = { path = "../sproc", version = "*" }
 clap = { version = "4", features = ["derive"] }
+
+[profile.release]
+lto = true
+strip = true

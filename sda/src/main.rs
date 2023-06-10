@@ -1,6 +1,6 @@
 mod assembler;
-
-mod assembly;
+mod argument;
+mod parser;
 mod instructions;
 
 use std::io::Write;
@@ -36,8 +36,7 @@ fn main() {
 
     let lines = match std::fs::read_to_string(&args.input) {
         Ok(s) => s
-            .split('\n')
-            .flat_map(|i| i.split('\r'))
+            .lines()
             .map(|i| i.to_string())
             .collect::<Vec<_>>(),
         Err(_) => {
@@ -46,7 +45,15 @@ fn main() {
         }
     };
 
-    let result = match assembler::assemble(&lines.iter().map(|v| v.as_ref()).collect::<Vec<_>>()) {
+    let parsed = match parser::parse(&lines.iter().map(|v| v.as_ref()).collect::<Vec<_>>()) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("Unable to parse {} - {}", args.input, e);
+            std::process::exit(1);
+        }
+    };
+
+    let result = match assembler::assemble(&parsed) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("Unable to assemble {} - {}", args.input, e);

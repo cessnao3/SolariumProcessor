@@ -166,7 +166,7 @@ mod tests {
                 assert!(segment_val.is_none());
             }
 
-            let set_result = map.set(i, MemoryWord::new(set_val));
+            let set_result = map.set(i, MemoryWord::from(set_val));
 
             if within_expected {
                 assert!(set_result.is_ok());
@@ -219,13 +219,13 @@ mod tests {
         let add_result = map.add_segment(
             base,
             Rc::new(RefCell::new(ReadOnlySegment::new(
-                (0..size).map(|i| MemoryWord::new(calc_func(i))).collect(),
+                (0..size).map(|i| MemoryWord::from(calc_func(i))).collect(),
             ))),
         );
 
         assert!(add_result.is_ok());
 
-        let set_val = 314;
+        let set_val = 314u16;
 
         // Iterate through and check if values are within the expected results
         for i in 0..MEM_MAX_SIZE {
@@ -242,7 +242,7 @@ mod tests {
                 assert!(segment_val.is_none());
             }
 
-            let set_result = map.set(i, MemoryWord::new(set_val));
+            let set_result = map.set(i, MemoryWord::from(set_val));
 
             assert!(set_result.is_err());
         }

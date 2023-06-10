@@ -34,7 +34,15 @@ impl From<Register> for usize {
 
 impl std::fmt::Display for Register {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "r{}", usize::from(*self))
+        match self {
+            Self::ProgramCounter => write!(f, "$pc"),
+            Self::StatusFlags => write!(f, "$stat"),
+            Self::StackPointer => write!(f, "$sp"),
+            Self::Excess => write!(f, "$exc"),
+            Self::Return => write!(f, "$ret"),
+            Self::ArgumentBase => write!(f, "$arg"),
+            Self::GeneralPurpose(ind) => write!(f, "${}", ind),
+        }
     }
 }
 
@@ -47,8 +55,8 @@ pub enum StatusFlag {
 impl StatusFlag {
     /// Provides the mask required to set the flag with a bitwise-or
     pub fn get_mask(&self) -> MemoryWord {
-        MemoryWord::new(match self {
-            StatusFlag::InterruptEnable => 1 << 0,
+        MemoryWord::from(match self {
+            StatusFlag::InterruptEnable => 1u16 << 0,
         })
     }
 }
@@ -73,7 +81,7 @@ impl RegisterManager {
     /// Creates a new register manager
     pub fn new() -> RegisterManager {
         RegisterManager {
-            registers: [MemoryWord::new(0); RegisterManager::NUM_REGISTERS],
+            registers: [MemoryWord::default(); RegisterManager::NUM_REGISTERS],
         }
     }
 
@@ -114,14 +122,14 @@ impl RegisterManager {
     /// Sets the given flag for the processor status flags
     pub fn set_flag(&mut self, flag: StatusFlag) -> Result<(), SolariumError> {
         let last_val = self.get(Register::StatusFlags)?;
-        let new_val = MemoryWord::new(last_val.get() | flag.get_mask().get());
+        let new_val = MemoryWord::from(last_val.get() | flag.get_mask().get());
         self.set(Register::StatusFlags, new_val)
     }
 
     /// Clears the given flag to the processor status
     pub fn clear_flag(&mut self, flag: StatusFlag) -> Result<(), SolariumError> {
         let last_val = self.get(Register::StatusFlags)?;
-        let new_val = MemoryWord::new(last_val.get() & !flag.get_mask().get());
+        let new_val = MemoryWord::from(last_val.get() & !flag.get_mask().get());
         self.set(Register::StatusFlags, new_val)
     }
 
@@ -163,13 +171,13 @@ mod tests {
             // Determine values ot iterate over
             for v in 0..1000 {
                 // Set the register manager, and then ensure that the output result matches
-                let set_res = register_manager.set(*register, MemoryWord::new(v));
+                let set_res = register_manager.set(*register, MemoryWord::from(v as u16));
 
                 assert!(set_res.is_ok());
 
                 let get_res = register_manager.get(*register);
                 assert!(get_res.is_ok());
-                assert_eq!(get_res.unwrap(), MemoryWord::new(v));
+                assert_eq!(get_res.unwrap(), MemoryWord::from(v as u16));
             }
         }
     }
@@ -183,7 +191,7 @@ mod tests {
         // Add a value to each register
         for i in 0..RegisterManager::NUM_REGISTERS {
             assert!(register_manager
-                .set(Register::GeneralPurpose(i), MemoryWord::new(i as u16))
+                .set(Register::GeneralPurpose(i), MemoryWord::from(i as u16))
                 .is_ok());
         }
 
@@ -191,7 +199,7 @@ mod tests {
         for i in 0..RegisterManager::NUM_REGISTERS {
             let val = register_manager.get(Register::GeneralPurpose(i));
             assert!(val.is_ok());
-            assert_eq!(val.unwrap(), MemoryWord::new(i as u16));
+            assert_eq!(val.unwrap(), MemoryWord::from(i as u16));
         }
     }
 }

@@ -11,7 +11,7 @@ impl ReadWriteSegment {
     /// Defines a new memory segment with empty data, zero, in each memory location
     pub fn new(size: usize) -> Self {
         // Define the initial data array
-        let data: Vec<MemoryWord> = (0..size).map(|_| MemoryWord::new(0)).collect();
+        let data: Vec<MemoryWord> = (0..size).map(|_| MemoryWord::default()).collect();
 
         // Create the memory segment
         Self { data }
@@ -97,7 +97,7 @@ mod tests {
     #[test]
     fn test_panic_set_above() {
         let mut mem = get_default_test_segment();
-        let result = mem.set(mem.len(), MemoryWord::new(32));
+        let result = mem.set(mem.len(), MemoryWord::from(32u16));
         assert!(result.is_err());
     }
 
@@ -117,7 +117,7 @@ mod tests {
         let mut mem = ReadWriteSegment::new(size);
 
         for i in 0..size {
-            let success = mem.set(i, MemoryWord::new((i + 1) as u16));
+            let success = mem.set(i, MemoryWord::from((i + 1) as u16));
             assert!(success.is_ok());
         }
 

@@ -2,22 +2,12 @@ use std::num::ParseIntError;
 use std::str::FromStr;
 
 /// Provides the data type to use for a word in memory
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
 pub struct MemoryWord {
     value: u16,
 }
 
 impl MemoryWord {
-    /// Constructs a new memory value
-    pub fn new(val: u16) -> MemoryWord {
-        Self { value: val }
-    }
-
-    /// Constructs a new memory value
-    pub fn new_signed(val: i16) -> MemoryWord {
-        Self { value: val as u16 }
-    }
-
     /// Gets the current value
     pub fn get(&self) -> u16 {
         self.value
@@ -45,9 +35,21 @@ impl FromStr for MemoryWord {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.parse::<u16>() {
-            Ok(v) => Ok(MemoryWord::new(v)),
+            Ok(v) => Ok(MemoryWord::from(v)),
             Err(e) => Err(e),
         }
+    }
+}
+
+impl From<u16> for MemoryWord {
+    fn from(value: u16) -> Self {
+        Self { value }
+    }
+}
+
+impl From<i16> for MemoryWord {
+    fn from(value: i16) -> Self {
+        Self { value: value as u16 }
     }
 }
 
@@ -64,8 +66,6 @@ pub enum SolariumError {
     DivideByZero,
     ModByZero,
     ShiftError(usize),
-    CharacterToWord(char),
-    WordToCharacter(MemoryWord),
     DeviceError(usize, SolariumDeviceError),
     RegisterIndexError(usize),
     StartEndIndexMismatch(usize, usize),
@@ -98,12 +98,6 @@ impl ToString for SolariumError {
                 format!("invalid attempt to shift by {0:}", shift_count)
             }
             SolariumError::StackUnderflow => "stack underflow".to_string(),
-            SolariumError::CharacterToWord(c) => {
-                format!("unable to convert {0:02X} to word", *c as u8)
-            }
-            SolariumError::WordToCharacter(word) => {
-                format!("unable to convert {0:04X} to character", word.get())
-            }
             SolariumError::DeviceError(base_addr, err) => {
                 format!("device {0:} error: {1:}", base_addr, err.to_string())
             }
@@ -137,7 +131,7 @@ impl ToString for SolariumDeviceError {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum InstructionError {
     NybbleOversize(InstructionData)
 }
@@ -151,7 +145,7 @@ impl std::fmt::Display for InstructionError {
 }
 
 /// Defines the core instruction group value
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct InstructionData {
     pub opcode: u8,
     pub arg0: u8,
@@ -242,6 +236,6 @@ impl TryFrom<InstructionData> for MemoryWord {
             | ((value.arg1 as u16) << 4)
             | (value.arg2 as u16);
 
-        Ok(Self::new(mw))
+        Ok(Self::from(mw))
     }
 }

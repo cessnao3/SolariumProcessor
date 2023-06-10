@@ -1,346 +1,264 @@
-use crate::assembly::error::AssemblerError;
-use crate::instructions::get_instruction_map;
-use sproc::common::MemoryWord;
+use crate::instructions::{Argument, OpcodeParseError};
+use crate::parser::{ParsedValue, LineInformation, AssemblerCommand, ParseError, ParseErrorInner, CreateInstructionData};
+use sproc::common::{MemoryWord, InstructionError};
+use sproc::text::{character_to_word, CharacterError};
 
 use std::collections::HashMap;
 
-use crate::assembly::asm_regex::{ARGUMENT_SPLIT_REGEX, VALID_LINE_REGEX};
-
-use crate::assembly::argument::Argument;
-
 const MAX_ADDRESSABLE_VALUE: usize = (2usize).pow(16);
 
-enum LineValue {
-    Assembly(LineInformation),
-    Load(u16),
-    LoadLabelLoc(usize, String),
+enum AssembleResult {
+    Word(MemoryWord),
+    Opcode(LineInformation, CreateInstructionData),
+    GetLabel(LineInformation, String),
 }
 
-struct LineInformation {
-    pub instruction: String,
-    pub arguments: Vec<Argument>,
-    pub line_number: usize,
-    pub data_index: usize,
+struct AssemblyState {
+    map: HashMap<usize, AssembleResult>,
+    labels: HashMap<String, usize>,
+    next_loc: usize,
 }
 
-impl LineInformation {
-    pub fn new(
-        instruction: String,
-        arguments: Vec<Argument>,
-        line_number: usize,
-        data_index: usize,
-    ) -> LineInformation {
-        Self {
-            instruction,
-            arguments,
-            line_number,
-            data_index,
+impl AssemblyState {
+    fn new() -> Self {
+        Self { map: HashMap::new(), labels: HashMap::new(), next_loc: 0 }
+    }
+
+    fn move_value(&mut self, new_val: usize) -> Result<(), AssemblerErrorInner> {
+        if new_val < self.next_loc {
+            return Err(AssemblerErrorInner::InvalidNewValue{ new: new_val, existing: self.next_loc });
+        }
+
+        self.next_loc = new_val;
+        Ok(())
+    }
+
+    fn add_word(&mut self, word: MemoryWord) -> Result<(), AssemblerErrorInner> {
+        self.add_res(AssembleResult::Word(word))
+    }
+
+    fn add_opcode(&mut self, l: &LineInformation, op: CreateInstructionData) -> Result<(), AssemblerErrorInner> {
+        self.add_res(AssembleResult::Opcode(l.clone(), op))
+    }
+
+    fn add_label(&mut self, s: &str) -> Result<(), AssemblerErrorInner> {
+        if self.labels.contains_key(s) {
+            Err(AssemblerErrorInner::DuplicateLabel(s.to_string()))
+        } else {
+            self.labels.insert(s.to_string(), self.next_loc);
+            Ok(())
         }
     }
 
-    pub fn update_arguments_for_labels(
-        &self,
-        label_map: &HashMap<String, usize>,
-    ) -> Result<Vec<Argument>, String> {
-        return self
-            .arguments
-            .iter()
-            .map(|arg| {
-                let new_arg = match arg {
-                    Argument::Label(s) => match label_map.get(s) {
-                        Some(data_index) => {
-                            let delta_index = *data_index as i32 - self.data_index as i32;
-                            Argument::SignedNumber(delta_index)
-                        }
-                        None => return Err(format!("unable to find value for label {0:}", s)),
-                    },
-                    a => a.clone(),
-                };
-
-                Ok(new_arg)
-            })
-            .collect();
+    fn add_load_label(&mut self, l: &LineInformation, s: &str) -> Result<(), AssemblerErrorInner> {
+        self.add_res(AssembleResult::GetLabel(l.clone(), s.to_string()))
     }
-}
 
-pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String> {
-    let mut data_map = HashMap::<usize, LineValue>::new();
-    let mut current_data_index = 0usize;
-
-    let mut label_map = HashMap::<String, usize>::new();
-
-    let instruction_map = get_instruction_map();
-
-    for (i, l_in) in lines.iter().enumerate() {
-        // Define the line number
-        let line_num = i + 1;
-
-        // Cleanup the resulting string value and remove comments
-        let l: &str = match l_in.find(';') {
-            Some(len) => &l_in[..len],
-            None => l_in,
-        }
-        .trim();
-
-        // Skip if empty
-        if l.is_empty() {
-            continue;
-        }
-
-        // Check that the line matches the expected values
-        if !VALID_LINE_REGEX.is_match(l) {
-            return Err(format!(
-                "line {0:} does not match the expected line format \"{1:}\"",
-                line_num, l
-            ));
-        }
-
-        // Extract capture groups
-        let capture_groups = match VALID_LINE_REGEX.captures(l) {
-            Some(v) => v,
-            None => {
-                return Err(format!(
-                    "line {0:} no command captures found for \"{1:}\"",
-                    line_num, l
-                ))
-            }
-        };
-
-        // Extract parameters
-        let command = capture_groups
-            .name("command")
-            .unwrap()
-            .as_str()
-            .to_ascii_lowercase();
-
-        // Extract argument type
-        let args = match capture_groups.name("text") {
-            Some(v) => vec![Argument::Text(v.as_str().to_string())],
-            None => match capture_groups.name("args") {
-                Some(v) => match ARGUMENT_SPLIT_REGEX
-                    .split(&v.as_str().to_ascii_lowercase())
-                    .map(|v| v.parse::<Argument>())
-                    .collect()
-                {
-                    Ok(v) => v,
-                    Err(e) => return Err(format!("line {line_num} {e}")),
-                },
-                None => Vec::new(),
-            },
-        };
-
-        // Check the first character of the command to determine how to handle
-        let first_char = command.chars().next().unwrap();
-
-        if first_char == '.' {
-            let command_type = &command[1..];
-
-            if command_type == "oper" {
-                if args.len() != 1 {
-                    return Err(format!(
-                        "line {0:} command {1:} only takes 1 argument",
-                        line_num, command_type
-                    ));
-                }
-
-                let new_offset = match &args[0] {
-                    Argument::UnsignedNumber(v) => *v as usize,
-                    arg => {
-                        return Err(format!("line {line_num} command {command_type} unable to parse {arg} as address"))
-                    }
-                };
-
-                if new_offset < current_data_index {
-                    return Err(format!(
-                        "line {0:} command {1:} new offset {2:} must be greater or equal to current offset {3:}",
-                        line_num,
-                        command_type,
-                        new_offset,
-                        current_data_index));
-                } else {
-                    current_data_index = new_offset;
-                }
-            } else if command_type == "load" {
-                if args.len() != 1 {
-                    return Err(format!(
-                        "line {0:} command {1:} only takes 1 argument",
-                        i, command_type
-                    ));
-                }
-
-                let value_to_load = match args[0].to_u16() {
-                    Ok(v) => v,
-                    Err(e) => return Err(format!("line {0:} {1:}", line_num, e)),
-                };
-
-                data_map.insert(current_data_index, LineValue::Load(value_to_load));
-                current_data_index += 1;
-            } else if command_type == "loadloc" {
-                if args.len() != 1 {
-                    return Err(format!(
-                        "line {0:} command {1:} only takes 1 argument",
-                        line_num, command_type
-                    ));
-                }
-
-                let arg_label = match &args[0] {
-                    Argument::Label(label) => label.clone(),
-                    _ => {
-                        return Err(format!(
-                            "line {0:} command {1:} may only take a label input",
-                            line_num, command
-                        ))
-                    }
-                };
-
-                data_map.insert(
-                    current_data_index,
-                    LineValue::LoadLabelLoc(line_num, arg_label),
-                );
-                current_data_index += 1;
-            } else if command_type == "loadtext" {
-                if args.len() != 1 {
-                    return Err(format!(
-                        "line {0:} only one argument expected for {1:}",
-                        line_num, command_type
-                    ));
-                } else if let Argument::Text(text) = &args[0] {
-                    // Construct memory words from the text values
-                    let text_vals: Vec<MemoryWord> =
-                        match text.chars().map(sproc::text::character_to_word).collect() {
-                            Ok(v) => v,
-                            Err(e) => {
-                                return Err(format!(
-                                    "line {0:} character error - {1:}",
-                                    line_num,
-                                    e.to_string()
-                                ))
-                            }
-                        };
-
-                    // Insert all values in the text string
-                    for val in text_vals {
-                        data_map.insert(current_data_index, LineValue::Load(val.get()));
-                        current_data_index += 1;
-                    }
-
-                    // Add the ending null terminator
-                    data_map.insert(current_data_index, LineValue::Load(0));
-                    current_data_index += 1;
-                } else {
-                    return Err(format!("line {0:} no text input provided", line_num));
-                }
+    fn add_res(&mut self, r: AssembleResult) -> Result<(), AssemblerErrorInner> {
+        if let std::collections::hash_map::Entry::Vacant(e) = self.map.entry(self.next_loc) {
+            if self.next_loc >= MAX_ADDRESSABLE_VALUE {
+                Err(AssemblerErrorInner::AddressTooLarge(self.next_loc))
             } else {
-                return Err(format!(
-                    "line {0:} invalid command \"{1:}\" found",
-                    line_num, command_type
-                ));
-            }
-        } else if first_char == ':' {
-            if !args.is_empty() {
-                return Err(format!(
-                    "line {0:} label types cannot have any arguments",
-                    line_num
-                ));
-            }
-
-            let label = &command[1..];
-
-            if label_map.contains_key(label) {
-                return Err(format!(
-                    "line {0:} label \"{1:}\" already exists",
-                    line_num, label
-                ));
-            } else {
-                label_map.insert(label.to_string(), current_data_index);
+                e.insert(r);
+                self.next_loc += 1;
+                Ok(())
             }
         } else {
-            // Add the data values
-            if let std::collections::hash_map::Entry::Vacant(e) = data_map.entry(current_data_index)
-            {
-                if current_data_index < MAX_ADDRESSABLE_VALUE {
-                    e.insert(LineValue::Assembly(LineInformation::new(
-                        command,
-                        args,
-                        line_num,
-                        current_data_index,
-                    )));
-                } else {
-                    return Err(format!(
-                        "line {0:} \"{1:}\" does not match expected syntax",
-                        line_num, l
-                    ));
-                }
-            } else {
-                return Err(format!(
-                    "line {0:} offset {1:} already filled",
-                    line_num, current_data_index
-                ));
-            }
+            Err(AssemblerErrorInner::DuplicateAddress(self.next_loc))
         }
     }
 
-    let max_index = match data_map.keys().max() {
-        Some(v) => v,
-        None => return Ok(Vec::new()),
-    };
+    /*
+    fn update_labels(&mut self) -> Result<(), AssemblerError> {
+        for i in self.map.values_mut() {
+            let (loc, lbl) = match i {
+                AssembleResult::WaitingOnLabel(loc, lbl) => (loc.clone(), lbl.to_string()),
+                _ => continue,
+            };
 
-    let mut data_vec = Vec::new();
-    data_vec.resize(max_index + 1, 0);
-
-    for (data_index, line_value) in data_map {
-        data_vec[data_index] = match line_value {
-            LineValue::Assembly(assembly) => {
-                // Define the new arguments to include labels values
-                let new_args = match assembly.update_arguments_for_labels(&label_map) {
-                    Ok(v) => v,
-                    Err(e) => return Err(format!("line {0:} {1:}", assembly.line_number, e)),
-                };
-
-                // Extract the expected output value
-                let inst_val = match instruction_map.get(&assembly.instruction) {
-                    Some(v) => match v(&new_args) {
-                        Ok(v) => v,
-                        Err(e) => return Err(format!("line {} assembly error {}", assembly.line_number, e))
-                    }
-                    None => {
-                        return Err(format!(
-                            "line {0:} no instruction {1:} found",
-                            assembly.line_number, assembly.instruction
-                        ))
-                    }
-                };
-
-                // Attempt to create the resulting data
-                let inst_data = match inst_val.to_instruction() {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return Err(format!(
-                            "line {0:} {1:} -> {2:}",
-                            assembly.line_number, assembly.instruction, e
-                        ))
-                    }
-                };
-
-                match MemoryWord::try_from(inst_data) {
-                    Ok(v) => v.get(),
-                    Err(e) => return Err(AssemblerError::from(e).to_string()),
-                }
+            if let Some(loc) = self.labels.get(&lbl) {
+                *i = AssembleResult::Word(MemoryWord::from(*loc as u16));
+            } else {
+                return Err(AssemblerError { info: loc, err: AssemblerErrorInner::MissingLabel(lbl) });
             }
-            LineValue::LoadLabelLoc(line_number, label) => match label_map.get(&label) {
-                Some(v) => *v as u16,
-                None => {
-                    return Err(format!(
-                        "line {0:} no label {1:} provided",
-                        line_number, label
-                    ))
+        }
+
+        Ok(())
+    }
+    */
+
+    fn to_memory_vector(&self) -> Result<Vec<MemoryWord>, AssemblerError> {
+        let max_index = match self.map.keys().max() {
+            Some(v) => v,
+            None => return Ok(Vec::new()),
+        };
+
+        let mut data_vec = Vec::new();
+        data_vec.resize(max_index + 1, MemoryWord::default());
+
+        for (i, val) in self.map.iter() {
+            match val {
+                AssembleResult::GetLabel(loc, lbl) => {
+                    if let Some(dest) = self.labels.get(lbl) {
+                        data_vec[0] = MemoryWord::from(*dest as u16);
+                    } else {
+                        return Err(AssemblerError { info: loc.clone(), err: AssemblerErrorInner::MissingLabel(lbl.clone()) });
+                    }
                 }
-            },
-            LineValue::Load(data) => data,
+                AssembleResult::Opcode(loc, op) => {
+                    // Create new arguments to update for assembly locations
+                    let new_args = op.default_args.iter().map(|a| {
+                        match a {
+                            Argument::Label(s) => match self.labels.get(s) {
+                                Some(data_index) => {
+                                    let delta_index = *data_index as i32 - *i as i32;
+                                    Ok(Argument::SignedNumber(delta_index))
+                                }
+                                None => Err(AssemblerError { info: loc.clone(), err: AssemblerErrorInner::MissingLabel(s.to_string()) }),
+                            },
+                            a => Ok(a.clone()),
+                        }
+                    }).collect::<Result<Vec<_>, _>>()?;
+
+                    // Helper function for inner errors
+                    fn inner_create_fnc(op: &CreateInstructionData, args: &[Argument]) -> Result<MemoryWord, AssemblerErrorInner> {
+                        // Create the new instruction
+                        Ok(MemoryWord::try_from((op.create_func)(args)?.to_instruction()?)?)
+                    }
+
+                    // Add the resulting parameter
+                    data_vec[*i] = match inner_create_fnc(op, &new_args) {
+                        Ok(v) => v,
+                        Err(e) => return Err(AssemblerError { info: loc.clone(), err: e }),
+                    }
+                }
+                AssembleResult::Word(w) => data_vec[*i] = *w,
+            };
+        }
+
+        Ok(data_vec)
+    }
+}
+
+fn assemble_individual(state: &mut AssemblyState, l: &LineInformation, p: &ParsedValue) -> Result<(), AssemblerErrorInner> {
+    match p {
+        ParsedValue::Command(cmd) => match cmd {
+            AssemblerCommand::Oper(new_offset) => {
+                state.move_value(*new_offset)?;
+            }
+            AssemblerCommand::Load(w) => {
+                state.add_word(*w)?;
+            }
+            AssemblerCommand::LoadLoc(lbl) => {
+                state.add_load_label(l, lbl)?;
+            }
+            AssemblerCommand::LoadText(txt) => {
+                for c in txt.chars() {
+                    state.add_word(character_to_word(c)?)?;
+                }
+                state.add_word(MemoryWord::default())?;
+            }
+        },
+        ParsedValue::Label(label) => {
+            state.add_label(label)?;
+        },
+        ParsedValue::Instruction(inst) => {
+            state.add_opcode(l, inst.clone())?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn assemble(parsed: &[(LineInformation, ParsedValue)]) -> Result<Vec<u16>, AssemblerError> {
+    let mut state = AssemblyState::new();
+
+    for (l, p) in parsed {
+        match assemble_individual(&mut state, l, p) {
+            Ok(()) => (),
+            Err(e) => return Err(AssemblerError { info: l.clone(), err: e }),
         };
     }
 
-    Ok(data_vec)
+    match state.to_memory_vector() {
+        Ok(v) => Ok(v.into_iter().map(|v| v.get()).collect()),
+        Err(e) => Err(e),
+    }
+}
+
+
+#[derive(Clone, Debug)]
+pub struct AssemblerError {
+    pub info: LineInformation,
+    pub err: AssemblerErrorInner,
+}
+
+impl std::fmt::Display for AssemblerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "line {}: {} ({})", self.info.line_number, self.err, self.info.text)
+    }
+}
+
+impl From<ParseError> for AssemblerError {
+    fn from(value: ParseError) -> Self {
+        Self {
+            info: value.info,
+            err: AssemblerErrorInner::from(value.err),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum AssemblerErrorInner {
+    ParseError(ParseErrorInner),
+    InstructionError(InstructionError),
+    CharacterError(CharacterError),
+    OpcodeParseError(OpcodeParseError),
+    DuplicateLabel(String),
+    InvalidNewValue{ new: usize, existing: usize },
+    DuplicateAddress(usize),
+    AddressTooLarge(usize),
+    MissingLabel(String),
+}
+
+impl std::fmt::Display for AssemblerErrorInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ParseError(e) => write!(f, "{e}"),
+            Self::InstructionError(e) => write!(f, "{e}"),
+            Self::CharacterError(e) => write!(f, "{e}"),
+            Self::OpcodeParseError(e) => write!(f, "{e}"),
+            Self::DuplicateLabel(l) => write!(f, "duplicate label \"{l}\" provided"),
+            Self::InvalidNewValue { new, existing } => write!(f, "unable to move next location from {existing} to {new}"),
+            Self::DuplicateAddress(addr) => write!(f, "cannot add duplicate value to address {addr}"),
+            Self::AddressTooLarge(addr) => write!(f, "address {addr} exceeds bounds"),
+            Self::MissingLabel(l) => write!(f, "unable to find point associated with label \"{l}\""),
+        }
+    }
+}
+
+impl From<ParseErrorInner> for AssemblerErrorInner {
+    fn from(value: ParseErrorInner) -> Self {
+        Self::ParseError(value)
+    }
+}
+
+impl From<OpcodeParseError> for AssemblerErrorInner {
+    fn from(value: OpcodeParseError) -> Self {
+        Self::OpcodeParseError(value)
+    }
+}
+
+impl From<InstructionError> for AssemblerErrorInner {
+    fn from(value: InstructionError) -> Self {
+        Self::InstructionError(value)
+    }
+}
+
+impl From<CharacterError> for AssemblerErrorInner {
+    fn from(value: CharacterError) -> Self {
+        Self::CharacterError(value)
+    }
 }
 
 #[cfg(test)]
@@ -350,6 +268,13 @@ mod tests {
     use sproc::common::MemoryWord;
 
     use super::assemble;
+    use super::AssemblerError;
+    use crate::parser::parse;
+
+    pub fn assemble_lines(lines: &[&str]) -> Result<Vec<u16>, AssemblerError> {
+        let parsed = parse(lines)?;
+        assemble(&parsed)
+    }
 
     const NUM_REGISTERS: usize = 16;
 
@@ -357,7 +282,7 @@ mod tests {
     fn basic_test() {
         let line_test = vec!["ld 0, 0", "popr 3"];
 
-        let assemble_result = assemble(&line_test);
+        let assemble_result = assemble_lines(&line_test);
 
         assert!(assemble_result.is_ok());
 
@@ -372,7 +297,7 @@ mod tests {
     fn test_noop() {
         let line_test = vec!["noop", "noop"];
 
-        let binary_result = assemble(&line_test);
+        let binary_result = assemble_lines(&line_test);
 
         assert!(binary_result.is_ok());
 
@@ -389,16 +314,14 @@ mod tests {
             ("noop", 0),
             ("inton", 1),
             ("intoff", 2),
-            ("ari", 3),
-            ("aru", 4),
-            ("reset", 5),
-            ("pop", 6),
-            ("ret", 7),
-            ("retint", 8),
-            ("halt", 9),
+            ("reset", 3),
+            ("pop", 4),
+            ("ret", 5),
+            ("retint", 6),
+            ("halt", 7),
         ];
 
-        let binary_result = assemble(&line_test.iter().map(|v| v.0).collect::<Vec<_>>());
+        let binary_result = assemble_lines(&line_test.iter().map(|v| v.0).collect::<Vec<_>>());
 
         assert!(binary_result.is_ok());
 
@@ -444,7 +367,7 @@ mod tests {
                 let expected_result = ((opcode << 4) | reg) as u16;
 
                 let binary_result =
-                    assemble(&assembly_text.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
+                    assemble_lines(&assembly_text.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
 
                 assert!(binary_result.is_ok());
 
@@ -472,7 +395,7 @@ mod tests {
                 format!("jmpri {0:}", i as i8),
             ];
 
-            let binary_result = assemble(&code.iter().map(|v| v.as_ref()).collect::<Vec<_>>());
+            let binary_result = assemble_lines(&code.iter().map(|v| v.as_ref()).collect::<Vec<_>>());
 
             assert!(binary_result.is_ok());
 
@@ -493,11 +416,11 @@ mod tests {
             ("sav", 3),
             ("ldr", 4),
             ("savr", 5),
-            ("copy", 6),
+            ("cpy", 6),
             ("tg", 7),
-            ("tge", 8),
+            ("tgs", 8),
             ("tl", 9),
-            ("tle", 10),
+            ("tls", 10),
             ("teq", 11),
         ];
 
@@ -518,7 +441,7 @@ mod tests {
                     let expected_result = (opcode << 8) | ((reg2 as u16) << 4) | (reg1 as u16);
 
                     let binary_result =
-                        assemble(&assembly_text.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
+                        assemble_lines(&assembly_text.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
 
                     assert!(binary_result.is_ok());
 
@@ -537,15 +460,19 @@ mod tests {
     fn test_triple_arg_register_val() {
         // Define the arguments to test
         let args_to_test = vec![
-            ("add", 4),
-            ("sub", 5),
-            ("mul", 6),
-            ("div", 7),
-            ("rem", 8),
-            ("band", 9),
-            ("bor", 10),
-            ("bxor", 11),
-            ("bshft", 12),
+            ("add", 3),
+            ("sub", 4),
+            ("mul", 5),
+            ("div", 6),
+            ("mod", 7),
+            ("muls", 8),
+            ("divs", 9),
+            ("mods", 10),
+            ("band", 11),
+            ("bor", 12),
+            ("bxor", 13),
+            ("bshft", 14),
+            ("ashft", 15),
         ];
 
         for (arg, opcode) in args_to_test {
@@ -569,7 +496,7 @@ mod tests {
                             | (reg1 as u16);
 
                         let binary_result =
-                            assemble(&assembly_text.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
+                            assemble_lines(&assembly_text.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
 
                         assert!(binary_result.is_ok());
 
@@ -587,7 +514,7 @@ mod tests {
 
     #[test]
     fn test_ld_immediate() {
-        let instruction_vals = vec![("ldi", 1), ("ldui", 2), ("ldri", 3)];
+        let instruction_vals = vec![("ldi", 1), ("ldri", 2)];
 
         for (instruction, opcode) in instruction_vals {
             assert!(opcode & 0xF == opcode);
@@ -607,7 +534,7 @@ mod tests {
                     ];
 
                     let binary_result =
-                        assemble(&code.iter().map(|v| v.as_ref()).collect::<Vec<_>>());
+                        assemble_lines(&code.iter().map(|v| v.as_ref()).collect::<Vec<_>>());
 
                     assert!(binary_result.is_ok());
 
@@ -660,19 +587,19 @@ mod tests {
         expected_result.insert(0, 0x20);
         expected_result.insert(0x20, 0xC2);
         expected_result.insert(0x21, 0x0400);
-        expected_result.insert(0x22, 0x3095);
-        expected_result.insert(0x23, 0x4500);
-        expected_result.insert(0x24, 0x5);
+        expected_result.insert(0x22, 0x2095);
+        expected_result.insert(0x23, 0x3500);
+        expected_result.insert(0x24, 0x3);
         expected_result.insert(0x25, 0x1162);
         expected_result.insert(0x26, 0x1218);
         expected_result.insert(0x27, 0x1016);
         expected_result.insert(0x28, 0x1007);
-        expected_result.insert(0x29, 0x4677);
+        expected_result.insert(0x29, 0x3677);
         expected_result.insert(0x2A, 0x1FF);
         expected_result.insert(0x2B, 1);
 
         // Assemble the program
-        let binary_result = assemble(&assembly_lines);
+        let binary_result = assemble_lines(&assembly_lines);
         assert!(binary_result.is_ok());
         let binary = binary_result.unwrap();
 
@@ -691,6 +618,10 @@ mod tests {
                 None => 0,
             };
 
+            if resulting_val != *word {
+                println!("Location {index:x} does not match - expected {resulting_val:x} != {word:x}")
+            }
+
             assert_eq!(resulting_val, *word)
         }
     }
@@ -705,6 +636,7 @@ mod tests {
             ("$pc", 0),
             ("$stat", 1),
             ("$sp", 2),
+            ("$exc", 3),
             ("$ret", 4),
             ("$arg", 5),
         ];
@@ -721,7 +653,7 @@ mod tests {
                 let expected_result = ((opcode as u16) << 4) | *reg;
 
                 let binary_result =
-                    assemble(&assembly_text.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
+                    assemble_lines(&assembly_text.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
 
                 assert!(binary_result.is_ok());
 
@@ -759,7 +691,7 @@ mod tests {
 
                 let lines = vec![line_val.trim()];
 
-                let assembly_result = assemble(&lines);
+                let assembly_result = assemble_lines(&lines);
 
                 if i == arg_num {
                     assert!(assembly_result.is_ok());
@@ -785,13 +717,14 @@ mod tests {
                 Ok(v) => v,
                 Err(e) => panic!("{}", e.to_string()),
             };
-            expected_words.push(MemoryWord::new(0));
+            expected_words.push(MemoryWord::default());
 
             expected_output = expected_words.iter().map(|v| v.get()).collect();
         }
 
         let assembly_result =
-            assemble(&text_to_load.iter().map(|v| v.as_str()).collect::<Vec<_>>());
+            assemble_lines(&text_to_load.iter().map(|v| v.as_str()).collect::<Vec<_>>());
+
         assert!(assembly_result.is_ok());
 
         let data = assembly_result.unwrap();
@@ -822,7 +755,7 @@ mod tests {
         for line in bad_lines {
             let new_lines = vec![line];
 
-            let assembly_result = assemble(&new_lines);
+            let assembly_result = assemble_lines(&new_lines);
 
             assert!(assembly_result.is_err());
         }

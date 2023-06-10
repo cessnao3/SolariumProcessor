@@ -1,8 +1,6 @@
-use once_cell::sync::OnceCell;
 use super::types::{SpType, BuiltinTypes};
 
 pub struct CompilerState {
-    pub signed_airthmetic: bool,
     pub functions: Vec<Box<dyn Function>>,
     pub types: Vec<SpType>,
     pub scopes: Vec<Scope>,
@@ -29,7 +27,6 @@ impl Default for Scope {
 impl CompilerState {
     pub fn new() -> Self {
         Self {
-            signed_airthmetic: false,
             functions: Vec::new(),
             scopes: vec![Scope::new()],
             types: vec![

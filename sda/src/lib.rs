@@ -1,6 +1,8 @@
 mod assembler;
+mod parser;
+mod argument;
 
-mod assembly;
-mod instructions;
+pub mod instructions;
 
 pub use assembler::assemble;
+pub use parser::parse;

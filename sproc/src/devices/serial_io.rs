@@ -63,9 +63,9 @@ impl SerialInputOutputDevice {
     fn common_get(&self, offset: usize) -> Result<MemoryWord, SolariumError> {
         // Use the offset values to determine the action to take
         return match offset {
-            Self::OFFSET_INPUT_SIZE => Ok(MemoryWord::new(self.input_queue.borrow().len() as u16)),
-            Self::OFFSET_OUTPUT_SIZE => Ok(MemoryWord::new(self.output_queue.len() as u16)),
-            Self::OFFSET_OUTPUT_SET => Ok(MemoryWord::new(0)),
+            Self::OFFSET_INPUT_SIZE => Ok(MemoryWord::from(self.input_queue.borrow().len() as u16)),
+            Self::OFFSET_OUTPUT_SIZE => Ok(MemoryWord::from(self.output_queue.len() as u16)),
+            Self::OFFSET_OUTPUT_SET => Ok(MemoryWord::default()),
             _ => Err(SolariumError::InvalidMemoryAccess(offset)),
         };
     }
@@ -78,7 +78,7 @@ impl MemorySegment for SerialInputOutputDevice {
         return match offset {
             Self::OFFSET_INPUT_GET => match self.input_queue.borrow_mut().pop_front() {
                 Some(v) => Ok(v),
-                None => Ok(MemoryWord::new(0)),
+                None => Ok(MemoryWord::default()),
             },
             _ => self.common_get(offset),
         };
@@ -90,7 +90,7 @@ impl MemorySegment for SerialInputOutputDevice {
         return match offset {
             Self::OFFSET_INPUT_GET => match self.input_queue.borrow().front() {
                 Some(v) => Ok(*v),
-                None => Ok(MemoryWord::new(0)),
+                None => Ok(MemoryWord::default()),
             },
             _ => self.common_get(offset),
         };

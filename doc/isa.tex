@@ -151,7 +151,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 \begin{table}[h!]
     \centering
     \begin{footnotesize}
-        \begin{tabular}{cccc|c|l}
+        \begin{tabular}{cccc|l|l}
             \hline
             \multicolumn{4}{c|}{Instruction Word} & Assembly & Description \\
             opcode & arg2 & arg1 & arg0 & & \\
@@ -253,6 +253,7 @@ Reference names are available to link to the special register values, as listed 
         \texttt{\$pc} & 0 & Program Counter \\
         \texttt{\$stat} & 1 & Status Flags \\
         \texttt{\$sp} & 2 & Stack Pointer \\
+        \texttt{\$exc} & 3 & Excess \\
         \texttt{\$ret} & 4 & Return \\
         \texttt{\$arg} & 5 & Argument Base \\
         \hline

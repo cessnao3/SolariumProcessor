@@ -86,7 +86,7 @@ impl SolariumProcessor {
     fn inner_reset(&mut self, reset_vector: usize) -> Result<(), SolariumError> {
         let reset_loc = match self.memory_map.get(reset_vector) {
             Ok(v) => v,
-            Err(_) => MemoryWord::new(0),
+            Err(_) => MemoryWord::default(),
         };
 
         self.registers.reset();
@@ -109,7 +109,7 @@ impl SolariumProcessor {
     /// Obtains the current program counter offset
     fn get_pc_offset(&self, reg: Register) -> Result<MemoryWord, SolariumError> {
         let pc = self.registers.get(Register::ProgramCounter)?.get();
-        Ok(MemoryWord::new(
+        Ok(MemoryWord::from(
             (pc as i32 + self.registers.get(reg)?.get_signed() as i32) as u16,
         ))
     }
@@ -120,7 +120,7 @@ impl SolariumProcessor {
         let new_pc = (pc as i32 + pc_incr) as u16;
         self
             .registers
-            .set(Register::ProgramCounter, MemoryWord::new(new_pc))
+            .set(Register::ProgramCounter, MemoryWord::from(new_pc))
     }
 
     /// Obtains the current value of the stack pointer offset from the initial stack location
@@ -134,7 +134,7 @@ impl SolariumProcessor {
         let new_sp = current_sp + 1;
 
         self.registers
-            .set(Register::StackPointer, MemoryWord::new(new_sp as u16))?;
+            .set(Register::StackPointer, MemoryWord::from(new_sp as u16))?;
 
         self.memory_map.set(current_sp, value)
     }
@@ -147,7 +147,7 @@ impl SolariumProcessor {
         // Subtract one from the stack pointer
         self.registers.set(
             Register::StackPointer,
-            MemoryWord::new(self.get_stack_pointer()? as u16 - 1),
+            MemoryWord::from(self.get_stack_pointer()? as u16 - 1),
         )?;
 
         // Return the result
@@ -212,7 +212,7 @@ impl SolariumProcessor {
 
         self.registers.set(
             Register::StackPointer,
-            MemoryWord::new((current_sp + RegisterManager::NUM_REGISTERS) as u16),
+            MemoryWord::from((current_sp + RegisterManager::NUM_REGISTERS) as u16),
         )?;
 
         Ok(())
@@ -235,7 +235,7 @@ impl SolariumProcessor {
         }
 
         self.registers
-            .set(Register::StackPointer, MemoryWord::new(mem_val_base as u16))?;
+            .set(Register::StackPointer, MemoryWord::from(mem_val_base as u16))?;
 
         Ok(())
     }
@@ -262,7 +262,7 @@ impl SolariumProcessor {
         fn get_immediate_value_signed(arg_high: u8, arg_low: u8) -> MemoryWord {
             assert!(arg_low & 0xF == arg_low);
             assert!(arg_high & 0xF == arg_high);
-            MemoryWord::new(((((arg_high << 4) | arg_low) as i8) as i16) as u16)
+            MemoryWord::from(((((arg_high << 4) | arg_low) as i8) as i16) as u16)
         }
 
         // Switch based on opcode
@@ -437,15 +437,15 @@ impl SolariumProcessor {
                     // bool
                     {
                         let reg_val = self.registers.get(reg_a)?.get();
-                        let new_val = if reg_val == 0 { 0 } else { 1 };
-                        self.registers.set(reg_a, MemoryWord::new(new_val))?;
+                        let new_val: u16 = if reg_val == 0 { 0 } else { 1 };
+                        self.registers.set(reg_a, MemoryWord::from(new_val))?;
                     }
                     11 =>
                     // not
                     {
                         let reg_val = self.registers.get(reg_a)?.get();
-                        let new_val = if reg_val == 0 { 1 } else { 0 };
-                        self.registers.set(reg_a, MemoryWord::new(new_val))?;
+                        let new_val: u16 = if reg_val == 0 { 1 } else { 0 };
+                        self.registers.set(reg_a, MemoryWord::from(new_val))?;
                     }
                     12 =>
                     // ldn
@@ -466,14 +466,14 @@ impl SolariumProcessor {
                         // Save the resulting memory location in the register
                         self.registers.set(
                             reg_a,
-                            MemoryWord::new_signed(-self.registers.get(reg_a)?.get_signed()),
+                            MemoryWord::from(-self.registers.get(reg_a)?.get_signed()),
                         )?;
                     }
                     14 =>
                     //bnot
                     {
                         self.registers
-                            .set(reg_a, MemoryWord::new(!self.registers.get(reg_a)?.get()))?;
+                            .set(reg_a, MemoryWord::from(!self.registers.get(reg_a)?.get()))?;
                     }
                     _ =>
                     // ERROR
@@ -616,14 +616,14 @@ impl SolariumProcessor {
                         type ArithI32Func = fn(i32, i32) -> i32;
 
                         fn bitwise_function(a: MemoryWord, b: MemoryWord, f: fn(u16, u16) -> u16) -> ArithResult {
-                            Ok((MemoryWord::new(f(a.get(), b.get())), MemoryWord::new(0)))
+                            Ok((MemoryWord::from(f(a.get(), b.get())), MemoryWord::from(0u16)))
                         }
 
                         fn u32_to_result(x: u32) -> ArithResult {
                             let sum = (x & 0xFFFF) as u16;
                             let extra = ((x >> 16) & 0xFFFF) as u16;
 
-                            Ok((MemoryWord::new(sum), MemoryWord::new(extra)))
+                            Ok((MemoryWord::from(sum), MemoryWord::from(extra)))
                         }
 
                         fn unsigned_arith(a: MemoryWord, b: MemoryWord, f: ArithU32Func) -> ArithResult {

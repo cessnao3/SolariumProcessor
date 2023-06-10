@@ -59,7 +59,7 @@ mod tests {
         let size = 1024;
 
         // Create the segment
-        let mem = ReadOnlySegment::new((0..size).map(|_| MemoryWord::new(0)).collect());
+        let mem = ReadOnlySegment::new((0..size).map(|_| MemoryWord::default()).collect());
 
         // Ensure that the expected values match
         assert_eq!(mem.len(), size);
@@ -80,14 +80,14 @@ mod tests {
     fn get_default_test_segment() -> ReadOnlySegment {
         let size = 1024;
 
-        ReadOnlySegment::new((0..size).map(|_| MemoryWord::new(0)).collect())
+        ReadOnlySegment::new((0..size).map(|_| MemoryWord::default()).collect())
     }
 
     /// Test setting a memory location above the top address
     #[test]
     fn test_panic_set_above() {
         let mut mem = get_default_test_segment();
-        let result = mem.set(mem.len(), MemoryWord::new(32));
+        let result = mem.set(mem.len(), MemoryWord::from(32u16));
         assert!(result.is_err());
     }
 
@@ -105,10 +105,10 @@ mod tests {
         let size = 1024;
 
         let mut mem =
-            ReadOnlySegment::new((0..size).map(|i| MemoryWord::new((i + 1) as u16)).collect());
+            ReadOnlySegment::new((0..size).map(|i| MemoryWord::from((i + 1) as u16)).collect());
 
         for i in 0..size {
-            let success = mem.set(i, MemoryWord::new((i + 1) as u16));
+            let success = mem.set(i, MemoryWord::from((i + 1) as u16));
             assert!(success.is_err());
         }
 
