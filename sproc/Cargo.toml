@@ -5,10 +5,6 @@ edition = "2021"
 authors = ["Ian O'Rourke <cessna.ian@gmail.com>"]
 crate-type = ["lib", "cdylib"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-
 [profile.release]
 lto = true
 strip = true

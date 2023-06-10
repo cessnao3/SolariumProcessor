@@ -81,7 +81,7 @@ impl Argument {
         } as usize;
 
         if reg_val < sproc::cpu::SolariumProcessor::NUM_REGISTERS {
-            Ok(Register::GP(reg_val))
+            Ok(Register::GeneralPurpose(reg_val))
         } else {
             Err(ArgumentError::Register(self.clone()))
         }

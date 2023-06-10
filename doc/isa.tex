@@ -184,11 +184,11 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
             0 & 0 & 12 & R[a] & \texttt{ldn [a]} & \texttt{R[a] = mem[PC + 1]}, \texttt{PC += 2} \\
             0 & 0 & 13 & R[a] & \texttt{neg [a]} & \texttt{R[a] = -R[a]} \\
             0 & 1 & 0xI0 & 0x0I & \texttt{jmpri <imm>} & \texttt{PC += Im} \\
-            0 & 2 & R[src] & R[dst] & \texttt{ld [dst], [src]} & \texttt{R[dst] = mem[R[src]]} \\
-            0 & 3 & R[src] & R[dst] & \texttt{sav [dst], [src]} & \texttt{mem[R[dst]] = R[src]} \\
-            0 & 4 & R[src] & R[dst] & \texttt{ldr [dst], [src]} & \texttt{R[dst] = mem[PC + R[src]]} \\
-            0 & 5 & R[src] & R[dst] & \texttt{savr [dst], [src]} & \texttt{mem[PC + R[dst]] = R[src]} \\
-            0 & 6 & R[b] & R[a] & \texttt{copy [a], [b]} & \texttt{R[a] = R[b]} \\
+            0 & 2 & R[b] & R[a] & \texttt{ld [a], [b]} & \texttt{R[a] = mem[R[b]]} \\
+            0 & 3 & R[b] & R[a] & \texttt{sav [a], [b]} & \texttt{mem[R[a]] = R[b]} \\
+            0 & 4 & R[b] & R[a] & \texttt{ldr [a], [b]} & \texttt{R[a] = mem[PC + R[b]]} \\
+            0 & 5 & R[b] & R[a] & \texttt{savr [a], [b]} & \texttt{mem[PC + R[a]] = R[b]} \\
+            0 & 6 & R[b] & R[a] & \texttt{cpy [a], [b]} & \texttt{R[a] = R[b]} \\
             0 & 7 & R[b] & R[a] & \texttt{tg [a], [b]} & If \texttt{R[a] > R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
             0 & 8 & R[b] & R[a] & \texttt{tgs [a], [b]} & If \texttt{R[a] > R[b]} (signed) \texttt{PC += 1}, Else \texttt{PC += 2} \\
             0 & 9 & R[b] & R[a] & \texttt{tl [a], [b]} & If \texttt{R[a] < R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\

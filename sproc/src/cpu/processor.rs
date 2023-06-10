@@ -207,7 +207,7 @@ impl SolariumProcessor {
         // Push all the existing register values
         for i in 0..RegisterManager::NUM_REGISTERS {
             self.memory_map
-                .set(current_sp + i, self.registers.get(Register::GP(i))?)?;
+                .set(current_sp + i, self.registers.get(Register::GeneralPurpose(i))?)?;
         }
 
         self.registers.set(
@@ -231,7 +231,7 @@ impl SolariumProcessor {
         for i in 0..RegisterManager::NUM_REGISTERS {
             let mem_val = self.memory_map.get(mem_val_base + i)?;
 
-            self.registers.set(Register::GP(i), mem_val)?;
+            self.registers.set(Register::GeneralPurpose(i), mem_val)?;
         }
 
         self.registers
@@ -253,7 +253,7 @@ impl SolariumProcessor {
         self.registers.set(Register::ProgramCounter, pc)?;
 
         // Extract the different argument types
-        let inst = InstructionData::new(inst_word);
+        let inst = InstructionData::from(inst_word);
 
         // Check whether execution should be stopped
         let mut request_stop = false;
@@ -338,7 +338,7 @@ impl SolariumProcessor {
                 arg1: opcode,
                 arg2: arg0,
             } => {
-                let reg_a = Register::GP(arg0 as usize);
+                let reg_a = Register::GeneralPurpose(arg0 as usize);
 
                 match opcode {
                     1 =>
@@ -385,7 +385,7 @@ impl SolariumProcessor {
                     {
                         // Determine the interrupt vector value
                         let int_offset = if opcode == 6 {
-                            reg_a.get_index()
+                            usize::from(reg_a)
                         } else if opcode == 7 {
                             self.registers.get(reg_a)?.get() as usize
                         } else {
@@ -488,8 +488,8 @@ impl SolariumProcessor {
                 arg1: arg0,
                 arg2: arg1,
             } => {
-                let reg_a = Register::GP(arg1 as usize);
-                let reg_b = Register::GP(arg0 as usize);
+                let reg_a = Register::GeneralPurpose(arg1 as usize);
+                let reg_b = Register::GeneralPurpose(arg0 as usize);
 
                 match opcode {
                     1 =>
@@ -592,7 +592,7 @@ impl SolariumProcessor {
                     // ldi
                     {
                         let immediate = get_immediate_value_signed(arg0, arg1);
-                        self.registers.set(Register::GP(arg2 as usize), immediate)?;
+                        self.registers.set(Register::GeneralPurpose(arg2 as usize), immediate)?;
                     }
                     2 =>
                     // ldri
@@ -605,7 +605,7 @@ impl SolariumProcessor {
 
                         let mem_val = self.memory_map.get(load_loc as usize)?;
 
-                        self.registers.set(Register::GP(arg2 as usize), mem_val)?;
+                        self.registers.set(Register::GeneralPurpose(arg2 as usize), mem_val)?;
                     }
                     opcode => {
                         // Function that takes in two memory values and returns two memory words,
@@ -707,12 +707,12 @@ impl SolariumProcessor {
                             _ => panic!(),
                         };
 
-                        let val_a = self.registers.get(Register::GP(arg1 as usize))?;
-                        let val_b = self.registers.get(Register::GP(arg0 as usize))?;
+                        let val_a = self.registers.get(Register::GeneralPurpose(arg1 as usize))?;
+                        let val_b = self.registers.get(Register::GeneralPurpose(arg0 as usize))?;
 
                         let (result, excess) = arith_func(val_a, val_b)?;
 
-                        let reg_dest = Register::GP(arg2 as usize);
+                        let reg_dest = Register::GeneralPurpose(arg2 as usize);
                         self.registers.set(reg_dest, result)?;
                         self.registers.set(Register::Excess, excess)?;
                     }

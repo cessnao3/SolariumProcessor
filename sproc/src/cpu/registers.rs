@@ -9,24 +9,32 @@ pub enum Register {
     Excess,
     Return,
     ArgumentBase,
-    GP(usize),
+    GeneralPurpose(usize),
 }
 
-impl Register {
-    /// Converts the enumeration types to an index for a registry array
-    pub fn get_index(&self) -> usize {
-        // Determine the index
-        let ind: usize = match self {
+impl From<Register> for u8 {
+    fn from(value: Register) -> Self {
+        usize::from(value) as u8
+    }
+}
+
+impl From<Register> for usize {
+    fn from(value: Register) -> Self {
+        match value {
             Register::ProgramCounter => 0,
             Register::StatusFlags => 1,
             Register::StackPointer => 2,
             Register::Excess => 3,
             Register::Return => 4,
             Register::ArgumentBase => 5,
-            Register::GP(ind) => *ind,
-        };
+            Register::GeneralPurpose(ind) => ind,
+        }
+    }
+}
 
-        ind
+impl std::fmt::Display for Register {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "r{}", usize::from(*self))
     }
 }
 
@@ -83,10 +91,10 @@ impl RegisterManager {
 
     /// Gets the selected register value
     pub fn get(&self, register: Register) -> Result<MemoryWord, SolariumError> {
-        let ind = register.get_index();
+        let ind = usize::from(register);
 
         if ind < RegisterManager::NUM_REGISTERS {
-            Ok(self.registers[register.get_index()])
+            Ok(self.registers[ind])
         } else {
             Err(SolariumError::RegisterIndexError(ind))
         }
@@ -94,7 +102,7 @@ impl RegisterManager {
 
     /// Sets the selecteed register value
     pub fn set(&mut self, register: Register, value: MemoryWord) -> Result<(), SolariumError> {
-        let reg_ind = register.get_index();
+        let reg_ind = usize::from(register);
         if reg_ind < Self::NUM_REGISTERS {
             self.registers[reg_ind] = value;
             Ok(())
@@ -134,7 +142,7 @@ mod tests {
 
         // Add the register indices
         for i in registers.len()..RegisterManager::NUM_REGISTERS {
-            registers.push(Register::GP(i));
+            registers.push(Register::GeneralPurpose(i));
         }
 
         // Ensure the resulting value is correct
@@ -175,13 +183,13 @@ mod tests {
         // Add a value to each register
         for i in 0..RegisterManager::NUM_REGISTERS {
             assert!(register_manager
-                .set(Register::GP(i), MemoryWord::new(i as u16))
+                .set(Register::GeneralPurpose(i), MemoryWord::new(i as u16))
                 .is_ok());
         }
 
         // Ensure that we can get the resulting value out
         for i in 0..RegisterManager::NUM_REGISTERS {
-            let val = register_manager.get(Register::GP(i));
+            let val = register_manager.get(Register::GeneralPurpose(i));
             assert!(val.is_ok());
             assert_eq!(val.unwrap(), MemoryWord::new(i as u16));
         }

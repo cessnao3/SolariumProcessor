@@ -1,3 +1,4 @@
+use crate::assembly::error::AssemblerError;
 use crate::instructions::get_instruction_map;
 use sproc::common::MemoryWord;
 
@@ -290,9 +291,18 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String> {
     for (data_index, line_value) in data_map {
         data_vec[data_index] = match line_value {
             LineValue::Assembly(assembly) => {
+                // Define the new arguments to include labels values
+                let new_args = match assembly.update_arguments_for_labels(&label_map) {
+                    Ok(v) => v,
+                    Err(e) => return Err(format!("line {0:} {1:}", assembly.line_number, e)),
+                };
+
                 // Extract the expected output value
                 let inst_val = match instruction_map.get(&assembly.instruction) {
-                    Some(v) => v,
+                    Some(v) => match v(&new_args) {
+                        Ok(v) => v,
+                        Err(e) => return Err(format!("line {} assembly error {}", assembly.line_number, e))
+                    }
                     None => {
                         return Err(format!(
                             "line {0:} no instruction {1:} found",
@@ -301,14 +311,8 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String> {
                     }
                 };
 
-                // Define the new arguments to include labels values
-                let new_args = match assembly.update_arguments_for_labels(&label_map) {
-                    Ok(v) => v,
-                    Err(e) => return Err(format!("line {0:} {1:}", assembly.line_number, e)),
-                };
-
                 // Attempt to create the resulting data
-                let inst_data = match inst_val.to_instruction_data(&new_args) {
+                let inst_data = match inst_val.to_instruction() {
                     Ok(v) => v,
                     Err(e) => {
                         return Err(format!(
@@ -318,7 +322,10 @@ pub fn assemble(lines: &[&str]) -> Result<Vec<u16>, String> {
                     }
                 };
 
-                inst_data.combine().get()
+                match MemoryWord::try_from(inst_data) {
+                    Ok(v) => v.get(),
+                    Err(e) => return Err(AssemblerError::from(e).to_string()),
+                }
             }
             LineValue::LoadLabelLoc(line_number, label) => match label_map.get(&label) {
                 Some(v) => *v as u16,

@@ -137,7 +137,21 @@ impl ToString for SolariumDeviceError {
     }
 }
 
+#[derive(Copy, Clone)]
+pub enum InstructionError {
+    NybbleOversize(InstructionData)
+}
+
+impl std::fmt::Display for InstructionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NybbleOversize(v) => write!(f, "Instruction Nybble Oversize for {v}"),
+        }
+    }
+}
+
 /// Defines the core instruction group value
+#[derive(Copy, Clone)]
 pub struct InstructionData {
     pub opcode: u8,
     pub arg0: u8,
@@ -146,10 +160,52 @@ pub struct InstructionData {
 }
 
 impl InstructionData {
-    /// Constructs the instruction group from a given instruction value
-    pub fn new(instruction: MemoryWord) -> InstructionData {
+    pub fn new_arg0(opcode: u8) -> Result<Self, InstructionError> {
+        Self::new(0, 0, 0, opcode)
+    }
+
+    pub fn new_arg1(opcode: u8, arg0: u8) -> Result<Self, InstructionError> {
+        Self::new(0, 0, opcode, arg0)
+    }
+
+    pub fn new_arg2(opcode: u8, arg0: u8, arg1: u8) -> Result<Self, InstructionError> {
+        Self::new(0, opcode, arg0, arg1)
+    }
+
+    pub fn new(opcode: u8, arg0: u8, arg1: u8, arg2: u8) -> Result<Self, InstructionError> {
+        let v = Self { opcode, arg0, arg1, arg2 };
+
+        if !v.check_nybbles() {
+            Err(InstructionError::NybbleOversize(v))
+        } else {
+            Ok(v)
+        }
+    }
+
+    /// Checks for internal consistency for all nybbles in the data struct
+    fn check_nybbles(&self) -> bool {
+        fn is_nybble(v: u8) -> bool {
+            v & 0xF == v
+        }
+
+        is_nybble(self.opcode) &&
+            is_nybble(self.arg0) &&
+            is_nybble(self.arg1) &&
+            is_nybble(self.arg2)
+    }
+}
+
+impl std::fmt::Display for InstructionData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Instruction({}, {}, {}, {})", self.opcode, self.arg0, self.arg1, self.arg2)
+    }
+}
+
+/// Constructs instruction data from a given memory word
+impl From<MemoryWord> for InstructionData {
+    fn from(value: MemoryWord) -> Self {
         // Extracts the instruction value
-        let inst_val = instruction.get();
+        let inst_val = value.get();
 
         // Extract the different argument types
         let opcode = ((inst_val & 0xF000) >> 12) as u8;
@@ -169,20 +225,23 @@ impl InstructionData {
             arg2,
         }
     }
+}
 
-    /// Combines the instruction components into their word values
-    pub fn combine(&self) -> MemoryWord {
-        assert!(self.opcode & 0xF == self.opcode);
-        assert!(self.arg0 & 0xF == self.arg0);
-        assert!(self.arg1 & 0xF == self.arg1);
-        assert!(self.arg2 & 0xF == self.arg2);
+/// Combines the instruction components into their word values
+impl TryFrom<InstructionData> for MemoryWord {
+    type Error = InstructionError;
+
+    fn try_from(value: InstructionData) -> Result<Self, Self::Error> {
+        if !value.check_nybbles() {
+            return Err(InstructionError::NybbleOversize(value));
+        }
 
         let mw =
-            ((self.opcode as u16) << 12)
-            | ((self.arg0 as u16) << 8)
-            | ((self.arg1 as u16) << 4)
-            | (self.arg2 as u16);
+            ((value.opcode as u16) << 12)
+            | ((value.arg0 as u16) << 8)
+            | ((value.arg1 as u16) << 4)
+            | (value.arg2 as u16);
 
-        return MemoryWord::new(mw);
+        Ok(Self::new(mw))
     }
 }
