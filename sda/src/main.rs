@@ -1,5 +1,6 @@
 mod assembler;
 mod argument;
+mod combined;
 mod parser;
 mod instructions;
 
@@ -54,7 +55,7 @@ fn main() {
     };
 
     let result = match assembler::assemble(&parsed) {
-        Ok(v) => v,
+        Ok(v) => v.into_iter().map(|v| v.get()).collect::<Vec<_>>(),
         Err(e) => {
             eprintln!("Unable to assemble {} - {}", args.input, e);
             std::process::exit(1);
