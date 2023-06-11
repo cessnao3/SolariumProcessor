@@ -1,6 +1,5 @@
 mod assembler;
 mod argument;
-mod combined;
 mod parser;
 mod instructions;
 

@@ -11,10 +11,12 @@ pub fn assemble_text(lines: &[&str]) -> Result<Vec<MemoryWord>, AssemblerError> 
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use super::{AssemblerError, MemoryWord};
+
     use super::assemble_text;
 
     const NUM_REGISTERS: usize = 16;
-    
+
     fn assemble_lines(lines: &[&str]) -> Result<Vec<u16>, AssemblerError> {
         Ok(assemble_text(lines)?.into_iter().map(|v| v.get()).collect())
     }
