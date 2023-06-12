@@ -17,7 +17,8 @@ ldn $sp
 
 ; Setup the counter variables
 ldi 6, 1
-ldi 3, 0
+ldi 7, 0
+ldi 13, 0
 ldi 15, 100
 
 ; Setup the target value
@@ -27,24 +28,24 @@ jmpri load_data
 .load 32767 ; 0x7FFF
 
 :load_data
-ldri 4, target_value
+ldri 8, target_value
 
 ; Load the function call test
 ldri 15, 2
 jmpri 2
 .loadloc functest
 call 15
-copy $ret, 12
+cpy $ret, 12
 
 ; Perform the addition and check for reaching the target
 :loop
-add 3, 6, 3
+add 7, 6, 7
 int 0
-sub 5, 4, 3
+sub 9, 8, 7
 
 ; Jump back to the add instruction if the
 ; target minus current is greater than zero
-tgz 5
+tgs 9, 13
 jmpri loop
 jmpri endloc
 

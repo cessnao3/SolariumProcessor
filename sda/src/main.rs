@@ -19,7 +19,7 @@ enum OutputType {
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// Filename of the input
-    #[clap(short, long, value_parser)]
+    #[clap(value_parser)]
     input: String,
 
     /// Determine output format

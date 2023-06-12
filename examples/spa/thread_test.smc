@@ -81,7 +81,7 @@
     ldn 10
     .loadloc func_print_str
 
-    copy $arg, $sp
+    cpy $arg, $sp
     push 9
     call 10
     pop
@@ -103,7 +103,7 @@
     ; Increment to the next stack
     ldi 14, 1
     add 10, 10, 14
-    rem 10, 10, 11
+    mod 10, 10, 11
     add 13, 12, 10
     ld $sp, 13
     sav 9, 10
@@ -168,7 +168,7 @@
     ldn 12
     .loadloc init_thread
 
-    copy $arg, $sp
+    cpy $arg, $sp
     push 10
     push 11
     call 12
@@ -219,7 +219,7 @@
         :thread_1_loop_loop_end
 
         intoff
-        copy $arg, $sp
+        cpy $arg, $sp
         push 13
         call 12
         pop
@@ -247,7 +247,7 @@
         :thread_2_loop_loop_end
 
         intoff
-        copy $arg, $sp
+        cpy $arg, $sp
         push 13
         call 12
         pop

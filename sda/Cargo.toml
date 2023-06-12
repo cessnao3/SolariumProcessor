@@ -3,6 +3,8 @@ name = "sda"
 version = "0.1.0"
 authors = ["Ian O'Rourke <cessna.ian@gmail.com>"]
 edition = "2021"
+
+[lib]
 crate-type = ["lib", "cdylib"]
 
 [dependencies]

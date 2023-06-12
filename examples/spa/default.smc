@@ -110,12 +110,12 @@ jmpri 2
 .loadloc input_prompt_text_str_1
 ldri 8, -1
 
-copy $arg, $sp
+cpy $arg, $sp
 push 7
 call 6
 pop
 
-copy $arg, $sp
+cpy $arg, $sp
 push 8
 call 6
 pop
