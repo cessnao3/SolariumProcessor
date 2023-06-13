@@ -280,7 +280,11 @@ impl TryFrom<ParsedInformation> for ParsedValue {
     }
 }
 
-pub fn parse(lines: &[&str]) -> Result<Vec<(LineInformation, ParsedValue)>, ParseError> {
+pub fn parse_text(s: &str) -> Result<Vec<(LineInformation, ParsedValue)>, ParseError> {
+    parse_lines(&s.lines().collect::<Vec<_>>())
+}
+
+pub fn parse_lines(lines: &[&str]) -> Result<Vec<(LineInformation, ParsedValue)>, ParseError> {
     let mut entries = Vec::new();
 
     for (i, l_in) in lines.iter().enumerate() {

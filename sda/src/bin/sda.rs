@@ -1,11 +1,7 @@
-mod assembler;
-mod argument;
-mod parser;
-mod instructions;
-
 use std::io::Write;
 
 use clap::Parser;
+use sda::assemble_text;
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
 enum OutputType {
@@ -34,26 +30,15 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let lines = match std::fs::read_to_string(&args.input) {
-        Ok(s) => s
-            .lines()
-            .map(|i| i.to_string())
-            .collect::<Vec<_>>(),
+    let text = match std::fs::read_to_string(&args.input) {
+        Ok(s) => s,
         Err(_) => {
             eprintln!("Unable to read input file {}", args.input);
             std::process::exit(1);
         }
     };
 
-    let parsed = match parser::parse(&lines.iter().map(|v| v.as_ref()).collect::<Vec<_>>()) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("Unable to parse {} - {}", args.input, e);
-            std::process::exit(1);
-        }
-    };
-
-    let result = match assembler::assemble(&parsed) {
+    let result = match assemble_text(&text) {
         Ok(v) => v.into_iter().map(|v| v.get()).collect::<Vec<_>>(),
         Err(e) => {
             eprintln!("Unable to assemble {} - {}", args.input, e);
