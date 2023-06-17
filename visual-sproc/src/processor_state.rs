@@ -54,7 +54,7 @@ impl ProcessorStatusStruct {
                 if i < self.last_assembly.len() {
                     self.last_assembly[i]
                 } else {
-                    MemoryWord::new(0)
+                    MemoryWord::default()
                 }
             })
             .collect();
@@ -202,7 +202,7 @@ impl ProcessorStatusStruct {
             .map(|i| {
                 match self.cpu.memory_inspect(i) {
                     Ok(v) => v,
-                    Err(_) => MemoryWord::new(0),
+                    Err(_) => MemoryWord::default(),
                 }
             })
             .collect();

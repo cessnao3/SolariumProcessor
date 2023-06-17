@@ -6,7 +6,7 @@ use std::io::Write;
 
 use crate::compiler::compile;
 
-use sda::assemble;
+use sda::{assemble, assemble_lines};
 
 fn get_example_program() -> String {
     let text_bytes = include_bytes!("../test.sub");
@@ -30,7 +30,7 @@ fn main() {
                 file.write_all(v.join("\n").as_bytes()).unwrap();
             }
 
-            match assemble(&v.iter().map(|v| v.as_str()).collect::<Vec<_>>()) {
+            match assemble_lines(&v.iter().map(|v| v.as_str()).collect::<Vec<_>>()) {
                 Ok(_) => println!("Assembly Successful!"),
                 Err(e) => println!("Assembly Error: {0:}", e),
             };

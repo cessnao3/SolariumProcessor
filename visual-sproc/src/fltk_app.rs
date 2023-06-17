@@ -11,7 +11,7 @@ use super::messages::{FltkMessage, GuiMessage, ThreadMessage};
 
 use super::fltk_registers::setup_register_group;
 
-use sda::assemble;
+use sda::assemble_lines;
 use sproc::common::MemoryWord;
 use sproc::memory::MEM_MAX_SIZE;
 
@@ -105,7 +105,7 @@ pub fn setup_and_run_app(
     let shared_table_memory = Rc::new(RefCell::new(Vec::<MemoryWord>::new()));
     shared_table_memory
         .borrow_mut()
-        .resize(MEM_MAX_SIZE, MemoryWord::new(0));
+        .resize(MEM_MAX_SIZE, MemoryWord::default());
 
     // Add helpers for serial input
     let serial_input_queue = Vec::<Vec<char>>::new();
@@ -443,7 +443,7 @@ pub fn setup_and_run_app(
 
                             let lines_opt = match msg {
                                 FltkMessage::Assemble => {
-                                    Some(editor_text.split('\n').map(|v| v.to_string()).collect())
+                                    Some(editor_text.lines().map(|v| v.to_string()).collect())
                                 }
                                 FltkMessage::Compile | FltkMessage::CompileToText => {
                                     match spcc::compile(&editor_text) {
@@ -463,16 +463,14 @@ pub fn setup_and_run_app(
                                 }
 
                                 let assembled_binary =
-                                    assemble(&lines.iter().map(|v| v.as_str()).collect::<Vec<_>>());
+                                    assemble_lines(&lines.iter().map(|v| v.as_str()).collect::<Vec<_>>());
 
                                 match assembled_binary {
                                     Ok(v) => {
-                                        msg_to_send = Some(ThreadMessage::SetMemory(
-                                            v.iter().map(|v| MemoryWord::new(*v)).collect(),
-                                        ));
+                                        msg_to_send = Some(ThreadMessage::SetMemory(v));
                                     }
                                     Err(e) => {
-                                        message_queue.push(e);
+                                        message_queue.push(e.to_string());
                                     }
                                 };
                             }
