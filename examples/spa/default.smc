@@ -138,17 +138,17 @@ jmpri load_data
 .load 32767 ; 0x7FFF
 
 :load_data
-ldri 4, target_value
+ldri 10, target_value
 
 ; Perform the addition and check for reaching the target
 :loop
 add 8, 6, 8
 int 0
-sub 5, 4, 8
+sub 11, 10, 8
 
 ; Jump back to the add instruction if the
 ; target minus current is greater than zero
-tnz 5
+tnz 11
 jmpri loop
 jmpri endloc
 
@@ -156,5 +156,5 @@ jmpri endloc
 :endloc
 jmpri 2
 .loadloc start
-ldri 4, -1
-jmp 4
+ldri 10, -1
+jmp 10
