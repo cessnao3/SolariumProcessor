@@ -98,3 +98,22 @@ pub trait Variable: Addressable + Expression {
 pub trait Function: Addressable {
     fn get_input_parameters(&self) -> Vec<(String, SpType)>;
 }
+
+pub struct AsmFunction {
+    params: Vec<(String, SpType)>,
+    lines: Vec<String>,
+}
+
+impl AsmFunction {
+    pub fn new(params: &[(String, SpType)], lines: &[String]) -> Self {
+        Self {
+            params: params.to_vec(),
+            lines: lines.to_vec(),
+        }
+    }
+    
+    pub fn get_assembly(&self) -> Vec<(sda::LineInformation, sda::ParsedValue)> {
+        let res = sda::parse_lines(&self.lines.iter().map(|v| v.as_ref()).collect::<Vec<_>>());
+        res.unwrap()
+    }
+}

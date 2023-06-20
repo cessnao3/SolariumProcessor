@@ -5,7 +5,7 @@ mod parser;
 pub mod instructions;
 
 pub use assembler::assemble;
-pub use parser::{parse_lines, parse_text};
+pub use parser::{parse_lines, parse_text, LineInformation, ParsedValue};
 
 use crate::assembler::AssemblerError;
 
