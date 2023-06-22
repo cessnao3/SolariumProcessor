@@ -1,12 +1,12 @@
 use std::collections::HashMap;
-use sda::{instructions::{Add, Ldn}, AssemblerCommand};
+use sda::{instructions::{Add, Ldn, Ld}, AssemblerCommand};
 use sproc::common::MemoryWord;
 
 use super::types::{SpType, BuiltinTypes};
 
 pub struct CompilerState {
     pub globals: HashMap<String, GlobalVariable>,
-    pub functions: HashMap<String, Box<dyn Function>>,
+    //pub functions: HashMap<String, Box<dyn Function>>,
     pub types: Vec<SpType>,
     pub scopes: Vec<Scope>,
 }
@@ -33,7 +33,7 @@ impl CompilerState {
     pub fn new() -> Self {
         Self {
             globals: HashMap::new(),
-            functions: HashMap::new(),
+            //functions: HashMap::new(),
             scopes: vec![Scope::new()],
             types: vec![
                 SpType::Primitive{ name: "void".to_string(), base: BuiltinTypes::U16 },
@@ -91,6 +91,8 @@ pub trait BaseStatement {
 
 pub trait Expression {
     fn get_type(&self) -> SpType;
+
+    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<sda::ParsedValue>;
 }
 
 pub trait Addressable {
@@ -98,7 +100,6 @@ pub trait Addressable {
 }
 
 pub trait Variable: Addressable + Expression {
-
 }
 
 pub struct LocalVariable {
@@ -109,6 +110,12 @@ pub struct LocalVariable {
 impl Expression for LocalVariable {
     fn get_type(&self) -> SpType {
         self.var_type.clone()
+    }
+
+    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<sda::ParsedValue> {
+        let mut res = self.get_address(reg);
+        res.push(sda::ParsedValue::InstructionValue(Box::new(Ld::new(reg, reg))));
+        res
     }
 }
 
@@ -134,6 +141,12 @@ pub struct GlobalVariable {
 impl Expression for GlobalVariable {
     fn get_type(&self) -> SpType {
         self.var_type.clone()
+    }
+
+    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<sda::ParsedValue> {
+        let mut res = self.get_address(reg);
+        res.push(sda::ParsedValue::InstructionValue(Box::new(Ld::new(reg, reg))));
+        res
     }
 }
 
