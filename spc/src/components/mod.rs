@@ -1,19 +1,21 @@
+use std::collections::HashMap;
 use super::types::{SpType, BuiltinTypes};
 
 pub struct CompilerState {
-    pub functions: Vec<Box<dyn Function>>,
+    pub globals: HashMap<String, Box<dyn GlobalVariable>>,
+    pub functions: HashMap<String, Box<dyn Function>>,
     pub types: Vec<SpType>,
     pub scopes: Vec<Scope>,
 }
 
 pub struct Scope {
-    pub variables: Vec<Box<dyn Variable>>,
+    pub variables: HashMap<String, Box<dyn Variable>>,
 }
 
 impl Scope {
     pub fn new() -> Self {
         Self {
-            variables: Vec::new()
+            variables: HashMap::new()
         }
     }
 }
@@ -27,7 +29,8 @@ impl Default for Scope {
 impl CompilerState {
     pub fn new() -> Self {
         Self {
-            functions: Vec::new(),
+            globals: HashMap::new(),
+            functions: HashMap::new(),
             scopes: vec![Scope::new()],
             types: vec![
                 SpType::Primitive{ name: "void".to_string(), base: BuiltinTypes::U16 },
@@ -93,6 +96,10 @@ pub trait Addressable {
 
 pub trait Variable: Addressable + Expression {
 
+}
+
+pub trait GlobalVariable: Variable {
+    
 }
 
 pub trait Function: Addressable {
