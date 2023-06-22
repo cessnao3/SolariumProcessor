@@ -1,5 +1,5 @@
 use crate::instructions::{Argument, OpcodeParseError};
-use crate::parser::{ParsedValue, LineInformation, AssemblerCommand, ParseError, ParseErrorInner, CreateInstructionData};
+use crate::parser::{ParsedValue, LineInformation, AssemblerCommand, ParseErrorLocation, ParseError, CreateInstructionData};
 use sproc::common::{MemoryWord, InstructionError};
 use sproc::text::{character_to_word, CharacterError};
 
@@ -24,51 +24,51 @@ impl AssemblyState {
         Self { map: HashMap::new(), labels: HashMap::new(), next_loc: 0 }
     }
 
-    fn move_value(&mut self, new_val: usize) -> Result<(), AssemblerErrorInner> {
+    fn move_value(&mut self, new_val: usize) -> Result<(), AssemblerError> {
         if new_val < self.next_loc {
-            return Err(AssemblerErrorInner::InvalidNewValue{ new: new_val, existing: self.next_loc });
+            return Err(AssemblerError::InvalidNewValue{ new: new_val, existing: self.next_loc });
         }
 
         self.next_loc = new_val;
         Ok(())
     }
 
-    fn add_word(&mut self, word: MemoryWord) -> Result<(), AssemblerErrorInner> {
+    fn add_word(&mut self, word: MemoryWord) -> Result<(), AssemblerError> {
         self.add_res(AssembleResult::Word(word))
     }
 
-    fn add_opcode(&mut self, l: &LineInformation, op: CreateInstructionData) -> Result<(), AssemblerErrorInner> {
+    fn add_opcode(&mut self, l: &LineInformation, op: CreateInstructionData) -> Result<(), AssemblerError> {
         self.add_res(AssembleResult::Opcode(l.clone(), op))
     }
 
-    fn add_label(&mut self, s: &str) -> Result<(), AssemblerErrorInner> {
+    fn add_label(&mut self, s: &str) -> Result<(), AssemblerError> {
         if self.labels.contains_key(s) {
-            Err(AssemblerErrorInner::DuplicateLabel(s.to_string()))
+            Err(AssemblerError::DuplicateLabel(s.to_string()))
         } else {
             self.labels.insert(s.to_string(), self.next_loc);
             Ok(())
         }
     }
 
-    fn add_load_label(&mut self, l: &LineInformation, s: &str) -> Result<(), AssemblerErrorInner> {
+    fn add_load_label(&mut self, l: &LineInformation, s: &str) -> Result<(), AssemblerError> {
         self.add_res(AssembleResult::GetLabel(l.clone(), s.to_string()))
     }
 
-    fn add_res(&mut self, r: AssembleResult) -> Result<(), AssemblerErrorInner> {
+    fn add_res(&mut self, r: AssembleResult) -> Result<(), AssemblerError> {
         if let std::collections::hash_map::Entry::Vacant(e) = self.map.entry(self.next_loc) {
             if self.next_loc >= MAX_ADDRESSABLE_VALUE {
-                Err(AssemblerErrorInner::AddressTooLarge(self.next_loc))
+                Err(AssemblerError::AddressTooLarge(self.next_loc))
             } else {
                 e.insert(r);
                 self.next_loc += 1;
                 Ok(())
             }
         } else {
-            Err(AssemblerErrorInner::DuplicateAddress(self.next_loc))
+            Err(AssemblerError::DuplicateAddress(self.next_loc))
         }
     }
 
-    fn to_memory_vector(&self) -> Result<Vec<MemoryWord>, AssemblerError> {
+    fn to_memory_vector(&self) -> Result<Vec<MemoryWord>, AssemblerErrorLocation> {
         let max_index = match self.map.keys().max() {
             Some(v) => v,
             None => return Ok(Vec::new()),
@@ -83,7 +83,7 @@ impl AssemblyState {
                     if let Some(dest) = self.labels.get(lbl) {
                         data_vec[0] = MemoryWord::from(*dest as u16);
                     } else {
-                        return Err(AssemblerError { info: loc.clone(), err: AssemblerErrorInner::MissingLabel(lbl.clone()) });
+                        return Err(AssemblerErrorLocation { info: loc.clone(), err: AssemblerError::MissingLabel(lbl.clone()) });
                     }
                 }
                 AssembleResult::Opcode(loc, op) => {
@@ -95,14 +95,14 @@ impl AssemblyState {
                                     let delta_index = *data_index as i32 - *i as i32;
                                     Ok(Argument::SignedNumber(delta_index))
                                 }
-                                None => Err(AssemblerError { info: loc.clone(), err: AssemblerErrorInner::MissingLabel(s.to_string()) }),
+                                None => Err(AssemblerErrorLocation { info: loc.clone(), err: AssemblerError::MissingLabel(s.to_string()) }),
                             },
                             a => Ok(a.clone()),
                         }
                     }).collect::<Result<Vec<_>, _>>()?;
 
                     // Helper function for inner errors
-                    fn inner_create_fnc(op: &CreateInstructionData, args: &[Argument]) -> Result<MemoryWord, AssemblerErrorInner> {
+                    fn inner_create_fnc(op: &CreateInstructionData, args: &[Argument]) -> Result<MemoryWord, AssemblerError> {
                         // Create the new instruction
                         Ok(MemoryWord::try_from((op.create_func)(args)?.to_instruction()?)?)
                     }
@@ -110,7 +110,7 @@ impl AssemblyState {
                     // Add the resulting parameter
                     data_vec[*i] = match inner_create_fnc(op, &new_args) {
                         Ok(v) => v,
-                        Err(e) => return Err(AssemblerError { info: loc.clone(), err: e }),
+                        Err(e) => return Err(AssemblerErrorLocation { info: loc.clone(), err: e }),
                     }
                 }
                 AssembleResult::Word(w) => data_vec[*i] = *w,
@@ -121,7 +121,7 @@ impl AssemblyState {
     }
 }
 
-fn assemble_individual(state: &mut AssemblyState, l: &LineInformation, p: &ParsedValue) -> Result<(), AssemblerErrorInner> {
+fn assemble_individual(state: &mut AssemblyState, l: &LineInformation, p: &ParsedValue) -> Result<(), AssemblerError> {
     match p {
         ParsedValue::Command(cmd) => match cmd {
             AssemblerCommand::Oper(new_offset) => {
@@ -145,19 +145,22 @@ fn assemble_individual(state: &mut AssemblyState, l: &LineInformation, p: &Parse
         },
         ParsedValue::Instruction(inst) => {
             state.add_opcode(l, inst.clone())?;
-        }
+        },
+        ParsedValue::InstructionValue(val) => {
+            state.add_word(MemoryWord::try_from(val.to_instruction()?)?)?;
+        },
     }
 
     Ok(())
 }
 
-pub fn assemble(parsed: &[(LineInformation, ParsedValue)]) -> Result<Vec<MemoryWord>, AssemblerError> {
+pub fn assemble(parsed: &[(LineInformation, ParsedValue)]) -> Result<Vec<MemoryWord>, AssemblerErrorLocation> {
     let mut state = AssemblyState::new();
 
     for (l, p) in parsed {
         match assemble_individual(&mut state, l, p) {
             Ok(()) => (),
-            Err(e) => return Err(AssemblerError { info: l.clone(), err: e }),
+            Err(e) => return Err(AssemblerErrorLocation { info: l.clone(), err: e }),
         };
     }
 
@@ -166,32 +169,32 @@ pub fn assemble(parsed: &[(LineInformation, ParsedValue)]) -> Result<Vec<MemoryW
 
 
 #[derive(Clone, Debug)]
-pub struct AssemblerError {
+pub struct AssemblerErrorLocation {
     pub info: LineInformation,
-    pub err: AssemblerErrorInner,
+    pub err: AssemblerError,
 }
 
-impl std::fmt::Display for AssemblerError {
+impl std::fmt::Display for AssemblerErrorLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "line {}: {} ({})", self.info.line_number, self.err, self.info.text)
     }
 }
 
-impl From<ParseError> for AssemblerError {
-    fn from(value: ParseError) -> Self {
+impl From<ParseErrorLocation> for AssemblerErrorLocation {
+    fn from(value: ParseErrorLocation) -> Self {
         Self {
             info: value.info,
-            err: AssemblerErrorInner::from(value.err),
+            err: AssemblerError::from(value.err),
         }
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum AssemblerErrorInner {
-    ParseError(ParseErrorInner),
-    InstructionError(InstructionError),
-    CharacterError(CharacterError),
-    OpcodeParseError(OpcodeParseError),
+pub enum AssemblerError {
+    Parse(ParseError),
+    Instruction(InstructionError),
+    Character(CharacterError),
+    OpcodeParse(OpcodeParseError),
     DuplicateLabel(String),
     InvalidNewValue{ new: usize, existing: usize },
     DuplicateAddress(usize),
@@ -199,13 +202,13 @@ pub enum AssemblerErrorInner {
     MissingLabel(String),
 }
 
-impl std::fmt::Display for AssemblerErrorInner {
+impl std::fmt::Display for AssemblerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ParseError(e) => write!(f, "{e}"),
-            Self::InstructionError(e) => write!(f, "{e}"),
-            Self::CharacterError(e) => write!(f, "{e}"),
-            Self::OpcodeParseError(e) => write!(f, "{e}"),
+            Self::Parse(e) => write!(f, "{e}"),
+            Self::Instruction(e) => write!(f, "{e}"),
+            Self::Character(e) => write!(f, "{e}"),
+            Self::OpcodeParse(e) => write!(f, "{e}"),
             Self::DuplicateLabel(l) => write!(f, "duplicate label \"{l}\" provided"),
             Self::InvalidNewValue { new, existing } => write!(f, "unable to move next location from {existing} to {new}"),
             Self::DuplicateAddress(addr) => write!(f, "cannot add duplicate value to address {addr}"),
@@ -215,26 +218,26 @@ impl std::fmt::Display for AssemblerErrorInner {
     }
 }
 
-impl From<ParseErrorInner> for AssemblerErrorInner {
-    fn from(value: ParseErrorInner) -> Self {
-        Self::ParseError(value)
+impl From<ParseError> for AssemblerError {
+    fn from(value: ParseError) -> Self {
+        Self::Parse(value)
     }
 }
 
-impl From<OpcodeParseError> for AssemblerErrorInner {
+impl From<OpcodeParseError> for AssemblerError {
     fn from(value: OpcodeParseError) -> Self {
-        Self::OpcodeParseError(value)
+        Self::OpcodeParse(value)
     }
 }
 
-impl From<InstructionError> for AssemblerErrorInner {
+impl From<InstructionError> for AssemblerError {
     fn from(value: InstructionError) -> Self {
-        Self::InstructionError(value)
+        Self::Instruction(value)
     }
 }
 
-impl From<CharacterError> for AssemblerErrorInner {
+impl From<CharacterError> for AssemblerError {
     fn from(value: CharacterError) -> Self {
-        Self::CharacterError(value)
+        Self::Character(value)
     }
 }

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::instructions::{Argument, ArgumentError, INSTRUCTION_MAP, OpcodeParseError, InstructionFunction};
+use crate::instructions::{Argument, ArgumentError, INSTRUCTION_MAP, OpcodeParseError, InstructionFunction, AssemblyOpcode};
 use sproc::common::MemoryWord;
 
 use once_cell::sync::Lazy;
@@ -106,7 +106,7 @@ impl std::fmt::Display for LineInformation {
 }
 
 impl std::str::FromStr for ParsedInformation {
-    type Err = ParseErrorInner;
+    type Err = ParseError;
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         if !value.is_empty() {
             let command;
@@ -143,7 +143,7 @@ impl std::str::FromStr for ParsedInformation {
                 inst = command;
                 inst_type = LineType::Instruction;
             } else {
-                return Err(ParseErrorInner::UnknownLineType);
+                return Err(ParseError::UnknownLineType);
             }
 
             let args;
@@ -186,35 +186,35 @@ impl std::str::FromStr for ParsedInformation {
                 line_type: inst_type,
             })
         } else {
-            Err(ParseErrorInner::EmptyLine)
+            Err(ParseError::EmptyLine)
         }
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct ParseError {
+pub struct ParseErrorLocation {
     pub info: LineInformation,
-    pub err: ParseErrorInner,
+    pub err: ParseError,
 }
 
-impl std::fmt::Display for ParseError {
+impl std::fmt::Display for ParseErrorLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "line {}: {} ({})", self.info.line_number, self.err, self.info.text)
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum ParseErrorInner {
+pub enum ParseError {
     EmptyLine,
     UnknownLineType,
     ArgumentError(ArgumentError),
     CommandError(AssemblerCommandError),
     UnknownInstruction,
-    OpcodeParseError(OpcodeParseError),
+    OpcodeParse(OpcodeParseError),
     LabelArgumentsNotEmpty,
 }
 
-impl std::fmt::Display for ParseErrorInner {
+impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyLine => write!(f, "empty line"),
@@ -222,27 +222,27 @@ impl std::fmt::Display for ParseErrorInner {
             Self::ArgumentError(e) => write!(f, "{e}"),
             Self::CommandError(e) => write!(f, "{e}"),
             Self::UnknownInstruction => write!(f, "unknown instruction"),
-            Self::OpcodeParseError(e) => write!(f, "{e}"),
+            Self::OpcodeParse(e) => write!(f, "{e}"),
             Self::LabelArgumentsNotEmpty => write!(f, "label expects zero arguments"),
         }
     }
 }
 
-impl From<ArgumentError> for ParseErrorInner {
+impl From<ArgumentError> for ParseError {
     fn from(value: ArgumentError) -> Self {
-        ParseErrorInner::ArgumentError(value)
+        ParseError::ArgumentError(value)
     }
 }
 
-impl From<AssemblerCommandError> for ParseErrorInner {
+impl From<AssemblerCommandError> for ParseError {
     fn from(value: AssemblerCommandError) -> Self {
-        ParseErrorInner::CommandError(value)
+        ParseError::CommandError(value)
     }
 }
 
-impl From<OpcodeParseError> for ParseErrorInner {
+impl From<OpcodeParseError> for ParseError {
     fn from(value: OpcodeParseError) -> Self {
-        Self::OpcodeParseError(value)
+        Self::OpcodeParse(value)
     }
 }
 
@@ -254,12 +254,13 @@ pub struct CreateInstructionData {
 
 pub enum ParsedValue {
     Instruction(CreateInstructionData),
+    InstructionValue(Box<dyn AssemblyOpcode>),
     Command(AssemblerCommand),
     Label(String),
 }
 
 impl TryFrom<ParsedInformation> for ParsedValue {
-    type Error = ParseErrorInner;
+    type Error = ParseError;
     fn try_from(value: ParsedInformation) -> Result<Self, Self::Error> {
         Ok(match value.line_type {
             LineType::Command => ParsedValue::Command(AssemblerCommand::try_from(value)?),
@@ -267,12 +268,12 @@ impl TryFrom<ParsedInformation> for ParsedValue {
                 if let Some(f) = INSTRUCTION_MAP.get(&value.first) {
                     ParsedValue::Instruction(CreateInstructionData { default_args: value.arguments, create_func: *f } )
                 } else {
-                    return Err(ParseErrorInner::UnknownInstruction);
+                    return Err(ParseError::UnknownInstruction);
                 }
             },
             LineType::Label => {
                 if !value.arguments.is_empty() {
-                    return Err(ParseErrorInner::LabelArgumentsNotEmpty)
+                    return Err(ParseError::LabelArgumentsNotEmpty)
                 }
                 ParsedValue::Label(value.first)
             }
@@ -280,11 +281,11 @@ impl TryFrom<ParsedInformation> for ParsedValue {
     }
 }
 
-pub fn parse_text(s: &str) -> Result<Vec<(LineInformation, ParsedValue)>, ParseError> {
+pub fn parse_text(s: &str) -> Result<Vec<(LineInformation, ParsedValue)>, ParseErrorLocation> {
     parse_lines(&s.lines().collect::<Vec<_>>())
 }
 
-pub fn parse_lines(lines: &[&str]) -> Result<Vec<(LineInformation, ParsedValue)>, ParseError> {
+pub fn parse_lines(lines: &[&str]) -> Result<Vec<(LineInformation, ParsedValue)>, ParseErrorLocation> {
     let mut entries = Vec::new();
 
     for (i, l_in) in lines.iter().enumerate() {
@@ -308,13 +309,13 @@ pub fn parse_lines(lines: &[&str]) -> Result<Vec<(LineInformation, ParsedValue)>
         // Parse the resulting line
         let cmd = match ParsedInformation::from_str(l) {
             Ok(i) => i,
-            Err(e) => return Err(ParseError { info: line_info, err: e }),
+            Err(e) => return Err(ParseErrorLocation { info: line_info, err: e }),
         };
 
         // Match the resulting parameters
         match ParsedValue::try_from(cmd) {
             Ok(v) => entries.push((line_info, v)),
-            Err(e) => return Err(ParseError { info: line_info, err: e }),
+            Err(e) => return Err(ParseErrorLocation { info: line_info, err: e }),
         };
     }
 

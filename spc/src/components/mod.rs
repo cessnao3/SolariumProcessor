@@ -1,8 +1,11 @@
 use std::collections::HashMap;
+use sda::{instructions::{Add, Ldn}, AssemblerCommand};
+use sproc::common::MemoryWord;
+
 use super::types::{SpType, BuiltinTypes};
 
 pub struct CompilerState {
-    pub globals: HashMap<String, Box<dyn GlobalVariable>>,
+    pub globals: HashMap<String, GlobalVariable>,
     pub functions: HashMap<String, Box<dyn Function>>,
     pub types: Vec<SpType>,
     pub scopes: Vec<Scope>,
@@ -87,39 +90,94 @@ pub trait BaseStatement {
 }
 
 pub trait Expression {
-    fn get_type(&self) -> Box<SpType>;
+    fn get_type(&self) -> SpType;
 }
 
 pub trait Addressable {
-    fn get_address(&self) -> u16;
+    fn get_address(&self, reg: sproc::cpu::Register) -> Vec<sda::ParsedValue>;
 }
 
 pub trait Variable: Addressable + Expression {
 
 }
 
-pub trait GlobalVariable: Variable {
-    
+pub struct LocalVariable {
+    var_type: SpType,
+    base_offset: i16,
 }
+
+impl Expression for LocalVariable {
+    fn get_type(&self) -> SpType {
+        self.var_type.clone()
+    }
+}
+
+impl Addressable for LocalVariable {
+    fn get_address(&self, reg: sproc::cpu::Register) -> Vec<sda::ParsedValue> {
+        let mut a = Vec::new();
+        a.push(sda::ParsedValue::InstructionValue(Box::new(Ldn::new(reg))));
+        a.push(sda::ParsedValue::Command(AssemblerCommand::Load(MemoryWord::from(self.base_offset))));
+        a.push(sda::ParsedValue::InstructionValue(Box::new(Add::new(reg, reg, sproc::cpu::Register::ArgumentBase))));
+        a
+    }
+}
+
+impl Variable for LocalVariable {
+
+}
+
+pub struct GlobalVariable {
+    var_type: SpType,
+    var_label: String,
+}
+
+impl Expression for GlobalVariable {
+    fn get_type(&self) -> SpType {
+        self.var_type.clone()
+    }
+}
+
+impl Addressable for GlobalVariable {
+    fn get_address(&self, reg: sproc::cpu::Register) -> Vec<sda::ParsedValue> {
+        let mut a = Vec::new();
+        a.push(sda::ParsedValue::InstructionValue(Box::new(Ldn::new(reg))));
+        a.push(sda::ParsedValue::Command(AssemblerCommand::LoadLoc(self.var_label.clone())));
+        a
+    }
+}
+
+impl Variable for GlobalVariable {
+
+}
+
 
 pub trait Function: Addressable {
     fn get_input_parameters(&self) -> Vec<(String, SpType)>;
 }
 
+pub struct SpcFunction {
+    params: Vec<(String, SpType)>,
+    return_type: SpType,
+    statements: Vec<Box<dyn Statement>>,
+}
+
 pub struct AsmFunction {
     params: Vec<(String, SpType)>,
+    return_type: SpType,
     lines: Vec<String>,
 }
 
 impl AsmFunction {
-    pub fn new(params: &[(String, SpType)], lines: &[String]) -> Self {
+    pub fn new(params: &[(String, SpType)], return_type: SpType, lines: &[String]) -> Self {
         Self {
             params: params.to_vec(),
+            return_type,
             lines: lines.to_vec(),
         }
     }
-    
+
     pub fn get_assembly(&self) -> Vec<(sda::LineInformation, sda::ParsedValue)> {
+        // TODO - Mangle label names?
         let res = sda::parse_lines(&self.lines.iter().map(|v| v.as_ref()).collect::<Vec<_>>());
         res.unwrap()
     }

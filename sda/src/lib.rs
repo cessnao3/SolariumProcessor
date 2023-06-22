@@ -5,18 +5,18 @@ mod parser;
 pub mod instructions;
 
 pub use assembler::assemble;
-pub use parser::{parse_lines, parse_text, LineInformation, ParsedValue};
+pub use parser::{parse_lines, parse_text, LineInformation, ParsedValue, AssemblerCommand};
 
-use crate::assembler::AssemblerError;
+use crate::assembler::AssemblerErrorLocation;
 
 use sproc::common::MemoryWord;
 
-pub fn assemble_text(s: &str) -> Result<Vec<MemoryWord>, AssemblerError> {
+pub fn assemble_text(s: &str) -> Result<Vec<MemoryWord>, AssemblerErrorLocation> {
     let parsed = parse_text(s)?;
     assemble(&parsed)
 }
 
-pub fn assemble_lines(lines: &[&str]) -> Result<Vec<MemoryWord>, AssemblerError> {
+pub fn assemble_lines(lines: &[&str]) -> Result<Vec<MemoryWord>, AssemblerErrorLocation> {
     let parsed = parse_lines(lines)?;
     assemble(&parsed)
 }

@@ -33,6 +33,18 @@ macro_rules! NoArgInstruction {
         #[derive(Copy, Clone)]
         pub struct $inst_name;
 
+        impl $inst_name {
+            pub fn new() -> Self {
+                Self::default()
+            }
+        }
+
+        impl Default for $inst_name {
+            fn default() -> Self {
+                Self
+            }
+        }
+
         impl AssemblyOpcode for $inst_name {
             fn to_instruction(&self) -> Result<InstructionData, InstructionError> {
                 InstructionData::new_arg0($opcode)
@@ -67,6 +79,14 @@ macro_rules! SingleReg {
         #[derive(Copy, Clone)]
         pub struct $inst_name {
             pub reg: Register,
+        }
+
+        impl $inst_name {
+            pub fn new(reg: Register) -> Self {
+                Self {
+                    reg
+                }
+            }
         }
 
         impl AssemblyOpcode for $inst_name {
@@ -111,6 +131,15 @@ macro_rules! DoubleReg {
         pub struct $inst_name {
             pub reg_a: Register,
             pub reg_b: Register,
+        }
+
+        impl $inst_name {
+            pub fn new(reg_a: Register, reg_b: Register) -> Self {
+                Self {
+                    reg_a,
+                    reg_b,
+                }
+            }
         }
 
         impl AssemblyOpcode for $inst_name {
@@ -162,6 +191,16 @@ macro_rules! TripleReg {
             pub reg_dst: Register,
             pub reg_a: Register,
             pub reg_b: Register,
+        }
+
+        impl $inst_name {
+            pub fn new(reg_dst: Register, reg_a: Register, reg_b: Register) -> Self {
+                Self {
+                    reg_dst,
+                    reg_a,
+                    reg_b,
+                }
+            }
         }
 
         impl AssemblyOpcode for $inst_name {
@@ -218,6 +257,15 @@ macro_rules! ImmediateReg {
         pub struct $inst_name {
             pub reg_dst: Register,
             pub immediate: i8,
+        }
+
+        impl $inst_name {
+            pub fn new(reg_dst: Register, immediate: i8) -> Self {
+                Self {
+                    reg_dst,
+                    immediate,
+                }
+            }
         }
 
         impl AssemblyOpcode for $inst_name {
@@ -321,6 +369,14 @@ pub struct Jmpri {
     immediate: i8,
 }
 
+impl Jmpri {
+    pub fn new(immediate: i8) -> Self {
+        Self {
+            immediate,
+        }
+    }
+}
+
 impl AssemblyOpcode for Jmpri {
     fn to_instruction(&self) -> Result<InstructionData, InstructionError> {
         let imm = ImmedateByteValues::from(self.immediate);
@@ -369,6 +425,15 @@ DoubleReg!(11, Teq);
 pub struct Arg {
     reg: Register,
     arg: u8,
+}
+
+impl Arg {
+    pub fn new(reg: Register, arg: u8) -> Self {
+        Self {
+            reg,
+            arg,
+        }
+    }
 }
 
 impl AssemblyOpcode for Arg {
