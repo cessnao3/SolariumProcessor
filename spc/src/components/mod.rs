@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use sda::{instructions::{Add, Ldn, Ld}, AssemblerCommand};
 use sproc::common::MemoryWord;
+use sproc::cpu::Register;
 
 use super::types::{SpType, BuiltinTypes};
 
@@ -95,8 +96,33 @@ pub trait Expression {
     fn save_value_to(&self, reg: Register, spare: Register) -> Vec<sda::ParsedValue>;
 }
 
+pub struct BinaryExpression {
+    lhs: Box<dyn Expression>,
+    rhs: Box<dyn Expression>,
+}
+
+pub struct UnaryExpression {
+    expr: Box<dyn Expression>
+}
+
+pub struct AsExpression {
+    expr: Box<dyn Expression>,
+    new_type: Box<SpType>,
+}
+
+impl Expression for AsExpression {
+    fn get_type(&self) -> SpType {
+        return self.new_type.as_ref().clone();
+    }
+
+    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<sda::ParsedValue> {
+        // TODO - Update? Or is this okay (e.g., a struct saving pointers, to be copied later?)
+        return self.expr.save_value_to(reg, spare);
+    }
+}
+
 pub trait Addressable {
-    fn get_address(&self, reg: sproc::cpu::Register) -> Vec<sda::ParsedValue>;
+    fn get_address(&self, reg: Register) -> Vec<sda::ParsedValue>;
 }
 
 pub trait Variable: Addressable + Expression {
@@ -120,11 +146,11 @@ impl Expression for LocalVariable {
 }
 
 impl Addressable for LocalVariable {
-    fn get_address(&self, reg: sproc::cpu::Register) -> Vec<sda::ParsedValue> {
+    fn get_address(&self, reg: Register) -> Vec<sda::ParsedValue> {
         let mut a = Vec::new();
         a.push(sda::ParsedValue::InstructionValue(Box::new(Ldn::new(reg))));
         a.push(sda::ParsedValue::Command(AssemblerCommand::Load(MemoryWord::from(self.base_offset))));
-        a.push(sda::ParsedValue::InstructionValue(Box::new(Add::new(reg, reg, sproc::cpu::Register::ArgumentBase))));
+        a.push(sda::ParsedValue::InstructionValue(Box::new(Add::new(reg, reg, Register::ArgumentBase))));
         a
     }
 }
@@ -151,7 +177,7 @@ impl Expression for GlobalVariable {
 }
 
 impl Addressable for GlobalVariable {
-    fn get_address(&self, reg: sproc::cpu::Register) -> Vec<sda::ParsedValue> {
+    fn get_address(&self, reg: Register) -> Vec<sda::ParsedValue> {
         let mut a = Vec::new();
         a.push(sda::ParsedValue::InstructionValue(Box::new(Ldn::new(reg))));
         a.push(sda::ParsedValue::Command(AssemblerCommand::LoadLoc(self.var_label.clone())));
