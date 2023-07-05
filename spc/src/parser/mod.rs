@@ -156,7 +156,7 @@ fn parse_def_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a st
             return Err(ParseError::new(0, 0, "expressions not yet supported!"));
         }
 
-        println!("Defining type {name} as type {}", t.to_string());
+        println!("Defining type {name} as type {t}");
 
         Ok(s[end_ind+1..].trim_start())
     } else {

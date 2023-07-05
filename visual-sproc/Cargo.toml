@@ -10,7 +10,7 @@ edition = "2021"
 sproc = { path = "../sproc", version = "*" }
 sda = { path = "../sda", version = "*" }
 spcc = { path = "../spcc", version = "*" }
-fltk = { version = "1.4" }
+fltk = { version = "1.4", features = ["use-wayland"] }
 
 [profile.release]
 lto = true
