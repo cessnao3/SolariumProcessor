@@ -1,12 +1,11 @@
 use gtk::prelude::*;
-use adw::prelude::*;
 use gtk::{glib, Application, ApplicationWindow, Button};
 
 const APP_ID: &str = "com.orourke.Solarium.VisualSProc";
 
 fn main() -> glib::ExitCode {
     // Create a new application
-    let app = adw::Application::builder().application_id(APP_ID).build();
+    let app = Application::builder().application_id(APP_ID).build();
 
     // Connect to "activate" signal of `app`
     app.connect_activate(build_ui);
@@ -15,7 +14,7 @@ fn main() -> glib::ExitCode {
     app.run()
 }
 
-fn build_ui(app: &adw::Application) {
+fn build_ui(app: &Application) {
     // Create a button with label and margins
     let button = Button::builder()
         .label("Press me!")
