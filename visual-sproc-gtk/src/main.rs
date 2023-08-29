@@ -1,3 +1,4 @@
+use gtk::glib::clone;
 use gtk::prelude::*;
 use gtk::{glib, Application, ApplicationWindow};
 use gtk::{TextView, TextBuffer, Frame, ScrolledWindow, Button, Box};
@@ -25,13 +26,13 @@ fn build_ui(app: &Application) {
         .margin_end(12)
         .build();
 
-    let buffer_code = std::rc::Rc::new(TextBuffer::builder()
+    let buffer_code = TextBuffer::builder()
         .enable_undo(true)
         .text("TESTING!")
-        .build());
+        .build();
 
     let text_code = TextView::builder()
-        .buffer(&*buffer_code)
+        .buffer(&buffer_code)
         .width_request(500)
         .height_request(400)
         .has_tooltip(true)
@@ -66,10 +67,8 @@ fn build_ui(app: &Application) {
     let btn1 = Button::builder().label("TESTING 1!").build();
     let btn2 = Button::builder().label("TESTING!").build();
 
-    let btn1_buffer = buffer_code.clone();
-    btn1.connect_clicked(move |_| println!("Button 1 -> {}", btn1_buffer.text(&btn1_buffer.start_iter(), &btn1_buffer.end_iter(), false).as_str()));
-    let btn2_buffer = buffer_code.clone();
-    btn2.connect_clicked(move |_| println!("Button 2 -> {}", btn2_buffer.text(&btn2_buffer.start_iter(), &btn2_buffer.end_iter(), false).as_str()));
+    btn1.connect_clicked(clone!(@weak buffer_code => move |b| b.set_label(&format!("B1: {}", buffer_code.text(&buffer_code.start_iter(), &buffer_code.end_iter(), false).as_str()))));
+    btn2.connect_clicked(clone!(@weak buffer_code => move |b| b.set_label(&format!("B2: {}", buffer_code.text(&buffer_code.start_iter(), &buffer_code.end_iter(), false).as_str()))));
 
     column_1.append(&text_code_frame);
     column_1.append(&button);
