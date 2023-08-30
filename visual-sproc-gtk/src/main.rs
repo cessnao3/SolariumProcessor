@@ -1,5 +1,5 @@
 use gtk::glib::clone;
-use gtk::prelude::*;
+use gtk::{prelude::*, StackSwitcher, Stack};
 use gtk::{glib, Application, ApplicationWindow};
 use gtk::{TextView, TextBuffer, Frame, ScrolledWindow, Button, Box};
 
@@ -39,6 +39,7 @@ fn build_ui(app: &Application) {
         .hexpand(true)
         .vexpand(true)
         .tooltip_text("Text input for assembly code")
+        .monospace(true)
         .build();
 
     let text_code_scroll = ScrolledWindow::builder()
@@ -50,9 +51,12 @@ fn build_ui(app: &Application) {
         .child(&text_code_scroll)
         .build();
 
-    text_code.set_monospace(true);
-    text_code.set_hscroll_policy(gtk::ScrollablePolicy::Natural);
-    text_code.set_vscroll_policy(gtk::ScrollablePolicy::Natural);
+    let code_stack = Stack::builder().build();
+    let p1 = code_stack.add_child(&text_code_frame);
+    p1.set_title("Name!");
+    let p2 = code_stack.add_child(&Button::builder().label("TESTING!").build());
+    p2.set_title("NAME2");
+    let code_switcher = StackSwitcher::builder().stack(&code_stack).build();
 
     // Connect to "clicked" signal of `button`
     button.connect_clicked(|button| {
@@ -70,7 +74,8 @@ fn build_ui(app: &Application) {
     btn1.connect_clicked(clone!(@weak buffer_code => move |b| b.set_label(&format!("B1: {}", buffer_code.text(&buffer_code.start_iter(), &buffer_code.end_iter(), false).as_str()))));
     btn2.connect_clicked(clone!(@weak buffer_code => move |b| b.set_label(&format!("B2: {}", buffer_code.text(&buffer_code.start_iter(), &buffer_code.end_iter(), false).as_str()))));
 
-    column_1.append(&text_code_frame);
+    column_1.append(&code_switcher);
+    column_1.append(&code_stack);
     column_1.append(&button);
     column_2.append(&btn1);
     column_2.append(&btn2);
