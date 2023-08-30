@@ -3,7 +3,7 @@ use gtk::{prelude::*, StackSwitcher, Stack};
 use gtk::{glib, Application, ApplicationWindow};
 use gtk::{TextView, TextBuffer, Frame, ScrolledWindow, Button, Box};
 
-const APP_ID: &str = "com.orourke.Solarium.VisualSProc";
+const APP_ID: &str = "com.orourke.Solarium.VSProc";
 
 fn main() -> glib::ExitCode {
     // Create a new application
@@ -33,7 +33,7 @@ fn build_ui(app: &Application) {
 
     let text_code = TextView::builder()
         .buffer(&buffer_code)
-        .width_request(500)
+        .width_request(300)
         .height_request(400)
         .has_tooltip(true)
         .hexpand(true)
@@ -42,20 +42,38 @@ fn build_ui(app: &Application) {
         .monospace(true)
         .build();
 
+    let buffer_log = TextBuffer::builder().build();
+
+    let text_log = TextView::builder()
+        .buffer(&buffer_log)
+        .width_request(300)
+        .height_request(200)
+        .has_tooltip(true)
+        .hexpand(true)
+        .vexpand(true)
+        .editable(false)
+        .tooltip_text("Application log")
+        .monospace(true)
+        .build();
+    let text_log_frame = Frame::builder()
+        .label("Application Log")
+        .child(&text_log)
+        .build();
+
     let text_code_scroll = ScrolledWindow::builder()
         .child(&text_code)
         .build();
 
     let text_code_frame = Frame::builder()
-        .label("Code Editor")
+        .label("Assembly Code Editor")
         .child(&text_code_scroll)
         .build();
 
     let code_stack = Stack::builder().build();
     let p1 = code_stack.add_child(&text_code_frame);
-    p1.set_title("Name!");
+    p1.set_title("Assembly");
     let p2 = code_stack.add_child(&Button::builder().label("TESTING!").build());
-    p2.set_title("NAME2");
+    p2.set_title("SPC");
     let code_switcher = StackSwitcher::builder().stack(&code_stack).build();
 
     // Connect to "clicked" signal of `button`
@@ -64,9 +82,9 @@ fn build_ui(app: &Application) {
         button.set_label("Hello World!");
     });
 
-    let columns = Box::builder().vexpand(true).hexpand(true).orientation(gtk::Orientation::Horizontal).spacing(4).build();
-    let column_1 = Box::new(gtk::Orientation::Vertical, 4);
-    let column_2 = Box::new(gtk::Orientation::Vertical, 4);
+    let columns = Box::builder().vexpand(true).hexpand(true).orientation(gtk::Orientation::Horizontal).spacing(4).margin_top(4).margin_bottom(4).margin_start(4).margin_end(4).build();
+    let column_1 = Box::builder().vexpand(true).hexpand(true).orientation(gtk::Orientation::Vertical).spacing(4).build();
+    let column_2 = Box::builder().vexpand(true).hexpand(true).orientation(gtk::Orientation::Vertical).spacing(4).build();
 
     let btn1 = Button::builder().label("TESTING 1!").build();
     let btn2 = Button::builder().label("TESTING!").build();
@@ -79,6 +97,7 @@ fn build_ui(app: &Application) {
     column_1.append(&button);
     column_2.append(&btn1);
     column_2.append(&btn2);
+    column_2.append(&text_log_frame);
 
     columns.append(&column_1);
     columns.append(&column_2);
@@ -86,7 +105,7 @@ fn build_ui(app: &Application) {
     // Create a window and set the title
     let window = ApplicationWindow::builder()
         .application(app)
-        .title("My GTK App")
+        .title("V/SProc")
         .child(&columns)
         .build();
 
