@@ -15,6 +15,8 @@ asmfn asm_func(a, b, c): ret_type
     asm
 }
 
+fn func_name_ptr(a, b): ret_type = 3943;
+
 fn func_name(a, b, c): ret_type
 {
     def var_name: var_type;
