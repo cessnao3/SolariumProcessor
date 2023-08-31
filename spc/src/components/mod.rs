@@ -189,7 +189,6 @@ impl Variable for GlobalVariable {
 
 }
 
-
 pub trait Function: Addressable {
     fn get_input_parameters(&self) -> Vec<(String, SpType)>;
 }

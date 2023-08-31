@@ -1,4 +1,4 @@
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum BuiltinTypes {
     U16,
     I16,
@@ -21,7 +21,7 @@ impl std::fmt::Display for BuiltinTypes {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum SpType {
     Primitive{ name: String, base: BuiltinTypes },
     Array{ base: Box<SpType>, size: usize },

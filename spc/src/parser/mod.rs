@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 use super::components::BaseStatement;
-use super::types::SpType;
+use super::types::{SpType, BuiltinTypes};
 
 pub fn is_valid_name(s: &str) -> bool {
     // Ensure that the first character is alphabetic and that the only characters are ascii-alphanumeric/_/-
@@ -57,7 +57,7 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
     let fields_string;
     let remaining;
 
-    if let Some(open_ind) = s.find(s) {
+    if let Some(open_ind) = s.find('{') {
         struct_name = s[..open_ind].trim();
 
         if let Some(close_ind) = s.find('}') {
@@ -88,8 +88,10 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
     if fields.is_none() {
         return Err(ParseError::new(0, 0, &format!("unable to parse field entries for {struct_name}")));
     }
-
-    let fields = fields.unwrap();
+    
+    let fields = fields.unwrap().iter()
+        .map(|(s1, s2)| (s1.trim(), s2.trim()))
+        .collect::<Vec<_>>();
 
     if fields.is_empty() {
         return Err(ParseError::new(0, 0, &format!("no fields provided for {struct_name}")));
@@ -225,10 +227,20 @@ impl ParserState {
 
 impl Default for ParserState {
     fn default() -> Self {
-        Self::new()
+        let mut s = Self {
+            statement: Vec::new(),
+            types: HashMap::new(),
+        };
+        
+        s.types.insert("void".into(), SpType::Primitive{ name: "void".to_string(), base: BuiltinTypes::U16 });
+        s.types.insert("u16".into(), SpType::Primitive{ name: "u16".to_string(), base: BuiltinTypes::U16 });
+        s.types.insert("i16".into(), SpType::Primitive{ name: "i16".to_string(), base: BuiltinTypes::I16 });
+        
+        s
     }
 }
 
+#[derive(Debug)]
 pub struct ParseError {
     line: usize,
     col: usize,
@@ -248,5 +260,49 @@ impl ParseError {
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{} {}", self.line, self.col, self.msg)
+    }
+}
+
+#[cfg(test)]
+mod test
+{
+    use super::*;
+    
+    #[test]
+    fn test_parse_struct()
+    {
+        let mut state = ParserState::new();
+        let struct_string = "
+        type_name
+        {
+            var1: u16,
+            var2: i16,
+        }
+        ".trim();
+        
+        let res = parse_struct_statement(struct_string, &mut state);
+
+        assert!(res.is_ok());
+        assert!(state.types.contains_key("type_name"));
+        
+        let t = state.get_type("type_name");
+        assert!(t.is_ok());
+        
+        if let Ok(SpType::Struct { name, fields }) = t {
+            assert_eq!(name, "type_name");
+            assert_eq!(fields.len(), 2);
+            
+            let f1 = &fields[0];
+            
+            assert_eq!(f1.0, "var1");
+            assert_eq!(*f1.1, state.get_type("u16").unwrap());
+            
+            let f2 = &fields[1];
+            
+            assert_eq!(f2.0, "var2");
+            assert_eq!(*f2.1, state.get_type("i16").unwrap());
+        } else {
+            assert!(false);
+        }
     }
 }
