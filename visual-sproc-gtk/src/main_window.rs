@@ -1,17 +1,15 @@
 //use gtk::glib::clone;
 use gtk::{Application, ApplicationWindow};
-use gtk::prelude::*;
+use gtk::{glib, prelude::*};
 use gtk::{Box, Button, Frame, ScrolledWindow, Stack, StackSwitcher, TextBuffer, TextView};
-
-use std::sync::mpsc::channel;
 
 use crate::cpu_thread::cpu_thread;
 use crate::messages::{ThreadToUi, UiToThread};
 
 pub fn build_ui(app: &Application) {
     // Create the tx/rx for the secondary thread
-    let (tx_ui, rx_thread) = channel::<UiToThread>();
-    let (tx_thread, rx_ui) = channel::<ThreadToUi>();
+    let (tx_ui, rx_thread) = std::sync::mpsc::channel::<UiToThread>();
+    let (tx_thread, rx_ui) = glib::MainContext::channel::<ThreadToUi>(glib::Priority::DEFAULT);
 
     // Create a button with label and margins
     let button = Button::builder()
@@ -160,6 +158,16 @@ pub fn build_ui(app: &Application) {
         .title("V/SProc")
         .child(&columns)
         .build();
+
+    // Setup the UI receiver
+    rx_ui.attach(None, move |msg| {
+        match msg {
+            ThreadToUi::ThreadExit => (),
+            _ => panic!("unknown message provided!")
+        };
+
+        glib::ControlFlow::Continue
+    });
 
     // Create the accompanying thread
     std::thread::spawn(move || cpu_thread(rx_thread, tx_thread));

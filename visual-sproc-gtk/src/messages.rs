@@ -16,4 +16,5 @@ pub enum ThreadToUi {
     SerialOutput(String),
     LogMessage(String),
     RegisterState([u16; 16]),
+    ThreadExit,
 }
