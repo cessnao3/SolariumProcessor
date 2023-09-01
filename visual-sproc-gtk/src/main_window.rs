@@ -215,6 +215,11 @@ pub fn build_ui(app: &Application) {
     // Setup the UI receiver
     rx_ui.attach(None, move |msg| {
         match msg {
+            ThreadToUi::RegisterState(regs) => {
+                for (i, r) in regs.iter().enumerate() {
+                    register_fields[i].set_text(&format!("0x{r:04x}"));
+                }
+            }
             ThreadToUi::ThreadExit => (),
             _ => panic!("unknown message provided!")
         };
