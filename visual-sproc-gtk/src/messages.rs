@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub enum UiToThread {
     CpuStep,
     CpuStart,
@@ -7,10 +8,11 @@ pub enum UiToThread {
     SetCode(Vec<u16>),
     SerialInput(String),
     RequestMemory(u16, u16),
-    SetMultiplier(i32),
+    SetMultiplier(f64),
     Exit,
 }
 
+#[derive(Clone)]
 pub enum ThreadToUi {
     ResponseMemory(u16, Vec<u16>),
     SerialOutput(String),

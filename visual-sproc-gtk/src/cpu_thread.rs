@@ -5,7 +5,7 @@ use crate::messages::{UiToThread, ThreadToUi};
 
 struct ThreadState {
     running: bool,
-    multiplier: i32,
+    multiplier: f64,
     run_thread: bool,
 }
 
@@ -14,7 +14,7 @@ impl ThreadState {
         Self {
             run_thread: true,
             running: false,
-            multiplier: 1,
+            multiplier: 1.0,
         }
     }
 
