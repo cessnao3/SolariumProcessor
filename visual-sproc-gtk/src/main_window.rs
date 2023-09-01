@@ -146,12 +146,11 @@ pub fn build_ui(app: &Application) {
             .lower(1.0)
             .upper(10.0)
             .value(1.0)
-            .step_increment(1.0)
             .build())
         .show_fill_level(true)
         .build();
 
-    cpu_speed_scale.connect_move_slider(clone!(@strong tx_ui => move |sld, hdl| tx_ui.send(UiToThread::SetMultiplier(sld.value())).unwrap();));
+    cpu_speed_scale.connect_change_value(clone!(@strong tx_ui => move |_, _, val| tx_ui.send(UiToThread::SetMultiplier(val)).unwrap(); glib::Propagation::Proceed));
     cpu_controls_box.append(&cpu_speed_scale);
 
     let register_box = Box::builder().orientation(gtk::Orientation::Horizontal).spacing(4).build();

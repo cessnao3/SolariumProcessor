@@ -1,5 +1,5 @@
 use gtk::glib::Sender;
-use std::sync::mpsc::{Receiver, TryRecvError};
+use std::sync::mpsc::{Receiver, TryRecvError, RecvError};
 use crate::messages::{UiToThread, ThreadToUi};
 
 
@@ -23,7 +23,7 @@ impl ThreadState {
             UiToThread::CpuStart => self.running = true,
             UiToThread::CpuStop => self.running = false,
             UiToThread::Exit => self.run_thread = false,
-            UiToThread::SetMultiplier(m) => self.multiplier = m,
+            UiToThread::SetMultiplier(m) => { self.multiplier = m; println!("Setting to {m}"); },
             _ => (), // TODO - Process All Inputs
         }
 
@@ -35,28 +35,34 @@ pub fn cpu_thread(rx: Receiver<UiToThread>, tx: Sender<ThreadToUi>) {
     let mut state = ThreadState::new();
 
     'mainloop: while state.run_thread {
-        // TODO - Change from try_recv to recv if not running so we don't need sleep
+        if state.running {
+            for _ in 0..1000 {
+                let resp = match rx.try_recv() {
+                    Ok(msg) => state.handle_msg(msg),
+                    Err(TryRecvError::Disconnected) => break 'mainloop,
+                    Err(TryRecvError::Empty) => break,
+                };
 
-        // Process Inputs
-        let max_val = if state.running { 1000 } else { 1 };
-        for _ in 0..max_val {
-            let resp: Option<ThreadToUi> = match rx.try_recv() {
+                if let Some(r) = &resp {
+                    tx.send(r.clone()).expect("Unable to send response to main thread!");
+                }
+            }
+        } else {
+            let resp = match rx.recv() {
                 Ok(msg) => state.handle_msg(msg),
-                Err(TryRecvError::Disconnected) => break 'mainloop,
-                Err(TryRecvError::Empty) => break,
+                Err(RecvError) => break 'mainloop,
             };
 
-            if let Some(r) = resp {
-                tx.send(r).expect("Unable to send response to main thread!");
+            if let Some(r) = &resp {
+                tx.send(r.clone()).expect("Unable to send response to main thread!");
             }
         }
 
         // Step if required
         if state.running {
             // TODO: Step CPU
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
-
-        std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
     let _ = tx.send(ThreadToUi::ThreadExit);
