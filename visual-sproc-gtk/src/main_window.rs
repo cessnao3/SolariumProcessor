@@ -1,6 +1,6 @@
 //use gtk::glib::clone;
 use gtk::glib::clone;
-use gtk::{glib, prelude::*};
+use gtk::{glib, prelude::*, Entry};
 use gtk::{Adjustment, Application, ApplicationWindow, EditableLabel, Label, Scale};
 use gtk::{Box, Button, Frame, ScrolledWindow, Stack, StackSwitcher, TextBuffer, TextView};
 
@@ -306,15 +306,13 @@ fn build_serial_column(tx_ui: &std::sync::mpsc::Sender<UiToThread>,) -> Box {
         .child(&text_input_box)
         .build();
 
-    let text_input_buffer = TextBuffer::builder().build();
+    let text_input = Entry::builder().build();
+    text_input.connect_activate(clone!(@strong tx_ui => move |t| {
+        tx_ui.send(UiToThread::SerialInput(t.text().to_string())).unwrap();
+        t.set_text("");
+    }));
 
-    let text_input = TextView::builder()
-        .monospace(true)
-        .buffer(&text_input_buffer)
-        .build();
-
-    let text_input_scroll = ScrolledWindow::builder().child(&text_input).build();
-    text_input_box.append(&text_input_scroll);
+    text_input_box.append(&text_input);
 
     let text_input_button_box = Box::builder()
         .orientation(gtk::Orientation::Horizontal)
@@ -322,9 +320,8 @@ fn build_serial_column(tx_ui: &std::sync::mpsc::Sender<UiToThread>,) -> Box {
         .build();
     let text_input_btn_submit = Button::builder().label("Submit").build();
     text_input_btn_submit.connect_clicked(clone!(@strong tx_ui => move |_| {
-        let txt = text_input_buffer.text(&text_input_buffer.start_iter(), &text_input_buffer.end_iter(), false);
-        tx_ui.send(UiToThread::SerialInput(txt.to_string())).unwrap();
-        text_input_buffer.set_text("");
+        tx_ui.send(UiToThread::SerialInput(text_input.text().to_string())).unwrap();
+        text_input.set_text("");
     }));
 
     text_input_button_box.append(&text_input_btn_submit);
