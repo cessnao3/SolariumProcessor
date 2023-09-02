@@ -6,7 +6,7 @@ use std::io::Write;
 
 use crate::compiler::compile;
 
-use sda::{assemble, assemble_lines};
+use sda::assemble_lines;
 
 fn get_example_program() -> String {
     let text_bytes = include_bytes!("../test.sub");

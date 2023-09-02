@@ -43,7 +43,7 @@ impl SolariumProcessor {
         // Initiate the reset and return
         match cpu.hard_reset() {
             Ok(()) => cpu,
-            Err(e) => panic!("Unable to reset the cpu - {}", e.to_string()),
+            Err(e) => panic!("Unable to reset the cpu - {e}"),
         }
     }
 
