@@ -108,7 +108,6 @@ impl ThreadState {
                 }
                 UiToThread::SetMultiplier(m) => {
                     state.multiplier = m;
-                    println!("Setting to {m}");
                 }
                 UiToThread::SetCode(data) => {
                     state.last_code = data;
