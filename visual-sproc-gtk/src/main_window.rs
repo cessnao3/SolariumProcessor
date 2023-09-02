@@ -23,11 +23,12 @@ pub fn build_ui(app: &Application) {
 
     let code_stack = Stack::builder().build();
 
-    let buffer_assembly_code = TextBuffer::builder()
-        .enable_undo(true)
-        .text("; ASM Code")
-        .build();
     {
+        let buffer_assembly_code = TextBuffer::builder()
+            .enable_undo(true)
+            .text("; ASM Code")
+            .build();
+
         let text_code = TextView::builder()
             .buffer(&buffer_assembly_code)
             .width_request(300)
@@ -68,11 +69,12 @@ pub fn build_ui(app: &Application) {
         page_asm.set_title("ASM");
     }
 
-    let buffer_spc_code = TextBuffer::builder()
-        .enable_undo(true)
-        .text("// SPC Code")
-        .build();
     {
+        let buffer_spc_code = TextBuffer::builder()
+            .enable_undo(true)
+            .text("// SPC Code")
+            .build();
+
         let text_code = TextView::builder()
             .buffer(&buffer_spc_code)
             .width_request(300)
@@ -94,6 +96,10 @@ pub fn build_ui(app: &Application) {
             .spacing(4)
             .build();
         let btn_build = Button::builder().label("Compile").build();
+
+        btn_build.connect_clicked(clone!(@strong tx_thread => move |_| {
+            tx_thread.send(ThreadToUi::LogMessage("SPC compiling not supported".to_string())).unwrap();
+        }));
 
         code_box.append(&text_code_frame);
         code_box.append(&btn_build);
@@ -121,6 +127,10 @@ pub fn build_ui(app: &Application) {
         .spacing(4)
         .build();
     let column_cpu = Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(4)
+        .build();
+    let column_serial = Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
         .build();
@@ -212,8 +222,54 @@ pub fn build_ui(app: &Application) {
 
     column_cpu.append(&text_log_frame);
 
+    let buffer_serial = TextBuffer::builder().build();
+
+    let text_serial = TextView::builder()
+        .buffer(&buffer_serial)
+        .width_request(300)
+        .height_request(200)
+        .has_tooltip(true)
+        .hexpand(true)
+        .vexpand(true)
+        .editable(false)
+        .tooltip_text("Serial log")
+        .monospace(true)
+        .build();
+    let text_serial_frame = Frame::builder()
+        .label("Serial Log")
+        .child(&text_serial)
+        .build();
+
+    column_serial.append(&text_serial_frame);
+
+    let text_input_box = Box::builder().orientation(gtk::Orientation::Vertical).spacing(4).build();
+
+    let text_input_frame = Frame::builder().label("Serial Input").child(&text_input_box).build();
+
+    let text_input_buffer = TextBuffer::builder().build();
+
+    let text_input = TextView::builder().buffer(&text_input_buffer).build();
+
+    let text_input_scroll = ScrolledWindow::builder().child(&text_input).build();
+    text_input_box.append(&text_input_scroll);
+
+    let text_input_button_box = Box::builder().orientation(gtk::Orientation::Horizontal).spacing(4).build();
+    let text_input_btn_submit = Button::builder().label("Submit").build();
+    text_input_btn_submit.connect_clicked(clone!(@strong tx_ui => move |_| {
+        let txt = text_input_buffer.text(&text_input_buffer.start_iter(), &text_input_buffer.end_iter(), false);
+        tx_ui.send(UiToThread::SerialInput(txt.to_string())).unwrap();
+        text_input_buffer.set_text("");
+    }));
+
+    text_input_button_box.append(&text_input_btn_submit);
+
+    text_input_box.append(&text_input_button_box);
+
+    column_serial.append(&text_input_frame);
+
     columns.append(&column_code);
     columns.append(&column_cpu);
+    columns.append(&column_serial);
 
     // Create a window and set the title
     let window = ApplicationWindow::builder()
