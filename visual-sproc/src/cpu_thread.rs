@@ -114,7 +114,7 @@ impl ThreadState {
                     state.reset()?;
                 }
                 UiToThread::SerialInput(s) => {
-                    for c in s.chars() {
+                    for c in s.chars().chain(['\n'; 1]) {
                         match sproc::text::character_to_word(c) {
                             Ok(word) => {
                                 if !state.serial_io_dev.borrow_mut().push_input(word) {

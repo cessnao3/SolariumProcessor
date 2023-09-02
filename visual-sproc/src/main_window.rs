@@ -379,9 +379,10 @@ fn build_serial_column(
         .tooltip_text("Serial log")
         .monospace(true)
         .build();
+    let text_serial_scroll = gtk::ScrolledWindow::builder().child(&text_serial).build();
     let text_serial_frame = gtk::Frame::builder()
         .label("Serial Log")
-        .child(&text_serial)
+        .child(&text_serial_scroll)
         .build();
 
     column_serial.append(&text_serial_frame);
@@ -410,7 +411,7 @@ fn build_serial_column(
         .build();
     let text_input_btn_submit = gtk::Button::builder().label("Submit").build();
     text_input_btn_submit.connect_clicked(clone!(@strong tx_ui => move |_| {
-        tx_ui.send(UiToThread::SerialInput(format!("{}\n", text_input.text()))).unwrap();
+        tx_ui.send(UiToThread::SerialInput(text_input.text().to_string())).unwrap();
         text_input.set_text("");
     }));
 
