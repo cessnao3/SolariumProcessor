@@ -4,3 +4,4 @@
 
 # Cargo/Rust Items
 /target
+/Cargo.lock

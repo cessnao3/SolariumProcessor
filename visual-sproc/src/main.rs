@@ -1,37 +1,20 @@
+mod cpu_thread;
+mod main_window;
 mod messages;
-mod processor_state;
-mod scpu_thread;
 
-mod fltk_app;
-mod fltk_registers;
+//use gtk::glib::clone;
+use gtk::prelude::*;
+use gtk::{glib, Application};
 
-use std::sync::mpsc;
-use std::thread;
+const APP_ID: &str = "com.orourke.Solarium.VSProc";
 
-use fltk_app::setup_and_run_app;
-use scpu_thread::run_scpu_thread;
+fn main() -> glib::ExitCode {
+    // Create a new application
+    let app = Application::builder().application_id(APP_ID).build();
 
-fn main() {
-    // Define the CPU Thread join handle
-    let cpu_thread;
+    // Connect to "activate" signal of `app`
+    app.connect_activate(main_window::build_ui);
 
-    {
-        // Initialize thread communication channels
-        let (gui_to_thread_tx, gui_to_thread_rx) = mpsc::channel();
-        let (thread_to_gui_tx, thread_to_gui_rx) = mpsc::channel();
-
-        // Setup the start/stop timer
-        cpu_thread = thread::spawn(move || {
-            run_scpu_thread(gui_to_thread_rx, thread_to_gui_tx);
-        });
-
-        // Run the main application
-        setup_and_run_app(gui_to_thread_tx, thread_to_gui_rx);
-    }
-
-    // Wait for thread to exit
-    match cpu_thread.join() {
-        Ok(()) => (),
-        Err(_) => eprintln!("error joining to thread"),
-    }
+    // Run the application
+    app.run()
 }

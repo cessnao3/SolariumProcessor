@@ -1,39 +1,25 @@
 use sproc::common::MemoryWord;
+use sproc::cpu::SolariumProcessor;
 
-use super::processor_state::RegisterArray;
-
-#[derive(Clone, Copy)]
-pub enum FltkMessage {
-    Step,
-    Start,
-    Stop,
-    Reset,
-    Assemble,
-    Compile,
-    CompileToText,
-    Tick,
-    SetSpeed(f64),
-    SerialInput,
-    HardwareInterrupt(usize),
-    FileLoadError,
+#[derive(Clone)]
+pub enum UiToThread {
+    CpuStep,
+    CpuStart,
+    CpuStop,
+    CpuReset,
+    CpuIrq(u8),
+    SetCode(Vec<MemoryWord>),
+    SerialInput(String),
+    RequestMemory(usize, usize),
+    SetMultiplier(f64),
+    Exit,
 }
 
 #[derive(Clone)]
-pub enum ThreadMessage {
-    SetMemory(Vec<MemoryWord>),
-    Start,
-    Stop,
-    Reset,
-    Step,
-    SetSpeed(f64),
-    SerialInput(Vec<char>),
-    HardwareInterrupt(usize),
-}
-
-#[derive(Clone)]
-pub enum GuiMessage {
-    UpdateRegisters(RegisterArray),
-    UpdateMemory(Vec<MemoryWord>),
-    SerialOutput(char),
+pub enum ThreadToUi {
+    ResponseMemory(usize, Vec<MemoryWord>),
+    SerialOutput(String),
     LogMessage(String),
+    RegisterState([MemoryWord; SolariumProcessor::NUM_REGISTERS]),
+    ThreadExit,
 }

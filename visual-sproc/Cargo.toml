@@ -1,16 +1,15 @@
 [package]
 name = "visual-sproc"
 version = "0.1.0"
-authors = ["Ian O'Rourke <cessna.ian@gmail.com>"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+gtk = { version = "0.7", package = "gtk4", features = ["v4_8"] }
 sproc = { path = "../sproc", version = "*" }
 sda = { path = "../sda", version = "*" }
-spcc = { path = "../spcc", version = "*" }
-fltk = { version = "1.4", features = ["use-wayland"] }
+#spcc = { path = "../spcc", version = "*" }
 
 [profile.release]
 lto = true
