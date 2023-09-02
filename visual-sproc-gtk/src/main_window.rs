@@ -1,5 +1,5 @@
 //use gtk::glib::clone;
-use gtk::{Application, ApplicationWindow, Range, Scale, Adjustment, Label, EditableLabel};
+use gtk::{Application, ApplicationWindow, Scale, Adjustment, Label, EditableLabel};
 use gtk::{glib, prelude::*};
 use gtk::glib::clone;
 use gtk::{Box, Button, Frame, ScrolledWindow, Stack, StackSwitcher, TextBuffer, TextView};
@@ -216,8 +216,11 @@ pub fn build_ui(app: &Application) {
         match msg {
             ThreadToUi::RegisterState(regs) => {
                 for (i, r) in regs.iter().enumerate() {
-                    register_fields[i].set_text(&format!("0x{r:04x}"));
+                    register_fields[i].set_text(&format!("0x{:04x}", r.get()));
                 }
+            }
+            ThreadToUi::LogMessage(msg) => {
+                buffer_log.insert(&mut buffer_log.end_iter(), &format!("{msg}\n"));
             }
             ThreadToUi::ThreadExit => (),
             _ => panic!("unknown message provided!")
@@ -226,7 +229,7 @@ pub fn build_ui(app: &Application) {
         glib::ControlFlow::Continue
     });
 
-    window.connect_close_request(clone!(@strong tx_ui => move |w| {
+    window.connect_close_request(clone!(@strong tx_ui => move |_| {
         tx_ui.send(UiToThread::Exit).unwrap();
         glib::Propagation::Proceed
     }));

@@ -1,4 +1,5 @@
 use std::num::ParseIntError;
+use std::fmt;
 use std::str::FromStr;
 
 /// Provides the data type to use for a word in memory
@@ -24,9 +25,9 @@ impl MemoryWord {
     }
 }
 
-impl ToString for MemoryWord {
-    fn to_string(&self) -> String {
-        self.value.to_string()
+impl fmt::Display for MemoryWord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
     }
 }
 
@@ -73,46 +74,24 @@ pub enum SolariumError {
     StopRequested,
 }
 
-impl ToString for SolariumError {
-    fn to_string(&self) -> String {
+impl fmt::Display for SolariumError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SolariumError::None => "none".to_string(),
-            SolariumError::DivideByZero => "divide-by-zero".to_string(),
-            SolariumError::InvalidInstruction(inst) => {
-                format!("invalid instruction \"{0:}\"", inst.to_string())
-            }
-            SolariumError::InvalidMemoryAccess(loc) => {
-                format!("invalid memory access at location \"{0:}\"", loc)
-            }
-            SolariumError::InvalidMemoryWrite(loc) => {
-                format!("invalid memory write at location \"{0:}\"", loc)
-            }
-            SolariumError::InvalidSoftwareInterrupt(intnum) => {
-                format!("invalid sw interrupt {0:} provided", intnum)
-            }
-            SolariumError::InvalidHardwareInterrupt(intnum) => {
-                format!("invalid hw interrupt {0:} provided", intnum)
-            }
-            SolariumError::ModByZero => "mod-by-zero".to_string(),
-            SolariumError::ShiftError(shift_count) => {
-                format!("invalid attempt to shift by {0:}", shift_count)
-            }
-            SolariumError::StackUnderflow => "stack underflow".to_string(),
-            SolariumError::DeviceError(base_addr, err) => {
-                format!("device {0:} error: {1:}", base_addr, err.to_string())
-            }
-            SolariumError::RegisterIndexError(ind) => {
-                format!("register {0:} exceeds the register size", ind)
-            }
-            SolariumError::StartEndIndexMismatch(start_index, end_index) => format!(
-                "segment starting index {0:} is >= ending index {1:}",
-                start_index, end_index
-            ),
-            SolariumError::SegmentOverlap(start_index, end_index) => format!(
-                "segment from [{0:}, {1:}) overlaps with other segments",
-                start_index, end_index
-            ),
-            SolariumError::StopRequested => "stop requested".to_string(),
+            SolariumError::None => write!(f, "none"),
+            SolariumError::DivideByZero => write!(f, "divide-by-zero"),
+            SolariumError::InvalidInstruction(inst) => write!(f, "invalid instruction \"{inst}\""),
+            SolariumError::InvalidMemoryAccess(loc) => write!(f, "invalid memory access at location \"{loc}\""),
+            SolariumError::InvalidMemoryWrite(loc) => write!(f, "invalid memory write at location \"{loc}\""),
+            SolariumError::InvalidSoftwareInterrupt(intnum) => write!(f, "invalid sw interrupt {intnum} provided"),
+            SolariumError::InvalidHardwareInterrupt(intnum) => write!(f, "invalid hw interrupt {0:} provided", intnum),
+            SolariumError::ModByZero => write!(f, "mod-by-zero"),
+            SolariumError::ShiftError(shift_count) => write!(f, "invalid attempt to shift by {shift_count}"),
+            SolariumError::StackUnderflow => write!(f, "stack underflow"),
+            SolariumError::DeviceError(base_addr, err) => write!(f, "device {base_addr} error: {err}"),
+            SolariumError::RegisterIndexError(ind) => write!(f, "register {ind} exceeds the register size"),
+            SolariumError::StartEndIndexMismatch(start_index, end_index) => write!(f, "segment starting index {start_index} is >= ending index {end_index}"),
+            SolariumError::SegmentOverlap(start_index, end_index) => write!(f, "segment from [{start_index}, {end_index}) overlaps with other segments",),
+            SolariumError::StopRequested => write!(f, "stop requested"),
         }
     }
 }
@@ -123,10 +102,10 @@ pub enum SolariumDeviceError {
     BufferFull,
 }
 
-impl ToString for SolariumDeviceError {
-    fn to_string(&self) -> String {
+impl fmt::Display for SolariumDeviceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SolariumDeviceError::BufferFull => "device buffer is full".to_string(),
+            SolariumDeviceError::BufferFull => write!(f, "device buffer is full"),
         }
     }
 }

@@ -7,3 +7,10 @@ edition = "2021"
 
 [dependencies]
 gtk = { version = "0.7", package = "gtk4", features = ["v4_8"] }
+sproc = { path = "../sproc", version = "*" }
+sda = { path = "../sda", version = "*" }
+#spcc = { path = "../spcc", version = "*" }
+
+[profile.release]
+lto = true
+strip = true
