@@ -98,7 +98,7 @@ impl ThreadState {
                 UiToThread::CpuStart => state.running = true,
                 UiToThread::CpuStop => state.running = false,
                 UiToThread::Exit => state.run_thread = false,
-                UiToThread::CpuReset => state.cpu.hard_reset()?,
+                UiToThread::CpuReset => state.reset()?,
                 UiToThread::CpuIrq(irq) => {
                     if !state.cpu.hardware_interrupt(irq as usize)? {
                         return Ok(Some(ThreadToUi::LogMessage(format!(
