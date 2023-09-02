@@ -1,10 +1,9 @@
 //use gtk::glib::clone;
+use crate::cpu_thread::cpu_thread;
+use crate::messages::{ThreadToUi, UiToThread};
 use gtk::glib::clone;
 use gtk::{glib, prelude::*};
 use gtk::{Application, ApplicationWindow};
-
-use crate::cpu_thread::cpu_thread;
-use crate::messages::{ThreadToUi, UiToThread};
 
 pub fn build_ui(app: &Application) {
     // Create the tx/rx for the secondary thread
