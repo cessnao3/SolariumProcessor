@@ -48,10 +48,21 @@ pub fn build_ui(app: &Application) {
             .orientation(gtk::Orientation::Vertical)
             .spacing(4)
             .build();
-        let btn_build = Button::builder().label("Assemble").build();
+        let btn_asm = Button::builder().label("Assemble").build();
+
+        btn_asm.connect_clicked(clone!(@strong tx_thread, @strong tx_ui => move |_| {
+            let asm = buffer_assembly_code.text(&buffer_assembly_code.start_iter(), &buffer_assembly_code.end_iter(), false);
+            match sda::assemble_text(asm.as_str()) {
+                Ok(v) => {
+                    tx_ui.send(UiToThread::SetCode(v)).unwrap();
+                    tx_thread.send(ThreadToUi::LogMessage("Assembly Successful".to_string())).unwrap();
+                }
+                Err(e) => tx_thread.send(ThreadToUi::LogMessage(format!("Assmbler: {e}"))).unwrap(),
+            }
+        }));
 
         code_box.append(&text_code_frame);
-        code_box.append(&btn_build);
+        code_box.append(&btn_asm);
 
         let page_asm = code_stack.add_child(&code_box);
         page_asm.set_title("ASM");
