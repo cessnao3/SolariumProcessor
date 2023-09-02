@@ -142,8 +142,8 @@ fn build_code_column(
         code_box.append(&text_code_frame);
         code_box.append(&btn_build);
 
-        let page_asm = code_stack.add_child(&code_box);
-        page_asm.set_title("ASM");
+        let page = code_stack.add_child(&code_box);
+        page.set_title(short_name);
     }
 
     let column_code = gtk::Box::builder()
