@@ -15,6 +15,7 @@ struct ThreadState {
     running: bool,
     multiplier: f64,
     run_thread: bool,
+    memory_request: (usize, usize),
     cpu: SolariumProcessor,
     serial_io_dev: Rc<RefCell<SerialInputOutputDevice>>,
     last_code: Vec<MemoryWord>,
@@ -31,6 +32,7 @@ impl ThreadState {
             cpu: SolariumProcessor::new(),
             serial_io_dev: Rc::new(RefCell::new(SerialInputOutputDevice::new(usize::MAX))),
             last_code: Vec::new(),
+            memory_request: (0, 0),
         };
 
         s.reset().unwrap();
@@ -75,6 +77,14 @@ impl ThreadState {
 
         self.cpu.hard_reset()?;
 
+        for (i, val) in self.last_code.iter().enumerate() {
+            if i < INIT_RO_LEN {
+                continue;
+            }
+
+            self.cpu.memory_set(i, *val)?;
+        }
+
         Ok(())
     }
 
@@ -109,22 +119,16 @@ impl ThreadState {
                         match sproc::text::character_to_word(c) {
                             Ok(word) => {
                                 if !state.serial_io_dev.borrow_mut().push_input(word) {
-                                    return Ok(Some(ThreadToUi::LogMessage("device serial input buffer full".to_string())));
+                                    return Ok(Some(ThreadToUi::LogMessage(
+                                        "device serial input buffer full".to_string(),
+                                    )));
                                 }
                             }
-                            Err(e) => {
-                                return Ok(Some(ThreadToUi::LogMessage(e.to_string())))
-                            }
+                            Err(e) => return Ok(Some(ThreadToUi::LogMessage(e.to_string()))),
                         }
                     }
                 }
-                UiToThread::RequestMemory(base, size) => {
-                    let mut resp_vec = Vec::new();
-                    for i in 0..size {
-                        resp_vec.push(state.cpu.memory_inspect(base + i)?);
-                    }
-                    return Ok(Some(ThreadToUi::ResponseMemory(base, resp_vec)));
-                }
+                UiToThread::RequestMemory(base, size) => state.memory_request = (base, size),
             }
 
             Ok(None)
@@ -184,7 +188,10 @@ pub fn cpu_thread(rx: Receiver<UiToThread>, tx: Sender<ThreadToUi>) {
         }
 
         if !char_vec.is_empty() {
-            tx.send(ThreadToUi::SerialOutput(char_vec.into_iter().collect::<String>())).unwrap();
+            tx.send(ThreadToUi::SerialOutput(
+                char_vec.into_iter().collect::<String>(),
+            ))
+            .unwrap();
         }
 
         // Step if required
@@ -201,7 +208,17 @@ pub fn cpu_thread(rx: Receiver<UiToThread>, tx: Sender<ThreadToUi>) {
         }
 
         // Send Registers
-        tx.send(ThreadToUi::RegisterState(state.cpu.get_register_state())).unwrap();
+        tx.send(ThreadToUi::RegisterState(state.cpu.get_register_state()))
+            .unwrap();
+
+        // Send memory if needed
+        let (base, size) = state.memory_request;
+        let mut resp_memory = Vec::new();
+        for i in 0..size {
+            resp_memory.push(state.cpu.memory_inspect(base + i).unwrap_or_default());
+        }
+        tx.send(ThreadToUi::ResponseMemory(base, resp_memory))
+            .unwrap();
 
         // Final sleep
         if state.running {

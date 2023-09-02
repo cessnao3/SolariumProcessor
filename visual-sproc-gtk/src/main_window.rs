@@ -1,8 +1,7 @@
 //use gtk::glib::clone;
 use gtk::glib::clone;
-use gtk::{glib, prelude::*, Entry};
-use gtk::{Adjustment, Application, ApplicationWindow, EditableLabel, Label, Scale};
-use gtk::{Box, Button, Frame, ScrolledWindow, Stack, StackSwitcher, TextBuffer, TextView};
+use gtk::{glib, prelude::*};
+use gtk::{Application, ApplicationWindow};
 
 use crate::cpu_thread::cpu_thread;
 use crate::messages::{ThreadToUi, UiToThread};
@@ -12,7 +11,7 @@ pub fn build_ui(app: &Application) {
     let (tx_ui, rx_thread) = std::sync::mpsc::channel::<UiToThread>();
     let (tx_thread, rx_ui) = glib::MainContext::channel::<ThreadToUi>(glib::Priority::DEFAULT);
 
-    let columns = Box::builder()
+    let columns = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .spacing(4)
         .margin_top(4)
@@ -24,7 +23,8 @@ pub fn build_ui(app: &Application) {
     columns.append(&build_code_column(&tx_ui, &tx_thread));
     let (column_cpu, register_fields, buffer_log) = build_cpu_column(&tx_ui);
     columns.append(&column_cpu);
-    columns.append(&build_serial_column(&tx_ui));
+    let (column_serial, memory_vals, buffer_serial) = build_serial_column(&tx_ui, &tx_thread);
+    columns.append(&column_serial);
 
     // Create a window and set the title
     let window = ApplicationWindow::builder()
@@ -44,8 +44,23 @@ pub fn build_ui(app: &Application) {
             ThreadToUi::LogMessage(msg) => {
                 buffer_log.insert(&mut buffer_log.end_iter(), &format!("{msg}\n"));
             }
-            ThreadToUi::ThreadExit => (),
-            _ => panic!("unknown message provided!"),
+            ThreadToUi::SerialOutput(msg) => {
+                buffer_serial.insert(&mut buffer_serial.end_iter(), msg.as_str());
+            }
+            ThreadToUi::ResponseMemory(base, vals) => {
+                for (i, l) in memory_vals.labels.iter().enumerate() {
+                    l.set_text(&format!("L{:04x}", base + 4 * i));
+                }
+
+                for (i, m) in memory_vals.locations.iter().enumerate() {
+                    if i < vals.len() {
+                        m.set_text(&format!("{:04x}", vals[i].get()));
+                    } else {
+                        m.set_text("");
+                    }
+                }
+            }
+            ThreadToUi::ThreadExit => return glib::ControlFlow::Break,
         };
 
         glib::ControlFlow::Continue
@@ -59,6 +74,9 @@ pub fn build_ui(app: &Application) {
     // Create the accompanying thread
     std::thread::spawn(move || cpu_thread(rx_thread, tx_thread));
 
+    // Activate the memory
+    memory_vals.base_input.unwrap().emit_activate();
+
     // Present window
     window.present();
 }
@@ -66,21 +84,23 @@ pub fn build_ui(app: &Application) {
 fn build_code_column(
     tx_ui: &std::sync::mpsc::Sender<UiToThread>,
     tx_thread: &gtk::glib::Sender<ThreadToUi>,
-) -> Box {
-    let code_stack = Stack::builder().build();
+) -> gtk::Box {
+    let code_stack = gtk::Stack::builder().build();
+
+    let default_asm = include_str!("../../examples/spa/serial_echo.smc");
 
     let code_options = vec![
-        ("; ASM Code", "Assemble", "ASM", true),
+        (default_asm, "Assemble", "ASM", true),
         ("// SPC Code", "Build", "SPC", false),
     ];
 
     for (comment, button_verb, short_name, is_assembly) in code_options.into_iter() {
-        let buffer_assembly_code = TextBuffer::builder()
+        let buffer_assembly_code = gtk::TextBuffer::builder()
             .enable_undo(true)
             .text(comment)
             .build();
 
-        let text_code = TextView::builder()
+        let text_code = gtk::TextView::builder()
             .buffer(&buffer_assembly_code)
             .width_request(300)
             .height_request(400)
@@ -90,17 +110,17 @@ fn build_code_column(
             .tooltip_text(&format!("Text input for {short_name} code"))
             .monospace(true)
             .build();
-        let text_code_scroll = ScrolledWindow::builder().child(&text_code).build();
-        let text_code_frame = Frame::builder()
+        let text_code_scroll = gtk::ScrolledWindow::builder().child(&text_code).build();
+        let text_code_frame = gtk::Frame::builder()
             .label(&format!("{} Code Editor", short_name))
             .child(&text_code_scroll)
             .build();
 
-        let code_box = Box::builder()
+        let code_box = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(4)
             .build();
-        let btn_build = Button::builder().label(button_verb).build();
+        let btn_build = gtk::Button::builder().label(button_verb).build();
 
         if is_assembly {
             btn_build.connect_clicked(clone!(@strong tx_thread, @strong tx_ui => move |_| {
@@ -126,12 +146,12 @@ fn build_code_column(
         page_asm.set_title("ASM");
     }
 
-    let column_code = Box::builder()
+    let column_code = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
         .build();
 
-    column_code.append(&StackSwitcher::builder().stack(&code_stack).build());
+    column_code.append(&gtk::StackSwitcher::builder().stack(&code_stack).build());
     column_code.append(&code_stack);
 
     column_code
@@ -139,22 +159,22 @@ fn build_code_column(
 
 fn build_cpu_column(
     tx_ui: &std::sync::mpsc::Sender<UiToThread>,
-) -> (Box, Vec<EditableLabel>, TextBuffer) {
-    let column_cpu = Box::builder()
+) -> (gtk::Box, Vec<gtk::EditableLabel>, gtk::TextBuffer) {
+    let column_cpu = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
         .build();
 
-    let cpu_controls_box = Box::builder()
+    let cpu_controls_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
         .build();
-    let cpu_controls_frame = Frame::builder()
+    let cpu_controls_frame = gtk::Frame::builder()
         .label("CPU Controls")
         .child(&cpu_controls_box)
         .build();
 
-    let cpu_controls_buttons = Box::builder()
+    let cpu_controls_buttons = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .spacing(4)
         .build();
@@ -169,17 +189,17 @@ fn build_cpu_column(
     ];
 
     for (lbl, action) in cpu_btns.into_iter() {
-        let btn = Button::builder().label(lbl).hexpand(true).build();
+        let btn = gtk::Button::builder().label(lbl).hexpand(true).build();
         btn.connect_clicked(clone!(@strong tx_ui => move |_| tx_ui.send(action.clone()).unwrap()));
         cpu_controls_buttons.append(&btn);
     }
 
     column_cpu.append(&cpu_controls_frame);
 
-    let cpu_speed_scale = Scale::builder()
+    let cpu_speed_scale = gtk::Scale::builder()
         .draw_value(true)
         .adjustment(
-            &Adjustment::builder()
+            &gtk::Adjustment::builder()
                 .lower(1.0)
                 .upper(10.0)
                 .value(1.0)
@@ -188,23 +208,26 @@ fn build_cpu_column(
         .show_fill_level(true)
         .build();
 
-    cpu_speed_scale.connect_change_value(clone!(@strong tx_ui => move |_, _, val| tx_ui.send(UiToThread::SetMultiplier(val)).unwrap(); glib::Propagation::Proceed));
+    cpu_speed_scale.connect_change_value(clone!(@strong tx_ui => move |_, _, val| {
+        tx_ui.send(UiToThread::SetMultiplier(val)).unwrap();
+        glib::Propagation::Proceed
+    }));
     cpu_controls_box.append(&cpu_speed_scale);
 
-    let register_box = Box::builder()
+    let register_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .spacing(4)
         .build();
-    let register_box_a = Box::builder()
+    let register_box_a = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
         .build();
-    let register_box_b = Box::builder()
+    let register_box_b = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
         .build();
 
-    let register_frame = Frame::builder()
+    let register_frame = gtk::Frame::builder()
         .label("Registers")
         .child(&register_box)
         .build();
@@ -220,17 +243,17 @@ fn build_cpu_column(
             register_box_b.clone()
         };
 
-        let inner_box = Box::builder()
+        let inner_box = gtk::Box::builder()
             .orientation(gtk::Orientation::Horizontal)
             .margin_start(4)
             .margin_end(4)
             .build();
 
-        let label = Label::builder()
+        let label = gtk::Label::builder()
             .label(&format!("R{i:02}"))
             .margin_end(6)
             .build();
-        let text = EditableLabel::builder()
+        let text = gtk::EditableLabel::builder()
             .text(&format!("0x{:04x}", 0))
             .hexpand(true)
             .editable(false)
@@ -246,9 +269,9 @@ fn build_cpu_column(
 
     column_cpu.append(&register_frame);
 
-    let buffer_log = TextBuffer::builder().build();
+    let buffer_log = gtk::TextBuffer::builder().build();
 
-    let text_log = TextView::builder()
+    let text_log = gtk::TextView::builder()
         .buffer(&buffer_log)
         .width_request(300)
         .height_request(200)
@@ -259,9 +282,10 @@ fn build_cpu_column(
         .tooltip_text("Application log")
         .monospace(true)
         .build();
-    let text_log_frame = Frame::builder()
+    let text_scroll = gtk::ScrolledWindow::builder().child(&text_log).build();
+    let text_log_frame = gtk::Frame::builder()
         .label("Application Log")
-        .child(&text_log)
+        .child(&text_scroll)
         .build();
 
     column_cpu.append(&text_log_frame);
@@ -269,15 +293,81 @@ fn build_cpu_column(
     (column_cpu, register_fields, buffer_log)
 }
 
-fn build_serial_column(tx_ui: &std::sync::mpsc::Sender<UiToThread>,) -> Box {
-    let column_serial = Box::builder()
+struct MemoryLocationData {
+    labels: Vec<gtk::Label>,
+    locations: Vec<gtk::Label>,
+    base_input: Option<gtk::Entry>,
+}
+
+impl MemoryLocationData {
+    fn new() -> Self {
+        Self {
+            labels: Vec::new(),
+            locations: Vec::new(),
+            base_input: None,
+        }
+    }
+}
+
+fn build_serial_column(
+    tx_ui: &std::sync::mpsc::Sender<UiToThread>,
+    tx_thread: &gtk::glib::Sender<ThreadToUi>,
+) -> (gtk::Box, MemoryLocationData, gtk::TextBuffer) {
+    let column_serial = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
         .build();
 
-    let buffer_serial = TextBuffer::builder().build();
+    let memory_box = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .build();
+    let memory_frame = gtk::Frame::builder()
+        .label("Memory")
+        .child(&memory_box)
+        .build();
 
-    let text_serial = TextView::builder()
+    let mut memory = MemoryLocationData::new();
+
+    let memory_base_entry = gtk::Entry::builder().text("0").build();
+
+    let memory_grid = gtk::Grid::builder()
+        .hexpand(true)
+        .row_spacing(4)
+        .column_homogeneous(true)
+        .build();
+    for i in 0..6 {
+        let label = gtk::Label::builder().label(format!("R{i}")).build();
+        memory_grid.attach(&label, 0, i, 1, 1);
+        memory.labels.push(label);
+
+        for j in 0..4 {
+            let mem_lbl = gtk::Label::builder()
+                .label(format!("0x{:04x}", i * 4 + j))
+                .build();
+            memory_grid.attach(&mem_lbl, 1 + j, i, 1, 1);
+            memory.locations.push(mem_lbl);
+        }
+    }
+
+    let memory_count = memory.locations.len();
+    memory_base_entry.connect_activate(clone!(@strong tx_ui, @strong tx_thread => move |t| {
+        match usize::from_str_radix(&t.text(), 16) {
+            Ok(v) => tx_ui.send(UiToThread::RequestMemory(v, memory_count)).unwrap(),
+            Err(_) => {
+                tx_thread.send(ThreadToUi::LogMessage(format!("Unable to set '{}' as base in hex", t.text()))).unwrap();
+            }
+        }
+    }));
+
+    memory_box.append(&memory_base_entry);
+    memory_box.append(&memory_grid);
+    column_serial.append(&memory_frame);
+
+    memory.base_input = Some(memory_base_entry);
+
+    let buffer_serial = gtk::TextBuffer::builder().build();
+
+    let text_serial = gtk::TextView::builder()
         .buffer(&buffer_serial)
         .width_request(300)
         .height_request(200)
@@ -289,24 +379,24 @@ fn build_serial_column(tx_ui: &std::sync::mpsc::Sender<UiToThread>,) -> Box {
         .tooltip_text("Serial log")
         .monospace(true)
         .build();
-    let text_serial_frame = Frame::builder()
+    let text_serial_frame = gtk::Frame::builder()
         .label("Serial Log")
         .child(&text_serial)
         .build();
 
     column_serial.append(&text_serial_frame);
 
-    let text_input_box = Box::builder()
+    let text_input_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
         .build();
 
-    let text_input_frame = Frame::builder()
+    let text_input_frame = gtk::Frame::builder()
         .label("Serial Input")
         .child(&text_input_box)
         .build();
 
-    let text_input = Entry::builder().build();
+    let text_input = gtk::Entry::builder().build();
     text_input.connect_activate(clone!(@strong tx_ui => move |t| {
         tx_ui.send(UiToThread::SerialInput(t.text().to_string())).unwrap();
         t.set_text("");
@@ -314,13 +404,13 @@ fn build_serial_column(tx_ui: &std::sync::mpsc::Sender<UiToThread>,) -> Box {
 
     text_input_box.append(&text_input);
 
-    let text_input_button_box = Box::builder()
+    let text_input_button_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .spacing(4)
         .build();
-    let text_input_btn_submit = Button::builder().label("Submit").build();
+    let text_input_btn_submit = gtk::Button::builder().label("Submit").build();
     text_input_btn_submit.connect_clicked(clone!(@strong tx_ui => move |_| {
-        tx_ui.send(UiToThread::SerialInput(text_input.text().to_string())).unwrap();
+        tx_ui.send(UiToThread::SerialInput(format!("{}\n", text_input.text()))).unwrap();
         text_input.set_text("");
     }));
 
@@ -330,5 +420,5 @@ fn build_serial_column(tx_ui: &std::sync::mpsc::Sender<UiToThread>,) -> Box {
 
     column_serial.append(&text_input_frame);
 
-    column_serial
+    (column_serial, memory, buffer_serial)
 }
