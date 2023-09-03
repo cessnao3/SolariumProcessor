@@ -7,14 +7,24 @@ use std::collections::HashMap;
 
 const MAX_ADDRESSABLE_VALUE: usize = (2usize).pow(16);
 
-enum AssembleResult {
+enum AssembleWordCommand {
     Word(MemoryWord),
     Opcode(LineInformation, CreateInstructionData),
     GetLabel(LineInformation, String),
 }
 
+impl std::fmt::Display for AssembleWordCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AssembleWordCommand::GetLabel(l, lbl) => write!(f, "get('{lbl}') -> {l}"),
+            AssembleWordCommand::Opcode(l, _) => write!(f, "op('{l}')"),
+            AssembleWordCommand::Word(w) => write!(f, "word({:04x})", w.get()),
+        }
+    }
+}
+
 struct AssemblyState {
-    map: HashMap<usize, AssembleResult>,
+    map: HashMap<usize, AssembleWordCommand>,
     labels: HashMap<String, usize>,
     next_loc: usize,
 }
@@ -34,11 +44,11 @@ impl AssemblyState {
     }
 
     fn add_word(&mut self, word: MemoryWord) -> Result<(), AssemblerError> {
-        self.add_res(AssembleResult::Word(word))
+        self.add_res(AssembleWordCommand::Word(word))
     }
 
     fn add_opcode(&mut self, l: &LineInformation, op: CreateInstructionData) -> Result<(), AssemblerError> {
-        self.add_res(AssembleResult::Opcode(l.clone(), op))
+        self.add_res(AssembleWordCommand::Opcode(l.clone(), op))
     }
 
     fn add_label(&mut self, s: &str) -> Result<(), AssemblerError> {
@@ -51,10 +61,10 @@ impl AssemblyState {
     }
 
     fn add_load_label(&mut self, l: &LineInformation, s: &str) -> Result<(), AssemblerError> {
-        self.add_res(AssembleResult::GetLabel(l.clone(), s.to_string()))
+        self.add_res(AssembleWordCommand::GetLabel(l.clone(), s.to_string()))
     }
 
-    fn add_res(&mut self, r: AssembleResult) -> Result<(), AssemblerError> {
+    fn add_res(&mut self, r: AssembleWordCommand) -> Result<(), AssemblerError> {
         if let std::collections::hash_map::Entry::Vacant(e) = self.map.entry(self.next_loc) {
             if self.next_loc >= MAX_ADDRESSABLE_VALUE {
                 Err(AssemblerError::AddressTooLarge(self.next_loc))
@@ -78,15 +88,15 @@ impl AssemblyState {
         data_vec.resize(max_index + 1, MemoryWord::default());
 
         for (i, val) in self.map.iter() {
-            match val {
-                AssembleResult::GetLabel(loc, lbl) => {
+            data_vec[*i] = match val {
+                AssembleWordCommand::GetLabel(loc, lbl) => {
                     if let Some(dest) = self.labels.get(lbl) {
-                        data_vec[0] = MemoryWord::from(*dest as u16);
+                        MemoryWord::from(*dest as u16)
                     } else {
                         return Err(AssemblerErrorLocation { info: loc.clone(), err: AssemblerError::MissingLabel(lbl.clone()) });
                     }
                 }
-                AssembleResult::Opcode(loc, op) => {
+                AssembleWordCommand::Opcode(loc, op) => {
                     // Create new arguments to update for assembly locations
                     let new_args = op.default_args.iter().map(|a| {
                         match a {
@@ -108,12 +118,12 @@ impl AssemblyState {
                     }
 
                     // Add the resulting parameter
-                    data_vec[*i] = match inner_create_fnc(op, &new_args) {
+                    match inner_create_fnc(op, &new_args) {
                         Ok(v) => v,
                         Err(e) => return Err(AssemblerErrorLocation { info: loc.clone(), err: e }),
                     }
                 }
-                AssembleResult::Word(w) => data_vec[*i] = *w,
+                AssembleWordCommand::Word(w) => *w,
             };
         }
 
