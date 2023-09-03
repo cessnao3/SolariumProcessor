@@ -21,5 +21,6 @@ pub enum ThreadToUi {
     SerialOutput(String),
     LogMessage(String),
     RegisterState([MemoryWord; SolariumProcessor::NUM_REGISTERS]),
+    ProcessorReset,
     ThreadExit,
 }

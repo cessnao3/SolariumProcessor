@@ -98,7 +98,10 @@ impl ThreadState {
                 UiToThread::CpuStart => state.running = true,
                 UiToThread::CpuStop => state.running = false,
                 UiToThread::Exit => state.run_thread = false,
-                UiToThread::CpuReset => state.reset()?,
+                UiToThread::CpuReset => {
+                    state.reset()?;
+                    return Ok(Some(ThreadToUi::ProcessorReset));
+                },
                 UiToThread::CpuIrq(irq) => {
                     if !state.cpu.hardware_interrupt(irq as usize)? {
                         return Ok(Some(ThreadToUi::LogMessage(format!(
@@ -112,6 +115,7 @@ impl ThreadState {
                 UiToThread::SetCode(data) => {
                     state.last_code = data;
                     state.reset()?;
+                    return Ok(Some(ThreadToUi::ProcessorReset));
                 }
                 UiToThread::SerialInput(s) => {
                     for c in s.chars().chain(['\n'; 1]) {
