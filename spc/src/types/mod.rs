@@ -2,7 +2,6 @@
 pub enum BuiltinTypes {
     U16,
     I16,
-    Void
 }
 
 impl BuiltinTypes {
@@ -16,14 +15,15 @@ impl std::fmt::Display for BuiltinTypes {
         match self {
             Self::U16 => write!(f, "u16"),
             Self::I16 => write!(f, "i16"),
-            Self::Void => write!(f, "void"),
         }
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum SpType {
-    Primitive{ name: String, base: BuiltinTypes },
+    OpaqueType{ name: String },
+    Primitive{ base: BuiltinTypes },
+    Alias{ name: String, base: Box<SpType> },
     Array{ base: Box<SpType>, size: usize },
     Struct{ name: String, fields: Vec<(String, Box<SpType>)> },
     Pointer{ base: Box<SpType> },
@@ -43,14 +43,27 @@ impl SpType {
         }
     }
 
-    pub fn word_count(&self) -> usize {
+    pub fn word_count(&self) -> Result<usize, String> {
         match self {
-            Self::Primitive { base, .. } => base.word_count(),
-            Self::Array { base, size } => base.word_count() * size,
+            Self::OpaqueType { .. } => Err("opaque type has no size".to_string()),
+            Self::Primitive { base, .. } => Ok(base.word_count()),
+            Self::Array { base, size } => Ok(base.word_count()? * size),
             Self::Struct { fields, .. } => fields.iter().map(|(_, t)| t.word_count()).sum(),
-            Self::Pointer { .. } => BuiltinTypes::U16.word_count(),
-            Self::Function { .. } => BuiltinTypes::U16.word_count(),
+            Self::Pointer { .. } => Ok(BuiltinTypes::U16.word_count()),
+            Self::Function { .. } => Ok(BuiltinTypes::U16.word_count()),
             Self::Constant { base } => base.word_count(),
+            Self::Alias { base, .. } => base.word_count(),
+        }
+    }
+
+    pub fn base_primitive(&self) -> Option<SpType> {
+        match self {
+            Self::Pointer { .. } => Some(SpType::Primitive { base: BuiltinTypes::U16 }),
+            Self::Array { .. } => Some(SpType::Primitive { base: BuiltinTypes::U16 }),
+            Self::Primitive { .. } => Some(self.clone()),
+            Self::Alias { base, .. } => base.base_primitive(),
+            Self::Constant { base } => base.base_primitive(),
+            _ => None,
         }
     }
 }
@@ -58,8 +71,9 @@ impl SpType {
 impl std::fmt::Display for SpType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Primitive{ name: n, .. } => write!(f, "{n}"),
-            Self::Array{ base, size } => write!(f, "[{size}]{}", base.to_string()),
+            Self::OpaqueType { name } => write!(f, "{name}"),
+            Self::Primitive{ base } => write!(f, "{base}"),
+            Self::Array{ base, size } => write!(f, "[{size}]{base}"),
             Self::Struct{ name, .. } => write!(f, "{name}"),
             Self::Pointer{ base, .. } => write!(f, "*{base}"),
             Self::Constant{ base, .. } => write!(f, "${base}"),
@@ -73,6 +87,7 @@ impl std::fmt::Display for SpType {
                 }
                 write!(f, ")")
             },
+            Self::Alias { name, .. } => write!(f, "{name}"),
         }
     }
 }

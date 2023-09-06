@@ -1,6 +1,9 @@
 def var_name: var_type;
 def array_name: [SIZE]var_type;
 def int_test: u16 = 3;
+def ptr_test: *u16 = 6;
+def void_test: *void = 0;
+def void_er: void;
 
 struct type_name
 {

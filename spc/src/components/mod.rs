@@ -37,9 +37,9 @@ impl CompilerState {
             //functions: HashMap::new(),
             scopes: vec![Scope::new()],
             types: vec![
-                SpType::Primitive{ name: "void".to_string(), base: BuiltinTypes::U16 },
-                SpType::Primitive{ name: "u16".to_string(), base: BuiltinTypes::U16 },
-                SpType::Primitive{ name: "i16".to_string(), base: BuiltinTypes::I16 },
+                SpType::Primitive{ base: BuiltinTypes::U16 },
+                SpType::Primitive{ base: BuiltinTypes::I16 },
+                SpType::OpaqueType { name: "void".to_string() },
             ]
         }
     }
