@@ -69,14 +69,14 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
     if let Some(first_ind) = s.find(|c| c == '{' || c == ';') {
         struct_name = s[..first_ind].trim();
 
-        if !SpType::is_valid_name(struct_name) {
+        if !SpType::is_valid_name(struct_name) || struct_name == "void" {
             return Err(ParseError::new(0, 0, &format!("struct name `{struct_name}` is not a valid type name")));
         }
 
         if let Some(';') = s.chars().nth(first_ind) {
             match state.get_type(struct_name) {
-                Ok(SpType::OpaqueType { .. }) => (),
                 Ok(SpType::Struct { .. }) => (),
+                Ok(SpType::OpaqueType { .. }) => (),
                 Err(_) => { state.types.insert(struct_name.to_string(), SpType::OpaqueType { name: struct_name.to_string() }); },
                 Ok(_) => return Err(ParseError { line: 0, col: 0, msg: format!("unexpected provided type for given type value for {struct_name}") }),
             }
@@ -396,7 +396,9 @@ mod test
         let init_type_len = state.types.len();
 
         let struct_dec = "struct type_1; struct type_2; struct type_1; struct type_2; struct type_2;";
-        assert!(parse_with_state(struct_dec, &mut state).is_ok());
+        if let Err(e) = parse_with_state(struct_dec, &mut state) {
+            panic!("{e}");
+        }
 
         assert_eq!(state.types.len(), 2 + init_type_len);
 
@@ -409,7 +411,9 @@ mod test
         }
 
         let struct_def = "struct type_1 { f: *type_2 }";
-        assert!(parse_with_state(struct_def, &mut state).is_ok());
+        if let Err(e) = parse_with_state(struct_def, &mut state) {
+            panic!("{e}");
+        }
 
         assert_eq!(state.types.len(), 2 + init_type_len);
 
@@ -423,5 +427,18 @@ mod test
         if let Ok(SpType::OpaqueType { name }) = state.get_type("type_2") {
             assert_eq!(name, "type_2");
         }
+    }
+
+    #[test]
+    fn test_parse_struct_void()
+    {
+        let mut state = ParserState::new();
+
+        let init_type_len = state.types.len();
+
+        let s = "struct void;";
+
+        assert!(parse_with_state(s, &mut state).is_err());
+        assert_eq!(state.types.len(), init_type_len);
     }
 }
