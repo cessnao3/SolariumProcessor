@@ -5,6 +5,8 @@ def ptr_test: *u16 = 6;
 def void_test: *void = 0;
 def void_er: void;
 
+def func_ptr: ^ret_type(type_1, type_2, type_3) = 3049;
+
 struct type_name
 {
     var1: type1;

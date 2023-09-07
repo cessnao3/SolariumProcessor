@@ -25,6 +25,46 @@ pub fn parse(s: &str) -> Result<(), ParseError> {
 }
 
 fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> {
+    // Strip out comments
+    let mut s = s
+        .lines()
+        .map(|l| {
+            match l.find("//") {
+                Some(i) => l[..i].trim_end(),
+                None => l,
+            }
+            .to_string()
+        })
+        .reduce(|a, b| format!("{a}\n{b}"))
+        .unwrap_or(String::new());
+
+    // Strip out block comments
+
+    while let Some(i1) = s.find("/*") {
+        if let Some(i2) = s.find("*/") {
+            if i2 < i1 + 2 {
+                return Err(ParseError::new(
+                    0,
+                    0,
+                    "block comment end before block comment start",
+                ));
+            }
+
+            let removed = s
+                .drain(i1..(i2 + 2))
+                .collect::<String>();
+            assert!(removed.starts_with("/*"));
+            assert!(removed.ends_with("*/"));
+        } else {
+            return Err(ParseError::new(
+                0,
+                0,
+                "unable to find matching '*/' for block comment",
+            ));
+        }
+    }
+
+    // Loop Parameters
     let mut current = s.trim_start();
 
     while !current.is_empty() {
@@ -34,8 +74,7 @@ fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> 
         // Find the first word
         let (first_word, remaining) = if let Some(ind) = current.find(char::is_whitespace) {
             (&current[..ind], &current[ind..])
-        }
-        else {
+        } else {
             (current, "")
         };
 
@@ -44,9 +83,13 @@ fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> 
             "asmfn" => parse_asmfn_statement(remaining, state)?,
             "def" => parse_def_statement(remaining, state)?,
             "struct" => parse_struct_statement(remaining, state)?,
-            "//" => skip_to_next_line(s)?,
-            "/*" => skip_to_end_of_comment_block(s)?,
-            word => return Err(ParseError::new(0, 0, &format!("unknown start of base expression {word}"))),
+            word => {
+                return Err(ParseError::new(
+                    0,
+                    0,
+                    &format!("unknown start of base expression {word}"),
+                ))
+            }
         };
     }
 
@@ -73,32 +116,56 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
         struct_name = s[..first_ind].trim();
 
         if !SpType::is_valid_name(struct_name) || struct_name == "void" {
-            return Err(ParseError::new(0, 0, &format!("struct name `{struct_name}` is not a valid type name")));
+            return Err(ParseError::new(
+                0,
+                0,
+                &format!("struct name `{struct_name}` is not a valid type name"),
+            ));
         }
 
         if let Some(';') = s.chars().nth(first_ind) {
             match state.types.get_type(struct_name) {
                 Ok(SpType::Struct { .. }) => (),
                 Ok(SpType::OpaqueType { .. }) => (),
-                Err(_) => { state.types.add_type(SpType::OpaqueType { name: struct_name.to_string() })?; },
-                Ok(_) => return Err(ParseError { line: 0, col: 0, msg: format!("unexpected provided type for given type value for {struct_name}") }),
+                Err(_) => {
+                    state.types.add_type(SpType::OpaqueType {
+                        name: struct_name.to_string(),
+                    })?;
+                }
+                Ok(_) => {
+                    return Err(ParseError {
+                        line: 0,
+                        col: 0,
+                        msg: format!(
+                            "unexpected provided type for given type value for {struct_name}"
+                        ),
+                    })
+                }
             }
 
-            return Ok(&s[(first_ind+1)..]);
+            return Ok(&s[(first_ind + 1)..]);
         }
 
         if let Some(close_ind) = s.find('}') {
             if close_ind < first_ind {
-                return Err(ParseError::new(0, 0, "struct unexpected closing brace before open brace"));
+                return Err(ParseError::new(
+                    0,
+                    0,
+                    "struct unexpected closing brace before open brace",
+                ));
             }
 
-            fields_string = s[first_ind+1..close_ind].trim();
-            remaining = s[close_ind+1..].trim_start();
+            fields_string = s[first_ind + 1..close_ind].trim();
+            remaining = s[close_ind + 1..].trim_start();
         } else {
             return Err(ParseError::new(0, 0, "no closing brace found"));
         }
     } else {
-        return Err(ParseError::new(0, 0, "unable to find open brace for struct definition"));
+        return Err(ParseError::new(
+            0,
+            0,
+            "unable to find open brace for struct definition",
+        ));
     }
 
     let fields = fields_string
@@ -109,25 +176,45 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
         .collect::<Option<Vec<_>>>();
 
     if fields.is_none() {
-        return Err(ParseError::new(0, 0, &format!("unable to parse field entries for {struct_name}")));
+        return Err(ParseError::new(
+            0,
+            0,
+            &format!("unable to parse field entries for {struct_name}"),
+        ));
     }
 
-    let fields = fields.unwrap().iter()
+    let fields = fields
+        .unwrap()
+        .iter()
         .map(|(s1, s2)| (s1.trim(), s2.trim()))
         .collect::<Vec<_>>();
 
     if fields.is_empty() {
-        return Err(ParseError::new(0, 0, &format!("no fields provided for {struct_name}")));
+        return Err(ParseError::new(
+            0,
+            0,
+            &format!("no fields provided for {struct_name}"),
+        ));
     }
 
-    fn to_field_entry(e: (&str, &str), parser: &ParserState) -> Result<(String, Box<SpType>), ParseError> {
+    fn to_field_entry(
+        e: (&str, &str),
+        parser: &ParserState,
+    ) -> Result<(String, Box<SpType>), ParseError> {
         if !SpType::is_valid_name(e.0) {
-            Err(ParseError::new(0, 0, &format!("field `{}` is not a valid name", e.0)))
-        }
-        else if let Ok(t) = parser.types.get_type(e.1) {
+            Err(ParseError::new(
+                0,
+                0,
+                &format!("field `{}` is not a valid name", e.0),
+            ))
+        } else if let Ok(t) = parser.types.get_type(e.1) {
             Ok((e.0.to_string(), Box::new(t)))
         } else {
-            Err(ParseError::new(0, 0, &format!("no type `{}` found for field `{}`", e.1, e.0)))
+            Err(ParseError::new(
+                0,
+                0,
+                &format!("no type `{}` found for field `{}`", e.1, e.0),
+            ))
         }
     }
 
@@ -143,7 +230,13 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
 
     match state.types.get_type(struct_name) {
         Ok(SpType::OpaqueType { .. }) => (),
-        Ok(_) => return Err(ParseError::new(0, 0, &format!("cannot create struct `{struct_name}` - type with name already exists!"))),
+        Ok(_) => {
+            return Err(ParseError::new(
+                0,
+                0,
+                &format!("cannot create struct `{struct_name}` - type with name already exists!"),
+            ))
+        }
         _ => (),
     };
 
@@ -157,18 +250,22 @@ fn parse_def_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a st
         let name = s[..type_split].trim();
 
         if !SpType::is_valid_name(name) {
-            return Err(ParseError::new(0, 0, &format!("variable name `{name}` not valid")));
+            return Err(ParseError::new(
+                0,
+                0,
+                &format!("variable name `{name}` not valid"),
+            ));
         }
 
         let end_ind = s.find(';').unwrap();
 
-        let remaining = &s[type_split+1..end_ind];
+        let remaining = &s[type_split + 1..end_ind];
         let type_name;
         let expression;
 
         if let Some(expr_ind) = remaining.find('=') {
             type_name = remaining[..expr_ind].trim();
-            expression = Some(remaining[expr_ind+1..].trim());
+            expression = Some(remaining[expr_ind + 1..].trim());
         } else {
             type_name = remaining.trim();
             expression = None;
@@ -185,26 +282,9 @@ fn parse_def_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a st
 
         println!("Defining type {name} as type {t}");
 
-        Ok(s[end_ind+1..].trim_start())
+        Ok(s[end_ind + 1..].trim_start())
     } else {
         Err(ParseError::new(0, 0, "no type provided in statement!"))
-    }
-}
-
-fn skip_to_next_line(s: &str) -> Result<&str, ParseError> {
-    if let Some(i) = s.find('\n') {
-        Ok(&s[i+1..])
-    }
-    else {
-        Ok("")
-    }
-}
-
-fn skip_to_end_of_comment_block(s: &str) -> Result<&str, ParseError> {
-    if let Some(i) = s.find("*/") {
-        Ok(&s[i+2..])
-    } else {
-        Err(ParseError::new(0, 0, "no end comment block provided!"))
     }
 }
 
@@ -264,13 +344,11 @@ impl From<SpTypeError> for ParseError {
 }
 
 #[cfg(test)]
-mod test
-{
+mod test {
     use super::*;
 
     #[test]
-    fn test_parse_struct()
-    {
+    fn test_parse_struct() {
         let mut state = ParserState::new();
         let struct_string = "
         struct type_name
@@ -278,7 +356,8 @@ mod test
             var1: u16,
             var2: i16,
         }
-        ".trim();
+        "
+        .trim();
 
         let res = parse_with_state(struct_string, &mut state);
 
@@ -304,13 +383,8 @@ mod test
     }
 
     #[test]
-    fn test_parse_struct_multiple()
-    {
-        let simple_types = [
-            "u16",
-            "i16",
-            "*void",
-        ];
+    fn test_parse_struct_multiple() {
+        let simple_types = ["u16", "i16", "*void"];
 
         let mut initial_types = Vec::new();
 
@@ -323,7 +397,8 @@ mod test
                 (0..=i)
                     .map(|j| format!("var{j}: {}", simple_types[j]))
                     .reduce(|a, b| format!("{a}, {b}"))
-                    .unwrap_or(String::new()));
+                    .unwrap_or(String::new())
+            );
             if let Err(e) = parse_with_state(&s, &mut state) {
                 panic!("{e}");
             }
@@ -342,13 +417,21 @@ mod test
                         initial_types.push(st.clone())
                     }
                     v => panic!("unknown type `{v}` parsed"),
-                }
-                Err(e) => panic!("{e}")
+                },
+                Err(e) => panic!("{e}"),
             }
         }
 
         let join_name = "type_joined";
-        let join_struct_string = format!("struct {join_name} {{ {} }}", initial_types.iter().enumerate().map(|(i, t)| format!("var{i}: {t}")).reduce(|a, b| format!("{a}, {b}")).unwrap_or(String::new()));
+        let join_struct_string = format!(
+            "struct {join_name} {{ {} }}",
+            initial_types
+                .iter()
+                .enumerate()
+                .map(|(i, t)| format!("var{i}: {t}"))
+                .reduce(|a, b| format!("{a}, {b}"))
+                .unwrap_or(String::new())
+        );
 
         if let Err(e) = parse_with_state(&join_struct_string, &mut state) {
             panic!("{e}");
@@ -367,13 +450,13 @@ mod test
     }
 
     #[test]
-    fn test_parse_struct_opaque()
-    {
+    fn test_parse_struct_opaque() {
         let mut state = ParserState::new();
 
         let init_type_len = state.types.len();
 
-        let struct_dec = "struct type_1; struct type_2; struct type_1; struct type_2; struct type_2;";
+        let struct_dec =
+            "struct type_1; struct type_2; struct type_1; struct type_2; struct type_2;";
         if let Err(e) = parse_with_state(struct_dec, &mut state) {
             panic!("{e}");
         }
@@ -399,7 +482,14 @@ mod test
             assert_eq!(name, "type_1");
             assert_eq!(fields.len(), 1);
             assert_eq!(fields[0].0, "f");
-            assert_eq!(fields[0].1, Box::new(SpType::Pointer { base: Box::new(SpType::OpaqueType { name: "type_2".to_string() }) }));
+            assert_eq!(
+                fields[0].1,
+                Box::new(SpType::Pointer {
+                    base: Box::new(SpType::OpaqueType {
+                        name: "type_2".to_string()
+                    })
+                })
+            );
         }
 
         if let Ok(SpType::OpaqueType { name }) = state.types.get_type("type_2") {
@@ -408,8 +498,7 @@ mod test
     }
 
     #[test]
-    fn test_parse_struct_void()
-    {
+    fn test_parse_struct_void() {
         let mut state = ParserState::new();
 
         let init_type_len = state.types.len();
@@ -419,4 +508,55 @@ mod test
         assert!(parse_with_state(s, &mut state).is_err());
         assert_eq!(state.types.len(), init_type_len);
     }
+
+    #[test]
+    fn test_parse_line_comment() {
+        let comments = "// This is a comment!
+        // This is a comment, too
+
+        // This is also a comment?";
+
+        let mut state = ParserState::new();
+
+        if let Err(e) = parse_with_state(comments, &mut state) {
+            panic!("{e}");
+        }
+    }
+
+    #[test]
+    fn test_parse_block_comment() {
+        let comments = "// This is a comment!
+        /* This is a
+        multi-line
+        block comment */
+        /* This is a single-line block comment */
+        /* And this is as well
+        */";
+
+        if let Err(e) = parse_with_state(comments, &mut ParserState::new()) {
+            panic!("{e}");
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_parse_block_comment_invalid_location() {
+        let comments = "*/ /* This is a block comment! */";
+        if let Err(e) = parse_with_state(comments, &mut ParserState::new()) {
+            panic!("{e}");
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_parse_invalid_line_block_comment() {
+        let comments = "///*
+        This is in a comment, but it really isn't!
+        */";
+
+        if let Err(e) = parse_with_state(comments, &mut ParserState::new()) {
+            panic!("{e}");
+        }
+    }
+
 }

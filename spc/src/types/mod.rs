@@ -19,6 +19,37 @@ impl std::fmt::Display for BuiltinTypes {
     }
 }
 
+#[derive(Debug)]
+pub enum SpTypeError {
+    ArraySizeError(String),
+    ArrayTypeError(String),
+    NoTypeFound(String),
+    InvalidTypeName(String),
+    EmptyType(String),
+    UnableToModifyBuiltin,
+    CannotOverrideType{ new_type: SpType, old_type: SpType },
+    MissingTypeSize(SpType),
+    MissingTypeName(SpType),
+    InvalidWhitespace(String),
+}
+
+impl std::fmt::Display for SpTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ArraySizeError(t) => write!(f, "unable to find valid array size for '{t}'"),
+            Self::ArrayTypeError(t) => write!(f, "unable to find valid array type for '{t}'"),
+            Self::NoTypeFound(t) => write!(f, "no type found for name '{t}'"),
+            Self::InvalidTypeName(t) => write!(f, "'{t}' is not a valid type name"),
+            Self::EmptyType(t) => write!(f, "type specification empty for '{t}'"),
+            Self::UnableToModifyBuiltin => write!(f, "unable to modify builtin type"),
+            Self::CannotOverrideType{ new_type, old_type } => write!(f, "unable to override '{new_type}' with '{old_type}'"),
+            Self::MissingTypeSize(t) => write!(f, "missing type size for '{t}'"),
+            Self::MissingTypeName(t) => write!(f, "missing type name specification for '{t}'"),
+            Self::InvalidWhitespace(t) => write!(f, "unexpected whitespace found in '{t}'"),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum SpType {
     OpaqueType{ name: String },
@@ -28,7 +59,7 @@ pub enum SpType {
     Struct{ name: String, fields: Vec<(String, Box<SpType>)> },
     Pointer{ base: Box<SpType> },
     Constant{ base: Box<SpType> },
-    Function{ args: Vec<Box<SpType>> },
+    Function{ ret: Box<SpType>, args: Vec<Box<SpType>> },
 }
 
 impl SpType {
@@ -77,48 +108,8 @@ impl std::fmt::Display for SpType {
             Self::Struct{ name, .. } => write!(f, "{name}"),
             Self::Pointer{ base, .. } => write!(f, "*{base}"),
             Self::Constant{ base, .. } => write!(f, "${base}"),
-            Self::Function { args } => {
-                write!(f, "fn(")?;
-                for (i, t) in args.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{t}")?;
-                }
-                write!(f, ")")
-            },
-            Self::Alias { name, .. } => write!(f, "{name}"),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum SpTypeError {
-    ArraySizeError(String),
-    ArrayTypeError(String),
-    NoTypeFound(String),
-    InvalidTypeName(String),
-    EmptyType(String),
-    UnableToModifyBuiltin,
-    CannotOverrideType{ new_type: SpType, old_type: SpType },
-    MissingTypeSize(SpType),
-    MissingTypeName(SpType),
-    InvalidWhitespace(String),
-}
-
-impl std::fmt::Display for SpTypeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::ArraySizeError(t) => write!(f, "unable to find valid array size for '{t}'"),
-            Self::ArrayTypeError(t) => write!(f, "unable to find valid array type for '{t}'"),
-            Self::NoTypeFound(t) => write!(f, "no type found for name '{t}'"),
-            Self::InvalidTypeName(t) => write!(f, "'{t}' is not a valid type name"),
-            Self::EmptyType(t) => write!(f, "type specification empty for '{t}'"),
-            Self::UnableToModifyBuiltin => write!(f, "unable to modify builtin type"),
-            Self::CannotOverrideType{ new_type, old_type } => write!(f, "unable to override '{new_type}' with '{old_type}'"),
-            Self::MissingTypeSize(t) => write!(f, "missing type size for '{t}'"),
-            Self::MissingTypeName(t) => write!(f, "missing type name specification for '{t}'"),
-            Self::InvalidWhitespace(t) => write!(f, "unexpected whitespace found in '{t}'"),
+            Self::Function { ret, args } => write!(f, "^{ret}({})", args.iter().map(|t| format!("{t}")).reduce(|a, b| format!("{a}, {b}")).unwrap_or(String::new())),
+            Self::Alias { name, base } => write!(f, "{name} /* {base} */"),
         }
     }
 }
