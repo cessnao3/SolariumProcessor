@@ -3,12 +3,12 @@ use sda::{instructions::{Add, Ldn, Ld}, AssemblerCommand};
 use sproc::common::MemoryWord;
 use sproc::cpu::Register;
 
-use super::types::{SpType, BuiltinTypes};
+use super::types::{SpType, SpTypeDict};
 
 pub struct CompilerState {
     pub globals: HashMap<String, GlobalVariable>,
     //pub functions: HashMap<String, Box<dyn Function>>,
-    pub types: Vec<SpType>,
+    pub types: SpTypeDict,
     pub scopes: Vec<Scope>,
 }
 
@@ -36,11 +36,7 @@ impl CompilerState {
             globals: HashMap::new(),
             //functions: HashMap::new(),
             scopes: vec![Scope::new()],
-            types: vec![
-                SpType::Primitive{ base: BuiltinTypes::U16 },
-                SpType::Primitive{ base: BuiltinTypes::I16 },
-                SpType::OpaqueType { name: "void".to_string() },
-            ]
+            types: SpTypeDict::new(),
         }
     }
 }
