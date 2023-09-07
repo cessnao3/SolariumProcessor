@@ -273,14 +273,14 @@ mod test
     {
         let mut state = ParserState::new();
         let struct_string = "
-        type_name
+        struct type_name
         {
             var1: u16,
             var2: i16,
         }
         ".trim();
 
-        let res = parse_struct_statement(struct_string, &mut state);
+        let res = parse_with_state(struct_string, &mut state);
 
         assert!(res.is_ok());
         assert!(state.types.get_type("type_name").is_ok());
@@ -319,14 +319,13 @@ mod test
         for i in 0..simple_types.len() {
             let type_name = format!("type_{i}");
             let s = format!(
-                "{type_name} {{ {} }}",
+                "struct {type_name} {{ {} }}",
                 (0..=i)
                     .map(|j| format!("var{j}: {}", simple_types[j]))
                     .reduce(|a, b| format!("{a}, {b}"))
                     .unwrap_or(String::new()));
-            match parse_struct_statement(&s, &mut state) {
-                Ok(r) => assert_eq!(r, ""),
-                Err(e) => panic!("{e}")
+            if let Err(e) = parse_with_state(&s, &mut state) {
+                panic!("{e}");
             }
 
             match &state.types.get_type(&type_name) {
@@ -349,11 +348,10 @@ mod test
         }
 
         let join_name = "type_joined";
-        let join_struct_string = format!("{join_name} {{ {} }}", initial_types.iter().enumerate().map(|(i, t)| format!("var{i}: {t}")).reduce(|a, b| format!("{a}, {b}")).unwrap_or(String::new()));
+        let join_struct_string = format!("struct {join_name} {{ {} }}", initial_types.iter().enumerate().map(|(i, t)| format!("var{i}: {t}")).reduce(|a, b| format!("{a}, {b}")).unwrap_or(String::new()));
 
-        match parse_struct_statement(&join_struct_string, &mut state) {
-            Ok(v) => assert_eq!(v, ""),
-            Err(e) => panic!("{e}")
+        if let Err(e) = parse_with_state(&join_struct_string, &mut state) {
+            panic!("{e}");
         }
 
         if let Ok(SpType::Struct { name, fields }) = state.types.get_type(join_name) {
