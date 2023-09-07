@@ -10,7 +10,7 @@ enum OutputType {
     Hex,
 }
 
-/// Simple program to greet a person
+/// SProc Assembler
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
