@@ -123,10 +123,10 @@ impl SpTypeDict {
         Self::default()
     }
 
-    pub fn get_type(&self, t: &str) -> Result<SpType, SpTypeError> {
+    pub fn parse_type(&self, t: &str) -> Result<SpType, SpTypeError> {
         match t.chars().next() {
-            Some('*') => Ok(SpType::Pointer { base: Box::new(self.get_type(&t[1..])?) }),
-            Some('$') => Ok(SpType::Constant { base: Box::new(self.get_type(&t[1..])?) }),
+            Some('*') => Ok(SpType::Pointer { base: Box::new(self.parse_type(&t[1..])?) }),
+            Some('$') => Ok(SpType::Constant { base: Box::new(self.parse_type(&t[1..])?) }),
             Some('[') => {
                 if let Some(ind) = t.find(']') {
                     let size = match t[1..ind].parse::<u16>() {
@@ -134,7 +134,7 @@ impl SpTypeDict {
                         Err(_) => return Err(SpTypeError::ArraySizeError(t.into())),
                     };
 
-                    Ok(SpType::Array { base: Box::new(self.get_type(&t[ind+1..])?), size: size as usize })
+                    Ok(SpType::Array { base: Box::new(self.parse_type(&t[ind+1..])?), size: size as usize })
                 } else {
                     Err(SpTypeError::ArrayTypeError(t.into()))
                 }

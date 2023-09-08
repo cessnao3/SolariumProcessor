@@ -14,13 +14,19 @@ pub struct CompilerState {
 
 pub struct Scope {
     pub variables: HashMap<String, Box<dyn Variable>>,
+    pub statements: Vec<Box<dyn Statement>>,
 }
 
 impl Scope {
     pub fn new() -> Self {
         Self {
-            variables: HashMap::new()
+            variables: HashMap::new(),
+            statements: Vec::new(),
         }
+    }
+    
+    pub fn add_statement(&mut self, s: Box<dyn Statement>) {
+        self.statements.push(s);
     }
 }
 
@@ -81,6 +87,30 @@ impl From<Literal> for String {
 }
 
 pub trait Statement {
+}
+
+pub struct DefinitionStatement {
+    var_type: SpType,
+    var_name: String,
+    init_expr: Option<Box<dyn Expression>>
+}
+
+impl DefinitionStatement {
+    pub fn new(name: &str, t: SpType) -> Self {
+        Self {
+            var_type: t,
+            var_name: name.into(),
+            init_expr: None
+        }
+    }
+    
+    pub fn set_init(&mut self, expr: Box<dyn Expression>) {
+        self.init_expr = Some(expr);
+    }
+}
+
+impl Statement for DefinitionStatement {
+    
 }
 
 pub trait BaseStatement {

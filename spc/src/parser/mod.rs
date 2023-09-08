@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use crate::components::{Scope, DefinitionStatement};
 use crate::types::SpTypeError;
 
 use super::components::BaseStatement;
@@ -124,7 +125,7 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
         }
 
         if let Some(';') = s.chars().nth(first_ind) {
-            match state.types.get_type(struct_name) {
+            match state.types.parse_type(struct_name) {
                 Ok(SpType::Struct { .. }) => (),
                 Ok(SpType::OpaqueType { .. }) => (),
                 Err(_) => {
@@ -207,7 +208,7 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
                 0,
                 &format!("field `{}` is not a valid name", e.0),
             ))
-        } else if let Ok(t) = parser.types.get_type(e.1) {
+        } else if let Ok(t) = parser.types.parse_type(e.1) {
             Ok((e.0.to_string(), Box::new(t)))
         } else {
             Err(ParseError::new(
@@ -228,7 +229,7 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
         fields: fields_parsed,
     };
 
-    match state.types.get_type(struct_name) {
+    match state.types.parse_type(struct_name) {
         Ok(SpType::OpaqueType { .. }) => (),
         Ok(_) => {
             return Err(ParseError::new(
@@ -245,7 +246,7 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
     Ok(remaining)
 }
 
-fn parse_def_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a str, ParseError> {
+fn parse_def_statement<'a>(s: &'a str, state: &mut ParserState, scope: &mut Scope) -> Result<&'a str, ParseError> {
     if let Some(type_split) = s.find(':') {
         let name = s[..type_split].trim();
 
@@ -271,16 +272,21 @@ fn parse_def_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a st
             expression = None;
         }
 
-        let t = match state.types.get_type(type_name) {
-            Err(s) => return Err(ParseError::new(0, 0, &format!("error getting type - {s}"))),
+        let t = match state.types.parse_type(type_name) {
+            Err(e) => return Err(ParseError::new(0, 0, &format!("error getting type - {e}"))),
             Ok(v) => v,
         };
 
-        if expression.is_some() {
-            return Err(ParseError::new(0, 0, "expressions not yet supported!"));
+        println!("Defining variable {name} as type {t}");
+        
+        let def_statement = Box::new(DefinitionStatement::new(name, t));
+        
+        if let Some(expr) = expression {
+            println!("  with init `{expr}`");
+            panic!("parsing expressions not yet supported");
         }
-
-        println!("Defining type {name} as type {t}");
+        
+        scope.add_statement(def_statement);
 
         Ok(s[end_ind + 1..].trim_start())
     } else {
@@ -362,21 +368,21 @@ mod test {
         let res = parse_with_state(struct_string, &mut state);
 
         assert!(res.is_ok());
-        assert!(state.types.get_type("type_name").is_ok());
+        assert!(state.types.parse_type("type_name").is_ok());
 
-        if let Ok(SpType::Struct { name, fields }) = state.types.get_type("type_name") {
+        if let Ok(SpType::Struct { name, fields }) = state.types.parse_type("type_name") {
             assert_eq!(name, "type_name");
             assert_eq!(fields.len(), 2);
 
             let f1 = &fields[0];
 
             assert_eq!(f1.0, "var1");
-            assert_eq!(*f1.1, state.types.get_type("u16").unwrap());
+            assert_eq!(*f1.1, state.types.parse_type("u16").unwrap());
 
             let f2 = &fields[1];
 
             assert_eq!(f2.0, "var2");
-            assert_eq!(*f2.1, state.types.get_type("i16").unwrap());
+            assert_eq!(*f2.1, state.types.parse_type("i16").unwrap());
         } else {
             panic!("unable to get expected type");
         }
@@ -403,7 +409,7 @@ mod test {
                 panic!("{e}");
             }
 
-            match &state.types.get_type(&type_name) {
+            match &state.types.parse_type(&type_name) {
                 Ok(t) => match t {
                     st @ SpType::Struct { name, fields } => {
                         assert_eq!(*name, type_name);
@@ -437,7 +443,7 @@ mod test {
             panic!("{e}");
         }
 
-        if let Ok(SpType::Struct { name, fields }) = state.types.get_type(join_name) {
+        if let Ok(SpType::Struct { name, fields }) = state.types.parse_type(join_name) {
             assert_eq!(name, join_name);
             assert_eq!(fields.len(), initial_types.len());
             for (i, (t, (f_name, f_type))) in std::iter::zip(initial_types, fields).enumerate() {
@@ -463,11 +469,11 @@ mod test {
 
         assert_eq!(state.types.len(), 2 + init_type_len);
 
-        if let Ok(SpType::OpaqueType { name }) = state.types.get_type("type_1") {
+        if let Ok(SpType::OpaqueType { name }) = state.types.parse_type("type_1") {
             assert_eq!(name, "type_1");
         }
 
-        if let Ok(SpType::OpaqueType { name }) = state.types.get_type("type_2") {
+        if let Ok(SpType::OpaqueType { name }) = state.types.parse_type("type_2") {
             assert_eq!(name, "type_2");
         }
 
@@ -478,7 +484,7 @@ mod test {
 
         assert_eq!(state.types.len(), 2 + init_type_len);
 
-        if let Ok(SpType::Struct { name, fields }) = state.types.get_type("type_1") {
+        if let Ok(SpType::Struct { name, fields }) = state.types.parse_type("type_1") {
             assert_eq!(name, "type_1");
             assert_eq!(fields.len(), 1);
             assert_eq!(fields[0].0, "f");
@@ -492,7 +498,7 @@ mod test {
             );
         }
 
-        if let Ok(SpType::OpaqueType { name }) = state.types.get_type("type_2") {
+        if let Ok(SpType::OpaqueType { name }) = state.types.parse_type("type_2") {
             assert_eq!(name, "type_2");
         }
     }
