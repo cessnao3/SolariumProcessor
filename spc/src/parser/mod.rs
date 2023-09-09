@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use crate::components::{DefinitionStatement, Scope};
 use crate::types::SpTypeError;
+use crate::tokenizer::{tokenize, Token, TokenizeError};
 
 use super::components::BaseStatement;
 use super::types::{SpType, SpTypeDict};
@@ -20,6 +21,9 @@ pub fn is_valid_name(s: &str) -> bool {
 */
 
 pub fn parse(s: &str) -> Result<(), ParseError> {
+    // Get the tokens
+    let tokens = tokenize(s)?;
+
     // Define the state
     let mut state = ParserState::new();
     parse_with_state(s, &mut state)
@@ -344,6 +348,16 @@ impl From<SpTypeError> for ParseError {
             line: 0,
             col: 0,
             msg: format!("type: {value}"),
+        }
+    }
+}
+
+impl From<TokenizeError> for ParseError {
+    fn from(value: TokenizeError) -> Self {
+        Self {
+            line: 0,
+            col: 0,
+            msg: format!("tokenizer: {value}"),
         }
     }
 }
