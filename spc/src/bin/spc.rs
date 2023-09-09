@@ -1,6 +1,4 @@
-mod components;
-mod parser;
-mod types;
+use spc::compile;
 
 fn main() {
     let code = match std::fs::read_to_string("examples/test.spc") {
@@ -11,11 +9,13 @@ fn main() {
         }
     };
 
-    match parser::parse(&code) {
-        Ok(()) => (),
+    let code = match compile(&code) {
+        Ok(v) => v,
         Err(e) => {
             eprintln!("Parser Error: {e}");
             std::process::exit(2);
         }
     };
+
+    println!("Compiled into {} words", code.len());
 }

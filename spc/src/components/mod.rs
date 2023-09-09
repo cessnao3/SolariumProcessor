@@ -1,7 +1,10 @@
-use std::collections::HashMap;
-use sda::{instructions::{Add, Ldn, Ld}, AssemblerCommand};
+use sda::{
+    instructions::{Add, Ld, Ldn},
+    AssemblerCommand,
+};
 use sproc::common::MemoryWord;
 use sproc::cpu::Register;
+use std::collections::HashMap;
 
 use super::types::{SpType, SpTypeDict};
 
@@ -24,7 +27,7 @@ impl Scope {
             statements: Vec::new(),
         }
     }
-    
+
     pub fn add_statement(&mut self, s: Box<dyn Statement>) {
         self.statements.push(s);
     }
@@ -59,12 +62,10 @@ pub trait CodeComponent {
 
 pub struct Literal {
     words: Vec<u16>,
-    var_type: Box<SpType>
+    var_type: Box<SpType>,
 }
 
-impl Literal {
-
-}
+impl Literal {}
 
 impl From<Literal> for u16 {
     fn from(value: Literal) -> Self {
@@ -80,19 +81,20 @@ impl From<Literal> for i16 {
 
 impl From<Literal> for String {
     fn from(value: Literal) -> Self {
-        return value.words.iter()
+        return value
+            .words
+            .iter()
             .map(|v| (*v as u8) as char)
             .collect::<String>();
     }
 }
 
-pub trait Statement {
-}
+pub trait Statement {}
 
 pub struct DefinitionStatement {
     var_type: SpType,
     var_name: String,
-    init_expr: Option<Box<dyn Expression>>
+    init_expr: Option<Box<dyn Expression>>,
 }
 
 impl DefinitionStatement {
@@ -100,21 +102,18 @@ impl DefinitionStatement {
         Self {
             var_type: t,
             var_name: name.into(),
-            init_expr: None
+            init_expr: None,
         }
     }
-    
+
     pub fn set_init(&mut self, expr: Box<dyn Expression>) {
         self.init_expr = Some(expr);
     }
 }
 
-impl Statement for DefinitionStatement {
-    
-}
+impl Statement for DefinitionStatement {}
 
-pub trait BaseStatement {
-}
+pub trait BaseStatement {}
 
 pub trait Expression {
     fn get_type(&self) -> SpType;
@@ -128,7 +127,7 @@ pub struct BinaryExpression {
 }
 
 pub struct UnaryExpression {
-    expr: Box<dyn Expression>
+    expr: Box<dyn Expression>,
 }
 
 pub struct AsExpression {
@@ -151,8 +150,7 @@ pub trait Addressable {
     fn get_address(&self, reg: Register) -> Vec<sda::ParsedValue>;
 }
 
-pub trait Variable: Addressable + Expression {
-}
+pub trait Variable: Addressable + Expression {}
 
 pub struct LocalVariable {
     var_type: SpType,
@@ -166,7 +164,9 @@ impl Expression for LocalVariable {
 
     fn save_value_to(&self, reg: Register, spare: Register) -> Vec<sda::ParsedValue> {
         let mut res = self.get_address(reg);
-        res.push(sda::ParsedValue::InstructionValue(Box::new(Ld::new(reg, reg))));
+        res.push(sda::ParsedValue::InstructionValue(Box::new(Ld::new(
+            reg, reg,
+        ))));
         res
     }
 }
@@ -175,15 +175,19 @@ impl Addressable for LocalVariable {
     fn get_address(&self, reg: Register) -> Vec<sda::ParsedValue> {
         let mut a = Vec::new();
         a.push(sda::ParsedValue::InstructionValue(Box::new(Ldn::new(reg))));
-        a.push(sda::ParsedValue::Command(AssemblerCommand::Load(MemoryWord::from(self.base_offset))));
-        a.push(sda::ParsedValue::InstructionValue(Box::new(Add::new(reg, reg, Register::ArgumentBase))));
+        a.push(sda::ParsedValue::Command(AssemblerCommand::Load(
+            MemoryWord::from(self.base_offset),
+        )));
+        a.push(sda::ParsedValue::InstructionValue(Box::new(Add::new(
+            reg,
+            reg,
+            Register::ArgumentBase,
+        ))));
         a
     }
 }
 
-impl Variable for LocalVariable {
-
-}
+impl Variable for LocalVariable {}
 
 pub struct GlobalVariable {
     var_type: SpType,
@@ -197,7 +201,9 @@ impl Expression for GlobalVariable {
 
     fn save_value_to(&self, reg: Register, spare: Register) -> Vec<sda::ParsedValue> {
         let mut res = self.get_address(reg);
-        res.push(sda::ParsedValue::InstructionValue(Box::new(Ld::new(reg, reg))));
+        res.push(sda::ParsedValue::InstructionValue(Box::new(Ld::new(
+            reg, reg,
+        ))));
         res
     }
 }
@@ -206,14 +212,14 @@ impl Addressable for GlobalVariable {
     fn get_address(&self, reg: Register) -> Vec<sda::ParsedValue> {
         let mut a = Vec::new();
         a.push(sda::ParsedValue::InstructionValue(Box::new(Ldn::new(reg))));
-        a.push(sda::ParsedValue::Command(AssemblerCommand::LoadLoc(self.var_label.clone())));
+        a.push(sda::ParsedValue::Command(AssemblerCommand::LoadLoc(
+            self.var_label.clone(),
+        )));
         a
     }
 }
 
-impl Variable for GlobalVariable {
-
-}
+impl Variable for GlobalVariable {}
 
 pub trait Function: Addressable {
     fn get_input_parameters(&self) -> Vec<(String, SpType)>;

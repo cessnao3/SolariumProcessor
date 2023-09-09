@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::components::{Scope, DefinitionStatement};
+use crate::components::{DefinitionStatement, Scope};
 use crate::types::SpTypeError;
 
 use super::components::BaseStatement;
@@ -51,9 +51,7 @@ fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> 
                 ));
             }
 
-            let removed = s
-                .drain(i1..(i2 + 2))
-                .collect::<String>();
+            let removed = s.drain(i1..(i2 + 2)).collect::<String>();
             assert!(removed.starts_with("/*"));
             assert!(removed.ends_with("*/"));
         } else {
@@ -246,7 +244,7 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
     Ok(remaining)
 }
 
-fn parse_def_statement<'a>(s: &'a str, state: &mut ParserState, scope: &mut Scope) -> Result<&'a str, ParseError> {
+fn parse_def_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a str, ParseError> {
     if let Some(type_split) = s.find(':') {
         let name = s[..type_split].trim();
 
@@ -278,15 +276,16 @@ fn parse_def_statement<'a>(s: &'a str, state: &mut ParserState, scope: &mut Scop
         };
 
         println!("Defining variable {name} as type {t}");
-        
+
         let def_statement = Box::new(DefinitionStatement::new(name, t));
-        
+
         if let Some(expr) = expression {
             println!("  with init `{expr}`");
             panic!("parsing expressions not yet supported");
         }
-        
-        scope.add_statement(def_statement);
+
+        panic!("need to add definition statement somewhere!");
+        //scope.add_statement(def_statement);
 
         Ok(s[end_ind + 1..].trim_start())
     } else {
@@ -564,5 +563,4 @@ mod test {
             panic!("{e}");
         }
     }
-
 }
