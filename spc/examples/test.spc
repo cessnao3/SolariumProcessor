@@ -20,6 +20,14 @@ asmfn asm_func(a, b, c): ret_type
     asm
 }
 
+/* asmfn asm_func(a, b, c): ret_type
+{
+    asm1
+    asm1
+    asm1
+}
+*/
+
 fn func_name_ptr(a, b): ret_type = 3943;
 
 fn func_name(a, b, c): ret_type
@@ -31,6 +39,10 @@ fn func_name(a, b, c): ret_type
     }
 
     if (b = 3 && c == 3) {
+        return 5;
+    }
+
+    if (b=4&&c==6) {
         return 5;
     }
 

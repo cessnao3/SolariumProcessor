@@ -363,7 +363,7 @@ impl From<TokenizeError> for ParseError {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
