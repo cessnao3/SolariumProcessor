@@ -22,7 +22,6 @@ impl std::fmt::Display for Token {
 
 #[derive(Debug, Clone)]
 pub enum TokenizeError {
-    CreateError(String),
     EndError,
     EmptyToken,
     MissingLocation,
@@ -32,7 +31,6 @@ pub enum TokenizeError {
 impl std::fmt::Display for TokenizeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::CreateError(s) => write!(f, "create error - {}", s),
             Self::EndError => write!(f, "unexpected characters remaining in build buffer"),
             Self::EmptyToken => write!(f, "unexpected empty token"),
             Self::MissingLocation => write!(f, "token missing location"),
@@ -191,6 +189,9 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenizeError> {
 
                     // Create the double-character separator
                     builder.push(c2)?;
+
+                    assert!(builder.starts_with(&double_check));
+
                     tokens.push(builder.build_and_reset()?);
                 } else if double_check == "//" {
                     within_line_comment = true;
