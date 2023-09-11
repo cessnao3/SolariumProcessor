@@ -13,11 +13,59 @@ impl Token {
             column,
         }
     }
+
+    pub fn get_value(&self) -> &str {
+        &self.value
+    }
+
+    pub fn get_line(&self) -> usize {
+        self.line
+    }
+
+    pub fn get_column(&self) -> usize {
+        self.column
+    }
+
+    pub fn is_comment(&self) -> bool {
+        self.value.starts_with("//") || self.value.starts_with("/*")
+    }
 }
 
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "[{}:{}] {}", self.line, self.column, self.value)
+    }
+}
+
+pub struct TokenIter {
+    tokens: Vec<Token>,
+    ind: usize,
+}
+
+impl TokenIter {
+    pub fn new(tokens: Vec<Token>) -> Self {
+        Self {
+            tokens,
+            ind: 0,
+        }
+    }
+
+    pub fn next(&mut self) -> Option<Token> {
+        if self.ind < self.tokens.len() {
+            let i = self.ind;
+            self.ind += 1;
+            Some(self.tokens[i].clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn peek(&mut self) -> Option<Token> {
+        if self.ind < self.tokens.len() {
+            Some(self.tokens[self.ind].clone())
+        } else {
+            None
+        }
     }
 }
 
@@ -309,5 +357,36 @@ mod tests {
         }
 
         assert_eq!(tokens.len(), expected_tokens.len());
+    }
+
+    #[test]
+    fn test_tokenizer_struct() {
+        let test_code = "struct s1 { var1: u16, var2: u56 } struct s2;";
+        let expected_tokens = [
+            "struct",
+            "s1",
+            "{",
+            "var1",
+            ":",
+            "u16",
+            ",",
+            "var2",
+            ":",
+            "u56",
+            "}",
+            "struct",
+            "s2",
+            ";",
+        ];
+
+        match tokenize(test_code) {
+            Ok(v) => {
+                for (tok, exp_tok) in v.iter().zip(expected_tokens.iter()) {
+                    assert_eq!(tok.get_value(), *exp_tok);
+                }
+                assert_eq!(v.len(), expected_tokens.len());
+            },
+            Err(e) => panic!("{e}")
+        }
     }
 }

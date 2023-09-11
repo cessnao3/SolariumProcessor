@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
-use crate::components::{DefinitionStatement, Scope};
+//use crate::components::{DefinitionStatement, Scope};
 use crate::types::SpTypeError;
-use crate::tokenizer::{tokenize, Token, TokenizeError};
+use crate::tokenizer::{tokenize, Token, TokenIter, TokenizeError};
 
 use super::components::BaseStatement;
 use super::types::{SpType, SpTypeDict};
@@ -21,113 +21,69 @@ pub fn is_valid_name(s: &str) -> bool {
 */
 
 pub fn parse(s: &str) -> Result<(), ParseError> {
-    // Get the tokens
-    let tokens = tokenize(s)?;
-
-    // Define the state
-    let mut state = ParserState::new();
-    parse_with_state(s, &mut state)
+    parse_with_state(s, &mut ParserState::new())
 }
 
 fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> {
-    // Strip out comments
-    let mut s = s
-        .lines()
-        .map(|l| {
-            match l.find("//") {
-                Some(i) => l[..i].trim_end(),
-                None => l,
-            }
-            .to_string()
-        })
-        .reduce(|a, b| format!("{a}\n{b}"))
-        .unwrap_or(String::new());
+    let mut tokens = TokenIter::new(tokenize(s)?.into_iter().filter(|t| !t.is_comment()).collect::<Vec<_>>());
 
-    // Strip out block comments
-
-    while let Some(i1) = s.find("/*") {
-        if let Some(i2) = s.find("*/") {
-            if i2 < i1 + 2 {
-                return Err(ParseError::new(
-                    0,
-                    0,
-                    "block comment end before block comment start",
-                ));
-            }
-
-            let removed = s.drain(i1..(i2 + 2)).collect::<String>();
-            assert!(removed.starts_with("/*"));
-            assert!(removed.ends_with("*/"));
-        } else {
-            return Err(ParseError::new(
-                0,
-                0,
-                "unable to find matching '*/' for block comment",
-            ));
-        }
-    }
-
-    // Loop Parameters
-    let mut current = s.trim_start();
-
-    while !current.is_empty() {
-        // Trim the start of the current value
-        current = current.trim_start();
-
-        // Find the first word
-        let (first_word, remaining) = if let Some(ind) = current.find(char::is_whitespace) {
-            (&current[..ind], &current[ind..])
-        } else {
-            (current, "")
-        };
-
-        current = match first_word {
-            "fn" => parse_fn_statement(remaining, state)?,
-            "asmfn" => parse_asmfn_statement(remaining, state)?,
-            "def" => parse_def_statement(remaining, state)?,
-            "struct" => parse_struct_statement(remaining, state)?,
+    while let Some(tok) = tokens.next() {
+        match tok.get_value() {
+            "fn" => parse_fn_statement(&mut tokens, state)?,
+            "asmfn" => parse_asmfn_statement(&mut tokens, state)?,
+            "def" => parse_def_statement(&mut tokens, state)?,
+            "struct" => parse_struct_statement(&mut tokens, state)?,
             word => {
-                return Err(ParseError::new(
-                    0,
-                    0,
-                    &format!("unknown start of base expression {word}"),
+                return Err(ParseError::new(format!("unknown start of base expression {word}"),
                 ))
             }
         };
     }
 
-    assert_eq!(current.len(), 0);
+    Ok(())
+}
+
+fn parse_fn_statement(_tokens: &mut TokenIter, _state: &mut ParserState) -> Result<(), ParseError> {
+    panic!("not implemented");
+}
+
+fn parse_asmfn_statement(_tokens: &mut TokenIter, _state: &mut ParserState) -> Result<(), ParseError> {
+    panic!("not implemented");
+}
+
+fn expect_token(tokens: &mut TokenIter) -> Result<Token, ParseError> {
+    if let Some(val) = tokens.next() {
+        Ok(val)
+    } else {
+        Err(ParseError::new("unexpected end of tokens".into()))
+    }
+}
+
+fn expect_token_with_name(tokens: &mut TokenIter, tok: &str) -> Result<(), ParseError> {
+    let val = expect_token(tokens)?;
+
+    if val.get_value() != tok {
+        return Err(ParseError::new_tok(val, format!("expected token with value '{tok}'")));
+    }
 
     Ok(())
 }
 
-fn parse_fn_statement<'a>(_s: &'a str, _state: &mut ParserState) -> Result<&'a str, ParseError> {
-    panic!("not implemented");
-}
-
-fn parse_asmfn_statement<'a>(_s: &'a str, _state: &mut ParserState) -> Result<&'a str, ParseError> {
-    panic!("not implemented");
-}
-
-fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a str, ParseError> {
+fn parse_struct_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Result<(), ParseError> {
     // Find open brace
-    let struct_name;
-    let fields_string;
-    let remaining;
+    let first_tok = expect_token(tokens)?;
+    let struct_name = first_tok.get_value().to_string();
 
-    if let Some(first_ind) = s.find(|c| c == '{' || c == ';') {
-        struct_name = s[..first_ind].trim();
+    if !SpType::is_valid_name(&struct_name) || struct_name == "void" {
+        return Err(ParseError::new_tok(
+            first_tok,
+            format!("struct name `{struct_name}` is not a valid type name"),
+        ));
+    }
 
-        if !SpType::is_valid_name(struct_name) || struct_name == "void" {
-            return Err(ParseError::new(
-                0,
-                0,
-                &format!("struct name `{struct_name}` is not a valid type name"),
-            ));
-        }
-
-        if let Some(';') = s.chars().nth(first_ind) {
-            match state.types.parse_type(struct_name) {
+    if let Some(end_check) = tokens.next() {
+        if end_check.get_value() == ";" {
+            match state.types.parse_type(&struct_name) {
                 Ok(SpType::Struct { .. }) => (),
                 Ok(SpType::OpaqueType { .. }) => (),
                 Err(_) => {
@@ -135,109 +91,85 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
                         name: struct_name.to_string(),
                     })?;
                 }
-                Ok(_) => {
-                    return Err(ParseError {
-                        line: 0,
-                        col: 0,
-                        msg: format!(
-                            "unexpected provided type for given type value for {struct_name}"
-                        ),
-                    })
-                }
+                Ok(_) => return Err(ParseError::new_tok(end_check, format!("unexpected provided type for given type value for {struct_name}")))
             }
 
-            return Ok(&s[(first_ind + 1)..]);
+            return Ok(());
+        } else if end_check.get_value() != "{" {
+            return Err(ParseError::new_tok(end_check, format!("expected semicolon or open brace after struct for '{struct_name}'")));
+        }
+    }
+
+    let mut fields = Vec::new();
+
+    while let Some(end_tok) = tokens.peek() {
+        if end_tok.get_value() == "}" {
+            break;
         }
 
-        if let Some(close_ind) = s.find('}') {
-            if close_ind < first_ind {
-                return Err(ParseError::new(
-                    0,
-                    0,
-                    "struct unexpected closing brace before open brace",
-                ));
+        let field_name = expect_token(tokens)?;
+        expect_token_with_name(tokens, ":")?;
+
+        let mut type_vec = vec![
+            expect_token(tokens)?
+        ];
+
+        while let Some(v) = tokens.peek() {
+            if v.get_value() == "," || v.get_value() == "}" {
+                break;
             }
 
-            fields_string = s[first_ind + 1..close_ind].trim();
-            remaining = s[close_ind + 1..].trim_start();
+            type_vec.push(expect_token(tokens)?);
+        }
+
+        //expect_token_with_name(tokens, ",")?; -> Check ENDING!
+
+        let type_string_combined = type_vec.iter()
+            .map(|n| n.get_value().to_string())
+            .reduce(|a, b| format!("{a}{b}"))
+            .unwrap_or(String::new());
+
+        let sp_type = if let Ok(t) = state.types.parse_type(&type_string_combined) {
+            Box::new(t)
         } else {
-            return Err(ParseError::new(0, 0, "no closing brace found"));
+            return Err(ParseError::new_tok(type_vec[0].clone(), format!("no type `{type_string_combined}` found for field `{field_name}`")));
+        };
+
+        fields.push((field_name.get_value().to_string(), sp_type));
+
+        if let Some(t) = tokens.peek() {
+            if t.get_value() == "," {
+                expect_token(tokens)?;
+            } else if t.get_value() == "}" {
+                break;
+            } else {
+                return Err(ParseError::new_tok(t, format!("unexpected token found in struct definition '{struct_name}'")));
+            }
+        } else {
+            break;
         }
-    } else {
-        return Err(ParseError::new(
-            0,
-            0,
-            "unable to find open brace for struct definition",
-        ));
     }
 
-    let fields = fields_string
-        .split(',')
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.split_once(':'))
-        .collect::<Option<Vec<_>>>();
-
-    if fields.is_none() {
-        return Err(ParseError::new(
-            0,
-            0,
-            &format!("unable to parse field entries for {struct_name}"),
-        ));
-    }
-
-    let fields = fields
-        .unwrap()
-        .iter()
-        .map(|(s1, s2)| (s1.trim(), s2.trim()))
-        .collect::<Vec<_>>();
+    expect_token_with_name(tokens, "}")?;
 
     if fields.is_empty() {
-        return Err(ParseError::new(
-            0,
-            0,
-            &format!("no fields provided for {struct_name}"),
+        return Err(ParseError::new_tok(
+            first_tok,
+            format!("no fields provided for {struct_name}"),
         ));
     }
-
-    fn to_field_entry(
-        e: (&str, &str),
-        parser: &ParserState,
-    ) -> Result<(String, Box<SpType>), ParseError> {
-        if !SpType::is_valid_name(e.0) {
-            Err(ParseError::new(
-                0,
-                0,
-                &format!("field `{}` is not a valid name", e.0),
-            ))
-        } else if let Ok(t) = parser.types.parse_type(e.1) {
-            Ok((e.0.to_string(), Box::new(t)))
-        } else {
-            Err(ParseError::new(
-                0,
-                0,
-                &format!("no type `{}` found for field `{}`", e.1, e.0),
-            ))
-        }
-    }
-
-    let fields_parsed = fields
-        .iter()
-        .map(|i| to_field_entry(*i, state))
-        .collect::<Result<Vec<_>, _>>()?;
 
     let type_val = SpType::Struct {
         name: struct_name.to_string(),
-        fields: fields_parsed,
+        fields,
     };
 
-    match state.types.parse_type(struct_name) {
+    match state.types.parse_type(&struct_name) {
         Ok(SpType::OpaqueType { .. }) => (),
         Ok(_) => {
-            return Err(ParseError::new(
-                0,
-                0,
-                &format!("cannot create struct `{struct_name}` - type with name already exists!"),
+            return Err(ParseError::new_tok(
+                first_tok,
+                format!("cannot create struct `{struct_name}` - type with name already exists!"),
             ))
         }
         _ => (),
@@ -245,56 +177,48 @@ fn parse_struct_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a
 
     state.types.add_type(type_val)?;
 
-    Ok(remaining)
+    Ok(())
 }
 
-fn parse_def_statement<'a>(s: &'a str, state: &mut ParserState) -> Result<&'a str, ParseError> {
-    if let Some(type_split) = s.find(':') {
-        let name = s[..type_split].trim();
+fn parse_def_statement(tokens: &mut TokenIter, _state: &mut ParserState) -> Result<(), ParseError> {
+    let init_tok = expect_token(tokens)?;
+    let name = init_tok.get_value().to_string();
 
-        if !SpType::is_valid_name(name) {
-            return Err(ParseError::new(
-                0,
-                0,
-                &format!("variable name `{name}` not valid"),
-            ));
-        }
-
-        let end_ind = s.find(';').unwrap();
-
-        let remaining = &s[type_split + 1..end_ind];
-        let type_name;
-        let expression;
-
-        if let Some(expr_ind) = remaining.find('=') {
-            type_name = remaining[..expr_ind].trim();
-            expression = Some(remaining[expr_ind + 1..].trim());
-        } else {
-            type_name = remaining.trim();
-            expression = None;
-        }
-
-        let t = match state.types.parse_type(type_name) {
-            Err(e) => return Err(ParseError::new(0, 0, &format!("error getting type - {e}"))),
-            Ok(v) => v,
-        };
-
-        println!("Defining variable {name} as type {t}");
-
-        let def_statement = Box::new(DefinitionStatement::new(name, t));
-
-        if let Some(expr) = expression {
-            println!("  with init `{expr}`");
-            panic!("parsing expressions not yet supported");
-        }
-
-        panic!("need to add definition statement somewhere!");
-        //scope.add_statement(def_statement);
-
-        Ok(s[end_ind + 1..].trim_start())
-    } else {
-        Err(ParseError::new(0, 0, "no type provided in statement!"))
+    if !SpType::is_valid_name(&name) {
+        return Err(ParseError::new_tok(init_tok, format!("variable name '{name}' not valid")));
     }
+
+    if let Some(i) = tokens.next() {
+        if i.get_value() != ":" {
+            return Err(ParseError::new_tok(i, format!("expect colon after the variable name '{name}'")));
+        }
+    } else {
+        return Err(ParseError::new_tok(init_tok, format!("expected colon and type name after '{name}' in definition")));
+    }
+
+    let mut expr_tokens = Vec::new();
+
+    while let Some(i) = tokens.peek() {
+        if i.get_value() != ";" {
+            expr_tokens.push(tokens.next());
+        } else {
+            break;
+        }
+    }
+
+    if let Some(i) = tokens.next() {
+        if i.get_value() != ";" {
+            return Err(ParseError::new_tok(i, "expected ; after variable definition".into()));
+        }
+    } else {
+        return Err(ParseError::new("expected ; after variable definition".into()));
+    }
+
+    if !expr_tokens.is_empty() {
+        panic!("expression definition not yet supported!");
+    }
+
+    panic!("need to add definition statement somewhere!");
 }
 
 pub struct ParserState {
@@ -321,44 +245,44 @@ impl Default for ParserState {
 
 #[derive(Debug)]
 pub struct ParseError {
-    line: usize,
-    col: usize,
+    tok: Option<Token>,
     msg: String,
 }
 
 impl ParseError {
-    pub fn new(l: usize, c: usize, msg: &str) -> Self {
+    pub fn new(msg: String) -> Self {
         Self {
-            line: l,
-            col: c,
-            msg: msg.to_string(),
+            tok: None,
+            msg,
+        }
+    }
+
+    pub fn new_tok(tok: Token, msg: String) -> Self {
+        Self {
+            tok: Some(tok),
+            msg,
         }
     }
 }
 
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{} {}", self.line, self.col, self.msg)
+        if let Some(tok) = &self.tok {
+            write!(f, "{}:{} ({}) => ", tok.get_line(), tok.get_column(), tok.get_value())?;
+        }
+        write!(f, "{}", self.msg)
     }
 }
 
 impl From<SpTypeError> for ParseError {
     fn from(value: SpTypeError) -> Self {
-        Self {
-            line: 0,
-            col: 0,
-            msg: format!("type: {value}"),
-        }
+        Self::new(format!("type: {value}"))
     }
 }
 
 impl From<TokenizeError> for ParseError {
     fn from(value: TokenizeError) -> Self {
-        Self {
-            line: 0,
-            col: 0,
-            msg: format!("tokenizer: {value}"),
-        }
+        Self::new(format!("tokenizer: {value}"))
     }
 }
 
@@ -378,9 +302,10 @@ mod tests {
         "
         .trim();
 
-        let res = parse_with_state(struct_string, &mut state);
+        if let Err(e) = parse_with_state(struct_string, &mut state) {
+            panic!("{e}");
+        }
 
-        assert!(res.is_ok());
         assert!(state.types.parse_type("type_name").is_ok());
 
         if let Ok(SpType::Struct { name, fields }) = state.types.parse_type("type_name") {
