@@ -4,21 +4,8 @@ use std::fmt::Display;
 use crate::types::SpTypeError;
 use crate::tokenizer::{tokenize, Token, TokenIter, TokenizeError};
 
-use super::components::BaseStatement;
+use super::components::{BaseStatement, DefinitionStatement, AsmFunction, SpcFunction};
 use super::types::{SpType, SpTypeDict};
-
-/*
-pub fn is_valid_name(s: &str) -> bool {
-    // Ensure that the first character is alphabetic and that the only characters are ascii-alphanumeric/_/-
-    if !s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
-        false
-    } else if let Some(c) = s.chars().next() {
-        c.is_ascii_alphabetic()
-    } else {
-        false
-    }
-}
-*/
 
 pub fn parse(s: &str) -> Result<(), ParseError> {
     parse_with_state(s, &mut ParserState::new())
@@ -28,26 +15,30 @@ fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> 
     let mut tokens = TokenIter::new(tokenize(s)?.into_iter().filter(|t| !t.is_comment()).collect::<Vec<_>>());
 
     while let Some(tok) = tokens.next() {
-        match tok.get_value() {
-            "fn" => parse_fn_statement(&mut tokens, state)?,
-            "asmfn" => parse_asmfn_statement(&mut tokens, state)?,
-            "def" => parse_def_statement(&mut tokens, state)?,
-            "struct" => parse_struct_statement(&mut tokens, state)?,
-            word => {
-                return Err(ParseError::new(format!("unknown start of base expression {word}"),
-                ))
+        let base: Option<Box<dyn BaseStatement>> = match tok.get_value() {
+            "fn" => Some(Box::new(parse_fn_statement(&mut tokens, state)?)),
+            "asmfn" => Some(Box::new(parse_asmfn_statement(&mut tokens, state)?)),
+            "def" => Some(Box::new(parse_def_statement(&mut tokens, state)?)),
+            "struct" => {
+                parse_struct_statement(&mut tokens, state)?;
+                None
             }
+            word => return Err(ParseError::new(format!("unknown start of base expression {word}")))
         };
+        
+        if let Some(base_statement) = base {
+            state.statements.push(base_statement);
+        }
     }
 
     Ok(())
 }
 
-fn parse_fn_statement(_tokens: &mut TokenIter, _state: &mut ParserState) -> Result<(), ParseError> {
+fn parse_fn_statement(_tokens: &mut TokenIter, _state: &mut ParserState) -> Result<SpcFunction, ParseError> {
     panic!("not implemented");
 }
 
-fn parse_asmfn_statement(_tokens: &mut TokenIter, _state: &mut ParserState) -> Result<(), ParseError> {
+fn parse_asmfn_statement(_tokens: &mut TokenIter, _state: &mut ParserState) -> Result<AsmFunction, ParseError> {
     panic!("not implemented");
 }
 
@@ -59,7 +50,7 @@ fn expect_token(tokens: &mut TokenIter) -> Result<Token, ParseError> {
     }
 }
 
-fn expect_token_with_name(tokens: &mut TokenIter, tok: &str) -> Result<(), ParseError> {
+fn expect_token_with_value(tokens: &mut TokenIter, tok: &str) -> Result<(), ParseError> {
     let val = expect_token(tokens)?;
 
     if val.get_value() != tok {
@@ -108,7 +99,7 @@ fn parse_struct_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Re
         }
 
         let field_name = expect_token(tokens)?;
-        expect_token_with_name(tokens, ":")?;
+        expect_token_with_value(tokens, ":")?;
 
         let mut type_vec = vec![
             expect_token(tokens)?
@@ -150,7 +141,7 @@ fn parse_struct_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Re
         }
     }
 
-    expect_token_with_name(tokens, "}")?;
+    expect_token_with_value(tokens, "}")?;
 
     if fields.is_empty() {
         return Err(ParseError::new_tok(
@@ -180,7 +171,7 @@ fn parse_struct_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Re
     Ok(())
 }
 
-fn parse_def_statement(tokens: &mut TokenIter, _state: &mut ParserState) -> Result<(), ParseError> {
+fn parse_def_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Result<DefinitionStatement, ParseError> {
     let init_tok = expect_token(tokens)?;
     let name = init_tok.get_value().to_string();
 
@@ -195,34 +186,49 @@ fn parse_def_statement(tokens: &mut TokenIter, _state: &mut ParserState) -> Resu
     } else {
         return Err(ParseError::new_tok(init_tok, format!("expected colon and type name after '{name}' in definition")));
     }
+    
+    let mut type_tokens = Vec::new();
+    while let Some(i) = tokens.peek() {
+        if i.get_value() == ";" {
+            break;
+        } else if i.get_value() == "=" {
+            tokens.next(); // Read the = token to get ready for expression reading
+            break;
+        } else {
+            type_tokens.push(i);
+        }
+    }
+    
+    let type_name = type_tokens.iter()
+        .map(|i| i.get_value().to_string())
+        .reduce(|a, b| format!("{a}{b}"))
+        .unwrap_or(String::new());
+    let type_val = state.types.parse_type(&type_name)?;
 
     let mut expr_tokens = Vec::new();
 
     while let Some(i) = tokens.peek() {
         if i.get_value() != ";" {
-            expr_tokens.push(tokens.next());
+            expr_tokens.push(tokens.next().unwrap());
         } else {
             break;
         }
     }
-
-    if let Some(i) = tokens.next() {
-        if i.get_value() != ";" {
-            return Err(ParseError::new_tok(i, "expected ; after variable definition".into()));
-        }
-    } else {
-        return Err(ParseError::new("expected ; after variable definition".into()));
-    }
-
+    
+    expect_token_with_value(tokens, ";")?;
+    
+    // TODO - This works for base statements, but not anything else :-(
+    let def_statement = DefinitionStatement::new(&name, type_val);
+    
     if !expr_tokens.is_empty() {
         panic!("expression definition not yet supported!");
     }
-
-    panic!("need to add definition statement somewhere!");
+    
+    Ok(def_statement)
 }
 
 pub struct ParserState {
-    pub statement: Vec<Box<dyn BaseStatement>>,
+    pub statements: Vec<Box<dyn BaseStatement>>,
     pub types: SpTypeDict,
 }
 
@@ -237,7 +243,7 @@ impl ParserState {
 impl Default for ParserState {
     fn default() -> Self {
         Self {
-            statement: Vec::new(),
+            statements: Vec::new(),
             types: SpTypeDict::new(),
         }
     }

@@ -89,6 +89,8 @@ impl From<Literal> for String {
     }
 }
 
+pub trait BaseStatement {}
+
 pub trait Statement {}
 
 pub struct DefinitionStatement {
@@ -113,7 +115,7 @@ impl DefinitionStatement {
 
 impl Statement for DefinitionStatement {}
 
-pub trait BaseStatement {}
+impl BaseStatement for DefinitionStatement {}
 
 pub trait Expression {
     fn get_type(&self) -> SpType;
@@ -231,6 +233,8 @@ pub struct SpcFunction {
     statements: Vec<Box<dyn Statement>>,
 }
 
+impl BaseStatement for SpcFunction {}
+
 pub struct AsmFunction {
     params: Vec<(String, SpType)>,
     return_type: SpType,
@@ -252,3 +256,5 @@ impl AsmFunction {
         res.unwrap()
     }
 }
+
+impl BaseStatement for AsmFunction {}
