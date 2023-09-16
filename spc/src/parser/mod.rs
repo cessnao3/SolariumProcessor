@@ -195,6 +195,7 @@ fn parse_def_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Resul
             tokens.next(); // Read the = token to get ready for expression reading
             break;
         } else {
+            tokens.next(); // Read the token
             type_tokens.push(i);
         }
     }
