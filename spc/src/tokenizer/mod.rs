@@ -67,6 +67,39 @@ impl TokenIter {
             None
         }
     }
+
+    pub fn expect(&mut self) -> Result<Token, TokenIterError> {
+        if let Some(val) = self.next() {
+            Ok(val)
+        } else {
+            Err(TokenIterError::EndOfStream)
+        }
+    }
+
+    pub fn expect_with_value(&mut self, tok: &str) -> Result<(), TokenIterError> {
+        let val = self.expect()?;
+
+        if val.get_value() != tok {
+            return Err(TokenIterError::TokenMismatch(val, tok.to_string()));
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum TokenIterError {
+    EndOfStream,
+    TokenMismatch(Token, String),
+}
+
+impl std::fmt::Display for TokenIterError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EndOfStream => write!(f, "unexpected end of tokens"),
+            Self::TokenMismatch(tok, expected) => write!(f, "expected token with value '{expected}', found '{tok}'"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

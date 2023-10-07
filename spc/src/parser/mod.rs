@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 //use crate::components::{DefinitionStatement, Scope};
 use crate::types::SpTypeError;
-use crate::tokenizer::{tokenize, Token, TokenIter, TokenizeError};
+use crate::tokenizer::{tokenize, Token, TokenIter, TokenizeError, TokenIterError};
 
 use super::components::{BaseStatement, DefinitionStatement, AsmFunction, SpcFunction};
 use super::types::{SpType, SpTypeDict};
@@ -25,7 +25,7 @@ fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> 
             }
             word => return Err(ParseError::new(format!("unknown start of base expression {word}")))
         };
-        
+
         if let Some(base_statement) = base {
             state.statements.push(base_statement);
         }
@@ -42,27 +42,9 @@ fn parse_asmfn_statement(_tokens: &mut TokenIter, _state: &mut ParserState) -> R
     panic!("not implemented");
 }
 
-fn expect_token(tokens: &mut TokenIter) -> Result<Token, ParseError> {
-    if let Some(val) = tokens.next() {
-        Ok(val)
-    } else {
-        Err(ParseError::new("unexpected end of tokens".into()))
-    }
-}
-
-fn expect_token_with_value(tokens: &mut TokenIter, tok: &str) -> Result<(), ParseError> {
-    let val = expect_token(tokens)?;
-
-    if val.get_value() != tok {
-        return Err(ParseError::new_tok(val, format!("expected token with value '{tok}'")));
-    }
-
-    Ok(())
-}
-
 fn parse_struct_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Result<(), ParseError> {
     // Find open brace
-    let first_tok = expect_token(tokens)?;
+    let first_tok = tokens.expect()?;
     let struct_name = first_tok.get_value().to_string();
 
     if !SpType::is_valid_name(&struct_name) || struct_name == "void" {
@@ -98,11 +80,11 @@ fn parse_struct_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Re
             break;
         }
 
-        let field_name = expect_token(tokens)?;
-        expect_token_with_value(tokens, ":")?;
+        let field_name = tokens.expect()?;
+        tokens.expect_with_value(":")?;
 
         let mut type_vec = vec![
-            expect_token(tokens)?
+            tokens.expect()?
         ];
 
         while let Some(v) = tokens.peek() {
@@ -110,7 +92,7 @@ fn parse_struct_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Re
                 break;
             }
 
-            type_vec.push(expect_token(tokens)?);
+            type_vec.push(tokens.expect()?);
         }
 
         //expect_token_with_name(tokens, ",")?; -> Check ENDING!
@@ -130,7 +112,7 @@ fn parse_struct_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Re
 
         if let Some(t) = tokens.peek() {
             if t.get_value() == "," {
-                expect_token(tokens)?;
+                tokens.expect()?;
             } else if t.get_value() == "}" {
                 break;
             } else {
@@ -141,7 +123,7 @@ fn parse_struct_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Re
         }
     }
 
-    expect_token_with_value(tokens, "}")?;
+    tokens.expect_with_value("}")?;
 
     if fields.is_empty() {
         return Err(ParseError::new_tok(
@@ -172,7 +154,7 @@ fn parse_struct_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Re
 }
 
 fn parse_def_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Result<DefinitionStatement, ParseError> {
-    let init_tok = expect_token(tokens)?;
+    let init_tok = tokens.expect()?;
     let name = init_tok.get_value().to_string();
 
     if !SpType::is_valid_name(&name) {
@@ -186,7 +168,7 @@ fn parse_def_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Resul
     } else {
         return Err(ParseError::new_tok(init_tok, format!("expected colon and type name after '{name}' in definition")));
     }
-    
+
     let mut type_tokens = Vec::new();
     while let Some(i) = tokens.peek() {
         if i.get_value() == ";" {
@@ -199,7 +181,7 @@ fn parse_def_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Resul
             type_tokens.push(i);
         }
     }
-    
+
     let type_name = type_tokens.iter()
         .map(|i| i.get_value().to_string())
         .reduce(|a, b| format!("{a}{b}"))
@@ -215,16 +197,16 @@ fn parse_def_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Resul
             break;
         }
     }
-    
-    expect_token_with_value(tokens, ";")?;
-    
+
+    tokens.expect_with_value(";")?;
+
     // TODO - This works for base statements, but not anything else :-(
     let def_statement = DefinitionStatement::new(&name, type_val);
-    
+
     if !expr_tokens.is_empty() {
         panic!("expression definition not yet supported!");
     }
-    
+
     Ok(def_statement)
 }
 
@@ -278,6 +260,12 @@ impl Display for ParseError {
             write!(f, "{}:{} ({}) => ", tok.get_line(), tok.get_column(), tok.get_value())?;
         }
         write!(f, "{}", self.msg)
+    }
+}
+
+impl From<TokenIterError> for ParseError {
+    fn from(value: TokenIterError) -> Self {
+        Self::new(format!("tokiter: {value}"))
     }
 }
 
