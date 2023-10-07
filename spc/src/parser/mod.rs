@@ -287,37 +287,35 @@ mod tests {
 
     #[test]
     fn test_parse_struct() {
-        let mut state = ParserState::new();
-        let struct_string = "
-        struct type_name
-        {
-            var1: u16,
-            var2: i16,
-        }
-        "
-        .trim();
+        for use_trailing_comma in [true, false] {
+            let mut state = ParserState::new();
+            let expected_name = "type_name";
+            let struct_string = format!(
+                "struct {expected_name}\n{{\n    var1: u16,\n    var2: i16{}\n}}",
+                if use_trailing_comma { "," } else { "" });
 
-        if let Err(e) = parse_with_state(struct_string, &mut state) {
-            panic!("{e}");
-        }
+            if let Err(e) = parse_with_state(&struct_string, &mut state) {
+                panic!("{e}");
+            }
 
-        assert!(state.types.parse_type("type_name").is_ok());
+            assert!(state.types.parse_type(expected_name).is_ok());
 
-        if let Ok(SpType::Struct { name, fields }) = state.types.parse_type("type_name") {
-            assert_eq!(name, "type_name");
-            assert_eq!(fields.len(), 2);
+            if let Ok(SpType::Struct { name, fields }) = state.types.parse_type(expected_name) {
+                assert_eq!(name, expected_name);
+                assert_eq!(fields.len(), 2);
 
-            let f1 = &fields[0];
+                let f1 = &fields[0];
 
-            assert_eq!(f1.0, "var1");
-            assert_eq!(*f1.1, state.types.parse_type("u16").unwrap());
+                assert_eq!(f1.0, "var1");
+                assert_eq!(*f1.1, state.types.parse_type("u16").unwrap());
 
-            let f2 = &fields[1];
+                let f2 = &fields[1];
 
-            assert_eq!(f2.0, "var2");
-            assert_eq!(*f2.1, state.types.parse_type("i16").unwrap());
-        } else {
-            panic!("unable to get expected type");
+                assert_eq!(f2.0, "var2");
+                assert_eq!(*f2.1, state.types.parse_type("i16").unwrap());
+            } else {
+                panic!("unable to get expected type");
+            }
         }
     }
 
