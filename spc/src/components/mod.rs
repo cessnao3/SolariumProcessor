@@ -69,13 +69,13 @@ impl Literal {}
 
 impl From<Literal> for u16 {
     fn from(value: Literal) -> Self {
-        return value.words[0];
+        value.words[0]
     }
 }
 
 impl From<Literal> for i16 {
     fn from(value: Literal) -> Self {
-        return value.words[0] as i16;
+        value.words[0] as i16
     }
 }
 
