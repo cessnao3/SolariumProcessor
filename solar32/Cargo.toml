@@ -1,0 +1,10 @@
+[package]
+name = "solar32"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ian O'Rourke <cessna.ian@gmail.com>"]
+crate-type = ["lib", "cdylib"]
+
+[profile.release]
+lto = true
+strip = true
