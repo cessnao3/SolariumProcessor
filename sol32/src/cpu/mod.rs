@@ -114,7 +114,11 @@ impl Instruction {
     }
 
     fn arg_imm_signed(&self) -> i32 {
-        (self.arg_imm_unsigned() << 8) as i32 >> 8
+        let mut val = self.arg_imm_unsigned() as i32;
+        if (self.arg0 & 0x80) != 0 {
+            val |= 0xFF << 24;
+        }
+        val
     }
 
     fn arg_imm_unsigned(&self) -> u32 {
