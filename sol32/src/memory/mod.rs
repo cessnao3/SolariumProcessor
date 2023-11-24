@@ -10,6 +10,7 @@ pub enum MemoryError {
     InvalidMemoryAccess(u32),
     ReadOnlyMemory(u32),
     OverlappingSegment(u32),
+    EmptySegment(u32),
     InvalidAddress(u32),
     IndexBounds(usize),
 }
@@ -36,6 +37,11 @@ pub trait MemorySegment {
     /// Determines that the offset is within the memory segment
     fn within(&self, offset: u32) -> bool {
         offset < self.len()
+    }
+
+    /// Determines whether the memory map is empty
+    fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -66,6 +72,9 @@ impl MemoryMap {
         if top > u32::MAX as usize {
             return Err(MemoryError::IndexBounds(top));
         }
+        else if new_seg.seg.borrow().is_empty() {
+            return Err(MemoryError::EmptySegment(base));
+        }
 
         for sd in self.segments.iter() {
             if new_seg.within(sd.base) || new_seg.within(sd.top()) || sd.within(new_seg.base) || sd.within(new_seg.top()) {
@@ -95,5 +104,53 @@ impl MemoryMap {
         }
 
         Err(MemoryError::InvalidAddress(address))
+    }
+
+    pub fn reset(&mut self) {
+        for s in self.segments.iter() {
+            s.seg.borrow_mut().reset();
+        }
+    }
+
+    pub fn get_f32(&mut self, address: u32) -> Result<f32, MemoryError> {
+        Ok(f32::from_bits(self.get_u32(address)?))
+    }
+
+    pub fn set_f32(&mut self, address: u32, val: f32) -> Result<(), MemoryError> {
+        self.set_u32(address, val.to_bits())
+    }
+
+    pub fn get_u32(&mut self, address: u32) -> Result<u32, MemoryError> {
+        let mut val = 0;
+        for i in 0..4 {
+            val |= (self.get_word(address + i)?.get() as u32) << (8 * i);
+        }
+        Ok(val)
+    }
+
+    pub fn set_u32(&mut self, address: u32, val: u32) -> Result<(), MemoryError> {
+        let mut val = val;
+        for i in 0..4 {
+            self.set_word(address + i, Word::from((val & 0xFF) as u8))?;
+            val >>= 8;
+        }
+        Ok(())
+    }
+
+    pub fn get_u16(&mut self, address: u32) -> Result<u16, MemoryError> {
+        let mut val = 0;
+        for i in 0..2 {
+            val |= (self.get_word(address)?.get() as u16) << (8 * i);
+        }
+        Ok(val)
+    }
+
+    pub fn set_u16(&mut self, address: u32, val: u16) -> Result<(), MemoryError> {
+        let mut val = val;
+        for i in 0..2 {
+            self.set_word(address + i, Word::from((val & 0xFF) as u8))?;
+            val >>= 8;
+        }
+        Ok(())
     }
 }

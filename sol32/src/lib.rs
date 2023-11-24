@@ -1,8 +1,3 @@
-mod common;
-mod memory;
-
-use common::Word;
-
-fn main() {
-    println!("Hello, world!");
-}
+pub mod common;
+pub mod cpu;
+pub mod memory;

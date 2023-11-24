@@ -1,4 +1,5 @@
 #[derive(Debug, Clone, Copy)]
+/// Structure to contain the word values
 pub struct Word {
     val: u8
 }
