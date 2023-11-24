@@ -25,13 +25,13 @@ pub enum RegisterMap {
     GeneralPurpose(usize),
 }
 
-const REGISTER_COUNT: usize = 32;
-
 struct RegisterManager {
-    registers: [u32; REGISTER_COUNT],
+    registers: [u32; Self::REGISTER_COUNT],
 }
 
 impl RegisterManager {
+    pub const REGISTER_COUNT: usize = 32;
+
     pub fn get(&self, reg: RegisterMap) -> Result<u32, ProcessorError> {
         let ind = reg.get_index();
         if ind < self.registers.len() {
@@ -59,7 +59,7 @@ impl RegisterManager {
 impl Default for RegisterManager {
     fn default() -> Self {
         Self {
-            registers: [0; REGISTER_COUNT],
+            registers: [0; Self::REGISTER_COUNT],
         }
     }
 }
@@ -111,6 +111,14 @@ impl Instruction {
 
     fn reg_a2(&self) -> RegisterMap {
         RegisterMap::GeneralPurpose(self.arg0 as usize)
+    }
+
+    fn arg_imm_signed(&self) -> i32 {
+        (self.arg_imm_unsigned() << 8) as i32 >> 8
+    }
+
+    fn arg_imm_unsigned(&self) -> u32 {
+        ((self.arg0 as u32) << 16) | ((self.arg1 as u32) << 8) | (self.arg2 as u32)
     }
 }
 
@@ -167,7 +175,12 @@ impl Processor {
         const OP_TYPE_CPU_JUMP: u8 = 10;
         const OP_TYPE_CPU_JUMP_REL: u8 = 11;
         const OP_TYPE_CPU_JUMP_REL_IMM: u8 = 12;
+        const OP_TYPE_CPU_BOOL: u8 = 13;
         const OP_TYPE_CPU_HALT: u8 = 15;
+
+        // TODO - Add, Sub, Mul, Div, Shift, ArithShift, Mod, Eq, NEq, Lt, Gt, Lteq, Gteq, Conv, i32->f, u32->f, f->i32)
+
+        // TYPES: f32, i32, u32, i16, u16, i8, u8
 
         match inst.get_op_base() {
             OP_BASE_CPU => match inst.get_op_type() {
@@ -176,13 +189,13 @@ impl Processor {
                 OP_TYPE_CPU_INTERRUPT => self.trigger_interrupt(inst.arg0 as usize)?,
                 OP_TYPE_CPU_INTERRUPT_REGISTER => self.trigger_interrupt(self.registers.get(inst.reg_a0())? as usize)?,
                 OP_TYPE_CPU_CALL => {
-                    for i in 0..REGISTER_COUNT {
+                    for i in 0..RegisterManager::REGISTER_COUNT {
                         self.stack_push(self.registers.get(RegisterMap::GeneralPurpose(i))?)?;
                     }
                     self.registers.set(RegisterMap::ProgramCounter, self.registers.get(inst.reg_a0())?)?;
                 }
                 OP_TYPE_CPU_RETURN | OP_TYPE_CPU_INTERRUPT_RETURN => {
-                    for i in (0..REGISTER_COUNT).rev() {
+                    for i in (0..RegisterManager::REGISTER_COUNT).rev() {
                         let val = self.stack_pop()?;
                         if i != RegisterMap::Return.get_index() || inst.get_op_type() == OP_TYPE_CPU_INTERRUPT_RETURN {
                             self.registers.set(RegisterMap::GeneralPurpose(i), val)?;
@@ -209,6 +222,14 @@ impl Processor {
                 OP_TYPE_CPU_JUMP_REL => {
                     self.registers.set(RegisterMap::ProgramCounter, (pc as i32 + self.registers.get(inst.reg_a0())? as i32) as u32)?;
                     inst_jump = 0;
+                }
+                OP_TYPE_CPU_JUMP_REL_IMM => {
+                    self.registers.set(RegisterMap::ProgramCounter, (pc as i32 + inst.arg_imm_signed()) as u32)?;
+                    inst_jump = 0;
+                }
+                OP_TYPE_CPU_BOOL => {
+                    let val = self.registers.get(inst.reg_a1())?;
+                    self.registers.set(inst.reg_a0(), if val != 0 { 1 } else { 0 })?;
                 }
                 OP_TYPE_CPU_HALT => {
                     inst_jump = 0;
