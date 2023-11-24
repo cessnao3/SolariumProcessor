@@ -1,4 +1,4 @@
-use super::{MemorySegment, Word, MemoryError};
+use super::{MemorySegment, Word, MemorySegmentError};
 
 /// Provides a read-write memory segment type
 pub struct ReadWriteSegment {
@@ -18,22 +18,22 @@ impl ReadWriteSegment {
 
 impl MemorySegment for ReadWriteSegment {
     /// Provides the word at the requested memory location
-    fn get(&self, offset: u32) -> Result<Word, MemoryError> {
+    fn get(&self, offset: u32) -> Result<Word, MemorySegmentError> {
         if self.within(offset) {
             Ok(self.data[offset as usize])
         } else {
-            Err(MemoryError::InvalidMemoryAccess(offset))
+            Err(MemorySegmentError::InvalidMemoryAccess(offset))
         }
     }
 
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
-    fn set(&mut self, offset: u32, data: Word) -> Result<(), MemoryError> {
+    fn set(&mut self, offset: u32, data: Word) -> Result<(), MemorySegmentError> {
         if self.within(offset) {
             self.data[offset as usize] = data;
             Ok(())
         } else {
-            Err(MemoryError::InvalidMemoryAccess(offset))
+            Err(MemorySegmentError::InvalidMemoryAccess(offset))
         }
     }
 

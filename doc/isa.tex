@@ -4,11 +4,8 @@
 \usepackage{listings}
 \usepackage{graphicx}
 
-\usepackage{comment}
-
 \usepackage{amsmath}
-
-\usepackage{todonotes}
+\usepackage{easyReview}
 
 \newcommand{\titlelogoimage}{
 \begin{figure}[h!]
@@ -17,7 +14,7 @@
 \end{figure}}
 
 %opening
-\title{S/Proc Instruction Set Architecture}
+\title{Sol32 Instruction Set Architecture}
 \author{Ian O'Rourke}
 \date{\today \\ \titlelogoimage}
 
@@ -29,11 +26,11 @@
 
 \section{Overview}
 
-S/Proc is a general-purpose Instruction Set Architecture (ISA). Each processor instruction is designed to take up exactly one word of memory. For the S/Proc, each word is 16-bits, with the primary data type being integers. In cases where signed arithmetic is performed, signed integers are encoded using the two's-complement format.
+Sol32 is a general-purpose Instruction Set Architecture (ISA). Each processor instruction is designed to take up exactly one word of memory. For Sol32, each word takes up 32 bits; however, memory is addressable at the byte level. In cases where signed arithmetic is performed, signed integers are encoded using the two's-complement format. Sol32 also supports 32-bit floating point numeric algebra.
 
 \subsection{Registers}
 
-There are 16 total registers present on the S/Proc. These are defined generally as follows in Table \ref{table:register-setup}. Note that, as S/Proc is a 16-bit architecture, this means that each register is 16 bits wide.
+There are 32 total registers present on the Sol32. These are defined generally as follows in Table \ref{table:register-setup}. Note that, as Sol32 is a 32-bit architecture, this means that each register is 32 bits wide. While there are specifications between general-purpose and system-level registers, any register is addressable and usable via standard instructions equally.
 
 \begin{table}[h!]
     \centering
@@ -47,18 +44,18 @@ There are 16 total registers present on the S/Proc. These are defined generally 
         R3 & Excess / Overflow \\
         R4 & Return Register \\
         R5 & Argument Base Register \\
-        R6-R15 & General Purpose Register \\
+        R6-R31 & General Purpose Register \\
         \hline
     \end{tabular}
-    \caption{Registers 0 through 5 are reserved for system-level parameters. All remaining registers are general-purpose.}
+    \caption{Registers R0 through R5 are reserved for system-level parameters. All remaining registers are general-purpose.}
     \label{table:register-setup}
 \end{table}
 
-The program counter indicates the next instruction to be read. At the beginning of the processor cycle, the instruction at the memory address of the program counter is read in and processed. Then, the program counter is incremented at the end of each instruction cycle. If this value is needed to be modified, it is recommended to use the absolute jump instruction, \texttt{jmp}, or the relative jump instruction, \texttt{jmpr}, as opposed to writing directly to the register. This will automatically account for the increment at the end of the instruction cycle.
+The program counter indicates the next instruction to be read. At the beginning of the processor cycle, the instruction at the memory address of the program counter is read in and processed. Then, the program counter is incremented at the end of each instruction cycle. If this value is needed to be modified, it is recommended to use the absolute \alert{jump instruction}, \texttt{jmp}, or the \alert{relative jump instruction}, \texttt{jmpr} (see Section \ref{sec:instructions}), as opposed to writing directly to the register. This will automatically account for the increment at the end of the instruction cycle.
 
-The global stack pointer maintains the global stack, as defined in Section \ref{sec:the-stack}. This provides the absolute address of the current stack location. Thus, when the stack is empty, it points to the stack base address, and when the stack is completely full it points to the memory location just above the last stack entry, or the base address plus the stack size. This value should not be edited by-hand to maintain the consistency of the program execution, but is instead modified by the stack instructions \texttt{push}, \texttt{pop}, \texttt{popr}, \texttt{call}, \texttt{ret}, \texttt{retint}, and \texttt{int}, as well as hardware interrupts. This should be loaded by the init program by assembly, however, to provide the default base location for the stack.
+The global stack pointer maintains the global stack, as defined in Section \ref{sec:the-stack}. This provides the absolute address of the current stack location. Thus, when the stack is empty, it points to the stack base address, and when the stack is completely full it points to the memory location just above the last stack entry, or the base address plus the stack size. This value should not be edited by-hand to maintain the consistency of the program execution, but is instead modified by the \alert{stack instructions} \texttt{push}, \texttt{pop}, \texttt{popr}, \texttt{call}, \texttt{ret}, \texttt{retint}, and \texttt{int}, as well as hardware interrupts. This should be loaded by the init program by assembly, however, to provide the default base location for the stack.
 
-The return value instruction is intended to store the result of a function call, made using the \texttt{call} instruction. When the processor status flags are replaced with the caller's flags after the \texttt{ret} instruction is called, the return value is the only register that remains unchanged.
+The return value instruction is intended to store the result of a function call, made using the \texttt{call} instruction. When the processor status flags are replaced with the caller's flags after the \texttt{ret} \alert{instruction} is called, the return value is the only register that remains unchanged.
 
 The processor status flags indicate the current setup for the processor. Currently, the following flags are assigned, as noted in Table \ref{table:processor-flags}.
 
@@ -69,24 +66,23 @@ The processor status flags indicate the current setup for the processor. Current
         Bit & Value \\
         \hline
         0 & Interrupt Enable \\
-        1 & Signed Operations \\
         \hline
     \end{tabular}
     \caption{Processor status flags provide a window into the current processor state}
     \label{table:processor-flags}
 \end{table}
 
-This provides both a means to set and to read the current processor state values to ensure that the proper operating mode is configured for the currently-running program. This is maintained and replaced when \texttt{ret} and \texttt{retint} are called, so within an interrupt or function call, it is not necessary to replace the processor flags with those of the caller.
+This provides both a means to set and to read the current processor state values to ensure that the proper operating mode is configured for the currently-running program. \alert{This is maintained and replaced} when \texttt{ret} and \texttt{retint} are called, so within an interrupt or function call, it is not necessary to replace the processor flags with those of the caller.
 
 \subsection{Overall Instruction Syntax}
 
-Since the architecture of the S/Proc is 16-bit, this means that each word that may be addressed is 16-bits. The general instruction format is listed  in Table \ref{table:instruction-formatting}.
+Since the architecture of the Sol32 is 32-bit, this means that the basic word, and therefore instruction format, exists in a 32-bit format. Note that, however, memory addresses are with respect to byte boundaries. Words are stored in big-endian format, meaning the most-significant component of the word is associated with the first byte in the word, while the least-significant component of the word is associated with the last byte in the word. Instructions must be placed with a base at a memory location with a byte alignment of four (e.g. 0, 4, 8, 12, etc.). General data may be placed and accessed from any byte alignment. The general instruction format is listed  in Table \ref{table:instruction-formatting}.
 
 \begin{table}[h!]
     \centering
     \begin{tabular}{l|cccc}
         \hline
-        Location & 0xF000 & 0x0F00 & 0x00F0 & 0x000F \\
+        Location & 0xFF000000 & 0x00FF0000 & 0x0000FF00 & 0x000000FF \\
         \hline
         Usage & opcode & arg0 & arg1 & arg2 \\
         \hline
@@ -124,7 +120,7 @@ At the conclusion of any interrupt, the \texttt{retint} instruction should be ca
 
 It should be noted that, if any values were pushed onto the stack during the interrupt handler, they should be popped off the stack prior to the \texttt{retint} call to avoid corrupting the program state.
 
-The S/Proc supports up to 16 software interrupts and up to 16 hardware interrupts, as shown in Table \ref{table:interrupt-vector-locations}. Software interrupt vectors are stored in memory at location \texttt{0x10} for software interrupt 0 though \texttt{0x1F}, exclusive. Similarly, the 16 hardware interrupts are stored in memory at memory address \texttt{0x20} through \texttt{0x2F}, exclusive.
+The S/Proc supports up to 16 software interrupts and up to 16 hardware interrupts, as shown in Table \ref{table:interrupt-vector-locations}. \alert{Software interrupt vectors are stored in memory at locations} \texttt{0x10} for software interrupt 0 though \texttt{0x1F}, exclusive. Similarly, the \alert{16 hardware interrupts are stored in memory at memory addresses} \texttt{0x20} through \texttt{0x2F}, exclusive.
 
 \begin{table}[h!]
     \centering
@@ -145,8 +141,9 @@ Note that, if a vector has a value of zero, that interrupt vector is considered 
 \pagebreak
 
 \section{Instructions and Assembly Code}
+\label{sec:instructions}
 
-All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field. \todo{Update Assembler!} \todo{Update SProc}
+All \comment{available instructions}{Update instructions} are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field.
 
 \begin{table}[h!]
     \centering
