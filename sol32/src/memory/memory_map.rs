@@ -50,6 +50,10 @@ macro_rules! GetSetUnsignedType {
 }
 
 impl MemoryMap {
+    pub fn new() -> Self {
+        MemoryMap { segments: Vec::new() }
+    }
+
     pub fn add_segment(&mut self, base: u32, seg: Box<RefCell<dyn MemorySegment>>) -> Result<(), MemoryError> {
         let new_seg = SegmentData { base, seg };
 
@@ -107,4 +111,10 @@ impl MemoryMap {
 
     GetSetUnsignedType!(get_u32, set_u32, u32);
     GetSetUnsignedType!(get_u16, set_u16, u16);
+}
+
+impl Default for MemoryMap {
+    fn default() -> Self {
+        Self::new()
+    }
 }

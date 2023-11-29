@@ -1,11 +1,22 @@
-use crate::memory::{MemoryMap, MemoryError};
+mod instruction;
+mod operations;
+mod register;
+
+use crate::cpu::instruction::DataType;
+use crate::memory::{MemoryError, MemoryMap};
+
+use self::instruction::{Instruction, DataTypeError};
+use self::operations::{ArithmeticOperations, BinaryOperations, FloatOperations, IntegerU8Operations, IntegerU16Operations, IntegerU32Operations, IntegerI8Operations, IntegerI16Operations, IntegerI32Operations, OperationError};
+use self::register::{Register, RegisterManager, RegisterError};
 
 pub enum ProcessorError {
     Memory(MemoryError),
     UnsupportedInterrupt(usize),
-    UnknownRegister(usize),
-    UnknownOperation(Instruction),
+    Register(RegisterError),
+    UnknownInstruction(Instruction),
+    Operation(OperationError),
     StackUnderflow,
+    DataType(DataTypeError),
 }
 
 impl From<MemoryError> for ProcessorError {
@@ -14,67 +25,21 @@ impl From<MemoryError> for ProcessorError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Register {
-    ProgramCounter,
-    Status,
-    StackPointer,
-    Overflow,
-    Return,
-    ArgumentBase,
-    GeneralPurpose(usize),
-}
-
-struct RegisterManager {
-    registers: [u32; Self::REGISTER_COUNT],
-}
-
-impl RegisterManager {
-    pub const REGISTER_COUNT: usize = 32;
-
-    pub fn get(&self, reg: Register) -> Result<u32, ProcessorError> {
-        let ind = reg.get_index();
-        if ind < self.registers.len() {
-            Ok(self.registers[ind])
-        } else {
-            Err(ProcessorError::UnknownRegister(ind))
-        }
-    }
-
-    pub fn set(&mut self, reg: Register, val: u32) -> Result<(), ProcessorError> {
-        let ind = reg.get_index();
-        if ind < self.registers.len() {
-            self.registers[ind] = val;
-            Ok(())
-        } else {
-            Err(ProcessorError::UnknownRegister(ind))
-        }
-    }
-
-    pub fn reset(&mut self) {
-        self.registers.fill(0);
+impl From<RegisterError> for ProcessorError {
+    fn from(value: RegisterError) -> Self {
+        Self::Register(value)
     }
 }
 
-impl Default for RegisterManager {
-    fn default() -> Self {
-        Self {
-            registers: [0; Self::REGISTER_COUNT],
-        }
+impl From<DataTypeError> for ProcessorError {
+    fn from(value: DataTypeError) -> Self {
+        Self::DataType(value)
     }
 }
 
-impl Register {
-    pub fn get_index(&self) -> usize {
-        match self {
-            Self::ProgramCounter => 0,
-            Self::Status => 1,
-            Self::StackPointer => 2,
-            Self::Overflow => 3,
-            Self::Return => 4,
-            Self::ArgumentBase => 5,
-            Self::GeneralPurpose(num) => *num,
-        }
+impl From<OperationError> for ProcessorError {
+    fn from(value: OperationError) -> Self {
+        Self::Operation(value)
     }
 }
 
@@ -84,162 +49,35 @@ pub enum ResetType {
     Soft,
 }
 
-pub enum DataType {
-    U8,
-    I8,
-    U16,
-    I16,
-    U32,
-    I32,
-    F32,
-}
-
-pub struct DataTypeError(u8);
-
-impl TryFrom<u8> for DataType {
-    type Error = DataTypeError;
-
-    fn try_from(val: u8) -> Result<Self, Self::Error> {
-        Ok(match val {
-            0 => Self::U8,
-            1 => Self::I8,
-            2 => Self::U16,
-            3 => Self::I16,
-            4 => Self::U32,
-            5 => Self::I32,
-            6 => Self::F32,
-            _ => return Err(DataTypeError(val)),
-        })
-    }
-}
-
-impl From<DataType> for u8 {
-    fn from(value: DataType) -> Self {
-        match value {
-            DataType::U8 => 0,
-            DataType::I8 => 1,
-            DataType::U16 => 2,
-            DataType::I16 => 3,
-            DataType::U32 => 4,
-            DataType::I32 => 5,
-            DataType::F32 => 6,
-        }
-    }
-}
-
-// Bit Formatting:
-// | 31 30 29 28 27 26 25 24 | 23 22 21 | 20 19 18 17 16 | 15 14 13 | 12 11 10  9  8 |  7  6  5 |  4  3  2  1  0 |
-// | Opcode                  | Arg 0                     | Arg 1                     | Arg 2                     |
-// | Opcode                  | DType 0  | Arg 0 (Reg)    | DType 1  | Arg 1 (Reg)    | DType 2  | Arg 2 (Reg)    |
-// | Opcode                  | ImmTodo  | Immediate Value                                                        |
-//   ^ TODO - Split load into 2 instructions to get full immediate value (signed, unsigned)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Instruction {
-    data: [u8; 4],
-}
-
-impl Instruction {
-    const NUM_IMM_BITS: u32 = {
-        u8::BITS * 3
-    };
-
-    const IMM_SIGN_BIT: u32 = {
-        1 << (Self::NUM_IMM_BITS - 1)
-    };
-
-    const IMM_NEG_MASK: u32 = {
-        let mut val = 0;
-        let mut i = Self::NUM_IMM_BITS;
-        while i < u32::BITS {
-            val |= i << i;
-            i += 1;
-        }
-        val
-    };
-
-    pub fn opcode(&self) -> u8 {
-        self.data[0]
-    }
-
-    fn reg_from_arg(arg: u8) -> Register {
-        Register::GeneralPurpose((arg & 0x1F) as usize)
-    }
-
-    fn dt_from_arg(arg: u8) -> Result<DataType, DataTypeError>
-    {
-        let dt = (arg >> 5) & 7;
-        DataType::try_from(dt)
-    }
-
-    pub fn arg0(&self) -> u8
-    {
-        self.data[1]
-    }
-
-    pub fn arg0_data_type(&self) -> Result<DataType, DataTypeError>
-    {
-        Self::dt_from_arg(self.arg0())
-    }
-
-    pub fn arg0_register(&self) -> Register
-    {
-        Self::reg_from_arg(self.arg0())
-    }
-
-    pub fn arg1(&self) -> u8
-    {
-        self.data[2]
-    }
-
-    pub fn arg1_data_type(&self) -> Result<DataType, DataTypeError>
-    {
-        Self::dt_from_arg(self.arg1())
-    }
-
-    pub fn arg1_register(&self) -> Register
-    {
-        Self::reg_from_arg(self.arg1())
-    }
-
-    pub fn arg2(&self) -> u8
-    {
-        self.data[3]
-    }
-
-    pub fn arg2_data_type(&self) -> Result<DataType, DataTypeError>
-    {
-        Self::dt_from_arg(self.arg2())
-    }
-
-    pub fn arg2_register(&self) -> Register
-    {
-        Self::reg_from_arg(self.arg2())
-    }
-
-    pub fn imm_unsigned(&self) -> u32
-    {
-        ((self.arg0() as u32) << 16) | ((self.arg1() as u32) << 8) | (self.arg2() as u32)
-    }
-
-    pub fn imm_signed(&self) -> i32
-    {
-        let mut val = self.imm_unsigned();
-        if (val & Self::IMM_SIGN_BIT) != 0
-        {
-            val |= Self::IMM_NEG_MASK;
-        }
-        val as i32
-    }
-}
-
 pub struct Processor {
     memory: MemoryMap,
     registers: RegisterManager,
+    op_f32: FloatOperations,
+    op_u8: IntegerU8Operations,
+    op_u16: IntegerU16Operations,
+    op_u32: IntegerU32Operations,
+    op_i8: IntegerI8Operations,
+    op_i16: IntegerI16Operations,
+    op_i32: IntegerI32Operations,
 }
 
 impl Processor {
     pub const HARD_RESET_VECTOR: usize = 0;
     pub const SOFT_RESET_VECTOR: usize = 1;
+
+    pub fn new() -> Self {
+        Self {
+            memory: MemoryMap::default(),
+            registers: RegisterManager::default(),
+            op_f32: FloatOperations,
+            op_u8: IntegerU8Operations,
+            op_u16: IntegerU16Operations,
+            op_u32: IntegerU32Operations,
+            op_i8: IntegerI8Operations,
+            op_i16: IntegerI16Operations,
+            op_i32: IntegerI32Operations,
+        }
+    }
 
     pub fn reset(&mut self, reset_type: ResetType) -> Result<(), ProcessorError> {
         if ResetType::Hard == reset_type {
@@ -252,11 +90,40 @@ impl Processor {
         };
 
         self.registers.reset();
-        self.registers.set(Register::ProgramCounter, self.memory.get_u32(self.get_reset_vector(reset_vec)?)?)
+        self.registers.set(
+            Register::ProgramCounter,
+            self.memory.get_u32(self.get_reset_vector(reset_vec)?)?,
+        )?;
+
+        Ok(())
     }
 
     pub fn trigger_interrupt(&mut self, interrupt_num: usize) -> Result<(), ProcessorError> {
         Err(ProcessorError::UnsupportedInterrupt(interrupt_num))
+    }
+
+    fn get_arith_operation(&self, dt: DataType) -> Result<&dyn ArithmeticOperations, ProcessorError> {
+        Ok(match dt {
+            DataType::U8 => &self.op_u8,
+            DataType::U16 => &self.op_u16,
+            DataType::U32 => &self.op_u32,
+            DataType::I8 => &self.op_i8,
+            DataType::I16 => &self.op_i16,
+            DataType::I32 => &self.op_i32,
+            DataType::F32 => &self.op_f32,
+        })
+    }
+
+    fn get_bitwise_operation(&self, dt: DataType) -> Result<&dyn BinaryOperations, ProcessorError> {
+        Ok(match dt {
+            DataType::U8 => &self.op_u8,
+            DataType::U16 => &self.op_u16,
+            DataType::U32 => &self.op_u32,
+            DataType::I8 => &self.op_i8,
+            DataType::I16 => &self.op_i16,
+            DataType::I32 => &self.op_i32,
+            _ => return Err(ProcessorError::Operation(OperationError::UnuspportedOperation)),
+        })
     }
 
     pub fn step(&mut self) -> Result<(), ProcessorError> {
@@ -264,13 +131,12 @@ impl Processor {
 
         let pc = self.registers.get(Register::ProgramCounter)?;
 
-        let inst = Instruction {
-            data: [
-                self.memory.get_u8(pc)?.get(),
-                self.memory.get_u8(pc + 1)?.get(),
-                self.memory.get_u8(pc + 2)?.get(),
-                self.memory.get_u8(pc + 3)?.get()]
-        };
+        let inst = Instruction::new([
+            self.memory.get_u8(pc)?.get(),
+            self.memory.get_u8(pc + 1)?.get(),
+            self.memory.get_u8(pc + 2)?.get(),
+            self.memory.get_u8(pc + 3)?.get(),
+        ]);
 
         const OP_BASE_CPU: u8 = 0;
         const OP_TYPE_CPU_NOOP: u8 = 0;
@@ -289,9 +155,22 @@ impl Processor {
         const OP_TYPE_CPU_BOOL: u8 = 13;
         const OP_TYPE_CPU_HALT: u8 = 15;
 
-        // TODO - Add, Sub, Mul, Div, Shift, ArithShift, Mod, Eq, NEq, Lt, Gt, Lteq, Gteq, Conv, i32->f, u32->f, f->i32), load, save
+        const OP_MATH: u8 = 10;
+        const OP_MATH_ADD: u8 = 0;
+        const OP_MATH_SUB: u8 = 1;
+        const OP_MATH_MUL: u8 = 2;
+        const OP_MATH_DIV: u8 = 3;
+        const OP_MATH_REM: u8 = 4;
 
-        // TYPES: f32, i32, u32, i16, u16, i8, u8
+        const OP_BITS: u8 = 11;
+        const OP_BITS_AND: u8 = 0;
+        const OP_BITS_OR: u8 = 1;
+        const OP_BITS_XOR: u8 = 2;
+        const OP_BITS_SHL: u8 = 3;
+        const OP_BITS_SHR: u8 = 4;
+
+
+        // TODO - Add, Sub, Mul, Div, Shift, ArithShift, Mod, Eq, NEq, Lt, Gt, Lteq, Gteq, Conv, i32->f, u32->f, f->i32), load, save
 
         let opcode_base = (inst.opcode() >> 4) & 0xF;
         let opcode_type = inst.opcode() & 0xF;
@@ -301,17 +180,24 @@ impl Processor {
                 OP_TYPE_CPU_NOOP => (),
                 OP_TYPE_CPU_RESET => self.reset(ResetType::Soft)?,
                 OP_TYPE_CPU_INTERRUPT => self.trigger_interrupt(inst.arg0() as usize)?,
-                OP_TYPE_CPU_INTERRUPT_REGISTER => self.trigger_interrupt(self.registers.get(inst.arg0_register())? as usize)?,
+                OP_TYPE_CPU_INTERRUPT_REGISTER => {
+                    self.trigger_interrupt(self.registers.get(inst.arg0_register())? as usize)?
+                }
                 OP_TYPE_CPU_CALL => {
                     for i in 0..RegisterManager::REGISTER_COUNT {
                         self.stack_push(self.registers.get(Register::GeneralPurpose(i))?)?;
                     }
-                    self.registers.set(Register::ProgramCounter, self.registers.get(inst.arg0_register())?)?;
+                    self.registers.set(
+                        Register::ProgramCounter,
+                        self.registers.get(inst.arg0_register())?,
+                    )?;
                 }
                 OP_TYPE_CPU_RETURN | OP_TYPE_CPU_INTERRUPT_RETURN => {
                     for i in (0..RegisterManager::REGISTER_COUNT).rev() {
                         let val = self.stack_pop()?;
-                        if i != Register::Return.get_index() || opcode_type == OP_TYPE_CPU_INTERRUPT_RETURN {
+                        if i != Register::Return.get_index()
+                            || opcode_type == OP_TYPE_CPU_INTERRUPT_RETURN
+                        {
                             self.registers.set(Register::GeneralPurpose(i), val)?;
                         }
                     }
@@ -328,32 +214,79 @@ impl Processor {
                 OP_TYPE_CPU_POP_REG => {
                     let val = self.stack_pop()?;
                     self.registers.set(inst.arg0_register(), val)?;
-                },
+                }
                 OP_TYPE_CPU_JUMP => {
-                    self.registers.set(Register::ProgramCounter, self.registers.get(inst.arg0_register())?)?;
+                    self.registers.set(
+                        Register::ProgramCounter,
+                        self.registers.get(inst.arg0_register())?,
+                    )?;
                     inst_jump = 0;
                 }
                 OP_TYPE_CPU_JUMP_REL => {
-                    self.registers.set(Register::ProgramCounter, (pc as i32 + self.registers.get(inst.arg0_register())? as i32) as u32)?;
+                    self.registers.set(
+                        Register::ProgramCounter,
+                        (pc as i32 + self.registers.get(inst.arg0_register())? as i32) as u32,
+                    )?;
                     inst_jump = 0;
                 }
                 OP_TYPE_CPU_JUMP_REL_IMM => {
-                    self.registers.set(Register::ProgramCounter, (pc as i32 + inst.imm_signed()) as u32)?;
+                    self.registers.set(
+                        Register::ProgramCounter,
+                        (pc as i32 + inst.imm_signed()) as u32,
+                    )?;
                     inst_jump = 0;
                 }
                 OP_TYPE_CPU_BOOL => {
                     let val = self.registers.get(inst.arg1_register())?;
-                    self.registers.set(inst.arg0_register(), if val != 0 { 1 } else { 0 })?;
+                    self.registers
+                        .set(inst.arg0_register(), if val != 0 { 1 } else { 0 })?;
                 }
                 OP_TYPE_CPU_HALT => {
                     inst_jump = 0;
                 }
-                _ => return Err(ProcessorError::UnknownOperation(inst)),
-            }
-            _ => return Err(ProcessorError::UnknownOperation(inst)),
+                _ => return Err(ProcessorError::UnknownInstruction(inst)),
+            },
+            OP_MATH => {
+                let arith = self.get_arith_operation(inst.arg0_data_type()?)?;
+
+                let val_a = self.registers.get(inst.arg1_register())?;
+                let val_b = self.registers.get(inst.arg2_register())?;
+
+                let res = match opcode_type {
+                    OP_MATH_ADD => arith.add(val_a, val_b)?,
+                    OP_MATH_SUB => arith.sub(val_a, val_b)?,
+                    OP_MATH_MUL => arith.mul(val_a, val_b)?,
+                    OP_MATH_DIV => arith.div(val_a, val_b)?,
+                    OP_MATH_REM => arith.rem(val_a, val_b)?,
+                    _ => return Err(ProcessorError::UnknownInstruction(inst)),
+                };
+
+                self.registers.set(inst.arg0_register(), res.val)?;
+                self.registers.set(Register::Status, if res.carry { 1 } else { 0 })?;
+            },
+            OP_BITS => {
+                let bitwise = self.get_bitwise_operation(inst.arg0_data_type()?)?;
+
+                let val_a = self.registers.get(inst.arg1_register())?;
+                let val_b = self.registers.get(inst.arg2_register())?;
+
+                let res = match opcode_type {
+                    OP_BITS_AND => bitwise.band(val_a, val_b)?,
+                    OP_BITS_OR => bitwise.bor(val_a, val_b)?,
+                    OP_BITS_XOR => bitwise.bxor(val_a, val_b)?,
+                    OP_BITS_SHL => bitwise.bsftl(val_a, val_b)?,
+                    OP_BITS_SHR => bitwise.bsftr(val_a, val_b)?,
+                    _ => return Err(ProcessorError::UnknownInstruction(inst)),
+                };
+
+                self.registers.set(inst.arg0_register(), res.val)?;
+                self.registers.set(Register::Status, if res.carry { 1 } else { 0 })?;
+            },
+            _ => return Err(ProcessorError::UnknownInstruction(inst)),
         }
 
-        self.registers.set(Register::ProgramCounter, inst_jump * 4)?;
+        self.registers
+            .set(Register::ProgramCounter, inst_jump * 4)?;
 
         Ok(())
     }
@@ -384,5 +317,11 @@ impl Processor {
         } else {
             Err(ProcessorError::UnsupportedInterrupt(index))
         }
+    }
+}
+
+impl Default for Processor {
+    fn default() -> Self {
+        Self::new()
     }
 }
