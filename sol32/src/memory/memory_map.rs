@@ -32,17 +32,16 @@ pub struct MemoryMap {
 macro_rules! GetSetUnsignedType {
     ( $get_name: ident, $set_name: ident, $type: ident ) => {
         pub fn $get_name(&mut self, address: u32) -> Result<$type, MemoryError> {
-            let mut val: $type = 0;
+            let mut bytes = [0; size_of::<$type>()];
             for i in 0..size_of::<$type>() {
-                val |= (self.get_u8(address + i as u32)?.get() as $type) << (8 * (size_of::<$type>() - 1 - i));
+                bytes[i] = self.get_u8(address + i as u32)?.get();
             }
-            Ok(val)
+            Ok($type::from_be_bytes(bytes))
         }
 
-        pub fn $set_name(&mut self, address: u32, mut val: $type) -> Result<(), MemoryError> {
-            for i in 0..size_of::<$type>() {
-                self.set_u8(address + size_of::<$type>() as u32 - 1 - i as u32, Word::from((val & 0xFF) as u8))?;
-                val >>= 8;
+        pub fn $set_name(&mut self, address: u32, val: $type) -> Result<(), MemoryError> {
+            for (i, v) in val.to_be_bytes().iter().enumerate() {
+                self.set_u8(address + i as u32, Word::from(*v))?;
             }
             Ok(())
         }
@@ -99,14 +98,6 @@ impl MemoryMap {
         for s in self.segments.iter() {
             s.seg.borrow_mut().reset();
         }
-    }
-
-    pub fn get_f32(&mut self, address: u32) -> Result<f32, MemoryError> {
-        Ok(f32::from_bits(self.get_u32(address)?))
-    }
-
-    pub fn set_f32(&mut self, address: u32, val: f32) -> Result<(), MemoryError> {
-        self.set_u32(address, val.to_bits())
     }
 
     GetSetUnsignedType!(get_u32, set_u32, u32);

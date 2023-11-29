@@ -169,6 +169,9 @@ impl Processor {
         const OP_BITS_SHL: u8 = 3;
         const OP_BITS_SHR: u8 = 4;
 
+        // TODO - Load
+        // TODO - LoadN
+        // TODO - Save
 
         // TODO - Add, Sub, Mul, Div, Shift, ArithShift, Mod, Eq, NEq, Lt, Gt, Lteq, Gteq, Conv, i32->f, u32->f, f->i32), load, save
 

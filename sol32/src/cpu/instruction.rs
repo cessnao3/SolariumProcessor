@@ -10,6 +10,16 @@ pub enum DataType {
     F32,
 }
 
+impl DataType {
+    pub fn word_size(&self) -> usize {
+        match self {
+            Self::U8 | Self::I8 => 1,
+            Self::U16 | Self::I16 => 2,
+            Self::U32 | Self::I32 | Self::F32 => 4,
+        }
+    }
+}
+
 pub struct DataTypeError(u8);
 
 impl TryFrom<u8> for DataType {
