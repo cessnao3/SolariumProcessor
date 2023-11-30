@@ -34,14 +34,14 @@ macro_rules! GetSetUnsignedType {
         pub fn $get_name(&mut self, address: u32) -> Result<$type, MemoryError> {
             let mut bytes = [0; size_of::<$type>()];
             for i in 0..size_of::<$type>() {
-                bytes[i] = self.get_u8(address + i as u32)?.get();
+                bytes[i] = self.get_u8(address + i as u32)?;
             }
             Ok($type::from_be_bytes(bytes))
         }
 
         pub fn $set_name(&mut self, address: u32, val: $type) -> Result<(), MemoryError> {
             for (i, v) in val.to_be_bytes().iter().enumerate() {
-                self.set_u8(address + i as u32, Word::from(*v))?;
+                self.set_u8(address + i as u32, *v)?;
             }
             Ok(())
         }
@@ -74,14 +74,14 @@ impl MemoryMap {
         Ok(())
     }
 
-    pub fn get_u8(&self, address: u32) -> Result<Word, MemoryError> {
+    pub fn get_u8(&self, address: u32) -> Result<u8, MemoryError> {
         let data = self.get_segment(address)?;
-        segment_to_memory(data, data.seg.borrow().get(address))
+        Ok(segment_to_memory(data, data.seg.borrow().get(address))?.get())
     }
 
-    pub fn set_u8(&mut self, address: u32, val: Word) -> Result<(), MemoryError> {
+    pub fn set_u8(&mut self, address: u32, val: u8) -> Result<(), MemoryError> {
         let data = self.get_segment(address)?;
-        segment_to_memory(data, data.seg.borrow_mut().set(address, val))
+        segment_to_memory(data, data.seg.borrow_mut().set(address, Word::from(val)))
     }
 
     fn get_segment(&self, address: u32) -> Result<&SegmentData, MemoryError> {

@@ -18,6 +18,10 @@ impl DataType {
             Self::U32 | Self::I32 | Self::F32 => 4,
         }
     }
+
+    pub fn signed(&self) -> bool {
+        matches!(self, Self::I8 | Self::I16 | Self::I32)
+    }
 }
 
 pub struct DataTypeError(u8);
@@ -65,7 +69,7 @@ pub struct Instruction {
 }
 
 impl Instruction {
-    const NUM_IMM_BITS: u32 = { u8::BITS * 3 };
+    const NUM_IMM_BITS: u32 = { u8::BITS * 2 };
 
     const IMM_SIGN_BIT: u32 = { 1 << (Self::NUM_IMM_BITS - 1) };
 
@@ -133,7 +137,7 @@ impl Instruction {
     }
 
     pub fn imm_unsigned(&self) -> u32 {
-        ((self.arg0() as u32) << 16) | ((self.arg1() as u32) << 8) | (self.arg2() as u32)
+        ((self.arg1() as u32) << 8) | (self.arg2() as u32)
     }
 
     pub fn imm_signed(&self) -> i32 {
