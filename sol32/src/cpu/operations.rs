@@ -146,7 +146,7 @@ macro_rules! define_rel_for_type {
                 Ok((a as $tname) != (b as $tname))
             }
         }
-    }
+    };
 }
 
 pub struct IntegerU8Operations;

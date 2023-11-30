@@ -55,7 +55,7 @@ pub enum ResetType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct OpcodeCombination {
+pub struct OpcodeCombination {
     base: u8,
     code: u8,
 }
@@ -84,6 +84,182 @@ pub struct Processor {
 impl Processor {
     pub const HARD_RESET_VECTOR: usize = 0;
     pub const SOFT_RESET_VECTOR: usize = 1;
+
+    const OP_BASE_CPU: u8 = 0;
+    pub const OP_NOOP: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 0,
+    };
+    pub const OP_RESET: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 1,
+    };
+    pub const OP_INTERRUPT: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 2,
+    };
+    pub const OP_INTERRUPT_REGISTER: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 3,
+    };
+    pub const OP_INTERRUPT_RETURN: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 4,
+    };
+    pub const OP_CALL: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 5,
+    };
+    pub const OP_RETURN: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 6,
+    };
+    pub const OP_PUSH: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 7,
+    };
+    pub const OP_POP: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 8,
+    };
+    pub const OP_POP_REG: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 9,
+    };
+    pub const OP_JUMP: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 10,
+    };
+    pub const OP_JUMP_REL: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 11,
+    };
+    pub const OP_JUMP_REL_IMM: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 12,
+    };
+    pub const OP_HALT: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_CPU,
+        code: 15,
+    };
+
+    const OP_BASE_MEM: u8 = 1;
+    pub const OP_LOAD: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_MEM,
+        code: 0,
+    };
+    pub const OP_LOAD_REL: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_MEM,
+        code: 1,
+    };
+    pub const OP_LOAD_IMM: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_MEM,
+        code: 2,
+    };
+    pub const OP_LOAD_IMM_REL: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_MEM,
+        code: 3,
+    };
+    pub const OP_SAVE: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_MEM,
+        code: 4,
+    };
+    pub const OP_SAVE_REL: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_MEM,
+        code: 5,
+    };
+    pub const OP_COPY: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_MEM,
+        code: 6,
+    };
+
+    const OP_BASE_TEST: u8 = 2;
+    pub const OP_EQ: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_TEST,
+        code: 0,
+    };
+    pub const OP_NEQ: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_TEST,
+        code: 1,
+    };
+    pub const OP_GREATER: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_TEST,
+        code: 2,
+    };
+    pub const OP_GREATER_EQ: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_TEST,
+        code: 3,
+    };
+    pub const OP_LESS: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_TEST,
+        code: 4,
+    };
+    pub const OP_LESS_EQ: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_TEST,
+        code: 5,
+    };
+
+    const OP_BASE_LOGIC: u8 = 3;
+    pub const OP_NOT: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_LOGIC,
+        code: 0,
+    };
+    pub const OP_BOOL: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_LOGIC,
+        code: 1,
+    };
+    pub const OP_TEST_ZERO: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_LOGIC,
+        code: 2,
+    };
+    pub const OP_TEST_NOT_ZERO: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_LOGIC,
+        code: 3,
+    };
+
+    const OP_BASE_MATH: u8 = 10;
+    pub const OP_ADD: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_MATH,
+        code: 0,
+    };
+    pub const OP_SUB: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_MATH,
+        code: 1,
+    };
+    pub const OP_MUL: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_MATH,
+        code: 2,
+    };
+    pub const OP_DIV: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_MATH,
+        code: 3,
+    };
+    pub const OP_REM: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_MATH,
+        code: 4,
+    };
+
+    const OP_BASE_BITS: u8 = 11;
+    pub const OP_BAND: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_BITS,
+        code: 0,
+    };
+    pub const OP_BOR: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_BITS,
+        code: 1,
+    };
+    pub const OP_BXOR: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_BITS,
+        code: 2,
+    };
+    pub const OP_BSHL: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_BITS,
+        code: 3,
+    };
+    pub const OP_BSHR: OpcodeCombination = OpcodeCombination {
+        base: Self::OP_BASE_BITS,
+        code: 4,
+    };
 
     pub fn new() -> Self {
         Self {
@@ -153,7 +329,10 @@ impl Processor {
         })
     }
 
-    fn get_relative_operation(&self, dt: DataType) -> Result<&dyn RelationalOperations, ProcessorError> {
+    fn get_relative_operation(
+        &self,
+        dt: DataType,
+    ) -> Result<&dyn RelationalOperations, ProcessorError> {
         Ok(match dt {
             DataType::U8 => &self.op_u8,
             DataType::U16 => &self.op_u16,
@@ -182,192 +361,16 @@ impl Processor {
 
         let opcode = OpcodeCombination::from(inst.opcode());
 
-        const OP_BASE_CPU: u8 = 0;
-        const OP_NOOP: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 0,
-        };
-        const OP_RESET: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 1,
-        };
-        const OP_INTERRUPT: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 2,
-        };
-        const OP_INTERRUPT_REGISTER: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 3,
-        };
-        const OP_INTERRUPT_RETURN: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 4,
-        };
-        const OP_CALL: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 5,
-        };
-        const OP_RETURN: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 6,
-        };
-        const OP_PUSH: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 7,
-        };
-        const OP_POP: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 8,
-        };
-        const OP_POP_REG: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 9,
-        };
-        const OP_JUMP: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 10,
-        };
-        const OP_JUMP_REL: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 11,
-        };
-        const OP_JUMP_REL_IMM: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 12,
-        };
-        const OP_HALT: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 15,
-        };
-
-        const OP_BASE_MEM: u8 = 1;
-        const OP_LOAD: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_MEM,
-            code: 0,
-        };
-        const OP_LOAD_REL: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_MEM,
-            code: 1,
-        };
-        const OP_LOAD_IMM: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_MEM,
-            code: 2,
-        };
-        const OP_LOAD_IMM_REL: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_MEM,
-            code: 3,
-        };
-        const OP_SAVE: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_MEM,
-            code: 4,
-        };
-        const OP_SAVE_REL: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_MEM,
-            code: 5,
-        };
-        const OP_COPY: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_MEM,
-            code: 6,
-        };
-
-        const OP_BASE_TEST: u8 = 2;
-        const OP_EQ: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_TEST,
-            code: 0,
-        };
-        const OP_NEQ: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_TEST,
-            code: 1,
-        };
-        const OP_GREATER: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_TEST,
-            code: 2,
-        };
-        const OP_GREATER_EQ: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_TEST,
-            code: 3,
-        };
-        const OP_LESS: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_TEST,
-            code: 4,
-        };
-        const OP_LESS_EQ: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_TEST,
-            code: 5,
-        };
-
-        const OP_BASE_LOGIC: u8 = 3;
-        const OP_NOT: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_LOGIC,
-            code: 0,
-        };
-        const OP_BOOL: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_LOGIC,
-            code: 1,
-        };
-        const OP_TEST_ZERO: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_LOGIC,
-            code: 2,
-        };
-        const OP_TEST_NOT_ZERO: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_LOGIC,
-            code: 3,
-        };
-
-        const OP_BASE_MATH: u8 = 10;
-        const OP_ADD: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_MATH,
-            code: 0,
-        };
-        const OP_SUB: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_MATH,
-            code: 1,
-        };
-        const OP_MUL: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_MATH,
-            code: 2,
-        };
-        const OP_DIV: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_MATH,
-            code: 3,
-        };
-        const OP_REM: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_MATH,
-            code: 4,
-        };
-
-        const OP_BASE_BITS: u8 = 11;
-        const OP_BAND: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_BITS,
-            code: 0,
-        };
-        const OP_BOR: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_BITS,
-            code: 1,
-        };
-        const OP_BXOR: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_BITS,
-            code: 2,
-        };
-        const OP_BSHL: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_BITS,
-            code: 3,
-        };
-        const OP_BSHR: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_BITS,
-            code: 4,
-        };
-
         // TODO - Jump Condition
 
         match opcode {
-            OP_NOOP => (),
-            OP_RESET => self.reset(ResetType::Soft)?,
-            OP_INTERRUPT => self.trigger_interrupt(inst.arg0() as usize)?,
-            OP_INTERRUPT_REGISTER => {
+            Self::OP_NOOP => (),
+            Self::OP_RESET => self.reset(ResetType::Soft)?,
+            Self::OP_INTERRUPT => self.trigger_interrupt(inst.arg0() as usize)?,
+            Self::OP_INTERRUPT_REGISTER => {
                 self.trigger_interrupt(self.registers.get(inst.arg0_register())? as usize)?
             }
-            OP_CALL => {
+            Self::OP_CALL => {
                 for i in 0..RegisterManager::REGISTER_COUNT {
                     self.stack_push(self.registers.get(Register::GeneralPurpose(i))?)?;
                 }
@@ -376,159 +379,136 @@ impl Processor {
                     self.registers.get(inst.arg0_register())?,
                 )?;
             }
-            OP_RETURN | OP_INTERRUPT_RETURN => {
+            Self::OP_RETURN | Self::OP_INTERRUPT_RETURN => {
                 for i in (0..RegisterManager::REGISTER_COUNT).rev() {
                     let val = self.stack_pop()?;
-                    if i != Register::Return.get_index() || opcode == OP_INTERRUPT_RETURN {
+                    if i != Register::Return.get_index() || opcode == Self::OP_INTERRUPT_RETURN {
                         self.registers.set(Register::GeneralPurpose(i), val)?;
                     }
                 }
             }
-            OP_PUSH => {
+            Self::OP_PUSH => {
                 let val = self.registers.get(inst.arg0_register())?;
                 self.stack_push(val)?;
             }
-            OP_POP => {
+            Self::OP_POP => {
                 for _ in 0..inst.arg0() {
                     self.stack_pop()?;
                 }
             }
-            OP_POP_REG => {
+            Self::OP_POP_REG => {
                 let val = self.stack_pop()?;
                 self.registers.set(inst.arg0_register(), val)?;
             }
-            OP_JUMP => {
+            Self::OP_JUMP => {
                 self.registers.set(
                     Register::ProgramCounter,
                     self.registers.get(inst.arg0_register())?,
                 )?;
                 inst_jump = 0;
             }
-            OP_JUMP_REL => {
+            Self::OP_JUMP_REL => {
                 self.registers.set(
                     Register::ProgramCounter,
                     (pc as i32 + self.registers.get(inst.arg0_register())? as i32) as u32,
                 )?;
                 inst_jump = 0;
             }
-            OP_JUMP_REL_IMM => {
+            Self::OP_JUMP_REL_IMM => {
                 self.registers.set(
                     Register::ProgramCounter,
                     (pc as i32 + inst.imm_signed()) as u32,
                 )?;
                 inst_jump = 0;
             }
-            OP_HALT => {
+            Self::OP_HALT => {
                 inst_jump = 0;
             }
-            OP_NOT => {
+            Self::OP_NOT => {
                 let val = self.registers.get(inst.arg1_register())?;
                 self.registers
                     .set(inst.arg0_register(), if val != 0 { 0 } else { 1 })?;
             }
-            OP_BOOL => {
+            Self::OP_BOOL => {
                 let val = self.registers.get(inst.arg1_register())?;
                 self.registers
                     .set(inst.arg0_register(), if val != 0 { 1 } else { 0 })?;
             }
-            OP_TEST_ZERO | OP_TEST_NOT_ZERO => {
+            Self::OP_TEST_ZERO | Self::OP_TEST_NOT_ZERO => {
                 let val = self.registers.get(inst.arg0_register())?;
                 let is_true = match opcode {
-                    OP_TEST_ZERO => val == 0,
-                    OP_TEST_NOT_ZERO => val != 0,
+                    Self::OP_TEST_ZERO => val == 0,
+                    Self::OP_TEST_NOT_ZERO => val != 0,
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 };
 
-                inst_jump = if is_true {
-                    1
-                } else {
-                    2
-                };
+                inst_jump = if is_true { 1 } else { 2 };
             }
-            OP_LOAD | OP_LOAD_REL | OP_LOAD_IMM_REL => {
+            Self::OP_LOAD | Self::OP_LOAD_REL | Self::OP_LOAD_IMM_REL => {
                 let dt = inst.arg0_data_type()?;
                 let addr = match opcode {
-                    OP_LOAD => self.registers.get(inst.arg1_register())?,
-                    OP_LOAD_REL => self.registers.get(inst.arg1_register())? + self.registers.get(Register::ProgramCounter)?,
-                    OP_LOAD_IMM_REL => (self.registers.get(Register::ProgramCounter)? as i32 + inst.imm_signed()) as u32,
+                    Self::OP_LOAD => self.registers.get(inst.arg1_register())?,
+                    Self::OP_LOAD_REL => {
+                        self.registers.get(inst.arg1_register())?
+                            + self.registers.get(Register::ProgramCounter)?
+                    }
+                    Self::OP_LOAD_IMM_REL => {
+                        (self.registers.get(Register::ProgramCounter)? as i32 + inst.imm_signed())
+                            as u32
+                    }
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 };
                 let reg_target = inst.arg0_register();
 
                 if dt.signed() {
                     match dt.word_size() {
-                        1 => self.registers.set(
-                            reg_target,
-                            (self
-                                .memory
-                                .get_u8(addr)?
-                                as i32) as u32,
-                        )?,
-                        2 => self.registers.set(
-                            reg_target,
-                            (self
-                                .memory
-                                .get_u16(addr)?
-                                as i32) as u32,
-                        )?,
-                        4 => self.registers.set(
-                            reg_target,
-                            self.memory
-                                .get_u32(addr)?,
-                        )?,
+                        1 => self
+                            .registers
+                            .set(reg_target, (self.memory.get_u8(addr)? as i32) as u32)?,
+                        2 => self
+                            .registers
+                            .set(reg_target, (self.memory.get_u16(addr)? as i32) as u32)?,
+                        4 => self.registers.set(reg_target, self.memory.get_u32(addr)?)?,
                         _ => return Err(ProcessorError::UnknownInstruction(inst)),
                     }
                 } else {
                     match dt.word_size() {
-                        1 => self.registers.set(
-                            reg_target,
-                            self.memory
-                                .get_u8(addr)?
-                                as u32,
-                        )?,
-                        2 => self.registers.set(
-                            reg_target,
-                            self.memory
-                                .get_u16(addr)?
-                                as u32,
-                        )?,
-                        4 => self.registers.set(
-                            reg_target,
-                            self.memory
-                                .get_u32(addr)?,
-                        )?,
+                        1 => self
+                            .registers
+                            .set(reg_target, self.memory.get_u8(addr)? as u32)?,
+                        2 => self
+                            .registers
+                            .set(reg_target, self.memory.get_u16(addr)? as u32)?,
+                        4 => self.registers.set(reg_target, self.memory.get_u32(addr)?)?,
                         _ => return Err(ProcessorError::UnknownInstruction(inst)),
                     }
                 }
             }
-            OP_SAVE | OP_SAVE_REL => {
+            Self::OP_SAVE | Self::OP_SAVE_REL => {
                 let dt = inst.arg0_data_type()?;
                 let source_reg = self.registers.get(inst.arg1_register())?;
 
                 let addr = match opcode {
-                    OP_SAVE => self.registers.get(inst.arg0_register())?,
-                    OP_SAVE_REL => (inst.imm_signed() + self.registers.get(inst.arg0_register())? as i32) as u32,
+                    Self::OP_SAVE => self.registers.get(inst.arg0_register())?,
+                    Self::OP_SAVE_REL => {
+                        (inst.imm_signed() + self.registers.get(inst.arg0_register())? as i32)
+                            as u32
+                    }
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 };
 
                 match dt.word_size() {
-                    1 => self.memory.set_u8(
-                        addr,
-                        (source_reg & 0xFF) as u8,
-                    )?,
-                    2 => self.memory.set_u16(
-                        addr,
-                        (source_reg & 0xFFFF) as u16,
-                    )?,
-                    4 => self.memory.set_u32(
-                        addr,
-                        source_reg,
-                    )?,
+                    1 => self.memory.set_u8(addr, (source_reg & 0xFF) as u8)?,
+                    2 => self.memory.set_u16(addr, (source_reg & 0xFFFF) as u16)?,
+                    4 => self.memory.set_u32(addr, source_reg)?,
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 };
             }
-            OP_COPY => self.registers.set(inst.arg0_register(), self.registers.get(inst.arg1_register())?)?,
-            OP_LOAD_IMM => {
+            Self::OP_COPY => self.registers.set(
+                inst.arg0_register(),
+                self.registers.get(inst.arg1_register())?,
+            )?,
+            Self::OP_LOAD_IMM => {
                 let dt = inst.arg0_data_type()?;
                 match dt {
                     DataType::I16 => self
@@ -541,7 +521,8 @@ impl Processor {
                 }
             }
             OpcodeCombination {
-                base: OP_BASE_MATH, ..
+                base: Self::OP_BASE_MATH,
+                ..
             } => {
                 let arith = self.get_arith_operation(inst.arg0_data_type()?)?;
 
@@ -549,11 +530,11 @@ impl Processor {
                 let val_b = self.registers.get(inst.arg2_register())?;
 
                 let res = match opcode {
-                    OP_ADD => arith.add(val_a, val_b)?,
-                    OP_SUB => arith.sub(val_a, val_b)?,
-                    OP_MUL => arith.mul(val_a, val_b)?,
-                    OP_DIV => arith.div(val_a, val_b)?,
-                    OP_REM => arith.rem(val_a, val_b)?,
+                    Self::OP_ADD => arith.add(val_a, val_b)?,
+                    Self::OP_SUB => arith.sub(val_a, val_b)?,
+                    Self::OP_MUL => arith.mul(val_a, val_b)?,
+                    Self::OP_DIV => arith.div(val_a, val_b)?,
+                    Self::OP_REM => arith.rem(val_a, val_b)?,
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 };
 
@@ -562,7 +543,8 @@ impl Processor {
                     .set(Register::Status, if res.carry { 1 } else { 0 })?;
             }
             OpcodeCombination {
-                base: OP_BASE_BITS, ..
+                base: Self::OP_BASE_BITS,
+                ..
             } => {
                 let bitwise = self.get_bitwise_operation(inst.arg0_data_type()?)?;
 
@@ -570,11 +552,11 @@ impl Processor {
                 let val_b = self.registers.get(inst.arg2_register())?;
 
                 let res = match opcode {
-                    OP_BAND => bitwise.band(val_a, val_b)?,
-                    OP_BOR => bitwise.bor(val_a, val_b)?,
-                    OP_BXOR => bitwise.bxor(val_a, val_b)?,
-                    OP_BSHL => bitwise.bsftl(val_a, val_b)?,
-                    OP_BSHR => bitwise.bsftr(val_a, val_b)?,
+                    Self::OP_BAND => bitwise.band(val_a, val_b)?,
+                    Self::OP_BOR => bitwise.bor(val_a, val_b)?,
+                    Self::OP_BXOR => bitwise.bxor(val_a, val_b)?,
+                    Self::OP_BSHL => bitwise.bsftl(val_a, val_b)?,
+                    Self::OP_BSHR => bitwise.bsftr(val_a, val_b)?,
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 };
 
@@ -583,7 +565,8 @@ impl Processor {
                     .set(Register::Status, if res.carry { 1 } else { 0 })?;
             }
             OpcodeCombination {
-                base: OP_BASE_TEST,..
+                base: Self::OP_BASE_TEST,
+                ..
             } => {
                 let relative = self.get_relative_operation(inst.arg0_data_type()?)?;
 
@@ -591,16 +574,17 @@ impl Processor {
                 let val_b = self.registers.get(inst.arg2_register())?;
 
                 let res = match opcode {
-                    OP_EQ => relative.eq(val_a, val_b)?,
-                    OP_NEQ => relative.neq(val_a, val_b)?,
-                    OP_GREATER => relative.gt(val_a, val_b)?,
-                    OP_GREATER_EQ => relative.geq(val_a, val_b)?,
-                    OP_LESS => relative.lt(val_a, val_b)?,
-                    OP_LESS_EQ => relative.leq(val_a, val_b)?,
+                    Self::OP_EQ => relative.eq(val_a, val_b)?,
+                    Self::OP_NEQ => relative.neq(val_a, val_b)?,
+                    Self::OP_GREATER => relative.gt(val_a, val_b)?,
+                    Self::OP_GREATER_EQ => relative.geq(val_a, val_b)?,
+                    Self::OP_LESS => relative.lt(val_a, val_b)?,
+                    Self::OP_LESS_EQ => relative.leq(val_a, val_b)?,
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 };
 
-                self.registers.set(inst.arg0_register(), if res { 1 } else { 0 })?;
+                self.registers
+                    .set(inst.arg0_register(), if res { 1 } else { 0 })?;
             }
             _ => return Err(ProcessorError::UnknownInstruction(inst)),
         };
