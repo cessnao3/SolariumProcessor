@@ -25,6 +25,15 @@ pub trait ArithmeticOperations {
     fn rem(&self, a: u32, b: u32) -> Result<OperationValue, OperationError>;
 }
 
+pub trait RelationalOperations {
+    fn gt(&self, a: u32, b: u32) -> Result<bool, OperationError>;
+    fn geq(&self, a: u32, b: u32) -> Result<bool, OperationError>;
+    fn lt(&self, a: u32, b: u32) -> Result<bool, OperationError>;
+    fn leq(&self, a: u32, b: u32) -> Result<bool, OperationError>;
+    fn eq(&self, a: u32, b: u32) -> Result<bool, OperationError>;
+    fn neq(&self, a: u32, b: u32) -> Result<bool, OperationError>;
+}
+
 pub trait BinaryOperations {
     fn band(&self, a: u32, b: u32) -> Result<OperationValue, OperationError>;
     fn bor(&self, a: u32, b: u32) -> Result<OperationValue, OperationError>;
@@ -110,29 +119,65 @@ macro_rules! define_bitwise_for_type {
     };
 }
 
+macro_rules! define_rel_for_type {
+    ($sname:ident, $tname:ident) => {
+        impl RelationalOperations for $sname {
+            fn gt(&self, a: u32, b: u32) -> Result<bool, OperationError> {
+                Ok((a as $tname) > (b as $tname))
+            }
+
+            fn geq(&self, a: u32, b: u32) -> Result<bool, OperationError> {
+                Ok((a as $tname) >= (b as $tname))
+            }
+
+            fn lt(&self, a: u32, b: u32) -> Result<bool, OperationError> {
+                Ok((a as $tname) < (b as $tname))
+            }
+
+            fn leq(&self, a: u32, b: u32) -> Result<bool, OperationError> {
+                Ok((a as $tname) <= (b as $tname))
+            }
+
+            fn eq(&self, a: u32, b: u32) -> Result<bool, OperationError> {
+                Ok((a as $tname) == (b as $tname))
+            }
+
+            fn neq(&self, a: u32, b: u32) -> Result<bool, OperationError> {
+                Ok((a as $tname) != (b as $tname))
+            }
+        }
+    }
+}
+
 pub struct IntegerU8Operations;
 define_arith_for_type!(IntegerU8Operations, u8);
 define_bitwise_for_type!(IntegerU8Operations, u8);
+define_rel_for_type!(IntegerU8Operations, u8);
 
 pub struct IntegerU16Operations;
 define_arith_for_type!(IntegerU16Operations, u16);
 define_bitwise_for_type!(IntegerU16Operations, u16);
+define_rel_for_type!(IntegerU16Operations, u8);
 
 pub struct IntegerU32Operations;
 define_arith_for_type!(IntegerU32Operations, u32);
 define_bitwise_for_type!(IntegerU32Operations, u32);
+define_rel_for_type!(IntegerU32Operations, u8);
 
 pub struct IntegerI8Operations;
 define_arith_for_type!(IntegerI8Operations, i8);
 define_bitwise_for_type!(IntegerI8Operations, i8);
+define_rel_for_type!(IntegerI8Operations, u8);
 
 pub struct IntegerI16Operations;
 define_arith_for_type!(IntegerI16Operations, i16);
 define_bitwise_for_type!(IntegerI16Operations, i16);
+define_rel_for_type!(IntegerI16Operations, u8);
 
 pub struct IntegerI32Operations;
 define_arith_for_type!(IntegerI32Operations, i32);
 define_bitwise_for_type!(IntegerI32Operations, i32);
+define_rel_for_type!(IntegerI32Operations, u8);
 
 pub struct FloatOperations;
 impl ArithmeticOperations for FloatOperations {
@@ -167,5 +212,31 @@ impl ArithmeticOperations for FloatOperations {
         }
         let r = f32::from_bits(a) % bf;
         Ok((r.to_bits(), false).into())
+    }
+}
+
+impl RelationalOperations for FloatOperations {
+    fn gt(&self, a: u32, b: u32) -> Result<bool, OperationError> {
+        Ok(f32::from_bits(a) > f32::from_bits(b))
+    }
+
+    fn geq(&self, a: u32, b: u32) -> Result<bool, OperationError> {
+        Ok(f32::from_bits(a) >= f32::from_bits(b))
+    }
+
+    fn lt(&self, a: u32, b: u32) -> Result<bool, OperationError> {
+        Ok(f32::from_bits(a) < f32::from_bits(b))
+    }
+
+    fn leq(&self, a: u32, b: u32) -> Result<bool, OperationError> {
+        Ok(f32::from_bits(a) <= f32::from_bits(b))
+    }
+
+    fn eq(&self, a: u32, b: u32) -> Result<bool, OperationError> {
+        Ok(f32::from_bits(a) == f32::from_bits(b))
+    }
+
+    fn neq(&self, a: u32, b: u32) -> Result<bool, OperationError> {
+        Ok(f32::from_bits(a) != f32::from_bits(b))
     }
 }

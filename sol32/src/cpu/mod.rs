@@ -9,7 +9,7 @@ use self::instruction::{DataTypeError, Instruction};
 use self::operations::{
     ArithmeticOperations, BinaryOperations, FloatOperations, IntegerI16Operations,
     IntegerI32Operations, IntegerI8Operations, IntegerU16Operations, IntegerU32Operations,
-    IntegerU8Operations, OperationError,
+    IntegerU8Operations, OperationError, RelationalOperations,
 };
 use self::register::{Register, RegisterError, RegisterManager};
 
@@ -21,6 +21,7 @@ pub enum ProcessorError {
     Operation(OperationError),
     StackUnderflow,
     DataType(DataTypeError),
+    OpcodeAlignment(u32),
 }
 
 impl From<MemoryError> for ProcessorError {
@@ -152,10 +153,25 @@ impl Processor {
         })
     }
 
+    fn get_relative_operation(&self, dt: DataType) -> Result<&dyn RelationalOperations, ProcessorError> {
+        Ok(match dt {
+            DataType::U8 => &self.op_u8,
+            DataType::U16 => &self.op_u16,
+            DataType::U32 => &self.op_u32,
+            DataType::I8 => &self.op_i8,
+            DataType::I16 => &self.op_i16,
+            DataType::I32 => &self.op_i32,
+            DataType::F32 => &self.op_f32,
+        })
+    }
+
     pub fn step(&mut self) -> Result<(), ProcessorError> {
         let mut inst_jump = 1;
 
         let pc = self.registers.get(Register::ProgramCounter)?;
+        if pc % 4 != 0 {
+            return Err(ProcessorError::OpcodeAlignment(pc));
+        }
 
         let inst = Instruction::new([
             self.memory.get_u8(pc)?,
@@ -219,10 +235,6 @@ impl Processor {
             base: OP_BASE_CPU,
             code: 12,
         };
-        const OP_BOOL: OpcodeCombination = OpcodeCombination {
-            base: OP_BASE_CPU,
-            code: 13,
-        };
         const OP_HALT: OpcodeCombination = OpcodeCombination {
             base: OP_BASE_CPU,
             code: 15,
@@ -233,13 +245,73 @@ impl Processor {
             base: OP_BASE_MEM,
             code: 0,
         };
-        const OP_SAVE: OpcodeCombination = OpcodeCombination {
+        const OP_LOAD_REL: OpcodeCombination = OpcodeCombination {
             base: OP_BASE_MEM,
             code: 1,
         };
         const OP_LOAD_IMM: OpcodeCombination = OpcodeCombination {
             base: OP_BASE_MEM,
             code: 2,
+        };
+        const OP_LOAD_IMM_REL: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_MEM,
+            code: 3,
+        };
+        const OP_SAVE: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_MEM,
+            code: 4,
+        };
+        const OP_SAVE_REL: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_MEM,
+            code: 5,
+        };
+        const OP_COPY: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_MEM,
+            code: 6,
+        };
+
+        const OP_BASE_TEST: u8 = 2;
+        const OP_EQ: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_TEST,
+            code: 0,
+        };
+        const OP_NEQ: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_TEST,
+            code: 1,
+        };
+        const OP_GREATER: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_TEST,
+            code: 2,
+        };
+        const OP_GREATER_EQ: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_TEST,
+            code: 3,
+        };
+        const OP_LESS: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_TEST,
+            code: 4,
+        };
+        const OP_LESS_EQ: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_TEST,
+            code: 5,
+        };
+
+        const OP_BASE_LOGIC: u8 = 3;
+        const OP_NOT: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_LOGIC,
+            code: 0,
+        };
+        const OP_BOOL: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_LOGIC,
+            code: 1,
+        };
+        const OP_TEST_ZERO: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_LOGIC,
+            code: 2,
+        };
+        const OP_TEST_NOT_ZERO: OpcodeCombination = OpcodeCombination {
+            base: OP_BASE_LOGIC,
+            code: 3,
         };
 
         const OP_BASE_MATH: u8 = 10;
@@ -285,6 +357,8 @@ impl Processor {
             base: OP_BASE_BITS,
             code: 4,
         };
+
+        // TODO - Jump Condition
 
         match opcode {
             OP_NOOP => (),
@@ -344,80 +418,116 @@ impl Processor {
                 )?;
                 inst_jump = 0;
             }
+            OP_HALT => {
+                inst_jump = 0;
+            }
+            OP_NOT => {
+                let val = self.registers.get(inst.arg1_register())?;
+                self.registers
+                    .set(inst.arg0_register(), if val != 0 { 0 } else { 1 })?;
+            }
             OP_BOOL => {
                 let val = self.registers.get(inst.arg1_register())?;
                 self.registers
                     .set(inst.arg0_register(), if val != 0 { 1 } else { 0 })?;
             }
-            OP_HALT => {
-                inst_jump = 0;
+            OP_TEST_ZERO | OP_TEST_NOT_ZERO => {
+                let val = self.registers.get(inst.arg0_register())?;
+                let is_true = match opcode {
+                    OP_TEST_ZERO => val == 0,
+                    OP_TEST_NOT_ZERO => val != 0,
+                    _ => return Err(ProcessorError::UnknownInstruction(inst)),
+                };
+
+                inst_jump = if is_true {
+                    1
+                } else {
+                    2
+                };
             }
-            OP_LOAD => {
+            OP_LOAD | OP_LOAD_REL | OP_LOAD_IMM_REL => {
                 let dt = inst.arg0_data_type()?;
+                let addr = match opcode {
+                    OP_LOAD => self.registers.get(inst.arg1_register())?,
+                    OP_LOAD_REL => self.registers.get(inst.arg1_register())? + self.registers.get(Register::ProgramCounter)?,
+                    OP_LOAD_IMM_REL => (self.registers.get(Register::ProgramCounter)? as i32 + inst.imm_signed()) as u32,
+                    _ => return Err(ProcessorError::UnknownInstruction(inst)),
+                };
+                let reg_target = inst.arg0_register();
+
                 if dt.signed() {
                     match dt.word_size() {
                         1 => self.registers.set(
-                            inst.arg0_register(),
+                            reg_target,
                             (self
                                 .memory
-                                .get_u8(self.registers.get(inst.arg1_register())?)?
+                                .get_u8(addr)?
                                 as i32) as u32,
                         )?,
                         2 => self.registers.set(
-                            inst.arg0_register(),
+                            reg_target,
                             (self
                                 .memory
-                                .get_u16(self.registers.get(inst.arg1_register())?)?
+                                .get_u16(addr)?
                                 as i32) as u32,
                         )?,
                         4 => self.registers.set(
-                            inst.arg0_register(),
+                            reg_target,
                             self.memory
-                                .get_u32(self.registers.get(inst.arg1_register())?)?,
+                                .get_u32(addr)?,
                         )?,
                         _ => return Err(ProcessorError::UnknownInstruction(inst)),
                     }
                 } else {
                     match dt.word_size() {
                         1 => self.registers.set(
-                            inst.arg0_register(),
+                            reg_target,
                             self.memory
-                                .get_u8(self.registers.get(inst.arg1_register())?)?
+                                .get_u8(addr)?
                                 as u32,
                         )?,
                         2 => self.registers.set(
-                            inst.arg0_register(),
+                            reg_target,
                             self.memory
-                                .get_u16(self.registers.get(inst.arg1_register())?)?
+                                .get_u16(addr)?
                                 as u32,
                         )?,
                         4 => self.registers.set(
-                            inst.arg0_register(),
+                            reg_target,
                             self.memory
-                                .get_u32(self.registers.get(inst.arg1_register())?)?,
+                                .get_u32(addr)?,
                         )?,
                         _ => return Err(ProcessorError::UnknownInstruction(inst)),
                     }
                 }
             }
-            OP_SAVE => {
+            OP_SAVE | OP_SAVE_REL => {
                 let dt = inst.arg0_data_type()?;
+                let source_reg = self.registers.get(inst.arg1_register())?;
+
+                let addr = match opcode {
+                    OP_SAVE => self.registers.get(inst.arg0_register())?,
+                    OP_SAVE_REL => (inst.imm_signed() + self.registers.get(inst.arg0_register())? as i32) as u32,
+                    _ => return Err(ProcessorError::UnknownInstruction(inst)),
+                };
+
                 match dt.word_size() {
                     1 => self.memory.set_u8(
-                        self.registers.get(inst.arg0_register())?,
-                        (self.registers.get(inst.arg1_register())? & 0xFF) as u8,
+                        addr,
+                        (source_reg & 0xFF) as u8,
                     )?,
                     2 => self.memory.set_u16(
-                        self.registers.get(inst.arg0_register())?,
-                        (self.registers.get(inst.arg1_register())? & 0xFFFF) as u16,
+                        addr,
+                        (source_reg & 0xFFFF) as u16,
                     )?,
                     4 => self.memory.set_u32(
-                        self.registers.get(inst.arg0_register())?,
-                        self.registers.get(inst.arg1_register())?,
+                        addr,
+                        source_reg,
                     )?,
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 };
             }
+            OP_COPY => self.registers.set(inst.arg0_register(), self.registers.get(inst.arg1_register())?)?,
             OP_LOAD_IMM => {
                 let dt = inst.arg0_data_type()?;
                 match dt {
@@ -471,6 +581,26 @@ impl Processor {
                 self.registers.set(inst.arg0_register(), res.val)?;
                 self.registers
                     .set(Register::Status, if res.carry { 1 } else { 0 })?;
+            }
+            OpcodeCombination {
+                base: OP_BASE_TEST,..
+            } => {
+                let relative = self.get_relative_operation(inst.arg0_data_type()?)?;
+
+                let val_a = self.registers.get(inst.arg1_register())?;
+                let val_b = self.registers.get(inst.arg2_register())?;
+
+                let res = match opcode {
+                    OP_EQ => relative.eq(val_a, val_b)?,
+                    OP_NEQ => relative.neq(val_a, val_b)?,
+                    OP_GREATER => relative.gt(val_a, val_b)?,
+                    OP_GREATER_EQ => relative.geq(val_a, val_b)?,
+                    OP_LESS => relative.lt(val_a, val_b)?,
+                    OP_LESS_EQ => relative.leq(val_a, val_b)?,
+                    _ => return Err(ProcessorError::UnknownInstruction(inst)),
+                };
+
+                self.registers.set(inst.arg0_register(), if res { 1 } else { 0 })?;
             }
             _ => return Err(ProcessorError::UnknownInstruction(inst)),
         };
