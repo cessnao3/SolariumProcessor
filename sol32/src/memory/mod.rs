@@ -6,8 +6,6 @@ pub use segment_ro::ReadOnlySegment;
 pub use segment_rw::ReadWriteSegment;
 pub use memory_map::MemoryMap;
 
-use crate::common::Word;
-
 /// Provides error conditions for memory segment parameters
 pub enum MemoryError {
     InvalidMemoryAccess(u32),
@@ -25,16 +23,16 @@ pub enum MemorySegmentError {
 
 pub trait MemorySegment {
     /// Provides the word at the requested memory location
-    fn get(&self, offset: u32) -> Result<Word, MemorySegmentError>;
+    fn get(&self, offset: u32) -> Result<u8, MemorySegmentError>;
 
     /// Provides the word at the requested memory location without affecting the device state
-    fn inspect(&self, offset: u32) -> Result<Word, MemorySegmentError> {
+    fn inspect(&self, offset: u32) -> Result<u8, MemorySegmentError> {
         self.get(offset)
     }
 
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
-    fn set(&mut self, offset: u32, val: Word) -> Result<(), MemorySegmentError>;
+    fn set(&mut self, offset: u32, val: u8) -> Result<(), MemorySegmentError>;
 
     /// Provides the length of the memory segment
     fn len(&self) -> u32;

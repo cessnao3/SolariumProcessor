@@ -1,24 +1,21 @@
-use super::{MemorySegment, Word, MemorySegmentError};
+use super::{MemorySegment, MemorySegmentError};
 
 /// Provides a read-write memory segment type
 pub struct ReadWriteSegment {
-    data: Vec<Word>,
+    data: Vec<u8>,
 }
 
 impl ReadWriteSegment {
     /// Defines a new memory segment with empty data, zero, in each memory location
     pub fn new(size: usize) -> Self {
-        // Define the initial data array
-        let data: Vec<Word> = (0..size).map(|_| Word::default()).collect();
-
         // Create the memory segment
-        Self { data }
+        Self { data: (0..size).map(|_| 0).collect() }
     }
 }
 
 impl MemorySegment for ReadWriteSegment {
     /// Provides the word at the requested memory location
-    fn get(&self, offset: u32) -> Result<Word, MemorySegmentError> {
+    fn get(&self, offset: u32) -> Result<u8, MemorySegmentError> {
         if self.within(offset) {
             Ok(self.data[offset as usize])
         } else {
@@ -28,7 +25,7 @@ impl MemorySegment for ReadWriteSegment {
 
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
-    fn set(&mut self, offset: u32, data: Word) -> Result<(), MemorySegmentError> {
+    fn set(&mut self, offset: u32, data: u8) -> Result<(), MemorySegmentError> {
         if self.within(offset) {
             self.data[offset as usize] = data;
             Ok(())
@@ -40,9 +37,7 @@ impl MemorySegment for ReadWriteSegment {
     /// Resets the memory segment
     fn reset(&mut self) {
         // Reset all data values to 0 if not read only
-        for val in self.data.iter_mut() {
-            val.set(0);
-        }
+        self.data.fill(0);
     }
 
     /// Provides the length of the memory segment
@@ -91,7 +86,7 @@ mod tests {
     #[test]
     fn test_panic_set_above() {
         let mut mem = get_default_test_segment();
-        let result = mem.set(mem.len(), Word::from(32));
+        let result = mem.set(mem.len(), 32);
         assert!(result.is_err());
     }
 
@@ -111,7 +106,7 @@ mod tests {
         let mut mem = ReadWriteSegment::new(size);
 
         for i in 0..size {
-            let success = mem.set(i as u32, Word::from(((i + 1) % 256) as u8));
+            let success = mem.set(i as u32, ((i + 1) % 256) as u8);
             assert!(success.is_ok());
         }
 
@@ -124,7 +119,7 @@ mod tests {
             assert_eq!(val.is_err(), !should_be_within);
 
             if let Ok(mem_val) = val {
-                assert_eq!(mem_val.get(), ((i + 1) % 256) as u8);
+                assert_eq!(mem_val, ((i + 1) % 256) as u8);
             }
         }
     }

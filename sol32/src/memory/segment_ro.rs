@@ -1,13 +1,13 @@
-use super::{MemorySegment, Word, MemorySegmentError};
+use super::{MemorySegment, MemorySegmentError};
 
 /// Provides a read-write memory segment type
 pub struct ReadOnlySegment {
-    data: Vec<Word>,
+    data: Vec<u8>,
 }
 
 impl ReadOnlySegment {
     /// Defines a new memory segment with empty data, zero, in each memory location
-    pub fn new(data: Vec<Word>) -> Self {
+    pub fn new(data: Vec<u8>) -> Self {
         // Create the memory segment
         Self { data }
     }
@@ -15,7 +15,7 @@ impl ReadOnlySegment {
 
 impl MemorySegment for ReadOnlySegment {
     /// Provides the word at the requested memory location
-    fn get(&self, offset: u32) -> Result<Word, MemorySegmentError> {
+    fn get(&self, offset: u32) -> Result<u8, MemorySegmentError> {
         if self.within(offset) {
             Ok(self.data[offset as usize])
         } else {
@@ -25,7 +25,7 @@ impl MemorySegment for ReadOnlySegment {
 
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
-    fn set(&mut self, offset: u32, _: Word) -> Result<(), MemorySegmentError> {
+    fn set(&mut self, offset: u32, _: u8) -> Result<(), MemorySegmentError> {
         Err(MemorySegmentError::ReadOnlyMemory(offset))
     }
 
@@ -53,7 +53,7 @@ mod tests {
         let size = 1024;
 
         // Create the segment
-        let mem = ReadOnlySegment::new((0..size).map(|_| Word::default()).collect());
+        let mem = ReadOnlySegment::new((0..size).map(|_| 0).collect());
 
         // Ensure that the expected values match
         assert_eq!(mem.len(), size);
@@ -74,14 +74,14 @@ mod tests {
     fn get_default_test_segment() -> ReadOnlySegment {
         let size = 1024;
 
-        ReadOnlySegment::new((0..size).map(|_| Word::default()).collect())
+        ReadOnlySegment::new((0..size).map(|_| 0).collect())
     }
 
     /// Test setting a memory location above the top address
     #[test]
     fn test_panic_set_above() {
         let mut mem = get_default_test_segment();
-        let result = mem.set(mem.len(), Word::from(32));
+        let result = mem.set(mem.len(), 32);
         assert!(result.is_err());
     }
 
@@ -99,10 +99,10 @@ mod tests {
         let size = u8::MAX;
 
         let mut mem =
-            ReadOnlySegment::new((0..size).map(|i| Word::from(i + 1)).collect());
+            ReadOnlySegment::new((0..size).map(|i| (i + 1) as u8).collect());
 
         for i in 0..size {
-            let success = mem.set(i as u32, Word::from(i + 1));
+            let success = mem.set(i as u32, (i + 1) as u8);
             assert!(success.is_err());
         }
 
@@ -115,7 +115,7 @@ mod tests {
             assert_eq!(val.is_err(), !should_be_within);
 
             if let Ok(mem_val) = val {
-                assert_eq!(mem_val.get() as usize, (i + 1) as usize);
+                assert_eq!(mem_val as usize, (i + 1) as usize);
             }
         }
     }
