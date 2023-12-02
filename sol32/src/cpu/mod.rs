@@ -55,12 +55,12 @@ pub enum ResetType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct OpcodeCombination {
+pub struct Opcode {
     base: u8,
     code: u8,
 }
 
-impl From<u8> for OpcodeCombination {
+impl From<u8> for Opcode {
     fn from(value: u8) -> Self {
         Self {
             base: (value >> 4) & 0xF,
@@ -86,177 +86,177 @@ impl Processor {
     pub const SOFT_RESET_VECTOR: usize = 1;
 
     const OP_BASE_CPU: u8 = 0;
-    pub const OP_NOOP: OpcodeCombination = OpcodeCombination {
+    pub const OP_NOOP: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 0,
     };
-    pub const OP_RESET: OpcodeCombination = OpcodeCombination {
+    pub const OP_RESET: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 1,
     };
-    pub const OP_INTERRUPT: OpcodeCombination = OpcodeCombination {
+    pub const OP_INTERRUPT: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 2,
     };
-    pub const OP_INTERRUPT_REGISTER: OpcodeCombination = OpcodeCombination {
+    pub const OP_INTERRUPT_REGISTER: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 3,
     };
-    pub const OP_INTERRUPT_RETURN: OpcodeCombination = OpcodeCombination {
+    pub const OP_INTERRUPT_RETURN: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 4,
     };
-    pub const OP_CALL: OpcodeCombination = OpcodeCombination {
+    pub const OP_CALL: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 5,
     };
-    pub const OP_RETURN: OpcodeCombination = OpcodeCombination {
+    pub const OP_RETURN: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 6,
     };
-    pub const OP_PUSH: OpcodeCombination = OpcodeCombination {
+    pub const OP_PUSH: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 7,
     };
-    pub const OP_POP: OpcodeCombination = OpcodeCombination {
+    pub const OP_POP: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 8,
     };
-    pub const OP_POP_REG: OpcodeCombination = OpcodeCombination {
+    pub const OP_POP_REG: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 9,
     };
-    pub const OP_JUMP: OpcodeCombination = OpcodeCombination {
+    pub const OP_JUMP: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 10,
     };
-    pub const OP_JUMP_REL: OpcodeCombination = OpcodeCombination {
+    pub const OP_JUMP_REL: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 11,
     };
-    pub const OP_JUMP_REL_IMM: OpcodeCombination = OpcodeCombination {
+    pub const OP_JUMP_REL_IMM: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 12,
     };
-    pub const OP_HALT: OpcodeCombination = OpcodeCombination {
+    pub const OP_HALT: Opcode = Opcode {
         base: Self::OP_BASE_CPU,
         code: 15,
     };
 
     const OP_BASE_MEM: u8 = 1;
-    pub const OP_LOAD: OpcodeCombination = OpcodeCombination {
+    pub const OP_LOAD: Opcode = Opcode {
         base: Self::OP_BASE_MEM,
         code: 0,
     };
-    pub const OP_LOAD_REL: OpcodeCombination = OpcodeCombination {
+    pub const OP_LOAD_REL: Opcode = Opcode {
         base: Self::OP_BASE_MEM,
         code: 1,
     };
-    pub const OP_LOAD_IMM: OpcodeCombination = OpcodeCombination {
+    pub const OP_LOAD_IMM: Opcode = Opcode {
         base: Self::OP_BASE_MEM,
         code: 2,
     };
-    pub const OP_LOAD_IMM_REL: OpcodeCombination = OpcodeCombination {
+    pub const OP_LOAD_IMM_REL: Opcode = Opcode {
         base: Self::OP_BASE_MEM,
         code: 3,
     };
-    pub const OP_SAVE: OpcodeCombination = OpcodeCombination {
+    pub const OP_SAVE: Opcode = Opcode {
         base: Self::OP_BASE_MEM,
         code: 4,
     };
-    pub const OP_SAVE_REL: OpcodeCombination = OpcodeCombination {
+    pub const OP_SAVE_REL: Opcode = Opcode {
         base: Self::OP_BASE_MEM,
         code: 5,
     };
-    pub const OP_COPY: OpcodeCombination = OpcodeCombination {
+    pub const OP_COPY: Opcode = Opcode {
         base: Self::OP_BASE_MEM,
         code: 6,
     };
 
     const OP_BASE_TEST: u8 = 2;
-    pub const OP_EQ: OpcodeCombination = OpcodeCombination {
+    pub const OP_EQ: Opcode = Opcode {
         base: Self::OP_BASE_TEST,
         code: 0,
     };
-    pub const OP_NEQ: OpcodeCombination = OpcodeCombination {
+    pub const OP_NEQ: Opcode = Opcode {
         base: Self::OP_BASE_TEST,
         code: 1,
     };
-    pub const OP_GREATER: OpcodeCombination = OpcodeCombination {
+    pub const OP_GREATER: Opcode = Opcode {
         base: Self::OP_BASE_TEST,
         code: 2,
     };
-    pub const OP_GREATER_EQ: OpcodeCombination = OpcodeCombination {
+    pub const OP_GREATER_EQ: Opcode = Opcode {
         base: Self::OP_BASE_TEST,
         code: 3,
     };
-    pub const OP_LESS: OpcodeCombination = OpcodeCombination {
+    pub const OP_LESS: Opcode = Opcode {
         base: Self::OP_BASE_TEST,
         code: 4,
     };
-    pub const OP_LESS_EQ: OpcodeCombination = OpcodeCombination {
+    pub const OP_LESS_EQ: Opcode = Opcode {
         base: Self::OP_BASE_TEST,
         code: 5,
     };
 
     const OP_BASE_LOGIC: u8 = 3;
-    pub const OP_NOT: OpcodeCombination = OpcodeCombination {
+    pub const OP_NOT: Opcode = Opcode {
         base: Self::OP_BASE_LOGIC,
         code: 0,
     };
-    pub const OP_BOOL: OpcodeCombination = OpcodeCombination {
+    pub const OP_BOOL: Opcode = Opcode {
         base: Self::OP_BASE_LOGIC,
         code: 1,
     };
-    pub const OP_TEST_ZERO: OpcodeCombination = OpcodeCombination {
+    pub const OP_TEST_ZERO: Opcode = Opcode {
         base: Self::OP_BASE_LOGIC,
         code: 2,
     };
-    pub const OP_TEST_NOT_ZERO: OpcodeCombination = OpcodeCombination {
+    pub const OP_TEST_NOT_ZERO: Opcode = Opcode {
         base: Self::OP_BASE_LOGIC,
         code: 3,
     };
 
     const OP_BASE_MATH: u8 = 10;
-    pub const OP_ADD: OpcodeCombination = OpcodeCombination {
+    pub const OP_ADD: Opcode = Opcode {
         base: Self::OP_BASE_MATH,
         code: 0,
     };
-    pub const OP_SUB: OpcodeCombination = OpcodeCombination {
+    pub const OP_SUB: Opcode = Opcode {
         base: Self::OP_BASE_MATH,
         code: 1,
     };
-    pub const OP_MUL: OpcodeCombination = OpcodeCombination {
+    pub const OP_MUL: Opcode = Opcode {
         base: Self::OP_BASE_MATH,
         code: 2,
     };
-    pub const OP_DIV: OpcodeCombination = OpcodeCombination {
+    pub const OP_DIV: Opcode = Opcode {
         base: Self::OP_BASE_MATH,
         code: 3,
     };
-    pub const OP_REM: OpcodeCombination = OpcodeCombination {
+    pub const OP_REM: Opcode = Opcode {
         base: Self::OP_BASE_MATH,
         code: 4,
     };
 
     const OP_BASE_BITS: u8 = 11;
-    pub const OP_BAND: OpcodeCombination = OpcodeCombination {
+    pub const OP_BAND: Opcode = Opcode {
         base: Self::OP_BASE_BITS,
         code: 0,
     };
-    pub const OP_BOR: OpcodeCombination = OpcodeCombination {
+    pub const OP_BOR: Opcode = Opcode {
         base: Self::OP_BASE_BITS,
         code: 1,
     };
-    pub const OP_BXOR: OpcodeCombination = OpcodeCombination {
+    pub const OP_BXOR: Opcode = Opcode {
         base: Self::OP_BASE_BITS,
         code: 2,
     };
-    pub const OP_BSHL: OpcodeCombination = OpcodeCombination {
+    pub const OP_BSHL: Opcode = Opcode {
         base: Self::OP_BASE_BITS,
         code: 3,
     };
-    pub const OP_BSHR: OpcodeCombination = OpcodeCombination {
+    pub const OP_BSHR: Opcode = Opcode {
         base: Self::OP_BASE_BITS,
         code: 4,
     };
@@ -359,7 +359,7 @@ impl Processor {
             self.memory.get_u8(pc + 3)?,
         ]);
 
-        let opcode = OpcodeCombination::from(inst.opcode());
+        let opcode = Opcode::from(inst.opcode());
 
         // TODO - Jump Condition
 
@@ -520,7 +520,7 @@ impl Processor {
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 }
             }
-            OpcodeCombination {
+            Opcode {
                 base: Self::OP_BASE_MATH,
                 ..
             } => {
@@ -542,7 +542,7 @@ impl Processor {
                 self.registers
                     .set(Register::Status, if res.carry { 1 } else { 0 })?;
             }
-            OpcodeCombination {
+            Opcode {
                 base: Self::OP_BASE_BITS,
                 ..
             } => {
@@ -564,7 +564,7 @@ impl Processor {
                 self.registers
                     .set(Register::Status, if res.carry { 1 } else { 0 })?;
             }
-            OpcodeCombination {
+            Opcode {
                 base: Self::OP_BASE_TEST,
                 ..
             } => {

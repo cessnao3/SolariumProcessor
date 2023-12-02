@@ -99,10 +99,10 @@ mod tests {
         let size = u8::MAX;
 
         let mut mem =
-            ReadOnlySegment::new((0..size).map(|i| (i + 1) as u8).collect());
+            ReadOnlySegment::new((0..size).map(|i| i + 1).collect());
 
         for i in 0..size {
-            let success = mem.set(i as u32, (i + 1) as u8);
+            let success = mem.set(i as u32, i + 1);
             assert!(success.is_err());
         }
 

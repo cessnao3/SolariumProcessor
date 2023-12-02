@@ -76,7 +76,7 @@ impl MemoryMap {
 
     pub fn get_u8(&self, address: u32) -> Result<u8, MemoryError> {
         let data = self.get_segment(address)?;
-        Ok(segment_to_memory(data, data.seg.borrow().get(address))?)
+        segment_to_memory(data, data.seg.borrow().get(address))
     }
 
     pub fn set_u8(&mut self, address: u32, val: u8) -> Result<(), MemoryError> {
