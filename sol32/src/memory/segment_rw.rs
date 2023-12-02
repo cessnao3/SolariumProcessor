@@ -9,7 +9,9 @@ impl ReadWriteSegment {
     /// Defines a new memory segment with empty data, zero, in each memory location
     pub fn new(size: usize) -> Self {
         // Create the memory segment
-        Self { data: (0..size).map(|_| 0).collect() }
+        Self {
+            data: (0..size).map(|_| 0).collect(),
+        }
     }
 }
 

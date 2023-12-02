@@ -2,9 +2,9 @@ mod memory_map;
 mod segment_ro;
 mod segment_rw;
 
+pub use memory_map::MemoryMap;
 pub use segment_ro::ReadOnlySegment;
 pub use segment_rw::ReadWriteSegment;
-pub use memory_map::MemoryMap;
 
 /// Provides error conditions for memory segment parameters
 pub enum MemoryError {

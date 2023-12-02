@@ -1,4 +1,4 @@
-use super::{MemorySegment, MemoryError, MemorySegmentError};
+use super::{MemoryError, MemorySegment, MemorySegmentError};
 
 use std::{cell::RefCell, mem::size_of};
 
@@ -17,10 +17,17 @@ impl SegmentData {
     }
 }
 
-fn segment_to_memory<T>(seg: &SegmentData, result: Result<T, MemorySegmentError>) -> Result<T, MemoryError> {
+fn segment_to_memory<T>(
+    seg: &SegmentData,
+    result: Result<T, MemorySegmentError>,
+) -> Result<T, MemoryError> {
     match result {
-        Err(MemorySegmentError::InvalidMemoryAccess(offset)) => Err(MemoryError::InvalidMemoryAccess(seg.base + offset)),
-        Err(MemorySegmentError::ReadOnlyMemory(offset)) => Err(MemoryError::ReadOnlyMemory(seg.base + offset)),
+        Err(MemorySegmentError::InvalidMemoryAccess(offset)) => {
+            Err(MemoryError::InvalidMemoryAccess(seg.base + offset))
+        }
+        Err(MemorySegmentError::ReadOnlyMemory(offset)) => {
+            Err(MemoryError::ReadOnlyMemory(seg.base + offset))
+        }
         Ok(v) => Ok(v),
     }
 }
@@ -50,22 +57,31 @@ macro_rules! GetSetUnsignedType {
 
 impl MemoryMap {
     pub fn new() -> Self {
-        MemoryMap { segments: Vec::new() }
+        MemoryMap {
+            segments: Vec::new(),
+        }
     }
 
-    pub fn add_segment(&mut self, base: u32, seg: Box<RefCell<dyn MemorySegment>>) -> Result<(), MemoryError> {
+    pub fn add_segment(
+        &mut self,
+        base: u32,
+        seg: Box<RefCell<dyn MemorySegment>>,
+    ) -> Result<(), MemoryError> {
         let new_seg = SegmentData { base, seg };
 
         let top = base as usize + new_seg.seg.borrow().len() as usize;
         if top > u32::MAX as usize {
             return Err(MemoryError::IndexBounds(top));
-        }
-        else if new_seg.seg.borrow().is_empty() {
+        } else if new_seg.seg.borrow().is_empty() {
             return Err(MemoryError::EmptySegment(base));
         }
 
         for sd in self.segments.iter() {
-            if new_seg.within(sd.base) || new_seg.within(sd.top()) || sd.within(new_seg.base) || sd.within(new_seg.top()) {
+            if new_seg.within(sd.base)
+                || new_seg.within(sd.top())
+                || sd.within(new_seg.base)
+                || sd.within(new_seg.top())
+            {
                 return Err(MemoryError::OverlappingSegment(base));
             }
         }

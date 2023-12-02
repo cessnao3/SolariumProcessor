@@ -98,8 +98,7 @@ mod tests {
     fn test_offset_base() {
         let size = u8::MAX;
 
-        let mut mem =
-            ReadOnlySegment::new((0..size).map(|i| i + 1).collect());
+        let mut mem = ReadOnlySegment::new((0..size).map(|i| i + 1).collect());
 
         for i in 0..size {
             let success = mem.set(i as u32, i + 1);
