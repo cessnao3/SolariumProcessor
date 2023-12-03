@@ -1,5 +1,6 @@
 use super::register::Register;
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DataType {
     U8,
     I8,
@@ -22,6 +23,18 @@ impl DataType {
     pub fn signed(&self) -> bool {
         matches!(self, Self::I8 | Self::I16 | Self::I32)
     }
+
+    pub fn get_id(&self) -> u8 {
+        match self {
+            Self::U8 => 1,
+            Self::I8 => 2,
+            Self::U16 => 3,
+            Self::I16 => 4,
+            Self::U32 => 5,
+            Self::I32 => 6,
+            Self::F32 => 7,
+        }
+    }
 }
 
 pub struct DataTypeError(u8);
@@ -31,29 +44,15 @@ impl TryFrom<u8> for DataType {
 
     fn try_from(val: u8) -> Result<Self, Self::Error> {
         Ok(match val {
-            0 => Self::U8,
-            1 => Self::I8,
-            2 => Self::U16,
-            3 => Self::I16,
-            4 => Self::U32,
-            5 => Self::I32,
-            6 => Self::F32,
+            1 => Self::U8,
+            2 => Self::I8,
+            3 => Self::U16,
+            4 => Self::I16,
+            5 => Self::U32,
+            6 => Self::I32,
+            7 => Self::F32,
             _ => return Err(DataTypeError(val)),
         })
-    }
-}
-
-impl From<DataType> for u8 {
-    fn from(value: DataType) -> Self {
-        match value {
-            DataType::U8 => 0,
-            DataType::I8 => 1,
-            DataType::U16 => 2,
-            DataType::I16 => 3,
-            DataType::U32 => 4,
-            DataType::I32 => 5,
-            DataType::F32 => 6,
-        }
     }
 }
 
