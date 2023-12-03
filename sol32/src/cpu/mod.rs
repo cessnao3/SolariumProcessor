@@ -61,6 +61,12 @@ pub struct Opcode {
     code: u8,
 }
 
+impl Opcode {
+    pub fn to_byte(&self) -> u8 {
+        ((self.base << 4) & 0xF) | (self.code & 0xF)
+    }
+}
+
 impl From<u8> for Opcode {
     fn from(value: u8) -> Self {
         Self {
