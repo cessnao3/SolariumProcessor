@@ -2,7 +2,7 @@ mod instruction;
 mod operations;
 mod register;
 
-use crate::cpu::instruction::DataType;
+pub use crate::cpu::instruction::DataType;
 use crate::memory::{MemoryError, MemoryMap};
 
 use self::instruction::{DataTypeError, Instruction};
@@ -11,7 +11,8 @@ use self::operations::{
     IntegerI32Operations, IntegerI8Operations, IntegerU16Operations, IntegerU32Operations,
     IntegerU8Operations, OperationError, RelationalOperations,
 };
-use self::register::{Register, RegisterError, RegisterManager};
+use self::register::{RegisterError, RegisterManager};
+pub use self::register::Register;
 
 pub enum ProcessorError {
     Memory(MemoryError),
