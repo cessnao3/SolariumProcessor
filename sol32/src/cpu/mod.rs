@@ -11,8 +11,8 @@ use self::operations::{
     IntegerI32Operations, IntegerI8Operations, IntegerU16Operations, IntegerU32Operations,
     IntegerU8Operations, OperationError, RelationalOperations,
 };
-use self::register::{RegisterError, RegisterManager};
 pub use self::register::Register;
+use self::register::{RegisterError, RegisterManager};
 
 pub enum ProcessorError {
     Memory(MemoryError),
