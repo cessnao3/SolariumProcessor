@@ -1,7 +1,10 @@
 use std::fmt::Debug;
 
-use crate::{immediate::{ImmediateError, parse_imm_i16}, argument::{ArgumentError, ArgumentRegister, ArgumentType}};
-use sol32::cpu::{Processor, Opcode};
+use crate::{
+    argument::{ArgumentError, ArgumentRegister, ArgumentType},
+    immediate::{parse_imm_i16, ImmediateError},
+};
+use sol32::cpu::{Opcode, Processor};
 
 const INST_SIZE: usize = 4;
 
@@ -153,7 +156,12 @@ macro_rules! InstDoubleArg {
 
         impl ToInstruction for $op_name {
             fn to_instruction(&self) -> [u8; INST_SIZE] {
-                [Self::OP.to_byte(), self.arg0.to_byte(), self.arg1.to_byte(), 0]
+                [
+                    Self::OP.to_byte(),
+                    self.arg0.to_byte(),
+                    self.arg1.to_byte(),
+                    0,
+                ]
             }
         }
 
@@ -165,7 +173,7 @@ macro_rules! InstDoubleArg {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     let a0 = ArgumentRegister::try_from(args[0].as_ref())?;
-                    let a1= ArgumentRegister::try_from(args[1].as_ref())?;
+                    let a1 = ArgumentRegister::try_from(args[1].as_ref())?;
                     Ok(Self::new(a0, a1))
                 }
             }
@@ -192,7 +200,12 @@ macro_rules! InstDoubleArgType {
 
         impl ToInstruction for $op_name {
             fn to_instruction(&self) -> [u8; INST_SIZE] {
-                [Self::OP.to_byte(), self.arg0.to_byte(), self.arg1.to_byte(), 0]
+                [
+                    Self::OP.to_byte(),
+                    self.arg0.to_byte(),
+                    self.arg1.to_byte(),
+                    0,
+                ]
             }
         }
 
@@ -204,7 +217,7 @@ macro_rules! InstDoubleArgType {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     let a0 = ArgumentType::try_from(args[0].as_ref())?;
-                    let a1= ArgumentRegister::try_from(args[1].as_ref())?;
+                    let a1 = ArgumentRegister::try_from(args[1].as_ref())?;
                     Ok(Self::new(a0, a1))
                 }
             }
@@ -231,7 +244,12 @@ macro_rules! InstDoubleArgDoubleType {
 
         impl ToInstruction for $op_name {
             fn to_instruction(&self) -> [u8; INST_SIZE] {
-                [Self::OP.to_byte(), self.arg0.to_byte(), self.arg1.to_byte(), 0]
+                [
+                    Self::OP.to_byte(),
+                    self.arg0.to_byte(),
+                    self.arg1.to_byte(),
+                    0,
+                ]
             }
         }
 
@@ -243,7 +261,7 @@ macro_rules! InstDoubleArgDoubleType {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     let a0 = ArgumentType::try_from(args[0].as_ref())?;
-                    let a1= ArgumentType::try_from(args[1].as_ref())?;
+                    let a1 = ArgumentType::try_from(args[1].as_ref())?;
                     Ok(Self::new(a0, a1))
                 }
             }
@@ -271,7 +289,12 @@ macro_rules! InstArith {
 
         impl ToInstruction for $op_name {
             fn to_instruction(&self) -> [u8; INST_SIZE] {
-                [Self::OP.to_byte(), self.arg0.to_byte(), self.arg1.to_byte(), self.arg2.to_byte()]
+                [
+                    Self::OP.to_byte(),
+                    self.arg0.to_byte(),
+                    self.arg1.to_byte(),
+                    self.arg2.to_byte(),
+                ]
             }
         }
 

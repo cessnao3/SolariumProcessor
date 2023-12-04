@@ -67,48 +67,174 @@ struct TokenList {
 impl TokenList {
     pub fn new() -> Self {
         let inst = HashMap::from([
-            ("noop".into(), (|a| Ok(Rc::new(OpNoop::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("reset".into(), (|a| Ok(Rc::new(OpReset::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("retint".into(), (|a| Ok(Rc::new(OpRetInt::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("ret".into(), (|a| Ok(Rc::new(OpRet::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("halt".into(), (|a| Ok(Rc::new(OpHalt::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("int".into(), (|a| Ok(Rc::new(OpInt::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("intr".into(), (|a| Ok(Rc::new(OpIntr::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("call".into(), (|a| Ok(Rc::new(OpCall::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("push".into(), (|a| Ok(Rc::new(OpPush::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("pop".into(), (|a| Ok(Rc::new(OpPop::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("popr".into(), (|a| Ok(Rc::new(OpPopr::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("jmp".into(), (|a| Ok(Rc::new(OpJmp::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("jmpr".into(), (|a| Ok(Rc::new(OpJmpr::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("jmpri".into(), (|a| Ok(Rc::new(OpJmpri::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("loadi".into(), (|a| Ok(Rc::new(OpLoadi::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("loadri".into(), (|a| Ok(Rc::new(OpLoadri::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("not".into(), (|a| Ok(Rc::new(OpNot::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("bool".into(), (|a| Ok(Rc::new(OpBool::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("tz".into(), (|a| Ok(Rc::new(OpTz::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("tnz".into(), (|a| Ok(Rc::new(OpTnz::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("copy".into(), (|a| Ok(Rc::new(OpCopy::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("save".into(), (|a| Ok(Rc::new(OpSave::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("saver".into(), (|a| Ok(Rc::new(OpSaver::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("load".into(), (|a| Ok(Rc::new(OpLoad::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("loadr".into(), (|a| Ok(Rc::new(OpLoadr::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("conv".into(), (|a| Ok(Rc::new(OpConv::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("add".into(), (|a| Ok(Rc::new(OpAdd::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("sub".into(), (|a| Ok(Rc::new(OpSub::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("mul".into(), (|a| Ok(Rc::new(OpMul::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("div".into(), (|a| Ok(Rc::new(OpDiv::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("rem".into(), (|a| Ok(Rc::new(OpRem::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("band".into(), (|a| Ok(Rc::new(OpBand::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("bor".into(), (|a| Ok(Rc::new(OpBor::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("bxor".into(), (|a| Ok(Rc::new(OpBxor::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("bshl".into(), (|a| Ok(Rc::new(OpBshl::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("bshr".into(), (|a| Ok(Rc::new(OpBshr::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("teq".into(), (|a| Ok(Rc::new(OpTeq::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("tneq".into(), (|a| Ok(Rc::new(OpTneq::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("tgt".into(), (|a| Ok(Rc::new(OpTgt::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("tgeq".into(), (|a| Ok(Rc::new(OpTgeq::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("tlt".into(), (|a| Ok(Rc::new(OpTlt::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
-            ("tleq".into(), (|a| Ok(Rc::new(OpTleq::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            (
+                "noop".into(),
+                (|a| Ok(Rc::new(OpNoop::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "reset".into(),
+                (|a| Ok(Rc::new(OpReset::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "retint".into(),
+                (|a| Ok(Rc::new(OpRetInt::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "ret".into(),
+                (|a| Ok(Rc::new(OpRet::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "halt".into(),
+                (|a| Ok(Rc::new(OpHalt::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "int".into(),
+                (|a| Ok(Rc::new(OpInt::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "intr".into(),
+                (|a| Ok(Rc::new(OpIntr::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "call".into(),
+                (|a| Ok(Rc::new(OpCall::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "push".into(),
+                (|a| Ok(Rc::new(OpPush::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "pop".into(),
+                (|a| Ok(Rc::new(OpPop::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "popr".into(),
+                (|a| Ok(Rc::new(OpPopr::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "jmp".into(),
+                (|a| Ok(Rc::new(OpJmp::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "jmpr".into(),
+                (|a| Ok(Rc::new(OpJmpr::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "jmpri".into(),
+                (|a| Ok(Rc::new(OpJmpri::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "loadi".into(),
+                (|a| Ok(Rc::new(OpLoadi::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "loadri".into(),
+                (|a| Ok(Rc::new(OpLoadri::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "not".into(),
+                (|a| Ok(Rc::new(OpNot::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "bool".into(),
+                (|a| Ok(Rc::new(OpBool::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "tz".into(),
+                (|a| Ok(Rc::new(OpTz::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "tnz".into(),
+                (|a| Ok(Rc::new(OpTnz::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "copy".into(),
+                (|a| Ok(Rc::new(OpCopy::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "save".into(),
+                (|a| Ok(Rc::new(OpSave::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "saver".into(),
+                (|a| Ok(Rc::new(OpSaver::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "load".into(),
+                (|a| Ok(Rc::new(OpLoad::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "loadr".into(),
+                (|a| Ok(Rc::new(OpLoadr::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "conv".into(),
+                (|a| Ok(Rc::new(OpConv::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "add".into(),
+                (|a| Ok(Rc::new(OpAdd::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "sub".into(),
+                (|a| Ok(Rc::new(OpSub::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "mul".into(),
+                (|a| Ok(Rc::new(OpMul::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "div".into(),
+                (|a| Ok(Rc::new(OpDiv::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "rem".into(),
+                (|a| Ok(Rc::new(OpRem::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "band".into(),
+                (|a| Ok(Rc::new(OpBand::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "bor".into(),
+                (|a| Ok(Rc::new(OpBor::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "bxor".into(),
+                (|a| Ok(Rc::new(OpBxor::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "bshl".into(),
+                (|a| Ok(Rc::new(OpBshl::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "bshr".into(),
+                (|a| Ok(Rc::new(OpBshr::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "teq".into(),
+                (|a| Ok(Rc::new(OpTeq::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "tneq".into(),
+                (|a| Ok(Rc::new(OpTneq::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "tgt".into(),
+                (|a| Ok(Rc::new(OpTgt::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "tgeq".into(),
+                (|a| Ok(Rc::new(OpTgeq::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "tlt".into(),
+                (|a| Ok(Rc::new(OpTlt::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "tleq".into(),
+                (|a| Ok(Rc::new(OpTleq::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
         ]);
 
         Self {
@@ -121,7 +247,7 @@ impl TokenList {
         let s = line.trim();
         let words = s.split_whitespace().collect::<Vec<_>>();
 
-        let first: &str= if let Some(w) = words.first() {
+        let first: &str = if let Some(w) = words.first() {
             w
         } else {
             return Err(AssemblerError::UnknownInstruction(s.to_string()));

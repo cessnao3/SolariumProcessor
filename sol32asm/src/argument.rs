@@ -1,4 +1,4 @@
-use sol32::cpu::{Register, DataType};
+use sol32::cpu::{DataType, Register};
 
 use crate::immediate::ImmediateError;
 
