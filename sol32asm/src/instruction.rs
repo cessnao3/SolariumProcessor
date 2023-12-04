@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::{immediate::{ImmediateError, parse_imm_i16}, argument::{ArgumentError, ArgumentRegister, ArgumentType}};
 use sol32::cpu::{Processor, Opcode};
 
@@ -23,7 +25,7 @@ impl From<ArgumentError> for InstructionError {
 }
 
 pub trait ToInstruction {
-    fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE];
+    fn to_instruction(&self) -> [u8; INST_SIZE];
 }
 
 macro_rules! InstNoArg {
@@ -41,15 +43,15 @@ macro_rules! InstNoArg {
         }
 
         impl ToInstruction for $op_name {
-            fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE] {
+            fn to_instruction(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), 0, 0, 0]
             }
         }
 
-        impl TryFrom<&[&str]> for $op_name {
+        impl TryFrom<Vec<String>> for $op_name {
             type Error = InstructionError;
 
-            fn try_from(args: &[&str]) -> Result<Self, Self::Error> {
+            fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
                 if args.len() == Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
@@ -77,19 +79,19 @@ macro_rules! InstSingleArg {
         }
 
         impl ToInstruction for $op_name {
-            fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE] {
+            fn to_instruction(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), self.arg.to_byte(), 0, 0]
             }
         }
 
-        impl TryFrom<&[&str]> for $op_name {
+        impl TryFrom<Vec<String>> for $op_name {
             type Error = InstructionError;
 
-            fn try_from(args: &[&str]) -> Result<Self, Self::Error> {
+            fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
                 if args.len() == Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
-                    Ok(Self::new(ArgumentRegister::try_from(args[0])?))
+                    Ok(Self::new(ArgumentRegister::try_from(args[0].as_ref())?))
                 }
             }
         }
@@ -114,21 +116,21 @@ macro_rules! InstSingleArgImm {
         }
 
         impl ToInstruction for $op_name {
-            fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE] {
+            fn to_instruction(&self) -> [u8; INST_SIZE] {
                 let imm = self.val.to_be_bytes();
                 [Self::OP.to_byte(), self.arg.to_byte(), imm[0], imm[1]]
             }
         }
 
-        impl TryFrom<&[&str]> for $op_name {
+        impl TryFrom<Vec<String>> for $op_name {
             type Error = InstructionError;
 
-            fn try_from(args: &[&str]) -> Result<Self, Self::Error> {
+            fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
                 if args.len() == Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
-                    let a0 = ArgumentRegister::try_from(args[0])?;
-                    let imm = parse_imm_i16(args[1])? as u16;
+                    let a0 = ArgumentRegister::try_from(args[0].as_ref())?;
+                    let imm = parse_imm_i16(&args[1])? as u16;
                     Ok(Self::new(a0, imm))
                 }
             }
@@ -154,20 +156,20 @@ macro_rules! InstDoubleArg {
         }
 
         impl ToInstruction for $op_name {
-            fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE] {
+            fn to_instruction(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), self.arg0.to_byte(), self.arg1.to_byte(), 0]
             }
         }
 
-        impl TryFrom<&[&str]> for $op_name {
+        impl TryFrom<Vec<String>> for $op_name {
             type Error = InstructionError;
 
-            fn try_from(args: &[&str]) -> Result<Self, Self::Error> {
+            fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
                 if args.len() == Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
-                    let a0 = ArgumentRegister::try_from(args[0])?;
-                    let a1= ArgumentRegister::try_from(args[1])?;
+                    let a0 = ArgumentRegister::try_from(args[0].as_ref())?;
+                    let a1= ArgumentRegister::try_from(args[1].as_ref())?;
                     Ok(Self::new(a0, a1))
                 }
             }
@@ -193,20 +195,20 @@ macro_rules! InstDoubleArgType {
         }
 
         impl ToInstruction for $op_name {
-            fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE] {
+            fn to_instruction(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), self.arg0.to_byte(), self.arg1.to_byte(), 0]
             }
         }
 
-        impl TryFrom<&[&str]> for $op_name {
+        impl TryFrom<Vec<String>> for $op_name {
             type Error = InstructionError;
 
-            fn try_from(args: &[&str]) -> Result<Self, Self::Error> {
+            fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
                 if args.len() == Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
-                    let a0 = ArgumentType::try_from(args[0])?;
-                    let a1= ArgumentRegister::try_from(args[1])?;
+                    let a0 = ArgumentType::try_from(args[0].as_ref())?;
+                    let a1= ArgumentRegister::try_from(args[1].as_ref())?;
                     Ok(Self::new(a0, a1))
                 }
             }
@@ -232,20 +234,20 @@ macro_rules! InstDoubleArgDoubleType {
         }
 
         impl ToInstruction for $op_name {
-            fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE] {
+            fn to_instruction(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), self.arg0.to_byte(), self.arg1.to_byte(), 0]
             }
         }
 
-        impl TryFrom<&[&str]> for $op_name {
+        impl TryFrom<Vec<String>> for $op_name {
             type Error = InstructionError;
 
-            fn try_from(args: &[&str]) -> Result<Self, Self::Error> {
+            fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
                 if args.len() == Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
-                    let a0 = ArgumentType::try_from(args[0])?;
-                    let a1= ArgumentType::try_from(args[1])?;
+                    let a0 = ArgumentType::try_from(args[0].as_ref())?;
+                    let a1= ArgumentType::try_from(args[1].as_ref())?;
                     Ok(Self::new(a0, a1))
                 }
             }
@@ -272,21 +274,21 @@ macro_rules! InstArith {
         }
 
         impl ToInstruction for $op_name {
-            fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE] {
+            fn to_instruction(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), self.arg0.to_byte(), self.arg1.to_byte(), self.arg2.to_byte()]
             }
         }
 
-        impl TryFrom<&[&str]> for $op_name {
+        impl TryFrom<Vec<String>> for $op_name {
             type Error = InstructionError;
 
-            fn try_from(args: &[&str]) -> Result<Self, Self::Error> {
+            fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
                 if args.len() == Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
-                    let a0 = ArgumentType::try_from(args[0])?;
-                    let a1 = ArgumentRegister::try_from(args[1])?;
-                    let a2 = ArgumentRegister::try_from(args[2])?;
+                    let a0 = ArgumentType::try_from(args[0].as_ref())?;
+                    let a1 = ArgumentRegister::try_from(args[1].as_ref())?;
+                    let a2 = ArgumentRegister::try_from(args[2].as_ref())?;
                     Ok(Self::new(a0, a1, a2))
                 }
             }

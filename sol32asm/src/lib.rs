@@ -2,13 +2,13 @@ mod argument;
 mod immediate;
 mod instruction;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use instruction::{
-    OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall, OpConv, OpCopy, OpDiv, OpHalt,
-    OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLoad, OpLoadi, OpLoadr, OpLoadri, OpMul, OpNoop,
-    OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt, OpSave, OpSaver, OpSub, OpTeq,
-    OpTgeq, OpTgt, OpTleq, OpTlt, OpTneq, OpTnz, OpTz, ToInstruction, InstructionError,
+    InstructionError, OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall, OpConv, OpCopy,
+    OpDiv, OpHalt, OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLoad, OpLoadi, OpLoadr, OpLoadri,
+    OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt, OpSave, OpSaver,
+    OpSub, OpTeq, OpTgeq, OpTgt, OpTleq, OpTlt, OpTneq, OpTnz, OpTz, ToInstruction,
 };
 
 use immediate::{
@@ -28,55 +28,6 @@ enum AssemblerError {
     UnknownDataType(String),
 }
 
-/*
-static INSTRUCTIONS: Lazy<HashMap<i32, fn(&[&str]) -> Result<dyn ToInstruction, InstructionError>>> = Lazy::new(|| {
-    Mutex::new(HashMap::from([
-        ("noop", OpNoop::try_from),
-        ("reset", Box::<dyn ToInstruction>::new(OpReset)),
-        ("retint", Box::<dyn ToInstruction>::new(OpRetInt)),
-        ("ret", Box::<dyn ToInstruction>::new(OpRet)),
-        ("halt", Box::<dyn ToInstruction>::new(OpHalt)),
-        ("int", Box::<dyn ToInstruction>::new(OpInt)),
-        ("intr", Box::<dyn ToInstruction>::new(OpIntr)),
-        ("call", Box::<dyn ToInstruction>::new(OpCall)),
-        ("push", Box::<dyn ToInstruction>::new(OpPush)),
-        ("pop", Box::<dyn ToInstruction>::new(OpPop)),
-        ("popr", Box::<dyn ToInstruction>::new(OpPopr)),
-        ("jmp", Box::<dyn ToInstruction>::new(OpJmp)),
-        ("jmpr", Box::<dyn ToInstruction>::new(OpJmpr)),
-        ("jmpri", Box::<dyn ToInstruction>::new(OpJmpri)),
-        ("loadi", Box::<dyn ToInstruction>::new(OpLoadi)),
-        ("loadri", Box::<dyn ToInstruction>::new(OpLoadri)),
-        ("not", Box::<dyn ToInstruction>::new(OpNot)),
-        ("bool", Box::<dyn ToInstruction>::new(OpBool)),
-        ("tz", Box::<dyn ToInstruction>::new(OpTz)),
-        ("tnz", Box::<dyn ToInstruction>::new(OpTnz)),
-        ("copy", Box::<dyn ToInstruction>::new(OpCopy)),
-        ("save", Box::<dyn ToInstruction>::new(OpSave)),
-        ("saver", Box::<dyn ToInstruction>::new(OpSaver)),
-        ("load", Box::<dyn ToInstruction>::new(OpLoad)),
-        ("loadr", Box::<dyn ToInstruction>::new(OpLoadr)),
-        ("conv", Box::<dyn ToInstruction>::new(OpConv)),
-        ("add", Box::<dyn ToInstruction>::new(OpAdd)),
-        ("sub", Box::<dyn ToInstruction>::new(OpSub)),
-        ("mul", Box::<dyn ToInstruction>::new(OpMul)),
-        ("div", Box::<dyn ToInstruction>::new(OpDiv)),
-        ("rem", Box::<dyn ToInstruction>::new(OpRem)),
-        ("band", Box::<dyn ToInstruction>::new(OpBand)),
-        ("bor", Box::<dyn ToInstruction>::new(OpBor)),
-        ("bxor", Box::<dyn ToInstruction>::new(OpBxor)),
-        ("bshl", Box::<dyn ToInstruction>::new(OpBshl)),
-        ("bshr", Box::<dyn ToInstruction>::new(OpBshr)),
-        ("teq", Box::<dyn ToInstruction>::new(OpTeq)),
-        ("tneq", Box::<dyn ToInstruction>::new(OpTneq)),
-        ("tgt", Box::<dyn ToInstruction>::new(OpTgt)),
-        ("tgeq", Box::<dyn ToInstruction>::new(OpTgeq)),
-        ("tlt", Box::<dyn ToInstruction>::new(OpTlt)),
-        ("tleq", Box::<dyn ToInstruction>::new(OpTleq)),
-    ]))
-});
-*/
-
 impl From<ImmediateError> for AssemblerError {
     fn from(value: ImmediateError) -> Self {
         Self::ImmediateError(value.0)
@@ -95,11 +46,12 @@ struct AssemblerErrorLoc {
     loc: usize,
 }
 
-type FnInst = fn(&[&str]) -> Result<Box<dyn ToInstruction>, InstructionError>;
+type FnInst = fn(Vec<String>) -> Result<Rc<dyn ToInstruction>, InstructionError>;
 
+#[derive(Clone)]
 enum Token {
     ChangeAddress(u32),
-    Operation(Box<dyn ToInstruction>),
+    Operation(Rc<dyn ToInstruction>),
     CreateLabel(String),
     LoadLoc(String),
     Immediate1(u8),
@@ -119,17 +71,19 @@ impl Token {
     }
 }
 
-struct ParserState {
+struct TokenList {
     tokens: Vec<Token>,
-    labels: HashMap<String, u32>,
-    current_loc: usize,
     inst: HashMap<String, FnInst>,
 }
 
-impl ParserState {
+impl TokenList {
     pub fn new() -> Self {
-        fn convert_type<'a, T: ToInstruction + TryFrom<&'a [&'a str]>>(s: &[&str]) -> Result<Box<dyn ToInstruction>, T::Error> {
-            Ok(Box::new(T::try_from(s)?))
+        fn convert_type<T: ToInstruction + TryFrom<Vec<String>>>(
+            s: Vec<String>,
+        ) -> Result<Rc<dyn ToInstruction>, T::Error> {
+            let v = T::try_from(s)?;
+            let r = Rc::new(v);
+            Ok(r)
         }
 
         let inst = HashMap::from([
@@ -179,13 +133,11 @@ impl ParserState {
 
         Self {
             tokens: Vec::new(),
-            labels: HashMap::new(),
-            current_loc: 0,
             inst,
         }
     }
 
-    fn parse_line(&mut self, line: &str) -> Result<(), AssemblerError> {
+    pub fn parse_line(&mut self, line: &str) -> Result<(), AssemblerError> {
         let s = line.trim();
         let words = s.split_whitespace().collect::<Vec<_>>();
 
@@ -221,6 +173,7 @@ impl ParserState {
                     }
                     .to_bits(),
                 ),
+                _ => return Err(AssemblerError::UnknownInstruction(op.to_string())),
             }
         } else if first.starts_with(':') {
             if words.len() != 1 {
@@ -230,7 +183,7 @@ impl ParserState {
             Token::CreateLabel(first[1..].to_string())
         } else if let Some(inst_fn) = self.inst.get(words[0]) {
             let args = &words[1..];
-            let val = inst_fn(args)?;
+            let val = inst_fn(args.iter().map(|s| s.to_string()).collect())?;
             Token::Operation(val)
         } else {
             return Err(AssemblerError::UnknownInstruction(line.into()));
@@ -240,6 +193,100 @@ impl ParserState {
 
         Ok(())
     }
+
+    pub fn add_token(&mut self, tok: Token) {
+        self.tokens.push(tok)
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>, AssemblerError> {
+        let mut state = ParserState::new();
+
+        for t in self.tokens.iter() {
+            match t {
+                Token::ChangeAddress(new_addr) => {
+                    if *new_addr < state.addr {
+                        panic!("cannot backup address");
+                    } else {
+                        state.addr = *new_addr;
+                    }
+                }
+                Token::Immediate1(i) => {
+                    state.add_bytes(&[*i]);
+                }
+                Token::Immediate2(i) => {
+                    state.add_bytes(&i.to_be_bytes());
+                }
+                Token::Immediate4(i) => {
+                    state.add_bytes(&i.to_be_bytes());
+                }
+                Token::CreateLabel(lbl) => {
+                    // TODO - Duplicate label
+                    state.labels.insert(lbl.into(), state.addr);
+                }
+                Token::LoadLoc(lbl) => {
+                    state.loadloc_vals.insert(state.addr, lbl.into());
+                    state.add_bytes(&0u32.to_be_bytes());
+                }
+                Token::Operation(op) => {
+                    state.add_bytes(&op.to_instruction());
+                }
+            }
+        }
+
+        for (addr, lbl) in state.loadloc_vals {
+            if let Some(loc) = state.labels.get(&lbl) {
+                for (i, val) in loc.to_be_bytes().iter().enumerate() {
+                    state.values.insert(addr + i as u32, *val);
+                }
+            } else {
+                panic!("no label for {lbl} found");
+            }
+        }
+
+        let mut bytes = Vec::new();
+
+        if let Some(max_addr) = state.values.keys().max() {
+            bytes.resize(*max_addr as usize, 0);
+
+            for (a, v) in state.values {
+                bytes[a as usize] = v;
+            }
+        }
+
+        Ok(bytes)
+    }
+}
+
+pub struct ParserState {
+    addr: u32,
+    labels: HashMap<String, u32>,
+    values: HashMap<u32, u8>,
+    loadloc_vals: HashMap<u32, String>,
+}
+
+impl ParserState {
+    pub fn new() -> Self {
+        Self {
+            addr: 0,
+            labels: HashMap::new(),
+            values: HashMap::new(),
+            loadloc_vals: HashMap::new(),
+        }
+    }
+
+    fn add_bytes(&mut self, vals: &[u8]) {
+        self.align_boundary(vals.len() as u32);
+        for v in vals {
+            self.values.insert(self.addr, *v);
+            self.addr += 1;
+        }
+    }
+
+    fn align_boundary(&mut self, val: u32) {
+        if val > 0 && self.addr % val != 0 {
+            self.addr += val - (self.addr % val);
+        }
+    }
 }
 
 pub fn parse_text(txt: &str) -> Result<Vec<u8>, AssemblerErrorLoc> {
@@ -247,11 +294,24 @@ pub fn parse_text(txt: &str) -> Result<Vec<u8>, AssemblerErrorLoc> {
 }
 
 pub fn parse_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
+    let mut state = TokenList::new();
     for (i, l) in txt.iter().enumerate() {
+        match state.parse_line(l) {
+            Err(e) => return Err(AssemblerErrorLoc { err: e, loc: i + 1 }),
+            _ => (),
+        };
+    }
 
+    match state.to_bytes() {
+        Ok(v) => Ok(v),
+        Err(e) => Err(AssemblerErrorLoc { err: e, loc: 0 }),
     }
 }
 
-pub fn assemble(txt: &[Token]) -> Result<Vec<u8>, AssemblerError> {
-    Ok(Vec::new())
+pub fn assemble(tokens: &[Token]) -> Result<Vec<u8>, AssemblerError> {
+    let mut state = TokenList::new();
+    for t in tokens {
+        state.add_token(t.clone());
+    }
+    state.to_bytes()
 }
