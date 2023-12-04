@@ -36,10 +36,6 @@ macro_rules! InstNoArg {
         impl $op_name {
             const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 0;
-
-            pub fn new() -> Self {
-                Self
-            }
         }
 
         impl ToInstruction for $op_name {

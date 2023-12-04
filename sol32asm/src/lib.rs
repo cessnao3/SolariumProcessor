@@ -17,7 +17,7 @@ use immediate::{
 };
 
 #[derive(Debug, Clone)]
-enum AssemblerError {
+pub enum AssemblerError {
     UnknownLabel(String),
     UnknownInstruction(String),
     Instruction(InstructionError),
@@ -41,15 +41,15 @@ impl From<InstructionError> for AssemblerError {
 }
 
 #[derive(Debug, Clone)]
-struct AssemblerErrorLoc {
-    err: AssemblerError,
-    loc: usize,
+pub struct AssemblerErrorLoc {
+    pub err: AssemblerError,
+    pub loc: usize,
 }
 
 type FnInst = fn(Vec<String>) -> Result<Rc<dyn ToInstruction>, InstructionError>;
 
 #[derive(Clone)]
-enum Token {
+pub enum Token {
     ChangeAddress(u32),
     Operation(Rc<dyn ToInstruction>),
     CreateLabel(String),
@@ -59,18 +59,6 @@ enum Token {
     Immediate4(u32),
 }
 
-impl Token {
-    pub fn to_bytes(&self) -> Option<Vec<u8>> {
-        match self {
-            Self::Operation(inst) => Some(Vec::new()),
-            Self::Immediate1(v) => Some(vec![*v]),
-            Self::Immediate2(v) => Some(v.to_be_bytes().into_iter().collect()),
-            Self::Immediate4(v) => Some(v.to_be_bytes().into_iter().collect()),
-            _ => None,
-        }
-    }
-}
-
 struct TokenList {
     tokens: Vec<Token>,
     inst: HashMap<String, FnInst>,
@@ -78,57 +66,49 @@ struct TokenList {
 
 impl TokenList {
     pub fn new() -> Self {
-        fn convert_type<T: ToInstruction + TryFrom<Vec<String>>>(
-            s: Vec<String>,
-        ) -> Result<Rc<dyn ToInstruction>, T::Error> {
-            let v = T::try_from(s)?;
-            let r = Rc::new(v);
-            Ok(r)
-        }
-
         let inst = HashMap::from([
-            ("noop".into(), convert_type::<OpNoop> as FnInst),
-            ("reset".into(), convert_type::<OpReset> as FnInst),
-            ("retint".into(), convert_type::<OpRetInt> as FnInst),
-            ("ret".into(), convert_type::<OpRet> as FnInst),
-            ("halt".into(), convert_type::<OpHalt> as FnInst),
-            ("int".into(), convert_type::<OpInt> as FnInst),
-            ("intr".into(), convert_type::<OpIntr> as FnInst),
-            ("call".into(), convert_type::<OpCall> as FnInst),
-            ("push".into(), convert_type::<OpPush> as FnInst),
-            ("pop".into(), convert_type::<OpPop> as FnInst),
-            ("popr".into(), convert_type::<OpPopr> as FnInst),
-            ("jmp".into(), convert_type::<OpJmp> as FnInst),
-            ("jmpr".into(), convert_type::<OpJmpr> as FnInst),
-            ("jmpri".into(), convert_type::<OpJmpri> as FnInst),
-            ("loadi".into(), convert_type::<OpLoadi> as FnInst),
-            ("loadri".into(), convert_type::<OpLoadri> as FnInst),
-            ("not".into(), convert_type::<OpNot> as FnInst),
-            ("bool".into(), convert_type::<OpBool> as FnInst),
-            ("tz".into(), convert_type::<OpTz> as FnInst),
-            ("tnz".into(), convert_type::<OpTnz> as FnInst),
-            ("copy".into(), convert_type::<OpCopy> as FnInst),
-            ("save".into(), convert_type::<OpSave> as FnInst),
-            ("saver".into(), convert_type::<OpSaver> as FnInst),
-            ("load".into(), convert_type::<OpLoad> as FnInst),
-            ("loadr".into(), convert_type::<OpLoadr> as FnInst),
-            ("conv".into(), convert_type::<OpConv> as FnInst),
-            ("add".into(), convert_type::<OpAdd> as FnInst),
-            ("sub".into(), convert_type::<OpSub> as FnInst),
-            ("mul".into(), convert_type::<OpMul> as FnInst),
-            ("div".into(), convert_type::<OpDiv> as FnInst),
-            ("rem".into(), convert_type::<OpRem> as FnInst),
-            ("band".into(), convert_type::<OpBand> as FnInst),
-            ("bor".into(), convert_type::<OpBor> as FnInst),
-            ("bxor".into(), convert_type::<OpBxor> as FnInst),
-            ("bshl".into(), convert_type::<OpBshl> as FnInst),
-            ("bshr".into(), convert_type::<OpBshr> as FnInst),
-            ("teq".into(), convert_type::<OpTeq> as FnInst),
-            ("tneq".into(), convert_type::<OpTneq> as FnInst),
-            ("tgt".into(), convert_type::<OpTgt> as FnInst),
-            ("tgeq".into(), convert_type::<OpTgeq> as FnInst),
-            ("tlt".into(), convert_type::<OpTlt> as FnInst),
-            ("tleq".into(), convert_type::<OpTleq> as FnInst),
+            ("noop".into(), (|a| Ok(Rc::new(OpNoop::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("reset".into(), (|a| Ok(Rc::new(OpReset::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("retint".into(), (|a| Ok(Rc::new(OpRetInt::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("ret".into(), (|a| Ok(Rc::new(OpRet::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("halt".into(), (|a| Ok(Rc::new(OpHalt::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("int".into(), (|a| Ok(Rc::new(OpInt::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("intr".into(), (|a| Ok(Rc::new(OpIntr::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("call".into(), (|a| Ok(Rc::new(OpCall::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("push".into(), (|a| Ok(Rc::new(OpPush::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("pop".into(), (|a| Ok(Rc::new(OpPop::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("popr".into(), (|a| Ok(Rc::new(OpPopr::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("jmp".into(), (|a| Ok(Rc::new(OpJmp::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("jmpr".into(), (|a| Ok(Rc::new(OpJmpr::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("jmpri".into(), (|a| Ok(Rc::new(OpJmpri::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("loadi".into(), (|a| Ok(Rc::new(OpLoadi::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("loadri".into(), (|a| Ok(Rc::new(OpLoadri::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("not".into(), (|a| Ok(Rc::new(OpNot::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("bool".into(), (|a| Ok(Rc::new(OpBool::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("tz".into(), (|a| Ok(Rc::new(OpTz::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("tnz".into(), (|a| Ok(Rc::new(OpTnz::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("copy".into(), (|a| Ok(Rc::new(OpCopy::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("save".into(), (|a| Ok(Rc::new(OpSave::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("saver".into(), (|a| Ok(Rc::new(OpSaver::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("load".into(), (|a| Ok(Rc::new(OpLoad::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("loadr".into(), (|a| Ok(Rc::new(OpLoadr::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("conv".into(), (|a| Ok(Rc::new(OpConv::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("add".into(), (|a| Ok(Rc::new(OpAdd::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("sub".into(), (|a| Ok(Rc::new(OpSub::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("mul".into(), (|a| Ok(Rc::new(OpMul::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("div".into(), (|a| Ok(Rc::new(OpDiv::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("rem".into(), (|a| Ok(Rc::new(OpRem::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("band".into(), (|a| Ok(Rc::new(OpBand::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("bor".into(), (|a| Ok(Rc::new(OpBor::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("bxor".into(), (|a| Ok(Rc::new(OpBxor::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("bshl".into(), (|a| Ok(Rc::new(OpBshl::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("bshr".into(), (|a| Ok(Rc::new(OpBshr::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("teq".into(), (|a| Ok(Rc::new(OpTeq::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("tneq".into(), (|a| Ok(Rc::new(OpTneq::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("tgt".into(), (|a| Ok(Rc::new(OpTgt::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("tgeq".into(), (|a| Ok(Rc::new(OpTgeq::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("tlt".into(), (|a| Ok(Rc::new(OpTlt::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
+            ("tleq".into(), (|a| Ok(Rc::new(OpTleq::try_from(a)?) as Rc::<dyn ToInstruction>)) as FnInst),
         ]);
 
         Self {
@@ -141,14 +121,13 @@ impl TokenList {
         let s = line.trim();
         let words = s.split_whitespace().collect::<Vec<_>>();
 
-        let first: &str = if let Some(w) = words.first() {
-            *w
+        let first: &str= if let Some(w) = words.first() {
+            w
         } else {
             return Err(AssemblerError::UnknownInstruction(s.to_string()));
         };
 
-        let tok = if first.starts_with('.') {
-            let op = &first[1..];
+        let tok = if let Some(op) = first.strip_prefix('.') {
             let args = &words[1..];
 
             if args.len() != 1 {
@@ -175,12 +154,12 @@ impl TokenList {
                 ),
                 _ => return Err(AssemblerError::UnknownInstruction(op.to_string())),
             }
-        } else if first.starts_with(':') {
+        } else if let Some(lbl) = first.strip_prefix(':') {
             if words.len() != 1 {
                 return Err(AssemblerError::ArgumentCountMismatch(words.len(), 1));
             }
 
-            Token::CreateLabel(first[1..].to_string())
+            Token::CreateLabel(lbl.to_string())
         } else if let Some(inst_fn) = self.inst.get(words[0]) {
             let args = &words[1..];
             let val = inst_fn(args.iter().map(|s| s.to_string()).collect())?;
@@ -257,6 +236,7 @@ impl TokenList {
     }
 }
 
+#[derive(Default)]
 pub struct ParserState {
     addr: u32,
     labels: HashMap<String, u32>,
@@ -266,12 +246,7 @@ pub struct ParserState {
 
 impl ParserState {
     pub fn new() -> Self {
-        Self {
-            addr: 0,
-            labels: HashMap::new(),
-            values: HashMap::new(),
-            loadloc_vals: HashMap::new(),
-        }
+        Self::default()
     }
 
     fn add_bytes(&mut self, vals: &[u8]) {
@@ -296,10 +271,9 @@ pub fn parse_text(txt: &str) -> Result<Vec<u8>, AssemblerErrorLoc> {
 pub fn parse_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
     let mut state = TokenList::new();
     for (i, l) in txt.iter().enumerate() {
-        match state.parse_line(l) {
-            Err(e) => return Err(AssemblerErrorLoc { err: e, loc: i + 1 }),
-            _ => (),
-        };
+        if let Err(e) = state.parse_line(l) {
+            return Err(AssemblerErrorLoc { err: e, loc: i + 1 });
+        }
     }
 
     match state.to_bytes() {

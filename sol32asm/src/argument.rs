@@ -23,7 +23,7 @@ pub struct ArgumentRegister {
 impl ArgumentRegister {
     const REGISTER_MASK: u8 = 0x1F;
 
-    pub fn to_byte(&self) -> u8 {
+    pub fn to_byte(self) -> u8 {
         (self.reg.get_index() as u8) & Self::REGISTER_MASK
     }
 }
@@ -62,7 +62,7 @@ impl ArgumentType {
     const DT_OFFSET: i32 = 5;
     const DT_MASK: u8 = 0xE0;
 
-    pub fn to_byte(&self) -> u8 {
+    pub fn to_byte(self) -> u8 {
         ((self.data_type.get_id() << Self::DT_OFFSET) & Self::DT_MASK) | self.reg.to_byte()
     }
 }
