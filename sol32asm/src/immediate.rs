@@ -1,3 +1,4 @@
+#[derive(Debug, Clone)]
 pub struct ImmediateError(pub String);
 
 macro_rules! gen_read_immediate {

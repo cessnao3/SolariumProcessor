@@ -2,6 +2,7 @@ use sol32::cpu::{Register, DataType};
 
 use crate::immediate::ImmediateError;
 
+#[derive(Debug, Clone)]
 pub enum ArgumentError {
     Immediate(ImmediateError),
     UnknownRegister(String),

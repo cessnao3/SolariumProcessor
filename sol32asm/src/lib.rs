@@ -2,9 +2,7 @@ mod argument;
 mod immediate;
 mod instruction;
 
-use std::{collections::HashMap, sync::Mutex};
-
-use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 use instruction::{
     OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall, OpConv, OpCopy, OpDiv, OpHalt,
@@ -22,6 +20,7 @@ use immediate::{
 enum AssemblerError {
     UnknownLabel(String),
     UnknownInstruction(String),
+    Instruction(InstructionError),
     ArgumentCountMismatch(usize, usize),
     ImmediateError(String),
     InvalidLabel(String),
@@ -29,6 +28,7 @@ enum AssemblerError {
     UnknownDataType(String),
 }
 
+/*
 static INSTRUCTIONS: Lazy<HashMap<i32, fn(&[&str]) -> Result<dyn ToInstruction, InstructionError>>> = Lazy::new(|| {
     Mutex::new(HashMap::from([
         ("noop", OpNoop::try_from),
@@ -75,10 +75,17 @@ static INSTRUCTIONS: Lazy<HashMap<i32, fn(&[&str]) -> Result<dyn ToInstruction, 
         ("tleq", Box::<dyn ToInstruction>::new(OpTleq)),
     ]))
 });
+*/
 
 impl From<ImmediateError> for AssemblerError {
     fn from(value: ImmediateError) -> Self {
         Self::ImmediateError(value.0)
+    }
+}
+
+impl From<InstructionError> for AssemblerError {
+    fn from(value: InstructionError) -> Self {
+        Self::Instruction(value)
     }
 }
 
@@ -87,6 +94,8 @@ struct AssemblerErrorLoc {
     err: AssemblerError,
     loc: usize,
 }
+
+type FnInst = fn(&[&str]) -> Result<Box<dyn ToInstruction>, InstructionError>;
 
 enum Token {
     ChangeAddress(u32),
@@ -110,11 +119,74 @@ impl Token {
     }
 }
 
-impl TryFrom<&str> for Token {
-    type Error = AssemblerError;
+struct ParserState {
+    tokens: Vec<Token>,
+    labels: HashMap<String, u32>,
+    current_loc: usize,
+    inst: HashMap<String, FnInst>,
+}
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let s = value.trim();
+impl ParserState {
+    pub fn new() -> Self {
+        fn convert_type<'a, T: ToInstruction + TryFrom<&'a [&'a str]>>(s: &[&str]) -> Result<Box<dyn ToInstruction>, T::Error> {
+            Ok(Box::new(T::try_from(s)?))
+        }
+
+        let inst = HashMap::from([
+            ("noop".into(), convert_type::<OpNoop> as FnInst),
+            ("reset".into(), convert_type::<OpReset> as FnInst),
+            ("retint".into(), convert_type::<OpRetInt> as FnInst),
+            ("ret".into(), convert_type::<OpRet> as FnInst),
+            ("halt".into(), convert_type::<OpHalt> as FnInst),
+            ("int".into(), convert_type::<OpInt> as FnInst),
+            ("intr".into(), convert_type::<OpIntr> as FnInst),
+            ("call".into(), convert_type::<OpCall> as FnInst),
+            ("push".into(), convert_type::<OpPush> as FnInst),
+            ("pop".into(), convert_type::<OpPop> as FnInst),
+            ("popr".into(), convert_type::<OpPopr> as FnInst),
+            ("jmp".into(), convert_type::<OpJmp> as FnInst),
+            ("jmpr".into(), convert_type::<OpJmpr> as FnInst),
+            ("jmpri".into(), convert_type::<OpJmpri> as FnInst),
+            ("loadi".into(), convert_type::<OpLoadi> as FnInst),
+            ("loadri".into(), convert_type::<OpLoadri> as FnInst),
+            ("not".into(), convert_type::<OpNot> as FnInst),
+            ("bool".into(), convert_type::<OpBool> as FnInst),
+            ("tz".into(), convert_type::<OpTz> as FnInst),
+            ("tnz".into(), convert_type::<OpTnz> as FnInst),
+            ("copy".into(), convert_type::<OpCopy> as FnInst),
+            ("save".into(), convert_type::<OpSave> as FnInst),
+            ("saver".into(), convert_type::<OpSaver> as FnInst),
+            ("load".into(), convert_type::<OpLoad> as FnInst),
+            ("loadr".into(), convert_type::<OpLoadr> as FnInst),
+            ("conv".into(), convert_type::<OpConv> as FnInst),
+            ("add".into(), convert_type::<OpAdd> as FnInst),
+            ("sub".into(), convert_type::<OpSub> as FnInst),
+            ("mul".into(), convert_type::<OpMul> as FnInst),
+            ("div".into(), convert_type::<OpDiv> as FnInst),
+            ("rem".into(), convert_type::<OpRem> as FnInst),
+            ("band".into(), convert_type::<OpBand> as FnInst),
+            ("bor".into(), convert_type::<OpBor> as FnInst),
+            ("bxor".into(), convert_type::<OpBxor> as FnInst),
+            ("bshl".into(), convert_type::<OpBshl> as FnInst),
+            ("bshr".into(), convert_type::<OpBshr> as FnInst),
+            ("teq".into(), convert_type::<OpTeq> as FnInst),
+            ("tneq".into(), convert_type::<OpTneq> as FnInst),
+            ("tgt".into(), convert_type::<OpTgt> as FnInst),
+            ("tgeq".into(), convert_type::<OpTgeq> as FnInst),
+            ("tlt".into(), convert_type::<OpTlt> as FnInst),
+            ("tleq".into(), convert_type::<OpTleq> as FnInst),
+        ]);
+
+        Self {
+            tokens: Vec::new(),
+            labels: HashMap::new(),
+            current_loc: 0,
+            inst,
+        }
+    }
+
+    fn parse_line(&mut self, line: &str) -> Result<(), AssemblerError> {
+        let s = line.trim();
         let words = s.split_whitespace().collect::<Vec<_>>();
 
         let first: &str = if let Some(w) = words.first() {
@@ -152,33 +224,21 @@ impl TryFrom<&str> for Token {
             }
         } else if first.starts_with(':') {
             if words.len() != 1 {
-                return Err(AssemblerError::ArgumentCountMismatch(s.to_string()));
+                return Err(AssemblerError::ArgumentCountMismatch(words.len(), 1));
             }
 
             Token::CreateLabel(first[1..].to_string())
+        } else if let Some(inst_fn) = self.inst.get(words[0]) {
+            let args = &words[1..];
+            let val = inst_fn(args)?;
+            Token::Operation(val)
         } else {
-            Token::Operation(Instruction::new(
-                &words.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
-            )?)
+            return Err(AssemblerError::UnknownInstruction(line.into()));
         };
 
-        Ok(tok)
-    }
-}
+        self.tokens.push(tok);
 
-struct ParserState {
-    tokens: Vec<Token>,
-    labels: HashMap<String, u32>,
-    current_loc: usize,
-}
-
-impl ParserState {
-    pub fn new() -> Self {
-        Self {
-            tokens: Vec::new(),
-            labels: HashMap::new(),
-            current_loc: 0,
-        }
+        Ok(())
     }
 }
 
@@ -187,7 +247,11 @@ pub fn parse_text(txt: &str) -> Result<Vec<u8>, AssemblerErrorLoc> {
 }
 
 pub fn parse_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
-    for (i, l) in txt.iter().enumerate() {}
+    for (i, l) in txt.iter().enumerate() {
+
+    }
 }
 
-pub fn assemble(txt: &[Token]) -> Result<Vec<u8>, AssemblerError> {}
+pub fn assemble(txt: &[Token]) -> Result<Vec<u8>, AssemblerError> {
+    Ok(Vec::new())
+}

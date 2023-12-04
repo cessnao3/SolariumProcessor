@@ -3,6 +3,7 @@ use sol32::cpu::{Processor, Opcode};
 
 const INST_SIZE: usize = 4;
 
+#[derive(Debug, Clone)]
 pub enum InstructionError {
     CountMismatch(usize, usize),
     Immediate(ImmediateError),
@@ -27,12 +28,16 @@ pub trait ToInstruction {
 
 macro_rules! InstNoArg {
     ($op_name:ident, $opcode:expr) => {
-        #[derive(Default)]
+        #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
         pub struct $op_name;
 
         impl $op_name {
             const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 0;
+
+            pub fn new() -> Self {
+                Self
+            }
         }
 
         impl ToInstruction for $op_name {
@@ -57,20 +62,34 @@ macro_rules! InstNoArg {
 
 macro_rules! InstSingleArg {
     ($op_name:ident, $opcode:expr) => {
-        #[derive(Default)]
-        pub struct $op_name;
+        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+        pub struct $op_name {
+            arg: ArgumentRegister,
+        }
 
         impl $op_name {
             const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 1;
+
+            pub fn new(arg: ArgumentRegister) -> Self {
+                Self { arg }
+            }
         }
 
         impl ToInstruction for $op_name {
-            fn to_instruction(&self, args: &[&str]) -> Result<[u8; INST_SIZE], InstructionError> {
+            fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE] {
+                [Self::OP.to_byte(), self.arg.to_byte(), 0, 0]
+            }
+        }
+
+        impl TryFrom<&[&str]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(args: &[&str]) -> Result<Self, Self::Error> {
                 if args.len() == Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
-                    Ok([Self::OP.to_byte(), ArgumentRegister::try_from(args[0])?.to_byte(), 0, 0])
+                    Ok(Self::new(ArgumentRegister::try_from(args[0])?))
                 }
             }
         }
@@ -79,22 +98,38 @@ macro_rules! InstSingleArg {
 
 macro_rules! InstSingleArgImm {
     ($op_name:ident, $opcode:expr) => {
-        #[derive(Default)]
-        pub struct $op_name;
+        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+        pub struct $op_name {
+            arg: ArgumentRegister,
+            val: u16,
+        }
 
         impl $op_name {
             const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 2;
+
+            pub fn new(arg: ArgumentRegister, val: u16) -> Self {
+                Self { arg, val }
+            }
         }
 
         impl ToInstruction for $op_name {
-            fn to_instruction(&self, args: &[&str]) -> Result<[u8; INST_SIZE], InstructionError> {
+            fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE] {
+                let imm = self.val.to_be_bytes();
+                [Self::OP.to_byte(), self.arg.to_byte(), imm[0], imm[1]]
+            }
+        }
+
+        impl TryFrom<&[&str]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(args: &[&str]) -> Result<Self, Self::Error> {
                 if args.len() == Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     let a0 = ArgumentRegister::try_from(args[0])?;
-                    let imm = (parse_imm_i16(args[1])? as u16).to_be_bytes();
-                    Ok([Self::OP.to_byte(), a0.to_byte(), imm[0], imm[1]])
+                    let imm = parse_imm_i16(args[1])? as u16;
+                    Ok(Self::new(a0, imm))
                 }
             }
         }
@@ -103,22 +138,37 @@ macro_rules! InstSingleArgImm {
 
 macro_rules! InstDoubleArg {
     ($op_name:ident, $opcode:expr) => {
-        #[derive(Default)]
-        pub struct $op_name;
+        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+        pub struct $op_name {
+            arg0: ArgumentRegister,
+            arg1: ArgumentRegister,
+        }
 
         impl $op_name {
             const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 2;
+
+            pub fn new(arg0: ArgumentRegister, arg1: ArgumentRegister) -> Self {
+                Self { arg0, arg1 }
+            }
         }
 
         impl ToInstruction for $op_name {
-            fn to_instruction(&self, args: &[&str]) -> Result<[u8; INST_SIZE], InstructionError> {
+            fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE] {
+                [Self::OP.to_byte(), self.arg0.to_byte(), self.arg1.to_byte(), 0]
+            }
+        }
+
+        impl TryFrom<&[&str]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(args: &[&str]) -> Result<Self, Self::Error> {
                 if args.len() == Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     let a0 = ArgumentRegister::try_from(args[0])?;
                     let a1= ArgumentRegister::try_from(args[1])?;
-                    Ok([Self::OP.to_byte(), a0.to_byte(), a1.to_byte(), 0])
+                    Ok(Self::new(a0, a1))
                 }
             }
         }
@@ -127,22 +177,37 @@ macro_rules! InstDoubleArg {
 
 macro_rules! InstDoubleArgType {
     ($op_name:ident, $opcode:expr) => {
-        #[derive(Default)]
-        pub struct $op_name;
+        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+        pub struct $op_name {
+            arg0: ArgumentType,
+            arg1: ArgumentRegister,
+        }
 
         impl $op_name {
             const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 2;
+
+            pub fn new(arg0: ArgumentType, arg1: ArgumentRegister) -> Self {
+                Self { arg0, arg1 }
+            }
         }
 
         impl ToInstruction for $op_name {
-            fn to_instruction(&self, args: &[&str]) -> Result<[u8; INST_SIZE], InstructionError> {
+            fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE] {
+                [Self::OP.to_byte(), self.arg0.to_byte(), self.arg1.to_byte(), 0]
+            }
+        }
+
+        impl TryFrom<&[&str]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(args: &[&str]) -> Result<Self, Self::Error> {
                 if args.len() == Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     let a0 = ArgumentType::try_from(args[0])?;
                     let a1= ArgumentRegister::try_from(args[1])?;
-                    Ok([Self::OP.to_byte(), a0.to_byte(), a1.to_byte(), 0])
+                    Ok(Self::new(a0, a1))
                 }
             }
         }
@@ -151,22 +216,37 @@ macro_rules! InstDoubleArgType {
 
 macro_rules! InstDoubleArgDoubleType {
     ($op_name:ident, $opcode:expr) => {
-        #[derive(Default)]
-        pub struct $op_name;
+        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+        pub struct $op_name {
+            arg0: ArgumentType,
+            arg1: ArgumentType,
+        }
 
         impl $op_name {
             const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 2;
+
+            pub fn new(arg0: ArgumentType, arg1: ArgumentType) -> Self {
+                Self { arg0, arg1 }
+            }
         }
 
         impl ToInstruction for $op_name {
-            fn to_instruction(&self, args: &[&str]) -> Result<[u8; INST_SIZE], InstructionError> {
+            fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE] {
+                [Self::OP.to_byte(), self.arg0.to_byte(), self.arg1.to_byte(), 0]
+            }
+        }
+
+        impl TryFrom<&[&str]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(args: &[&str]) -> Result<Self, Self::Error> {
                 if args.len() == Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     let a0 = ArgumentType::try_from(args[0])?;
                     let a1= ArgumentType::try_from(args[1])?;
-                    Ok([Self::OP.to_byte(), a0.to_byte(), a1.to_byte(), 0])
+                    Ok(Self::new(a0, a1))
                 }
             }
         }
@@ -175,23 +255,39 @@ macro_rules! InstDoubleArgDoubleType {
 
 macro_rules! InstArith {
     ($op_name:ident, $opcode:expr) => {
-        #[derive(Default)]
-        pub struct $op_name;
+        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+        pub struct $op_name {
+            arg0: ArgumentType,
+            arg1: ArgumentRegister,
+            arg2: ArgumentRegister,
+        }
 
         impl $op_name {
             const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 3;
+
+            pub fn new(arg0: ArgumentType, arg1: ArgumentRegister, arg2: ArgumentRegister) -> Self {
+                Self { arg0, arg1, arg2 }
+            }
         }
 
         impl ToInstruction for $op_name {
-            fn to_instruction(&self, args: &[&str]) -> Result<[u8; INST_SIZE], InstructionError> {
+            fn to_instruction(&self, args: &[&str]) -> [u8; INST_SIZE] {
+                [Self::OP.to_byte(), self.arg0.to_byte(), self.arg1.to_byte(), self.arg2.to_byte()]
+            }
+        }
+
+        impl TryFrom<&[&str]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(args: &[&str]) -> Result<Self, Self::Error> {
                 if args.len() == Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     let a0 = ArgumentType::try_from(args[0])?;
                     let a1 = ArgumentRegister::try_from(args[1])?;
                     let a2 = ArgumentRegister::try_from(args[2])?;
-                    Ok([Self::OP.to_byte(), a0.to_byte(), a1.to_byte(), a2.to_byte()])
+                    Ok(Self::new(a0, a1, a2))
                 }
             }
         }
