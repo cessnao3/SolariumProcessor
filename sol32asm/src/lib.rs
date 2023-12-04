@@ -1,6 +1,6 @@
 mod argument;
 mod immediate;
-mod instruction;
+pub mod instruction;
 
 use std::{collections::HashMap, rc::Rc};
 
