@@ -1,13 +1,8 @@
 use crate::messages::{ThreadToUi, UiToThread};
 use gtk::glib::Sender;
-use sproc::common::MemoryWord;
+use sol32::cpu::{Processor, ProcessorError};
 use std::sync::mpsc::{Receiver, RecvError, TryRecvError};
 
-use sproc::{
-    common::SolariumError, cpu::SolariumProcessor, devices::InterruptClockDevice,
-    devices::SerialInputOutputDevice, memory::MemorySegment, memory::ReadOnlySegment,
-    memory::ReadWriteSegment,
-};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -16,41 +11,41 @@ struct ThreadState {
     multiplier: f64,
     run_thread: bool,
     memory_request: (usize, usize),
-    cpu: SolariumProcessor,
+    cpu: Processor,
     serial_io_dev: Rc<RefCell<SerialInputOutputDevice>>,
-    last_code: Vec<MemoryWord>,
+    last_code: Vec<u8>,
 }
 
 impl ThreadState {
     const DEVICE_START_IND: usize = 0xA000;
 
-    fn new() -> Self {
+    fn new() -> Result<Self, ProcessorError> {
         let mut s = Self {
             run_thread: true,
             running: false,
             multiplier: 1.0,
-            cpu: SolariumProcessor::new(),
+            cpu: Processor::new(),
             serial_io_dev: Rc::new(RefCell::new(SerialInputOutputDevice::new(usize::MAX))),
             last_code: Vec::new(),
             memory_request: (0, 0),
         };
 
-        s.reset().unwrap();
-        s
+        s.reset()?;
+        Ok(s)
     }
 
-    fn reset(&mut self) -> Result<(), SolariumError> {
+    fn reset(&mut self) -> Result<(), ProcessorError> {
         const INIT_RO_LEN: usize = SolariumProcessor::INIT_DATA_SIZE;
 
-        self.cpu = SolariumProcessor::new();
+        self.cpu = Processor::new();
         self.serial_io_dev.borrow_mut().reset();
 
-        let reset_vec_data: Vec<MemoryWord> = (0..INIT_RO_LEN)
+        let reset_vec_data: Vec<u8> = (0..INIT_RO_LEN)
             .map(|i| {
                 if i < self.last_code.len() {
                     self.last_code[i]
                 } else {
-                    MemoryWord::default()
+                    0
                 }
             })
             .collect();
@@ -75,7 +70,7 @@ impl ThreadState {
         self.cpu
             .device_add(Rc::new(RefCell::new(InterruptClockDevice::new(1000, 0))))?;
 
-        self.cpu.hard_reset()?;
+        self.cpu.reset(sol32::cpu::ResetType::Hard)?;
 
         for (i, val) in self.last_code.iter().enumerate() {
             if i < INIT_RO_LEN {

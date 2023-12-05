@@ -23,10 +23,12 @@ impl Register {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum RegisterError {
     UnknownRegister(usize),
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct RegisterManager {
     registers: [u32; Self::REGISTER_COUNT],
 }

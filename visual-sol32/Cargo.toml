@@ -1,5 +1,5 @@
 [package]
-name = "visual-sproc"
+name = "visual-sol32"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,8 +7,8 @@ edition = "2021"
 
 [dependencies]
 gtk = { version = "0.7", package = "gtk4", features = ["v4_8"] }
-sproc = { path = "../sproc", version = "*" }
-sda = { path = "../sda", version = "*" }
+sol32 = { path = "../sol32", version = "*" }
+sol32asm = { path = "../sol32asm", version = "*" }
 #spcc = { path = "../spcc", version = "*" }
 
 [profile.release]

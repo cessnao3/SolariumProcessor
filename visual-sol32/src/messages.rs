@@ -1,5 +1,4 @@
-use sproc::common::MemoryWord;
-use sproc::cpu::SolariumProcessor;
+use sol32::cpu::RegisterManager;
 
 #[derive(Clone)]
 pub enum UiToThread {
@@ -8,7 +7,7 @@ pub enum UiToThread {
     CpuStop,
     CpuReset,
     CpuIrq(u8),
-    SetCode(Vec<MemoryWord>),
+    SetCode(Vec<u8>),
     SerialInput(String),
     RequestMemory(usize, usize),
     SetMultiplier(f64),
@@ -17,10 +16,10 @@ pub enum UiToThread {
 
 #[derive(Clone)]
 pub enum ThreadToUi {
-    ResponseMemory(usize, Vec<MemoryWord>),
+    ResponseMemory(usize, Vec<u8>),
     SerialOutput(String),
     LogMessage(String),
-    RegisterState([MemoryWord; SolariumProcessor::NUM_REGISTERS]),
+    RegisterState(RegisterManager),
     ProcessorReset,
     ThreadExit,
 }
