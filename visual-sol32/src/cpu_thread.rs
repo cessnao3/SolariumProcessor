@@ -1,6 +1,8 @@
 use crate::messages::{ThreadToUi, UiToThread};
 use gtk::glib::Sender;
 use sol32::cpu::{Processor, ProcessorError};
+use sol32::device::{InterruptClockDevice, SerialInputOutputDevice};
+use sol32::memory::{ReadWriteSegment, ReadOnlySegment, MemorySegment};
 use std::sync::mpsc::{Receiver, RecvError, TryRecvError};
 
 use std::cell::RefCell;
@@ -10,14 +12,14 @@ struct ThreadState {
     running: bool,
     multiplier: f64,
     run_thread: bool,
-    memory_request: (usize, usize),
+    memory_request: (u32, u32),
     cpu: Processor,
     serial_io_dev: Rc<RefCell<SerialInputOutputDevice>>,
     last_code: Vec<u8>,
 }
 
 impl ThreadState {
-    const DEVICE_START_IND: usize = 0xA000;
+    const DEVICE_START_IND: u32 = 0xA000;
 
     fn new() -> Result<Self, ProcessorError> {
         let mut s = Self {
@@ -35,21 +37,22 @@ impl ThreadState {
     }
 
     fn reset(&mut self) -> Result<(), ProcessorError> {
-        const INIT_RO_LEN: usize = SolariumProcessor::INIT_DATA_SIZE;
+        const INIT_RO_LEN: u32 = Processor::INIT_DATA_SIZE;
 
         self.cpu = Processor::new();
         self.serial_io_dev.borrow_mut().reset();
 
         let reset_vec_data: Vec<u8> = (0..INIT_RO_LEN)
             .map(|i| {
-                if i < self.last_code.len() {
-                    self.last_code[i]
+                let is = i as usize;
+                if is < self.last_code.len() {
+                    self.last_code[is]
                 } else {
                     0
                 }
             })
             .collect();
-        assert!(reset_vec_data.len() == INIT_RO_LEN);
+        assert!(reset_vec_data.len() == INIT_RO_LEN as usize);
 
         self.cpu.memory_add_segment(
             0,
@@ -59,7 +62,7 @@ impl ThreadState {
         self.cpu.memory_add_segment(
             INIT_RO_LEN,
             Rc::new(RefCell::new(ReadWriteSegment::new(
-                Self::DEVICE_START_IND - INIT_RO_LEN,
+                (Self::DEVICE_START_IND - INIT_RO_LEN) as usize
             ))),
         )?;
         self.cpu
@@ -73,11 +76,11 @@ impl ThreadState {
         self.cpu.reset(sol32::cpu::ResetType::Hard)?;
 
         for (i, val) in self.last_code.iter().enumerate() {
-            if i < INIT_RO_LEN {
+            if i < INIT_RO_LEN as usize {
                 continue;
             }
 
-            self.cpu.memory_set(i, *val)?;
+            self.cpu.memory_set(i as u32, *val)?;
         }
 
         Ok(())
@@ -87,7 +90,7 @@ impl ThreadState {
         fn inner_handler(
             state: &mut ThreadState,
             msg: UiToThread,
-        ) -> Result<Option<ThreadToUi>, SolariumError> {
+        ) -> Result<Option<ThreadToUi>, ProcessorError> {
             match msg {
                 UiToThread::CpuStep => state.cpu.step()?,
                 UiToThread::CpuStart => state.running = true,
@@ -98,7 +101,7 @@ impl ThreadState {
                     return Ok(Some(ThreadToUi::ProcessorReset));
                 },
                 UiToThread::CpuIrq(irq) => {
-                    if !state.cpu.hardware_interrupt(irq as usize)? {
+                    if !state.cpu.hardware_interrupt(irq as u32)? {
                         return Ok(Some(ThreadToUi::LogMessage(format!(
                             "irq {irq} not triggered"
                         ))));
@@ -114,7 +117,7 @@ impl ThreadState {
                 }
                 UiToThread::SerialInput(s) => {
                     for c in s.chars().chain(['\n'; 1]) {
-                        match sproc::text::character_to_word(c) {
+                        match sol32::text::character_to_word(c) {
                             Ok(word) => {
                                 if !state.serial_io_dev.borrow_mut().push_input(word) {
                                     return Ok(Some(ThreadToUi::LogMessage(
@@ -140,7 +143,7 @@ impl ThreadState {
 }
 
 pub fn cpu_thread(rx: Receiver<UiToThread>, tx: Sender<ThreadToUi>) {
-    let mut state = ThreadState::new();
+    let mut state = ThreadState::new().unwrap();
 
     const THREAD_LOOP_MS: u64 = 50;
     //const THREAD_LOOP_HZ: u64 = 1000 / THREAD_LOOP_MS;
@@ -174,7 +177,7 @@ pub fn cpu_thread(rx: Receiver<UiToThread>, tx: Sender<ThreadToUi>) {
         // Check for serial output
         let mut char_vec = Vec::new();
         while let Some(w) = state.serial_io_dev.borrow_mut().pop_output() {
-            let c = match sproc::text::word_to_character(w) {
+            let c = match sol32::text::word_to_character(w) {
                 Ok(v) => v,
                 Err(e) => {
                     tx.send(ThreadToUi::LogMessage(format!("{e}"))).unwrap();

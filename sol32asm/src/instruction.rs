@@ -1,3 +1,4 @@
+use core::fmt;
 use std::fmt::Debug;
 
 use crate::{
@@ -13,6 +14,16 @@ pub enum InstructionError {
     CountMismatch(usize, usize),
     Immediate(ImmediateError),
     Argument(ArgumentError),
+}
+
+impl fmt::Display for InstructionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CountMismatch(num, expected) => write!(f, "Found {num}, Expected {expected}"),
+            Self::Immediate(i) => write!(f, "Immediate Error => {i}"),
+            Self::Argument(a) => write!(f, "Argument Error => {a}"),
+        }
+    }
 }
 
 impl From<ImmediateError> for InstructionError {

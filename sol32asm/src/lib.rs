@@ -2,6 +2,7 @@ mod argument;
 mod immediate;
 pub mod instruction;
 
+use core::fmt;
 use std::{collections::HashMap, rc::Rc};
 
 use instruction::{
@@ -28,6 +29,21 @@ pub enum AssemblerError {
     UnknownDataType(String),
 }
 
+impl fmt::Display for AssemblerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnknownLabel(l) => write!(f, "Unknown Label {l}"),
+            Self::UnknownInstruction(i) => write!(f, "Unknown Instruction {i}"),
+            Self::ArgumentCountMismatch(num, expected) => write!(f, "Argument Count Expected {expected}, found {num}"),
+            Self::ImmediateError(e) => write!(f, "Immediate Error {e}"),
+            Self::InvalidLabel(l) => write!(f, "Invalid Label {l}"),
+            Self::UnknownRegister(r) => write!(f, "Unknown Register {r}"),
+            Self::UnknownDataType(d) => write!(f, "Unknown Data Type {d}"),
+            Self::Instruction(i) => write!(f, "Instruction Error => {i}"),
+        }
+    }
+}
+
 impl From<ImmediateError> for AssemblerError {
     fn from(value: ImmediateError) -> Self {
         Self::ImmediateError(value.0)
@@ -44,6 +60,12 @@ impl From<InstructionError> for AssemblerError {
 pub struct AssemblerErrorLoc {
     pub err: AssemblerError,
     pub loc: usize,
+}
+
+impl fmt::Display for AssemblerErrorLoc {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Line {} - {}", self.loc, self.err)
+    }
 }
 
 type FnInst = fn(Vec<String>) -> Result<Rc<dyn ToInstruction>, InstructionError>;

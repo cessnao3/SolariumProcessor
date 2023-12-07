@@ -1,3 +1,5 @@
+use core::fmt;
+
 pub struct OperationValue {
     pub val: u32,
     pub carry: bool,
@@ -12,9 +14,19 @@ impl From<(u32, bool)> for OperationValue {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperationError {
     DivideByZero,
     UnuspportedOperation,
+}
+
+impl fmt::Display for OperationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DivideByZero => write!(f, "Divide By Zero"),
+            Self::UnuspportedOperation => write!(f, "Unsupported Operation"),
+        }
+    }
 }
 
 pub trait ArithmeticOperations {

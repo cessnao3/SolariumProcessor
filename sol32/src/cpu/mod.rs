@@ -2,8 +2,13 @@ mod instruction;
 mod operations;
 mod register;
 
+use core::fmt;
+use std::cell::RefCell;
+use std::rc::Rc;
+
 pub use crate::cpu::instruction::DataType;
-use crate::memory::{MemoryError, MemoryMap};
+use crate::device::{DeviceAction, ProcessorDevice};
+use crate::memory::{MemoryError, MemoryMap, MemorySegment};
 
 use self::instruction::{DataTypeError, Instruction};
 use self::operations::{
@@ -14,15 +19,31 @@ use self::operations::{
 
 pub use self::register::{Register, RegisterError, RegisterManager};
 
+#[derive(Debug, Clone)]
 pub enum ProcessorError {
     Memory(MemoryError),
-    UnsupportedInterrupt(usize),
+    UnsupportedInterrupt(u32),
     Register(RegisterError),
     UnknownInstruction(Instruction),
     Operation(OperationError),
     StackUnderflow,
     DataType(DataTypeError),
     OpcodeAlignment(u32),
+}
+
+impl fmt::Display for ProcessorError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Memory(m) => write!(f, "Memory Error => {m}"),
+            Self::DataType(dt) => write!(f, "Data Type Error => {dt}"),
+            Self::UnsupportedInterrupt(i) => write!(f, "Unsupported Interrupt => {i}"),
+            Self::Register(r) => write!(f, "Register Error => {r}"),
+            Self::UnknownInstruction(i) => write!(f, "Unknown Instruction => {i}"),
+            Self::Operation(o) => write!(f, "Operation Error => {o}"),
+            Self::StackUnderflow => write!(f, "Stack Underflow"),
+            Self::OpcodeAlignment(o) => write!(f, "Opcode Alignment Error => {o}"),
+        }
+    }
 }
 
 impl From<MemoryError> for ProcessorError {
@@ -78,6 +99,7 @@ impl From<u8> for Opcode {
 
 pub struct Processor {
     memory: MemoryMap,
+    devices: Vec<Rc<RefCell<dyn ProcessorDevice>>>,
     registers: RegisterManager,
     op_f32: FloatOperations,
     op_u8: IntegerU8Operations,
@@ -89,8 +111,10 @@ pub struct Processor {
 }
 
 impl Processor {
-    pub const HARD_RESET_VECTOR: usize = 0;
-    pub const SOFT_RESET_VECTOR: usize = 1;
+    pub const INIT_DATA_SIZE: u32 = 0x1000;
+
+    pub const HARD_RESET_VECTOR: u32 = 0;
+    pub const SOFT_RESET_VECTOR: u32 = 1;
 
     const OP_BASE_CPU: u8 = 0;
     pub const OP_NOOP: Opcode = Opcode {
@@ -275,6 +299,7 @@ impl Processor {
     pub fn new() -> Self {
         Self {
             memory: MemoryMap::default(),
+            devices: Vec::new(),
             registers: RegisterManager::default(),
             op_f32: FloatOperations,
             op_u8: IntegerU8Operations,
@@ -305,8 +330,35 @@ impl Processor {
         Ok(())
     }
 
-    pub fn trigger_interrupt(&mut self, interrupt_num: usize) -> Result<(), ProcessorError> {
+    pub fn get_register_state(&self) -> RegisterManager {
+        self.registers
+    }
+
+    pub fn hardware_interrupt(&mut self, interrupt_num: u32) -> Result<bool, ProcessorError> {
         Err(ProcessorError::UnsupportedInterrupt(interrupt_num))
+    }
+
+    pub fn software_interrupt(&mut self, interrupt_num: u32) -> Result<(), ProcessorError> {
+        Err(ProcessorError::UnsupportedInterrupt(interrupt_num))
+    }
+
+    pub fn memory_set(&mut self, address: u32, val: u8) -> Result<(), ProcessorError> {
+        self.memory.set_u8(address, val)?;
+        Ok(())
+    }
+
+    pub fn memory_inspect(&self, address: u32) -> Result<u8, ProcessorError> {
+        Ok(self.memory.inspect(address)?)
+    }
+
+    pub fn memory_add_segment(&mut self, address: u32, seg: Rc<RefCell<dyn MemorySegment>>) -> Result<(), ProcessorError> {
+        self.memory.add_segment(address, seg)?;
+        Ok(())
+    }
+
+    pub fn device_add(&mut self, seg: Rc<RefCell<dyn ProcessorDevice>>) -> Result<(), ProcessorError> {
+        self.devices.push(seg);
+        Ok(())
     }
 
     fn get_arith_operation(
@@ -377,9 +429,9 @@ impl Processor {
         match opcode {
             Self::OP_NOOP => (),
             Self::OP_RESET => self.reset(ResetType::Soft)?,
-            Self::OP_INTERRUPT => self.trigger_interrupt(inst.arg0() as usize)?,
+            Self::OP_INTERRUPT => self.software_interrupt(inst.arg0() as u32)?,
             Self::OP_INTERRUPT_REGISTER => {
-                self.trigger_interrupt(self.registers.get(inst.arg0_register())? as usize)?
+                self.software_interrupt(self.registers.get(inst.arg0_register())?)?
             }
             Self::OP_CALL => {
                 for i in 0..RegisterManager::REGISTER_COUNT {
@@ -677,6 +729,25 @@ impl Processor {
             _ => return Err(ProcessorError::UnknownInstruction(inst)),
         };
 
+        // Define an action queue
+        let mut dev_action_queue: Vec<DeviceAction> = Vec::new();
+
+        // Check for any actions
+        for dev in self.devices.iter() {
+            if let Some(action) = dev.borrow_mut().on_step() {
+                dev_action_queue.push(action);
+            }
+        }
+
+        // Perform requested actions
+        for action in dev_action_queue {
+            match action {
+                DeviceAction::CallInterrupt(num) => {
+                    self.hardware_interrupt(num)?;
+                }
+            }
+        }
+
         self.registers
             .set(Register::ProgramCounter, inst_jump * 4)?;
 
@@ -703,9 +774,9 @@ impl Processor {
         Ok(self.memory.get_u32(sp_curr)?)
     }
 
-    pub fn get_reset_vector(&self, index: usize) -> Result<u32, ProcessorError> {
+    pub fn get_reset_vector(&self, index: u32) -> Result<u32, ProcessorError> {
         if index < 64 {
-            Ok(index as u32 * 4)
+            Ok(index * 4)
         } else {
             Err(ProcessorError::UnsupportedInterrupt(index))
         }

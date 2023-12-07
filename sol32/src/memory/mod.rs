@@ -2,13 +2,17 @@ mod memory_map;
 mod segment_ro;
 mod segment_rw;
 
+use core::fmt;
+
 pub use memory_map::MemoryMap;
 pub use segment_ro::ReadOnlySegment;
 pub use segment_rw::ReadWriteSegment;
 
 /// Provides error conditions for memory segment parameters
+#[derive(Debug, Clone, Copy)]
 pub enum MemoryError {
     InvalidMemoryAccess(u32),
+    InvalidMemoryWrite(u32, u8),
     ReadOnlyMemory(u32),
     OverlappingSegment(u32),
     EmptySegment(u32),
@@ -16,9 +20,24 @@ pub enum MemoryError {
     IndexBounds(usize),
 }
 
+impl fmt::Display for MemoryError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidMemoryAccess(loc) => write!(f, "Invalid Memory Access {loc}"),
+            Self::InvalidMemoryWrite(loc, data) => write!(f, "Invalid Memory Access {loc}[{data}]"),
+            Self::ReadOnlyMemory(loc) => write!(f, "Read Only Memory {loc}"),
+            Self::OverlappingSegment(loc) => write!(f, "Overlapping Segment at {loc}"),
+            Self::EmptySegment(loc) => write!(f, "Empty Segment {loc}"),
+            Self::InvalidAddress(loc) => write!(f, "Invalid Address {loc}"),
+            Self::IndexBounds(loc) => write!(f, "Index Bounds {loc}"),
+        }
+    }
+}
+
 pub enum MemorySegmentError {
     InvalidMemoryAccess(u32),
     ReadOnlyMemory(u32),
+    InvalidMemoryWrite(u32, u8),
 }
 
 pub trait MemorySegment {

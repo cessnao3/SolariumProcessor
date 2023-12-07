@@ -1,10 +1,10 @@
 use super::{MemoryError, MemorySegment, MemorySegmentError};
 
-use std::{cell::RefCell, mem::size_of};
+use std::{cell::RefCell, mem::size_of, rc::Rc};
 
 struct SegmentData {
     base: u32,
-    seg: Box<RefCell<dyn MemorySegment>>,
+    seg: Rc<RefCell<dyn MemorySegment>>,
 }
 
 impl SegmentData {
@@ -27,6 +27,9 @@ fn segment_to_memory<T>(
         }
         Err(MemorySegmentError::ReadOnlyMemory(offset)) => {
             Err(MemoryError::ReadOnlyMemory(seg.base + offset))
+        }
+        Err(MemorySegmentError::InvalidMemoryWrite(offset, data)) => {
+            Err(MemoryError::InvalidMemoryWrite(seg.base + offset, data))
         }
         Ok(v) => Ok(v),
     }
@@ -65,7 +68,7 @@ impl MemoryMap {
     pub fn add_segment(
         &mut self,
         base: u32,
-        seg: Box<RefCell<dyn MemorySegment>>,
+        seg: Rc<RefCell<dyn MemorySegment>>,
     ) -> Result<(), MemoryError> {
         let new_seg = SegmentData { base, seg };
 
@@ -93,6 +96,11 @@ impl MemoryMap {
     pub fn get_u8(&self, address: u32) -> Result<u8, MemoryError> {
         let data = self.get_segment(address)?;
         segment_to_memory(data, data.seg.borrow().get(address))
+    }
+
+    pub fn inspect(&self, address: u32) -> Result<u8, MemoryError> {
+        let data = self.get_segment(address)?;
+        segment_to_memory(data, data.seg.borrow().inspect(address))
     }
 
     pub fn set_u8(&mut self, address: u32, val: u8) -> Result<(), MemoryError> {

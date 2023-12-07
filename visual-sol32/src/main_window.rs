@@ -39,8 +39,8 @@ pub fn build_ui(app: &Application) {
                 buffer_serial.set_text("");
             }
             ThreadToUi::RegisterState(regs) => {
-                for (i, r) in regs.iter().enumerate() {
-                    register_fields[i].set_text(&format!("0x{:04x}", r.get()));
+                for (i, r) in regs.registers.iter().enumerate() {
+                    register_fields[i].set_text(&format!("0x{:04x}", r));
                 }
             }
             ThreadToUi::LogMessage(msg) => {
@@ -51,12 +51,12 @@ pub fn build_ui(app: &Application) {
             }
             ThreadToUi::ResponseMemory(base, vals) => {
                 for (i, l) in memory_vals.labels.iter().enumerate() {
-                    l.set_text(&format!("L{:04x}", base + 4 * i));
+                    l.set_text(&format!("L{:04x}", base + 4 * i as u32));
                 }
 
                 for (i, m) in memory_vals.locations.iter().enumerate() {
                     if i < vals.len() {
-                        m.set_text(&format!("{:04x}", vals[i].get()));
+                        m.set_text(&format!("{:04x}", vals[i]));
                     } else {
                         m.set_text("");
                     }
@@ -127,7 +127,7 @@ fn build_code_column(
         if is_assembly {
             btn_build.connect_clicked(clone!(@strong tx_thread, @strong tx_ui => move |_| {
                 let asm = buffer_assembly_code.text(&buffer_assembly_code.start_iter(), &buffer_assembly_code.end_iter(), false);
-                match sda::assemble_text(asm.as_str()) {
+                match sol32asm::parse_text(asm.as_str()) {
                     Ok(v) => {
                         tx_ui.send(UiToThread::SetCode(v)).unwrap();
                         tx_thread.send(ThreadToUi::LogMessage(format!("{short_name} Successful"))).unwrap();
@@ -351,9 +351,9 @@ fn build_serial_column(
         }
     }
 
-    let memory_count = memory.locations.len();
+    let memory_count = memory.locations.len() as u32;
     memory_base_entry.connect_activate(clone!(@strong tx_ui, @strong tx_thread => move |t| {
-        match usize::from_str_radix(&t.text(), 16) {
+        match u32::from_str_radix(&t.text(), 16) {
             Ok(v) => tx_ui.send(UiToThread::RequestMemory(v, memory_count)).unwrap(),
             Err(_) => {
                 tx_thread.send(ThreadToUi::LogMessage(format!("Unable to set '{}' as base in hex", t.text()))).unwrap();

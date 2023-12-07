@@ -9,14 +9,14 @@ pub enum UiToThread {
     CpuIrq(u8),
     SetCode(Vec<u8>),
     SerialInput(String),
-    RequestMemory(usize, usize),
+    RequestMemory(u32, u32),
     SetMultiplier(f64),
     Exit,
 }
 
 #[derive(Clone)]
 pub enum ThreadToUi {
-    ResponseMemory(usize, Vec<u8>),
+    ResponseMemory(u32, Vec<u8>),
     SerialOutput(String),
     LogMessage(String),
     RegisterState(RegisterManager),

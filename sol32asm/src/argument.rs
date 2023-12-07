@@ -1,3 +1,5 @@
+use core::fmt;
+
 use sol32::cpu::{DataType, Register};
 
 use crate::immediate::ImmediateError;
@@ -7,6 +9,16 @@ pub enum ArgumentError {
     Immediate(ImmediateError),
     UnknownRegister(String),
     UnknownDataType(String),
+}
+
+impl fmt::Display for ArgumentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Immediate(i) => write!(f, "Immediate Error => {i}"),
+            Self::UnknownRegister(r) => write!(f, "Unknown Register {r}"),
+            Self::UnknownDataType(d) => write!(f, "Unknown Data Type {d}"),
+        }
+    }
 }
 
 impl From<ImmediateError> for ArgumentError {

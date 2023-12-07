@@ -1,3 +1,5 @@
+use core::fmt;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Register {
     ProgramCounter,
@@ -28,9 +30,17 @@ pub enum RegisterError {
     UnknownRegister(usize),
 }
 
+impl fmt::Display for RegisterError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnknownRegister(r) => write!(f, "Unknown Register {r}")
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct RegisterManager {
-    registers: [u32; Self::REGISTER_COUNT],
+    pub registers: [u32; Self::REGISTER_COUNT],
 }
 
 impl RegisterManager {

@@ -1,3 +1,5 @@
+use core::fmt;
+
 use super::register::Register;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -37,7 +39,14 @@ impl DataType {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DataTypeError(u8);
+
+impl fmt::Display for DataTypeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Data Type Error {}", self.0)
+    }
+}
 
 impl TryFrom<u8> for DataType {
     type Error = DataTypeError;
@@ -65,6 +74,12 @@ impl TryFrom<u8> for DataType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Instruction {
     data: [u8; 4],
+}
+
+impl fmt::Display for Instruction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{:02x}, {:02x}, {:02x}, {:02x}]", self.data[0], self.data[1], self.data[2], self.data[3])
+    }
 }
 
 impl Instruction {

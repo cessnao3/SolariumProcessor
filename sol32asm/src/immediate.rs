@@ -1,5 +1,13 @@
+use core::fmt;
+
 #[derive(Debug, Clone)]
 pub struct ImmediateError(pub String);
+
+impl fmt::Display for ImmediateError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Immediate Error => {}", self.0)
+    }
+}
 
 macro_rules! gen_read_immediate {
     ($fnname:ident, $t:ident) => {
