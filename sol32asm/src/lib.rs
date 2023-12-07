@@ -1,11 +1,11 @@
 mod argument;
 mod immediate;
-pub mod instruction;
+pub mod instructions;
 
 use core::fmt;
 use std::{collections::HashMap, rc::Rc};
 
-use instruction::{
+use instructions::{
     InstructionError, OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall, OpConv, OpCopy,
     OpDiv, OpHalt, OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLoad, OpLoadi, OpLoadr, OpLoadri,
     OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt, OpSave, OpSaver,

@@ -191,21 +191,25 @@ impl Processor {
         base: Self::OP_BASE_MEM,
         code: 3,
     };
-    pub const OP_SAVE: Opcode = Opcode {
+    pub const OP_LOAD_NEXT: Opcode = Opcode {
         base: Self::OP_BASE_MEM,
         code: 4,
     };
-    pub const OP_SAVE_REL: Opcode = Opcode {
+    pub const OP_SAVE: Opcode = Opcode {
         base: Self::OP_BASE_MEM,
         code: 5,
     };
-    pub const OP_COPY: Opcode = Opcode {
+    pub const OP_SAVE_REL: Opcode = Opcode {
         base: Self::OP_BASE_MEM,
         code: 6,
     };
-    pub const OP_CONV: Opcode = Opcode {
+    pub const OP_COPY: Opcode = Opcode {
         base: Self::OP_BASE_MEM,
         code: 7,
+    };
+    pub const OP_CONV: Opcode = Opcode {
+        base: Self::OP_BASE_MEM,
+        code: 8,
     };
 
     const OP_BASE_TEST: u8 = 2;
@@ -507,6 +511,18 @@ impl Processor {
 
                 inst_jump = if is_true { 1 } else { 2 };
             }
+            Self::OP_LOAD_IMM => {
+                let dt = inst.arg0_data_type()?;
+                match dt {
+                    DataType::I16 => self
+                        .registers
+                        .set(inst.arg0_register(), inst.imm_signed() as u32)?,
+                    DataType::U16 => self
+                        .registers
+                        .set(inst.arg0_register(), inst.imm_unsigned())?,
+                    _ => return Err(ProcessorError::UnknownInstruction(inst)),
+                }
+            }
             Self::OP_LOAD | Self::OP_LOAD_REL | Self::OP_LOAD_IMM_REL => {
                 let dt = inst.arg0_data_type()?;
                 let addr = match opcode {
@@ -546,6 +562,11 @@ impl Processor {
                         _ => return Err(ProcessorError::UnknownInstruction(inst)),
                     }
                 }
+            }
+            Self::OP_LOAD_NEXT => {
+                let val = self.memory.get_u32(pc + 4)?;
+                self.registers.set(inst.arg0_register(), val)?;
+                inst_jump = 2;
             }
             Self::OP_SAVE | Self::OP_SAVE_REL => {
                 let dt = inst.arg0_data_type()?;
@@ -647,18 +668,6 @@ impl Processor {
                 };
 
                 self.registers.set(inst.arg0_register(), v_dest)?;
-            }
-            Self::OP_LOAD_IMM => {
-                let dt = inst.arg0_data_type()?;
-                match dt {
-                    DataType::I16 => self
-                        .registers
-                        .set(inst.arg0_register(), inst.imm_signed() as u32)?,
-                    DataType::U16 => self
-                        .registers
-                        .set(inst.arg0_register(), inst.imm_unsigned())?,
-                    _ => return Err(ProcessorError::UnknownInstruction(inst)),
-                }
             }
             Opcode {
                 base: Self::OP_BASE_MATH,

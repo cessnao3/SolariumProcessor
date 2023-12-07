@@ -11,6 +11,6 @@ pub fn compile(s: &str) -> Result<Vec<u16>, String> {
     Err("compiling not yet fully supported".into())
 }
 
-pub fn assemble(_s: &str) -> Result<Vec<sda::AssemblerCommand>, String> {
+pub fn assemble(_s: &str) -> Result<Vec<sol32asm::AssemblerCommand>, String> {
     Err("compiling to assembly not yet fully supported".into())
 }

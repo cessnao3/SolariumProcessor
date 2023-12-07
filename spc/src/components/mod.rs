@@ -1,9 +1,8 @@
-use sda::{
-    instructions::{Add, Ld, Ldn},
+use sol32asm::{
+    instruction::{Add, Ld, Ldn},
     AssemblerCommand,
 };
-use sproc::common::MemoryWord;
-use sproc::cpu::Register;
+use sol32::cpu::Register;
 use std::collections::HashMap;
 
 use super::types::{SpType, SpTypeDict};
