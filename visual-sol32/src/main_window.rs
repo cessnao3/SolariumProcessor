@@ -4,6 +4,7 @@ use crate::messages::{ThreadToUi, UiToThread};
 use gtk::glib::clone;
 use gtk::{glib, prelude::*};
 use gtk::{Application, ApplicationWindow};
+use sol32::cpu::RegisterManager;
 
 pub fn build_ui(app: &Application) {
     // Create the tx/rx for the secondary thread
@@ -40,7 +41,7 @@ pub fn build_ui(app: &Application) {
             }
             ThreadToUi::RegisterState(regs) => {
                 for (i, r) in regs.registers.iter().enumerate() {
-                    register_fields[i].set_text(&format!("0x{:04x}", r));
+                    register_fields[i].set_text(&format!("0x{:08x}", r));
                 }
             }
             ThreadToUi::LogMessage(msg) => {
@@ -51,12 +52,12 @@ pub fn build_ui(app: &Application) {
             }
             ThreadToUi::ResponseMemory(base, vals) => {
                 for (i, l) in memory_vals.labels.iter().enumerate() {
-                    l.set_text(&format!("L{:04x}", base + 4 * i as u32));
+                    l.set_text(&format!("L{:08x}", base + 4 * i as u32));
                 }
 
                 for (i, m) in memory_vals.locations.iter().enumerate() {
                     if i < vals.len() {
-                        m.set_text(&format!("{:04x}", vals[i]));
+                        m.set_text(&format!("{:02x}", vals[i]));
                     } else {
                         m.set_text("");
                     }
@@ -238,8 +239,8 @@ fn build_cpu_column(
     register_box.append(&register_box_b);
 
     let mut register_fields = Vec::new();
-    for i in 0..16 {
-        let target_box = if i < 8 {
+    for i in 0..RegisterManager::REGISTER_COUNT {
+        let target_box = if i < RegisterManager::REGISTER_COUNT / 2 {
             register_box_a.clone()
         } else {
             register_box_b.clone()
@@ -335,16 +336,21 @@ fn build_serial_column(
     let memory_grid = gtk::Grid::builder()
         .hexpand(true)
         .row_spacing(4)
-        .column_homogeneous(true)
+        .column_spacing(6)
         .build();
-    for i in 0..6 {
-        let label = gtk::Label::builder().label(format!("R{i}")).build();
+
+    const NUM_ROWS: i32 = 6;
+    const NUM_COLS: i32 = 8;
+
+    for i in 0..NUM_ROWS {
+        let label = gtk::Label::builder().label(format!("L{i}")).build();
         memory_grid.attach(&label, 0, i, 1, 1);
         memory.labels.push(label);
 
-        for j in 0..4 {
+        for j in 0..NUM_COLS {
             let mem_lbl = gtk::Label::builder()
-                .label(format!("0x{:04x}", i * 4 + j))
+                .label(format!("{:02x}", i * NUM_COLS + j))
+                .hexpand(true)
                 .build();
             memory_grid.attach(&mem_lbl, 1 + j, i, 1, 1);
             memory.locations.push(mem_lbl);

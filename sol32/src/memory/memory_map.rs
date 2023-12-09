@@ -81,9 +81,9 @@ impl MemoryMap {
 
         for sd in self.segments.iter() {
             if new_seg.within(sd.base)
-                || new_seg.within(sd.top())
+                || new_seg.within(sd.top() - 1)
                 || sd.within(new_seg.base)
-                || sd.within(new_seg.top())
+                || sd.within(new_seg.top() - 1)
             {
                 return Err(MemoryError::OverlappingSegment(base));
             }
