@@ -39,6 +39,23 @@ impl fmt::Display for RegisterError {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum RegisterFlag {
+    InterruptEnable,
+}
+
+impl RegisterFlag {
+    pub fn get_bit(&self) -> i32 {
+        match self {
+            Self::InterruptEnable => 0,
+        }
+    }
+
+    pub fn get_mask(&self) -> u32 {
+        1 << self.get_bit()
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct RegisterManager {
     pub registers: [u32; Self::REGISTER_COUNT],
 }
@@ -67,6 +84,22 @@ impl RegisterManager {
 
     pub fn reset(&mut self) {
         self.registers.fill(0);
+    }
+
+    pub fn get_flag(&self, flag: RegisterFlag) -> Result<bool, RegisterError> {
+        let val = self.get(Register::Status)?;
+        Ok((val & flag.get_mask()) != 0)
+    }
+
+    pub fn set_flag(&mut self, flag: RegisterFlag, value: bool) -> Result<(), RegisterError> {
+        let status = self.get(Register::Status)?;
+        let new_status = if value {
+            status | flag.get_mask()
+        } else {
+            status & !flag.get_mask()
+        };
+        self.set(Register::Status, new_status)?;
+        Ok(())
     }
 }
 

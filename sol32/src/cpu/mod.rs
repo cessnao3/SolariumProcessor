@@ -17,6 +17,7 @@ use self::operations::{
     IntegerU8Operations, OperationError, RelationalOperations,
 };
 
+use self::register::RegisterFlag;
 pub use self::register::{Register, RegisterError, RegisterManager};
 
 #[derive(Debug, Clone)]
@@ -112,9 +113,14 @@ pub struct Processor {
 
 impl Processor {
     pub const INIT_DATA_SIZE: u32 = 0x1000;
+    pub const BYTES_PER_ADDRESS: u32 = std::mem::size_of::<u32>() as u32;
 
     pub const HARD_RESET_VECTOR: u32 = 0;
     pub const SOFT_RESET_VECTOR: u32 = 1;
+
+    pub const NUM_INTERRUPT: u32 = 32;
+    pub const BASE_HW_INT_ADDR: u32 = 0x100;
+    pub const BASE_SW_INT_ADDR: u32 = Self::BYTES_PER_ADDRESS * Self::NUM_INTERRUPT;
 
     const OP_BASE_CPU: u8 = 0;
     pub const OP_NOOP: Opcode = Opcode {
@@ -256,6 +262,16 @@ impl Processor {
         code: 3,
     };
 
+    const OP_BASE_STATUS_FLAGS: u8 = 4;
+    pub const OP_INTON: Opcode = Opcode {
+        base: Self::OP_BASE_STATUS_FLAGS,
+        code: 0,
+    };
+    pub const OP_INTOFF: Opcode = Opcode {
+        base: Self::OP_BASE_STATUS_FLAGS,
+        code: 1,
+    };
+
     const OP_BASE_MATH: u8 = 10;
     pub const OP_ADD: Opcode = Opcode {
         base: Self::OP_BASE_MATH,
@@ -330,6 +346,7 @@ impl Processor {
             Register::ProgramCounter,
             self.memory.get_u32(self.get_reset_vector(reset_vec)?)?,
         )?;
+        self.registers.set_flag(RegisterFlag::InterruptEnable, true)?;
 
         Ok(())
     }
@@ -339,11 +356,54 @@ impl Processor {
     }
 
     pub fn hardware_interrupt(&mut self, interrupt_num: u32) -> Result<bool, ProcessorError> {
-        Err(ProcessorError::UnsupportedInterrupt(interrupt_num))
+        self.call_interrupt(Self::BASE_HW_INT_ADDR + interrupt_num * Self::BYTES_PER_ADDRESS)
     }
 
-    pub fn software_interrupt(&mut self, interrupt_num: u32) -> Result<(), ProcessorError> {
-        Err(ProcessorError::UnsupportedInterrupt(interrupt_num))
+    pub fn software_interrupt(&mut self, interrupt_num: u32) -> Result<bool, ProcessorError> {
+        self.call_interrupt(Self::BASE_SW_INT_ADDR + interrupt_num * Self::BYTES_PER_ADDRESS)
+    }
+
+    fn call_interrupt(&mut self, interrupt_loc: u32) -> Result<bool, ProcessorError> {
+        // Return false if interrupts are not allowed
+        if !self.registers.get_flag(RegisterFlag::InterruptEnable)? {
+            return Ok(false);
+        }
+
+        // Obtain the desired value from the program counter
+        let new_pc = self.memory.get_u32(interrupt_loc)?;
+
+        // Return false if the vector value is 0 (Disabled)
+        if new_pc == 0 {
+            return Ok(false);
+        }
+
+        // Push all register values to the stack
+        self.push_all_registers()?;
+
+        // Update the program counter to the value in the interrupt vector
+        self.registers.set(Register::ProgramCounter, new_pc)?;
+
+        // Return true if the interrupt was called
+        Ok(true)
+    }
+
+    fn push_all_registers(&mut self) -> Result<(), ProcessorError> {
+        for i in 0..RegisterManager::REGISTER_COUNT {
+            self.stack_push(self.registers.get(Register::GeneralPurpose(i))?)?;
+        }
+
+        Ok(())
+    }
+
+    fn pop_all_registers(&mut self, save_return_register: bool) -> Result<(), ProcessorError> {
+        for i in (0..RegisterManager::REGISTER_COUNT).rev() {
+            let val = self.stack_pop()?;
+            if !save_return_register || i != Register::Return.get_index() {
+                self.registers.set(Register::GeneralPurpose(i), val)?;
+            }
+        }
+
+        Ok(())
     }
 
     pub fn memory_set(&mut self, address: u32, val: u8) -> Result<(), ProcessorError> {
@@ -433,26 +493,23 @@ impl Processor {
         match opcode {
             Self::OP_NOOP => (),
             Self::OP_RESET => self.reset(ResetType::Soft)?,
-            Self::OP_INTERRUPT => self.software_interrupt(inst.arg0() as u32)?,
+            Self::OP_INTON => self.registers.set_flag(RegisterFlag::InterruptEnable, true)?,
+            Self::OP_INTOFF => self.registers.set_flag(RegisterFlag::InterruptEnable, false)?,
+            Self::OP_INTERRUPT => {
+                self.software_interrupt(inst.arg0() as u32)?;
+            },
             Self::OP_INTERRUPT_REGISTER => {
-                self.software_interrupt(self.registers.get(inst.arg0_register())?)?
+                self.software_interrupt(self.registers.get(inst.arg0_register())?)?;
             }
             Self::OP_CALL => {
-                for i in 0..RegisterManager::REGISTER_COUNT {
-                    self.stack_push(self.registers.get(Register::GeneralPurpose(i))?)?;
-                }
+                self.push_all_registers()?;
                 self.registers.set(
                     Register::ProgramCounter,
                     self.registers.get(inst.arg0_register())?,
                 )?;
             }
             Self::OP_RETURN | Self::OP_INTERRUPT_RETURN => {
-                for i in (0..RegisterManager::REGISTER_COUNT).rev() {
-                    let val = self.stack_pop()?;
-                    if i != Register::Return.get_index() || opcode == Self::OP_INTERRUPT_RETURN {
-                        self.registers.set(Register::GeneralPurpose(i), val)?;
-                    }
-                }
+                self.pop_all_registers(opcode == Self::OP_RETURN)?;
             }
             Self::OP_PUSH => {
                 let val = self.registers.get(inst.arg0_register())?;

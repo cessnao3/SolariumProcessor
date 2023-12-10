@@ -9,14 +9,16 @@ pub enum ArgumentError {
     Immediate(ImmediateError),
     UnknownRegister(String),
     UnknownDataType(String),
+    ExpectedTypeInformation(String),
 }
 
 impl fmt::Display for ArgumentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Immediate(i) => write!(f, "Immediate Error => {i}"),
-            Self::UnknownRegister(r) => write!(f, "Unknown Register {r}"),
-            Self::UnknownDataType(d) => write!(f, "Unknown Data Type {d}"),
+            Self::UnknownRegister(r) => write!(f, "Unknown Argument Register {r}"),
+            Self::UnknownDataType(d) => write!(f, "Unknown Argument Data Type {d}"),
+            Self::ExpectedTypeInformation(r) => write!(f, "Expected Argument Type Information in '{r}'"),
         }
     }
 }
@@ -51,8 +53,8 @@ impl TryFrom<&str> for ArgumentRegister {
             "$ovf" => Register::Overflow,
             "$ret" => Register::Return,
             "$arg" => Register::ArgumentBase,
-            _ => {
-                if let Ok(val) = value.parse() {
+            val => {
+                if let Ok(val) = val.parse() {
                     Register::GeneralPurpose(val)
                 } else {
                     return Err(ArgumentError::UnknownRegister(value.to_string()));
@@ -99,7 +101,7 @@ impl TryFrom<&str> for ArgumentType {
 
             Ok(Self { reg, data_type: dt })
         } else {
-            Err(ArgumentError::UnknownRegister(value.to_string()))
+            Err(ArgumentError::ExpectedTypeInformation(value.to_string()))
         }
     }
 }

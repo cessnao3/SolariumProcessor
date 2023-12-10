@@ -12,8 +12,8 @@ impl fmt::Display for ImmediateError {
 macro_rules! gen_read_immediate {
     ($fnname:ident, $t:ident) => {
         pub fn $fnname(arg: &str) -> Result<$t, ImmediateError> {
-            let res = if arg.starts_with("0x") || arg.starts_with("0X") {
-                $t::from_str_radix(arg, 16)
+            let res = if let Some(i) = arg.strip_prefix("0x") {
+                $t::from_str_radix(i, 16)
             } else {
                 arg.parse::<$t>()
             };

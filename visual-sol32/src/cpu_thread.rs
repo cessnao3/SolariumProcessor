@@ -26,7 +26,7 @@ impl ThreadState {
             running: false,
             multiplier: 1.0,
             cpu: Processor::new(),
-            serial_io_dev: Rc::new(RefCell::new(SerialInputOutputDevice::new(usize::MAX))),
+            serial_io_dev: Rc::new(RefCell::new(SerialInputOutputDevice::new(2048))),
             last_code: Vec::new(),
             memory_request: (0, 0),
         };

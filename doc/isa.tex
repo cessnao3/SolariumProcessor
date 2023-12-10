@@ -94,7 +94,7 @@ Since the architecture of the Sol32 is 32-bit, this means that the basic word, a
 This is contrasted with the typical assembly language formatting, which is provided as
 
 \begin{center}
-    \texttt{instruction <arg2>, <arg1>, <arg0>}
+    \texttt{instruction <arg2> <arg1> <arg0>}
 \end{center}
 
 where the number of arguments depends on the required number of arguments for the instruction.
@@ -122,16 +122,16 @@ At the conclusion of any interrupt, the \texttt{retint} instruction should be ca
 
 It should be noted that, if any values were pushed onto the stack during the interrupt handler, they should be popped off the stack prior to the \texttt{retint} call to avoid corrupting the program state.
 
-The S/Proc supports up to 16 software interrupts and up to 16 hardware interrupts, as shown in Table \ref{table:interrupt-vector-locations}. \alert{Software interrupt vectors are stored in memory at locations} \texttt{0x10} for software interrupt 0 though \texttt{0x1F}, exclusive. Similarly, the \alert{16 hardware interrupts are stored in memory at memory addresses} \texttt{0x20} through \texttt{0x2F}, exclusive.
+The S/Proc supports 32 software and 32 hardware interrupts, as shown in Table \ref{table:interrupt-vector-locations}. The hardware interrupt vectors are stored in memory at locations \texttt{0x100} for interrupt 0 though \texttt{0x180}, exclusive, for interrupt 31. Similarly, the software interrupts are stored in memory at memory addresses \texttt{0x180} for interrupt 0 through \texttt{0x200}, exclusive, for interrupt 31.
 
 \begin{table}[h!]
     \centering
     \begin{tabular}{c|ccccccc}
         \hline
-        Type & 0 & 1 & 2 & \dots & 13 & 14 & 15 \\
+        Type & 0 & 1 & 2 & \dots & 29 & 30 & 31 \\
         \hline
-        Software & \texttt{0x10} & \texttt{0x11} & \texttt{0x12} & \dots & \texttt{0x1D} & \texttt{0x1E} & \texttt{0x1F} \\
-        Hardware & \texttt{0x20} & \texttt{0x21} & \texttt{0x22} & \dots & \texttt{0x2D} & \texttt{0x2E} & \texttt{0x2F} \\
+        Hardware & \texttt{0x100} & \texttt{0x104} & \texttt{0x108} & \dots & \texttt{0x174} & \texttt{0x178} & \texttt{0x17C} \\
+        Software & \texttt{0x180} & \texttt{0x184} & \texttt{0x188} & \dots & \texttt{0x1F4} & \texttt{0x1F8} & \texttt{0x1FC} \\
         \hline
     \end{tabular}
     \caption{Interrupt vector locations for both hardware and software interrupts}

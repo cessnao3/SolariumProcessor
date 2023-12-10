@@ -62,7 +62,7 @@ macro_rules! InstNoArg {
             type Error = InstructionError;
 
             fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
-                if args.len() == Self::NUM_ARGS {
+                if args.len() != Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     Ok(Self)
@@ -98,10 +98,48 @@ macro_rules! InstSingleArg {
             type Error = InstructionError;
 
             fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
-                if args.len() == Self::NUM_ARGS {
+                if args.len() != Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     Ok(Self::new(ArgumentRegister::try_from(args[0].as_ref())?))
+                }
+            }
+        }
+    };
+}
+
+macro_rules! InstImmediateArg {
+    ($op_name:ident, $opcode:expr) => {
+        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+        pub struct $op_name {
+            imm: u16,
+        }
+
+        impl $op_name {
+            const OP: Opcode = $opcode;
+            const NUM_ARGS: usize = 1;
+
+            pub fn new(imm: u16) -> Self {
+                Self { imm }
+            }
+        }
+
+        impl ToInstruction for $op_name {
+            fn to_instruction(&self) -> [u8; INST_SIZE] {
+                let imm = self.imm.to_be_bytes();
+                [Self::OP.to_byte(), 0, imm[0], imm[1]]
+            }
+        }
+
+        impl TryFrom<Vec<String>> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
+                if args.len() != Self::NUM_ARGS {
+                    Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
+                } else {
+                    let imm = parse_imm_i16(&args[0])? as u16;
+                    Ok(Self::new(imm))
                 }
             }
         }
@@ -136,7 +174,7 @@ macro_rules! InstSingleArgImm {
             type Error = InstructionError;
 
             fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
-                if args.len() == Self::NUM_ARGS {
+                if args.len() != Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     let a0 = ArgumentRegister::try_from(args[0].as_ref())?;
@@ -180,7 +218,7 @@ macro_rules! InstDoubleArg {
             type Error = InstructionError;
 
             fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
-                if args.len() == Self::NUM_ARGS {
+                if args.len() != Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     let a0 = ArgumentRegister::try_from(args[0].as_ref())?;
@@ -224,7 +262,7 @@ macro_rules! InstDoubleArgType {
             type Error = InstructionError;
 
             fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
-                if args.len() == Self::NUM_ARGS {
+                if args.len() != Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     let a0 = ArgumentType::try_from(args[0].as_ref())?;
@@ -268,7 +306,7 @@ macro_rules! InstDoubleArgDoubleType {
             type Error = InstructionError;
 
             fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
-                if args.len() == Self::NUM_ARGS {
+                if args.len() != Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     let a0 = ArgumentType::try_from(args[0].as_ref())?;
@@ -313,7 +351,7 @@ macro_rules! InstArith {
             type Error = InstructionError;
 
             fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
-                if args.len() == Self::NUM_ARGS {
+                if args.len() != Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
                 } else {
                     let a0 = ArgumentType::try_from(args[0].as_ref())?;
@@ -340,15 +378,17 @@ InstSingleArg!(OpPop, Processor::OP_POP);
 InstSingleArg!(OpPopr, Processor::OP_POP_REG);
 InstSingleArg!(OpJmp, Processor::OP_JUMP);
 InstSingleArg!(OpJmpr, Processor::OP_JUMP_REL);
+InstSingleArg!(OpLoadNext, Processor::OP_LOAD_NEXT);
 
-InstSingleArgImm!(OpJmpri, Processor::OP_JUMP_REL_IMM);
+InstSingleArg!(OpTz, Processor::OP_TEST_ZERO);
+InstSingleArg!(OpTnz, Processor::OP_TEST_NOT_ZERO);
+
+InstImmediateArg!(OpJmpri, Processor::OP_JUMP_REL_IMM);
 InstSingleArgImm!(OpLoadi, Processor::OP_LOAD_IMM);
 InstSingleArgImm!(OpLoadri, Processor::OP_LOAD_IMM_REL);
 
 InstDoubleArg!(OpNot, Processor::OP_NOT);
 InstDoubleArg!(OpBool, Processor::OP_BOOL);
-InstDoubleArg!(OpTz, Processor::OP_TEST_ZERO);
-InstDoubleArg!(OpTnz, Processor::OP_TEST_NOT_ZERO);
 InstDoubleArg!(OpCopy, Processor::OP_COPY);
 
 InstDoubleArgType!(OpSave, Processor::OP_SAVE);

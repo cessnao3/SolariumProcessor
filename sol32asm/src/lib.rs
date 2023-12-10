@@ -9,7 +9,7 @@ use instructions::{
     InstructionError, OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall, OpConv, OpCopy,
     OpDiv, OpHalt, OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLoad, OpLoadi, OpLoadr, OpLoadri,
     OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt, OpSave, OpSaver,
-    OpSub, OpTeq, OpTgeq, OpTgt, OpTleq, OpTlt, OpTneq, OpTnz, OpTz, ToInstruction,
+    OpSub, OpTeq, OpTgeq, OpTgt, OpTleq, OpTlt, OpTneq, OpTnz, OpTz, ToInstruction, OpLoadNext
 };
 
 use immediate::{
@@ -23,10 +23,8 @@ pub enum AssemblerError {
     UnknownInstruction(String),
     Instruction(InstructionError),
     ArgumentCountMismatch(usize, usize),
-    ImmediateError(String),
     InvalidLabel(String),
-    UnknownRegister(String),
-    UnknownDataType(String),
+    Immediate(ImmediateError),
 }
 
 impl fmt::Display for AssemblerError {
@@ -35,18 +33,16 @@ impl fmt::Display for AssemblerError {
             Self::UnknownLabel(l) => write!(f, "Unknown Label {l}"),
             Self::UnknownInstruction(i) => write!(f, "Unknown Instruction {i}"),
             Self::ArgumentCountMismatch(num, expected) => write!(f, "Argument Count Expected {expected}, found {num}"),
-            Self::ImmediateError(e) => write!(f, "Immediate Error {e}"),
             Self::InvalidLabel(l) => write!(f, "Invalid Label {l}"),
-            Self::UnknownRegister(r) => write!(f, "Unknown Register {r}"),
-            Self::UnknownDataType(d) => write!(f, "Unknown Data Type {d}"),
             Self::Instruction(i) => write!(f, "Instruction Error => {i}"),
+            Self::Immediate(i) => write!(f, "Immediate Error => {i}"),
         }
     }
 }
 
 impl From<ImmediateError> for AssemblerError {
     fn from(value: ImmediateError) -> Self {
-        Self::ImmediateError(value.0)
+        Self::Immediate(value)
     }
 }
 
@@ -59,12 +55,18 @@ impl From<InstructionError> for AssemblerError {
 #[derive(Debug, Clone)]
 pub struct AssemblerErrorLoc {
     pub err: AssemblerError,
+    pub full_line: Option<String>,
     pub loc: usize,
 }
 
 impl fmt::Display for AssemblerErrorLoc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Line {} - {}", self.loc, self.err)
+        write!(f, "Line {} - {}", self.loc, self.err)?;
+        if let Some(s) = self.full_line.as_ref() {
+            write!(f, " - \"{}\"", s)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -146,11 +148,11 @@ impl TokenList {
                 (|a| Ok(Rc::new(OpJmpri::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
             ),
             (
-                "loadi".into(),
+                "ldi".into(),
                 (|a| Ok(Rc::new(OpLoadi::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
             ),
             (
-                "loadri".into(),
+                "ldri".into(),
                 (|a| Ok(Rc::new(OpLoadri::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
             ),
             (
@@ -174,20 +176,24 @@ impl TokenList {
                 (|a| Ok(Rc::new(OpCopy::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
             ),
             (
-                "save".into(),
+                "sav".into(),
                 (|a| Ok(Rc::new(OpSave::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
             ),
             (
-                "saver".into(),
+                "savr".into(),
                 (|a| Ok(Rc::new(OpSaver::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
             ),
             (
-                "load".into(),
+                "ld".into(),
                 (|a| Ok(Rc::new(OpLoad::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
             ),
             (
-                "loadr".into(),
+                "ldr".into(),
                 (|a| Ok(Rc::new(OpLoadr::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
+            ),
+            (
+                "ldn".into(),
+                (|a| Ok(Rc::new(OpLoadNext::try_from(a)?) as Rc<dyn ToInstruction>)) as FnInst,
             ),
             (
                 "conv".into(),
@@ -268,7 +274,7 @@ impl TokenList {
     fn trim_line(line: &str) -> &str {
         let s = line.trim();
         if let Some(ind) = s.find(';') {
-            &s[(ind+1)..]
+            &s[..ind]
         } else {
             s
         }
@@ -307,7 +313,7 @@ impl TokenList {
                 "f32" => Token::Immediate4(
                     match arg.parse::<f32>() {
                         Ok(v) => v,
-                        Err(_) => return Err(AssemblerError::ImmediateError(arg.to_string())),
+                        Err(_) => return Err(ImmediateError(arg.to_string()).into()),
                     }
                     .to_bits(),
                 ),
@@ -430,14 +436,14 @@ pub fn parse_text(txt: &str) -> Result<Vec<u8>, AssemblerErrorLoc> {
 pub fn parse_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
     let mut state = TokenList::new();
     for (i, l) in txt.iter().enumerate() {
-        if let Err(e) = state.parse_line(l) {
-            return Err(AssemblerErrorLoc { err: e, loc: i + 1 });
+        if let Err(e) = state.parse_line(&l.to_lowercase()) {
+            return Err(AssemblerErrorLoc { err: e, loc: i + 1, full_line: Some(l.to_string()) });
         }
     }
 
     match state.to_bytes() {
         Ok(v) => Ok(v),
-        Err(e) => Err(AssemblerErrorLoc { err: e, loc: 0 }),
+        Err(e) => Err(AssemblerErrorLoc { err: e, loc: 0, full_line: None }),
     }
 }
 
