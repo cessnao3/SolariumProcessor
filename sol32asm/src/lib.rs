@@ -265,14 +265,25 @@ impl TokenList {
         }
     }
 
-    pub fn parse_line(&mut self, line: &str) -> Result<(), AssemblerError> {
+    fn trim_line(line: &str) -> &str {
         let s = line.trim();
+        if let Some(ind) = s.find(';') {
+            &s[(ind+1)..]
+        } else {
+            s
+        }
+    }
+
+    pub fn parse_line(&mut self, line: &str) -> Result<(), AssemblerError> {
+        // Trim Comments
+        let s = Self::trim_line(line);
+
         let words = s.split_whitespace().collect::<Vec<_>>();
 
         let first: &str = if let Some(w) = words.first() {
             w
         } else {
-            return Err(AssemblerError::UnknownInstruction(s.to_string()));
+            return Ok(()); // Empty Instruction
         };
 
         let tok = if let Some(op) = first.strip_prefix('.') {
