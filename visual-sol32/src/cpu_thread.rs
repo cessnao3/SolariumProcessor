@@ -1,9 +1,8 @@
 use crate::messages::{ThreadToUi, UiToThread};
-use gtk::glib::Sender;
 use sol32::cpu::{Processor, ProcessorError};
 use sol32::device::{InterruptClockDevice, SerialInputOutputDevice};
-use sol32::memory::{ReadWriteSegment, ReadOnlySegment, MemorySegment};
-use std::sync::mpsc::{Receiver, RecvError, TryRecvError};
+use sol32::memory::{MemorySegment, ReadOnlySegment, ReadWriteSegment};
+use std::sync::mpsc::{Receiver, RecvError, Sender, TryRecvError};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -62,7 +61,7 @@ impl ThreadState {
         self.cpu.memory_add_segment(
             INIT_RO_LEN,
             Rc::new(RefCell::new(ReadWriteSegment::new(
-                (Self::DEVICE_START_IND - INIT_RO_LEN) as usize
+                (Self::DEVICE_START_IND - INIT_RO_LEN) as usize,
             ))),
         )?;
         self.cpu
@@ -99,7 +98,7 @@ impl ThreadState {
                 UiToThread::CpuReset => {
                     state.reset()?;
                     return Ok(Some(ThreadToUi::ProcessorReset));
-                },
+                }
                 UiToThread::CpuIrq(irq) => {
                     if !state.cpu.hardware_interrupt(irq as u32)? {
                         return Ok(Some(ThreadToUi::LogMessage(format!(

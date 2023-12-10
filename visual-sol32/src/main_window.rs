@@ -9,7 +9,7 @@ use sol32::cpu::RegisterManager;
 pub fn build_ui(app: &Application) {
     // Create the tx/rx for the secondary thread
     let (tx_ui, rx_thread) = std::sync::mpsc::channel::<UiToThread>();
-    let (tx_thread, rx_ui) = glib::MainContext::channel::<ThreadToUi>(glib::Priority::DEFAULT);
+    let (tx_thread, rx_ui) = std::sync::mpsc::channel::<ThreadToUi>();
 
     let columns = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
@@ -33,40 +33,52 @@ pub fn build_ui(app: &Application) {
         .child(&columns)
         .build();
 
-    // Setup the UI receiver
-    rx_ui.attach(None, move |msg| {
-        match msg {
-            ThreadToUi::ProcessorReset => {
-                buffer_serial.set_text("");
-            }
-            ThreadToUi::RegisterState(regs) => {
-                for (i, r) in regs.registers.iter().enumerate() {
-                    register_fields[i].set_text(&format!("0x{:08x}", r));
-                }
-            }
-            ThreadToUi::LogMessage(msg) => {
-                buffer_log.insert(&mut buffer_log.end_iter(), &format!("{msg}\n"));
-            }
-            ThreadToUi::SerialOutput(msg) => {
-                buffer_serial.insert(&mut buffer_serial.end_iter(), msg.as_str());
-            }
-            ThreadToUi::ResponseMemory(base, vals) => {
-                for (i, l) in memory_vals.labels.iter().enumerate() {
-                    l.set_text(&format!("L{:08x}", base + 4 * i as u32));
-                }
+    let (tx_thread_async, rx_ui_async) = async_channel::bounded::<ThreadToUi>(10);
 
-                for (i, m) in memory_vals.locations.iter().enumerate() {
-                    if i < vals.len() {
-                        m.set_text(&format!("{:02x}", vals[i]));
-                    } else {
-                        m.set_text("");
+    // Create the accompanying thread to transform standard MPSC into async parameters (TODO - Move to just using async channels?)
+    std::thread::spawn(move || {
+        while let Ok(v) = rx_ui.recv() {
+            let tx_clone: async_channel::Sender<ThreadToUi> = tx_thread_async.clone();
+            glib::spawn_future(async move {
+                tx_clone.send(v).await.unwrap();
+            });
+        }
+    });
+
+    // Setup the UI receiver
+    glib::spawn_future_local(async move {
+        while let Ok(msg) = rx_ui_async.recv().await {
+            match msg {
+                ThreadToUi::ProcessorReset => {
+                    buffer_serial.set_text("");
+                }
+                ThreadToUi::RegisterState(regs) => {
+                    for (i, r) in regs.registers.iter().enumerate() {
+                        register_fields[i].set_text(&format!("0x{:08x}", r));
                     }
                 }
-            }
-            ThreadToUi::ThreadExit => return glib::ControlFlow::Break,
-        };
+                ThreadToUi::LogMessage(msg) => {
+                    buffer_log.insert(&mut buffer_log.end_iter(), &format!("{msg}\n"));
+                }
+                ThreadToUi::SerialOutput(msg) => {
+                    buffer_serial.insert(&mut buffer_serial.end_iter(), msg.as_str());
+                }
+                ThreadToUi::ResponseMemory(base, vals) => {
+                    for (i, l) in memory_vals.labels.iter().enumerate() {
+                        l.set_text(&format!("L{:08x}", base + 4 * i as u32));
+                    }
 
-        glib::ControlFlow::Continue
+                    for (i, m) in memory_vals.locations.iter().enumerate() {
+                        if i < vals.len() {
+                            m.set_text(&format!("{:02x}", vals[i]));
+                        } else {
+                            m.set_text("");
+                        }
+                    }
+                }
+                ThreadToUi::ThreadExit => break,
+            };
+        }
     });
 
     window.connect_close_request(clone!(@strong tx_ui => move |_| {
@@ -86,7 +98,7 @@ pub fn build_ui(app: &Application) {
 
 fn build_code_column(
     tx_ui: &std::sync::mpsc::Sender<UiToThread>,
-    tx_thread: &gtk::glib::Sender<ThreadToUi>,
+    tx_thread: &std::sync::mpsc::Sender<ThreadToUi>,
 ) -> gtk::Box {
     let code_stack = gtk::Stack::builder().build();
 
@@ -314,7 +326,7 @@ impl MemoryLocationData {
 
 fn build_serial_column(
     tx_ui: &std::sync::mpsc::Sender<UiToThread>,
-    tx_thread: &gtk::glib::Sender<ThreadToUi>,
+    tx_thread: &std::sync::mpsc::Sender<ThreadToUi>,
 ) -> (gtk::Box, MemoryLocationData, gtk::TextBuffer) {
     let column_serial = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
