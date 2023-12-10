@@ -7,9 +7,9 @@ use std::{collections::HashMap, rc::Rc};
 
 use instructions::{
     InstructionError, OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall, OpConv, OpCopy,
-    OpDiv, OpHalt, OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLoad, OpLoadi, OpLoadr, OpLoadri,
-    OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt, OpSave, OpSaver,
-    OpSub, OpTeq, OpTgeq, OpTgt, OpTleq, OpTlt, OpTneq, OpTnz, OpTz, ToInstruction, OpLoadNext
+    OpDiv, OpHalt, OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLoad, OpLoadNext, OpLoadi, OpLoadr,
+    OpLoadri, OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt, OpSave,
+    OpSaver, OpSub, OpTeq, OpTgeq, OpTgt, OpTleq, OpTlt, OpTneq, OpTnz, OpTz, ToInstruction,
 };
 
 use immediate::{
@@ -25,6 +25,8 @@ pub enum AssemblerError {
     ArgumentCountMismatch(usize, usize),
     InvalidLabel(String),
     Immediate(ImmediateError),
+    BadLabel(String),
+    DuplicateLabel(String),
 }
 
 impl fmt::Display for AssemblerError {
@@ -32,10 +34,14 @@ impl fmt::Display for AssemblerError {
         match self {
             Self::UnknownLabel(l) => write!(f, "Unknown Label {l}"),
             Self::UnknownInstruction(i) => write!(f, "Unknown Instruction {i}"),
-            Self::ArgumentCountMismatch(num, expected) => write!(f, "Argument Count Expected {expected}, found {num}"),
+            Self::ArgumentCountMismatch(num, expected) => {
+                write!(f, "Argument Count Expected {expected}, found {num}")
+            }
             Self::InvalidLabel(l) => write!(f, "Invalid Label {l}"),
             Self::Instruction(i) => write!(f, "Instruction Error => {i}"),
             Self::Immediate(i) => write!(f, "Immediate Error => {i}"),
+            Self::BadLabel(l) => write!(f, "Bad Label '{l}'"),
+            Self::DuplicateLabel(l) => write!(f, "Duplicate Label '{l}'"),
         }
     }
 }
@@ -53,16 +59,21 @@ impl From<InstructionError> for AssemblerError {
 }
 
 #[derive(Debug, Clone)]
+pub struct LocationInfo {
+    pub line: usize,
+    pub full_line: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct AssemblerErrorLoc {
     pub err: AssemblerError,
-    pub full_line: Option<String>,
-    pub loc: usize,
+    pub loc: LocationInfo,
 }
 
 impl fmt::Display for AssemblerErrorLoc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Line {} - {}", self.loc, self.err)?;
-        if let Some(s) = self.full_line.as_ref() {
+        write!(f, "Line {} - {}", self.loc.line, self.err)?;
+        if let Some(s) = self.loc.full_line.as_ref() {
             write!(f, " - \"{}\"", s)?;
         }
 
@@ -75,7 +86,7 @@ type FnInst = fn(Vec<String>) -> Result<Rc<dyn ToInstruction>, InstructionError>
 #[derive(Clone)]
 pub enum Token {
     ChangeAddress(u32),
-    Operation(Rc<dyn ToInstruction>),
+    Operation(FnInst, Vec<String>),
     CreateLabel(String),
     LoadLoc(String),
     Immediate1(u8),
@@ -83,9 +94,16 @@ pub enum Token {
     Immediate4(u32),
 }
 
+#[derive(Clone)]
+pub struct TokenLoc {
+    pub tok: Token,
+    pub loc: LocationInfo,
+}
+
 struct TokenList {
-    tokens: Vec<Token>,
+    tokens: Vec<TokenLoc>,
     inst: HashMap<String, FnInst>,
+    label_regex: regex::Regex,
 }
 
 impl TokenList {
@@ -268,6 +286,7 @@ impl TokenList {
         Self {
             tokens: Vec::new(),
             inst,
+            label_regex: regex::Regex::new("^[a-z](a-z0-9_)*").unwrap(),
         }
     }
 
@@ -280,7 +299,7 @@ impl TokenList {
         }
     }
 
-    pub fn parse_line(&mut self, line: &str) -> Result<(), AssemblerError> {
+    pub fn parse_line(&mut self, line: &str, loc: LocationInfo) -> Result<(), AssemblerError> {
         // Trim Comments
         let s = Self::trim_line(line);
 
@@ -320,6 +339,10 @@ impl TokenList {
                 _ => return Err(AssemblerError::UnknownInstruction(op.to_string())),
             }
         } else if let Some(lbl) = first.strip_prefix(':') {
+            if !self.label_regex.is_match(lbl) {
+                return Err(AssemblerError::BadLabel(lbl.to_string()));
+            }
+
             if words.len() != 1 {
                 return Err(AssemblerError::ArgumentCountMismatch(words.len(), 1));
             }
@@ -327,26 +350,25 @@ impl TokenList {
             Token::CreateLabel(lbl.to_string())
         } else if let Some(inst_fn) = self.inst.get(words[0]) {
             let args = &words[1..];
-            let val = inst_fn(args.iter().map(|s| s.to_string()).collect())?;
-            Token::Operation(val)
+            Token::Operation(*inst_fn, args.iter().map(|s| s.to_string()).collect())
         } else {
             return Err(AssemblerError::UnknownInstruction(line.into()));
         };
 
-        self.tokens.push(tok);
+        self.tokens.push(TokenLoc { tok: tok, loc: loc });
 
         Ok(())
     }
 
-    pub fn add_token(&mut self, tok: Token) {
+    pub fn add_token(&mut self, tok: TokenLoc) {
         self.tokens.push(tok)
     }
 
-    pub fn to_bytes(&self) -> Result<Vec<u8>, AssemblerError> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, AssemblerErrorLoc> {
         let mut state = ParserState::new();
 
         for t in self.tokens.iter() {
-            match t {
+            match &t.tok {
                 Token::ChangeAddress(new_addr) => {
                     if *new_addr < state.addr {
                         panic!("cannot backup address");
@@ -364,15 +386,18 @@ impl TokenList {
                     state.add_bytes(&i.to_be_bytes());
                 }
                 Token::CreateLabel(lbl) => {
-                    // TODO - Duplicate label
+                    if state.labels.contains_key(lbl) {
+                        return Err(AssemblerErrorLoc { err: AssemblerError::DuplicateLabel(lbl.to_string()), loc: t.loc.clone() });
+                    }
                     state.labels.insert(lbl.into(), state.addr);
                 }
                 Token::LoadLoc(lbl) => {
                     state.loadloc_vals.insert(state.addr, lbl.into());
                     state.add_bytes(&0u32.to_be_bytes());
                 }
-                Token::Operation(op) => {
-                    state.add_bytes(&op.to_instruction());
+                Token::Operation(func, args) => {
+                    state.oper_vals.insert(state.addr, (*func, args.to_owned(), t.loc.clone()));
+                    state.add_bytes(&0u32.to_be_bytes());
                 }
             }
         }
@@ -387,10 +412,35 @@ impl TokenList {
             }
         }
 
+        for (addr, (inst_fn, args, loc)) in state.oper_vals {
+            let mut new_args = Vec::new();
+
+            for a in args.iter() {
+                let na = if let Some(v) = state.labels.get(a) {
+                    format!("{v}")
+                } else {
+                    a.to_string()
+                };
+
+                new_args.push(na);
+            }
+
+            let val = match inst_fn(new_args) {
+                Ok(v) => v,
+                Err(err) => return Err(AssemblerErrorLoc { err: err.into(), loc }),
+            };
+
+            let inst = val.to_instruction();
+
+            for (i, val) in inst.iter().enumerate() {
+                state.values.insert(addr + i as u32, *val);
+            }
+        }
+
         let mut bytes = Vec::new();
 
         if let Some(max_addr) = state.values.keys().max() {
-            bytes.resize(*max_addr as usize, 0);
+            bytes.resize(*max_addr as usize + 1, 0);
 
             for (a, v) in state.values {
                 bytes[a as usize] = v;
@@ -407,6 +457,7 @@ pub struct ParserState {
     labels: HashMap<String, u32>,
     values: HashMap<u32, u8>,
     loadloc_vals: HashMap<u32, String>,
+    oper_vals: HashMap<u32, (FnInst, Vec<String>, LocationInfo)>,
 }
 
 impl ParserState {
@@ -436,18 +487,19 @@ pub fn parse_text(txt: &str) -> Result<Vec<u8>, AssemblerErrorLoc> {
 pub fn parse_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
     let mut state = TokenList::new();
     for (i, l) in txt.iter().enumerate() {
-        if let Err(e) = state.parse_line(&l.to_lowercase()) {
-            return Err(AssemblerErrorLoc { err: e, loc: i + 1, full_line: Some(l.to_string()) });
+        let loc: LocationInfo = LocationInfo { line: i + 1, full_line: Some(l.to_string()) };
+        if let Err(e) = state.parse_line(&l.to_lowercase(), loc.clone()) {
+            return Err(AssemblerErrorLoc {
+                err: e,
+                loc,
+            });
         }
     }
 
-    match state.to_bytes() {
-        Ok(v) => Ok(v),
-        Err(e) => Err(AssemblerErrorLoc { err: e, loc: 0, full_line: None }),
-    }
+    state.to_bytes()
 }
 
-pub fn assemble(tokens: &[Token]) -> Result<Vec<u8>, AssemblerError> {
+pub fn assemble(tokens: &[TokenLoc]) -> Result<Vec<u8>, AssemblerErrorLoc> {
     let mut state = TokenList::new();
     for t in tokens {
         state.add_token(t.clone());
