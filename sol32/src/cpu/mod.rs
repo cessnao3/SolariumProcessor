@@ -415,6 +415,14 @@ impl Processor {
         Ok(self.memory.inspect(address)?)
     }
 
+    pub fn memory_inspect_u32(&self, address: u32) -> Result<u32, ProcessorError> {
+        let mut bytes = [0; Self::BYTES_PER_ADDRESS as usize];
+        for (i, v) in bytes.iter_mut().enumerate() {
+            *v = self.memory.inspect(address + i as u32)?;
+        }
+        Ok(u32::from_be_bytes(bytes))
+    }
+
     pub fn memory_add_segment(&mut self, address: u32, seg: Rc<RefCell<dyn MemorySegment>>) -> Result<(), ProcessorError> {
         self.memory.add_segment(address, seg)?;
         Ok(())
@@ -580,7 +588,7 @@ impl Processor {
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 }
             }
-            Self::OP_LOAD | Self::OP_LOAD_REL | Self::OP_LOAD_IMM_REL => {
+            Self::OP_LOAD | Self::OP_LOAD_REL | Self::OP_LOAD_IMM_REL | Self::OP_LOAD_NEXT => {
                 let dt = inst.arg0_data_type()?;
                 let addr = match opcode {
                     Self::OP_LOAD => self.registers.get(inst.arg1_register())?,
@@ -591,6 +599,10 @@ impl Processor {
                     Self::OP_LOAD_IMM_REL => {
                         (self.registers.get(Register::ProgramCounter)? as i32 + inst.imm_signed())
                             as u32
+                    }
+                    Self::OP_LOAD_NEXT => {
+                        inst_jump = 2;
+                        pc + 4
                     }
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 };
@@ -619,11 +631,6 @@ impl Processor {
                         _ => return Err(ProcessorError::UnknownInstruction(inst)),
                     }
                 }
-            }
-            Self::OP_LOAD_NEXT => {
-                let val = self.memory.get_u32(pc + 4)?;
-                self.registers.set(inst.arg0_register(), val)?;
-                inst_jump = 2;
             }
             Self::OP_SAVE | Self::OP_SAVE_REL => {
                 let dt = inst.arg0_data_type()?;

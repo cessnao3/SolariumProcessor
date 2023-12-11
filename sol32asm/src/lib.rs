@@ -355,7 +355,7 @@ impl TokenList {
             return Err(AssemblerError::UnknownInstruction(line.into()));
         };
 
-        self.tokens.push(TokenLoc { tok: tok, loc: loc });
+        self.tokens.push(TokenLoc { tok, loc });
 
         Ok(())
     }

@@ -211,6 +211,15 @@ pub fn cpu_thread(rx: Receiver<UiToThread>, tx: Sender<ThreadToUi>) {
         tx.send(ThreadToUi::RegisterState(state.cpu.get_register_state()))
             .unwrap();
 
+        let pc = state
+            .cpu
+            .get_register_state()
+            .get(sol32::cpu::Register::ProgramCounter)
+            .unwrap_or(0);
+        let mem = state.cpu.memory_inspect_u32(pc).unwrap_or(0);
+
+        tx.send(ThreadToUi::ProgramCounterValue(pc, mem)).unwrap();
+
         // Send memory if needed
         let (base, size) = state.memory_request;
         let mut resp_memory = Vec::new();

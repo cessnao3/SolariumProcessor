@@ -23,7 +23,7 @@ pub fn build_ui(app: &Application) {
     columns.append(&build_code_column(&tx_ui, &tx_thread));
     let (column_cpu, register_fields, buffer_log) = build_cpu_column(&tx_ui);
     columns.append(&column_cpu);
-    let (column_serial, memory_vals, buffer_serial) = build_serial_column(&tx_ui, &tx_thread);
+    let (column_serial, memory_vals, buffer_serial, instruction_label) = build_serial_column(&tx_ui, &tx_thread);
     columns.append(&column_serial);
 
     // Create a window and set the title
@@ -56,6 +56,9 @@ pub fn build_ui(app: &Application) {
                     for (i, r) in regs.registers.iter().enumerate() {
                         register_fields[i].set_text(&format!("0x{:08x}", r));
                     }
+                }
+                ThreadToUi::ProgramCounterValue(pc, val) => {
+                    instruction_label.set_text(&format!("Mem[0x{:08x}] = 0x{:08x}", pc, val));
                 }
                 ThreadToUi::LogMessage(msg) => {
                     buffer_log.insert(&mut buffer_log.end_iter(), &format!("{msg}\n"));
@@ -327,7 +330,7 @@ impl MemoryLocationData {
 fn build_serial_column(
     tx_ui: &std::sync::mpsc::Sender<UiToThread>,
     tx_thread: &std::sync::mpsc::Sender<ThreadToUi>,
-) -> (gtk::Box, MemoryLocationData, gtk::TextBuffer) {
+) -> (gtk::Box, MemoryLocationData, gtk::TextBuffer, gtk::Label) {
     let column_serial = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
@@ -336,54 +339,70 @@ fn build_serial_column(
     let memory_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .build();
-    let memory_frame = gtk::Frame::builder()
-        .label("Memory")
-        .child(&memory_box)
-        .build();
-
-    let mut memory = MemoryLocationData::new();
-
     let memory_base_entry = gtk::Entry::builder().text("0").build();
+    let mut memory: MemoryLocationData = MemoryLocationData::new();
 
-    let memory_grid = gtk::Grid::builder()
-        .hexpand(true)
-        .row_spacing(4)
-        .column_spacing(6)
-        .build();
+    {
+        let memory_frame = gtk::Frame::builder()
+            .label("Memory")
+            .child(&memory_box)
+            .build();
 
-    const NUM_ROWS: i32 = 6;
-    const NUM_COLS: i32 = 8;
+        let memory_grid = gtk::Grid::builder()
+            .hexpand(true)
+            .row_spacing(4)
+            .column_spacing(6)
+            .build();
 
-    for i in 0..NUM_ROWS {
-        let label = gtk::Label::builder().label(format!("L{i}")).build();
-        memory_grid.attach(&label, 0, i, 1, 1);
-        memory.labels.push(label);
+        const NUM_ROWS: i32 = 6;
+        const NUM_COLS: i32 = 8;
 
-        for j in 0..NUM_COLS {
-            let mem_lbl = gtk::Label::builder()
-                .label(format!("{:02x}", i * NUM_COLS + j))
-                .hexpand(true)
-                .build();
-            memory_grid.attach(&mem_lbl, 1 + j, i, 1, 1);
-            memory.locations.push(mem_lbl);
-        }
-    }
+        for i in 0..NUM_ROWS {
+            let label = gtk::Label::builder().label(format!("L{i}")).build();
+            memory_grid.attach(&label, 0, i, 1, 1);
+            memory.labels.push(label);
 
-    let memory_count = memory.locations.len() as u32;
-    memory_base_entry.connect_activate(clone!(@strong tx_ui, @strong tx_thread => move |t| {
-        match u32::from_str_radix(&t.text(), 16) {
-            Ok(v) => tx_ui.send(UiToThread::RequestMemory(v, memory_count)).unwrap(),
-            Err(_) => {
-                tx_thread.send(ThreadToUi::LogMessage(format!("Unable to set '{}' as base in hex", t.text()))).unwrap();
+            for j in 0..NUM_COLS {
+                let mem_lbl = gtk::Label::builder()
+                    .label(format!("{:02x}", i * NUM_COLS + j))
+                    .hexpand(true)
+                    .build();
+                memory_grid.attach(&mem_lbl, 1 + j, i, 1, 1);
+                memory.locations.push(mem_lbl);
             }
         }
-    }));
 
-    memory_box.append(&memory_base_entry);
-    memory_box.append(&memory_grid);
-    column_serial.append(&memory_frame);
+        let memory_count = memory.locations.len() as u32;
+        memory_base_entry.connect_activate(clone!(@strong tx_ui, @strong tx_thread => move |t| {
+            match u32::from_str_radix(&t.text(), 16) {
+                Ok(v) => tx_ui.send(UiToThread::RequestMemory(v, memory_count)).unwrap(),
+                Err(_) => {
+                    tx_thread.send(ThreadToUi::LogMessage(format!("Unable to set '{}' as base in hex", t.text()))).unwrap();
+                }
+            }
+        }));
+
+        memory_box.append(&memory_base_entry);
+        memory_box.append(&memory_grid);
+        column_serial.append(&memory_frame);
+    }
 
     memory.base_input = Some(memory_base_entry);
+
+    let instruction_box = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .build();
+    let instruction_frame = gtk::Frame::builder()
+        .label("Instruction")
+        .child(&instruction_box)
+        .build();
+    let overall_instruction = gtk::Label::builder()
+        .label("")
+        .hexpand(true)
+        .build();
+    instruction_box.append(&overall_instruction);
+
+    column_serial.append(&instruction_frame);
 
     let buffer_serial = gtk::TextBuffer::builder().build();
 
@@ -441,5 +460,5 @@ fn build_serial_column(
 
     column_serial.append(&text_input_frame);
 
-    (column_serial, memory, buffer_serial)
+    (column_serial, memory, buffer_serial, overall_instruction)
 }
