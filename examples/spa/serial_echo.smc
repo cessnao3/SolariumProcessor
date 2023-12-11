@@ -16,25 +16,25 @@ retint
 
 .oper 0x4000
 :program_start
-ldn $sp
+ldn $sp:u32
 .u32 0x400
-ldn 13
+ldn 13:u32
 .u32 0xA000
 
 ; Mark the location to read input values from
-ldi 14 1
+ldi 14:u16 1
 add 14:u32 14 13
 
 ; Mark the location to write serial values from
-ldi 15 3
+ldi 15:u16 3
 add 15:u32 15 13
 
 :main_loop
-ld 6:u32 13
+ld 6:u8 13
 tz 6
 jmpri main_loop_end
 
-ld 7:u32 14
+ld 7:u8 14
 sav 15:u32 7
 
 jmpri main_loop

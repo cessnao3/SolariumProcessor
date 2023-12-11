@@ -15,23 +15,41 @@ impl SegmentData {
     pub fn top(&self) -> u32 {
         self.base + self.seg.borrow().len()
     }
-}
 
-fn segment_to_memory<T>(
-    seg: &SegmentData,
-    result: Result<T, MemorySegmentError>,
-) -> Result<T, MemoryError> {
-    match result {
-        Err(MemorySegmentError::InvalidMemoryAccess(offset)) => {
-            Err(MemoryError::InvalidMemoryAccess(seg.base + offset))
+    pub fn get(&self, addr: u32) -> Result<u8, MemoryError> {
+        let offset = addr - self.base;
+        let res = self.seg.borrow().get(offset);
+        self.segment_to_memory(res)
+    }
+
+    pub fn set(&self, addr: u32, val: u8) -> Result<(), MemoryError> {
+        let offset = addr - self.base;
+        let res = self.seg.borrow_mut().set(offset, val);
+        self.segment_to_memory(res)
+    }
+
+    pub fn inspect(&self, addr: u32) -> Result<u8, MemoryError> {
+        let offset = addr - self.base;
+        let res = self.seg.borrow().inspect(offset);
+        self.segment_to_memory(res)
+    }
+
+    fn segment_to_memory<T>(
+        &self,
+        result: Result<T, MemorySegmentError>,
+    ) -> Result<T, MemoryError> {
+        match result {
+            Err(MemorySegmentError::InvalidMemoryAccess(offset)) => {
+                Err(MemoryError::InvalidMemoryAccess(self.base + offset))
+            }
+            Err(MemorySegmentError::ReadOnlyMemory(offset)) => {
+                Err(MemoryError::ReadOnlyMemory(self.base + offset))
+            }
+            Err(MemorySegmentError::InvalidMemoryWrite(offset, data)) => {
+                Err(MemoryError::InvalidMemoryWrite(self.base + offset, data))
+            }
+            Ok(v) => Ok(v),
         }
-        Err(MemorySegmentError::ReadOnlyMemory(offset)) => {
-            Err(MemoryError::ReadOnlyMemory(seg.base + offset))
-        }
-        Err(MemorySegmentError::InvalidMemoryWrite(offset, data)) => {
-            Err(MemoryError::InvalidMemoryWrite(seg.base + offset, data))
-        }
-        Ok(v) => Ok(v),
     }
 }
 
@@ -95,17 +113,17 @@ impl MemoryMap {
 
     pub fn get_u8(&self, address: u32) -> Result<u8, MemoryError> {
         let data = self.get_segment(address)?;
-        segment_to_memory(data, data.seg.borrow().get(address))
+        data.get(address)
     }
 
     pub fn inspect(&self, address: u32) -> Result<u8, MemoryError> {
         let data = self.get_segment(address)?;
-        segment_to_memory(data, data.seg.borrow().inspect(address))
+        data.inspect(address)
     }
 
     pub fn set_u8(&mut self, address: u32, val: u8) -> Result<(), MemoryError> {
         let data = self.get_segment(address)?;
-        segment_to_memory(data, data.seg.borrow_mut().set(address, val))
+        data.set(address, val)
     }
 
     fn get_segment(&self, address: u32) -> Result<&SegmentData, MemoryError> {

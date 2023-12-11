@@ -26,6 +26,7 @@ pub enum ProcessorError {
     UnsupportedInterrupt(u32),
     Register(RegisterError),
     UnknownInstruction(Instruction),
+    UnsupportedDataType(Instruction, DataType),
     Operation(OperationError),
     StackUnderflow,
     DataType(DataTypeError),
@@ -40,6 +41,7 @@ impl fmt::Display for ProcessorError {
             Self::UnsupportedInterrupt(i) => write!(f, "Unsupported Interrupt => {i}"),
             Self::Register(r) => write!(f, "Register Error => {r}"),
             Self::UnknownInstruction(i) => write!(f, "Unknown Instruction => {i}"),
+            Self::UnsupportedDataType(i, dt) => write!(f, "Unsupported Data Type {dt} for Instruction {i}"),
             Self::Operation(o) => write!(f, "Operation Error => {o}"),
             Self::StackUnderflow => write!(f, "Stack Underflow"),
             Self::OpcodeAlignment(o) => write!(f, "Opcode Alignment Error => {o}"),
@@ -85,7 +87,7 @@ pub struct Opcode {
 
 impl Opcode {
     pub fn to_byte(&self) -> u8 {
-        ((self.base << 4) & 0xF) | (self.code & 0xF)
+        ((self.base & 0xF) << 4) | (self.code & 0xF)
     }
 }
 
@@ -480,7 +482,7 @@ impl Processor {
     }
 
     pub fn step(&mut self) -> Result<(), ProcessorError> {
-        let mut inst_jump = 1;
+        let mut inst_jump = Some(1);
 
         let pc = self.registers.get(Register::ProgramCounter)?;
         if pc % 4 != 0 {
@@ -537,24 +539,24 @@ impl Processor {
                     Register::ProgramCounter,
                     self.registers.get(inst.arg0_register())?,
                 )?;
-                inst_jump = 0;
+                inst_jump = None;
             }
             Self::OP_JUMP_REL => {
                 self.registers.set(
                     Register::ProgramCounter,
                     (pc as i32 + self.registers.get(inst.arg0_register())? as i32) as u32,
                 )?;
-                inst_jump = 0;
+                inst_jump = None;
             }
             Self::OP_JUMP_REL_IMM => {
                 self.registers.set(
                     Register::ProgramCounter,
                     (pc as i32 + inst.imm_signed()) as u32,
                 )?;
-                inst_jump = 0;
+                inst_jump = None;
             }
             Self::OP_HALT => {
-                inst_jump = 0;
+                inst_jump = None;
             }
             Self::OP_NOT => {
                 let val = self.registers.get(inst.arg1_register())?;
@@ -574,7 +576,7 @@ impl Processor {
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 };
 
-                inst_jump = if is_true { 1 } else { 2 };
+                inst_jump = Some(if is_true { 1 } else { 2 });
             }
             Self::OP_LOAD_IMM => {
                 let dt = inst.arg0_data_type()?;
@@ -585,7 +587,7 @@ impl Processor {
                     DataType::U16 => self
                         .registers
                         .set(inst.arg0_register(), inst.imm_unsigned())?,
-                    _ => return Err(ProcessorError::UnknownInstruction(inst)),
+                    _ => return Err(ProcessorError::UnsupportedDataType(inst, dt)),
                 }
             }
             Self::OP_LOAD | Self::OP_LOAD_REL | Self::OP_LOAD_IMM_REL | Self::OP_LOAD_NEXT => {
@@ -601,7 +603,7 @@ impl Processor {
                             as u32
                     }
                     Self::OP_LOAD_NEXT => {
-                        inst_jump = 2;
+                        inst_jump = Some(2);
                         pc + 4
                     }
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
@@ -821,8 +823,10 @@ impl Processor {
             }
         }
 
-        self.registers
-            .set(Register::ProgramCounter, inst_jump * 4)?;
+        if let Some(jmp_val) = inst_jump {
+            self.registers
+            .set(Register::ProgramCounter, pc + jmp_val * 4)?;
+        }
 
         Ok(())
     }

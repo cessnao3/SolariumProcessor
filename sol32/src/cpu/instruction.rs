@@ -13,6 +13,22 @@ pub enum DataType {
     F32,
 }
 
+impl fmt::Display for DataType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::U8 => "u8",
+            Self::I8 => "i8",
+            Self::U16 => "u16",
+            Self::I16 => "i16",
+            Self::U32 => "u32",
+            Self::I32 => "i32",
+            Self::F32 => "f32",
+        };
+
+        write!(f, "{s}")
+    }
+}
+
 impl DataType {
     pub fn word_size(&self) -> usize {
         match self {

@@ -249,7 +249,7 @@ impl AsmFunction {
         }
     }
 
-    pub fn get_assembly(&self) -> Vec<(sda::LineInformation, sda::ParsedValue)> {
+    pub fn get_assembly(&self) -> Vec<(sol32asm::LocationInfo, sda::ParsedValue)> {
         // TODO - Mangle label names?
         let res = sda::parse_lines(&self.lines.iter().map(|v| v.as_ref()).collect::<Vec<_>>());
         res.unwrap()

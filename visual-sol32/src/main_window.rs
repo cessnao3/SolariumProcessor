@@ -297,6 +297,7 @@ fn build_cpu_column(
         .hexpand(true)
         .vexpand(true)
         .editable(false)
+        .wrap_mode(gtk::WrapMode::Word)
         .tooltip_text("Application log")
         .monospace(true)
         .build();
@@ -398,7 +399,7 @@ fn build_serial_column(
         .build();
     let overall_instruction = gtk::Label::builder()
         .label("")
-        .hexpand(true)
+        .margin_end(6)
         .build();
     instruction_box.append(&overall_instruction);
 
