@@ -99,7 +99,7 @@ impl fmt::Display for Instruction {
 }
 
 impl Instruction {
-    const NUM_IMM_BITS: u32 = { u8::BITS * 2 };
+    const NUM_IMM_BITS: u32 = { u16::BITS };
 
     const IMM_SIGN_BIT: u32 = { 1 << (Self::NUM_IMM_BITS - 1) };
 
@@ -107,7 +107,7 @@ impl Instruction {
         let mut val = 0;
         let mut i = Self::NUM_IMM_BITS;
         while i < u32::BITS {
-            val |= i << i;
+            val |= 1 << i;
             i += 1;
         }
         val

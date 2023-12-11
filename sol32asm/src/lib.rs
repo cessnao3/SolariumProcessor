@@ -417,7 +417,7 @@ impl TokenList {
 
             for a in args.iter() {
                 let na = if let Some(v) = state.labels.get(a) {
-                    format!("{v}")
+                    format!("{}", (*v as i32) - (addr as i32))
                 } else {
                     a.to_string()
                 };

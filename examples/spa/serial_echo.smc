@@ -35,7 +35,7 @@ tz 6
 jmpri main_loop_end
 
 ld 7:u8 14
-sav 15:u32 7
+sav 15:u8 7
 
 jmpri main_loop
 
