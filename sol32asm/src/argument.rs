@@ -1,6 +1,6 @@
 use core::fmt;
 
-use sol32::cpu::{DataType, Register};
+use sol32::cpu::{DataType, Register, RegisterManager};
 
 use crate::immediate::ImmediateError;
 
@@ -42,24 +42,29 @@ impl ArgumentRegister {
     }
 }
 
+impl fmt::Display for ArgumentRegister {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.reg)
+    }
+}
+
 impl TryFrom<&str> for ArgumentRegister {
     type Error = ArgumentError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let reg = match value {
-            "$pc" => Register::ProgramCounter,
-            "$stat" => Register::Status,
-            "$sp" => Register::StackPointer,
-            "$ovf" => Register::Overflow,
-            "$ret" => Register::Return,
-            "$arg" => Register::ArgumentBase,
-            val => {
-                if let Ok(val) = val.parse() {
-                    Register::GeneralPurpose(val)
-                } else {
-                    return Err(ArgumentError::UnknownRegister(value.to_string()));
+        for i in 0..RegisterManager::REGISTER_COUNT {
+            let reg = Register::GeneralPurpose(i);
+            if let Some((name, reg)) = reg.get_special() {
+                if format!("${}", name) == value {
+                    return Ok(Self { reg })
                 }
             }
+        }
+
+        let reg = if let Ok(val) = value.parse() {
+            Register::GeneralPurpose(val)
+        } else {
+            return Err(ArgumentError::UnknownRegister(value.to_string()));
         };
 
         Ok(Self { reg })
@@ -78,6 +83,12 @@ impl ArgumentType {
 
     pub fn to_byte(self) -> u8 {
         ((self.data_type.get_id() << Self::DT_OFFSET) & Self::DT_MASK) | self.reg.to_byte()
+    }
+}
+
+impl fmt::Display for ArgumentType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.reg, self.data_type)
     }
 }
 

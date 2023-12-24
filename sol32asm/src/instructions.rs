@@ -38,8 +38,8 @@ impl From<ArgumentError> for InstructionError {
     }
 }
 
-pub trait ToInstruction {
-    fn to_instruction(&self) -> [u8; INST_SIZE];
+pub trait Instruction {
+    fn to_bytes(&self) -> [u8; INST_SIZE];
 }
 
 macro_rules! InstNoArg {
@@ -50,11 +50,21 @@ macro_rules! InstNoArg {
         impl $op_name {
             const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 0;
+
+            pub fn name() -> String {
+                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+            }
         }
 
-        impl ToInstruction for $op_name {
-            fn to_instruction(&self) -> [u8; INST_SIZE] {
+        impl Instruction for $op_name {
+            fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), 0, 0, 0]
+            }
+        }
+
+        impl fmt::Display for $op_name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}", stringify!($op_name))
             }
         }
 
@@ -86,11 +96,21 @@ macro_rules! InstSingleArg {
             pub fn new(arg: ArgumentRegister) -> Self {
                 Self { arg }
             }
+
+            pub fn name() -> String {
+                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+            }
         }
 
-        impl ToInstruction for $op_name {
-            fn to_instruction(&self) -> [u8; INST_SIZE] {
+        impl Instruction for $op_name {
+            fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), self.arg.to_byte(), 0, 0]
+            }
+        }
+
+        impl fmt::Display for $op_name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{} {}", stringify!($op_name), self.arg)
             }
         }
 
@@ -122,11 +142,21 @@ macro_rules! InstSingleArgDataType {
             pub fn new(arg: ArgumentType) -> Self {
                 Self { arg }
             }
+
+            pub fn name() -> String {
+                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+            }
         }
 
-        impl ToInstruction for $op_name {
-            fn to_instruction(&self) -> [u8; INST_SIZE] {
+        impl Instruction for $op_name {
+            fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), self.arg.to_byte(), 0, 0]
+            }
+        }
+
+        impl fmt::Display for $op_name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{} {}", stringify!($op_name), self.arg)
             }
         }
 
@@ -158,12 +188,22 @@ macro_rules! InstImmediateArg {
             pub fn new(imm: u16) -> Self {
                 Self { imm }
             }
+
+            pub fn name() -> String {
+                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+            }
         }
 
-        impl ToInstruction for $op_name {
-            fn to_instruction(&self) -> [u8; INST_SIZE] {
+        impl Instruction for $op_name {
+            fn to_bytes(&self) -> [u8; INST_SIZE] {
                 let imm = self.imm.to_be_bytes();
                 [Self::OP.to_byte(), 0, imm[0], imm[1]]
+            }
+        }
+
+        impl fmt::Display for $op_name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{} {}", stringify!($op_name), self.imm as i16)
             }
         }
 
@@ -197,12 +237,22 @@ macro_rules! InstSingleArgImm {
             pub fn new(arg: ArgumentType, val: u16) -> Self {
                 Self { arg, val }
             }
+
+            pub fn name() -> String {
+                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+            }
         }
 
-        impl ToInstruction for $op_name {
-            fn to_instruction(&self) -> [u8; INST_SIZE] {
+        impl Instruction for $op_name {
+            fn to_bytes(&self) -> [u8; INST_SIZE] {
                 let imm = self.val.to_be_bytes();
                 [Self::OP.to_byte(), self.arg.to_byte(), imm[0], imm[1]]
+            }
+        }
+
+        impl fmt::Display for $op_name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{} {} 0x{:04x}", stringify!($op_name), self.arg, self.val)
             }
         }
 
@@ -237,16 +287,26 @@ macro_rules! InstDoubleArg {
             pub fn new(arg0: ArgumentRegister, arg1: ArgumentRegister) -> Self {
                 Self { arg0, arg1 }
             }
+
+            pub fn name() -> String {
+                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+            }
         }
 
-        impl ToInstruction for $op_name {
-            fn to_instruction(&self) -> [u8; INST_SIZE] {
+        impl Instruction for $op_name {
+            fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [
                     Self::OP.to_byte(),
                     self.arg0.to_byte(),
                     self.arg1.to_byte(),
                     0,
                 ]
+            }
+        }
+
+        impl fmt::Display for $op_name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{} {} {}", stringify!($op_name), self.arg0, self.arg1)
             }
         }
 
@@ -281,16 +341,26 @@ macro_rules! InstDoubleArgType {
             pub fn new(arg0: ArgumentType, arg1: ArgumentRegister) -> Self {
                 Self { arg0, arg1 }
             }
+
+            pub fn name() -> String {
+                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+            }
         }
 
-        impl ToInstruction for $op_name {
-            fn to_instruction(&self) -> [u8; INST_SIZE] {
+        impl Instruction for $op_name {
+            fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [
                     Self::OP.to_byte(),
                     self.arg0.to_byte(),
                     self.arg1.to_byte(),
                     0,
                 ]
+            }
+        }
+
+        impl fmt::Display for $op_name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{} {} {}", stringify!($op_name), self.arg0, self.arg1)
             }
         }
 
@@ -325,16 +395,26 @@ macro_rules! InstDoubleArgDoubleType {
             pub fn new(arg0: ArgumentType, arg1: ArgumentType) -> Self {
                 Self { arg0, arg1 }
             }
+
+            pub fn name() -> String {
+                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+            }
         }
 
-        impl ToInstruction for $op_name {
-            fn to_instruction(&self) -> [u8; INST_SIZE] {
+        impl Instruction for $op_name {
+            fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [
                     Self::OP.to_byte(),
                     self.arg0.to_byte(),
                     self.arg1.to_byte(),
                     0,
                 ]
+            }
+        }
+
+        impl fmt::Display for $op_name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{} {} {}", stringify!($op_name), self.arg0, self.arg1)
             }
         }
 
@@ -370,16 +450,26 @@ macro_rules! InstArith {
             pub fn new(arg0: ArgumentType, arg1: ArgumentRegister, arg2: ArgumentRegister) -> Self {
                 Self { arg0, arg1, arg2 }
             }
+
+            pub fn name() -> String {
+                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+            }
         }
 
-        impl ToInstruction for $op_name {
-            fn to_instruction(&self) -> [u8; INST_SIZE] {
+        impl Instruction for $op_name {
+            fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [
                     Self::OP.to_byte(),
                     self.arg0.to_byte(),
                     self.arg1.to_byte(),
                     self.arg2.to_byte(),
                 ]
+            }
+        }
+
+        impl fmt::Display for $op_name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{} {} {} {}", stringify!($op_name), self.arg0, self.arg1, self.arg2)
             }
         }
 
@@ -414,23 +504,23 @@ InstSingleArg!(OpPop, Processor::OP_POP);
 InstSingleArg!(OpPopr, Processor::OP_POP_REG);
 InstSingleArg!(OpJmp, Processor::OP_JUMP);
 InstSingleArg!(OpJmpr, Processor::OP_JUMP_REL);
-InstSingleArgDataType!(OpLoadNext, Processor::OP_LOAD_NEXT);
+InstSingleArgDataType!(OpLdn, Processor::OP_LOAD_NEXT);
 
 InstSingleArg!(OpTz, Processor::OP_TEST_ZERO);
 InstSingleArg!(OpTnz, Processor::OP_TEST_NOT_ZERO);
 
 InstImmediateArg!(OpJmpri, Processor::OP_JUMP_REL_IMM); // REL IMMEDIATE NEEDS TO HAVE DELTAS FROM CURRENT!
-InstSingleArgImm!(OpLoadi, Processor::OP_LOAD_IMM);
-InstSingleArgImm!(OpLoadri, Processor::OP_LOAD_IMM_REL);
+InstSingleArgImm!(OpLdi, Processor::OP_LOAD_IMM);
+InstSingleArgImm!(OpLdri, Processor::OP_LOAD_IMM_REL);
 
 InstDoubleArg!(OpNot, Processor::OP_NOT);
 InstDoubleArg!(OpBool, Processor::OP_BOOL);
 InstDoubleArg!(OpCopy, Processor::OP_COPY);
 
-InstDoubleArgType!(OpSave, Processor::OP_SAVE);
-InstDoubleArgType!(OpSaver, Processor::OP_SAVE_REL);
-InstDoubleArgType!(OpLoad, Processor::OP_LOAD);
-InstDoubleArgType!(OpLoadr, Processor::OP_LOAD_REL);
+InstDoubleArgType!(OpSav, Processor::OP_SAVE);
+InstDoubleArgType!(OpSavr, Processor::OP_SAVE_REL);
+InstDoubleArgType!(OpLd, Processor::OP_LOAD);
+InstDoubleArgType!(OpLdr, Processor::OP_LOAD_REL);
 
 InstDoubleArgDoubleType!(OpConv, Processor::OP_CONV);
 

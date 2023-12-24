@@ -23,6 +23,28 @@ impl Register {
             Self::GeneralPurpose(num) => *num,
         }
     }
+
+    pub fn get_special(&self) -> Option<(&str, Self)> {
+        match self.get_index() {
+            0 => Some(("pc", Self::ProgramCounter)),
+            1 => Some(("stat", Self::Status)),
+            2 => Some(("sp", Self::StackPointer)),
+            3 => Some(("ovf", Self::Overflow)),
+            4 => Some(("ret", Self::Return)),
+            5 => Some(("arg",Self::ArgumentBase)),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for Register {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some((name, _)) = self.get_special() {
+            write!(f, "{} ({})", name, self.get_index())
+        } else {
+            write!(f, "{}", self.get_index())
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
