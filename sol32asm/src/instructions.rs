@@ -14,6 +14,7 @@ pub enum InstructionError {
     CountMismatch(usize, usize),
     Immediate(ImmediateError),
     Argument(ArgumentError),
+    OpcodeMismatch(Opcode, u8),
 }
 
 impl fmt::Display for InstructionError {
@@ -22,6 +23,7 @@ impl fmt::Display for InstructionError {
             Self::CountMismatch(num, expected) => write!(f, "Found {num}, Expected {expected}"),
             Self::Immediate(i) => write!(f, "Immediate Error => {i}"),
             Self::Argument(a) => write!(f, "Argument Error => {a}"),
+            Self::OpcodeMismatch(op, b) => write!(f, "Opcode Mismatch - {op} does not match provided {b}"),
         }
     }
 }
@@ -48,7 +50,7 @@ macro_rules! InstNoArg {
         pub struct $op_name;
 
         impl $op_name {
-            const OP: Opcode = $opcode;
+            pub const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 0;
 
             pub fn name() -> String {
@@ -64,7 +66,7 @@ macro_rules! InstNoArg {
 
         impl fmt::Display for $op_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}", stringify!($op_name))
+                write!(f, "{}", Self::name())
             }
         }
 
@@ -74,6 +76,18 @@ macro_rules! InstNoArg {
             fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
                 if args.len() != Self::NUM_ARGS {
                     Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
+                } else {
+                    Ok(Self)
+                }
+            }
+        }
+
+        impl TryFrom<[u8; 4]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(bytes: [u8; 4]) -> Result<Self, Self::Error> {
+                if bytes[0] != Self::OP.to_byte() {
+                    Err(InstructionError::OpcodeMismatch(Self::OP, bytes[0]))
                 } else {
                     Ok(Self)
                 }
@@ -90,7 +104,7 @@ macro_rules! InstSingleArg {
         }
 
         impl $op_name {
-            const OP: Opcode = $opcode;
+            pub const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 1;
 
             pub fn new(arg: ArgumentRegister) -> Self {
@@ -110,7 +124,7 @@ macro_rules! InstSingleArg {
 
         impl fmt::Display for $op_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{} {}", stringify!($op_name), self.arg)
+                write!(f, "{} {}", Self::name(), self.arg)
             }
         }
 
@@ -125,6 +139,20 @@ macro_rules! InstSingleArg {
                 }
             }
         }
+
+        impl TryFrom<[u8; 4]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(bytes: [u8; 4]) -> Result<Self, Self::Error> {
+                if bytes[0] != Self::OP.to_byte() {
+                    Err(InstructionError::OpcodeMismatch(Self::OP, bytes[0]))
+                } else {
+                    Ok(Self {
+                        arg: ArgumentRegister::try_from(bytes[1])?
+                    })
+                }
+            }
+        }
     };
 }
 
@@ -136,7 +164,7 @@ macro_rules! InstSingleArgDataType {
         }
 
         impl $op_name {
-            const OP: Opcode = $opcode;
+            pub const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 1;
 
             pub fn new(arg: ArgumentType) -> Self {
@@ -156,7 +184,7 @@ macro_rules! InstSingleArgDataType {
 
         impl fmt::Display for $op_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{} {}", stringify!($op_name), self.arg)
+                write!(f, "{} {}", Self::name(), self.arg)
             }
         }
 
@@ -171,6 +199,20 @@ macro_rules! InstSingleArgDataType {
                 }
             }
         }
+
+        impl TryFrom<[u8; 4]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(bytes: [u8; 4]) -> Result<Self, Self::Error> {
+                if bytes[0] != Self::OP.to_byte() {
+                    Err(InstructionError::OpcodeMismatch(Self::OP, bytes[0]))
+                } else {
+                    Ok(Self {
+                        arg: ArgumentType::try_from(bytes[1])?
+                    })
+                }
+            }
+        }
     };
 }
 
@@ -182,7 +224,7 @@ macro_rules! InstImmediateArg {
         }
 
         impl $op_name {
-            const OP: Opcode = $opcode;
+            pub const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 1;
 
             pub fn new(imm: u16) -> Self {
@@ -203,7 +245,7 @@ macro_rules! InstImmediateArg {
 
         impl fmt::Display for $op_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{} {}", stringify!($op_name), self.imm as i16)
+                write!(f, "{} {}", Self::name(), self.imm as i16)
             }
         }
 
@@ -219,6 +261,20 @@ macro_rules! InstImmediateArg {
                 }
             }
         }
+
+        impl TryFrom<[u8; 4]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(bytes: [u8; 4]) -> Result<Self, Self::Error> {
+                if bytes[0] != Self::OP.to_byte() {
+                    Err(InstructionError::OpcodeMismatch(Self::OP, bytes[0]))
+                } else {
+                    Ok(Self {
+                        imm: u16::from_be_bytes([bytes[2], bytes[3]]),
+                    })
+                }
+            }
+        }
     };
 }
 
@@ -227,15 +283,15 @@ macro_rules! InstSingleArgImm {
         #[derive(Debug, Copy, Clone, Eq, PartialEq)]
         pub struct $op_name {
             arg: ArgumentType,
-            val: u16,
+            imm: u16,
         }
 
         impl $op_name {
-            const OP: Opcode = $opcode;
+            pub const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 2;
 
-            pub fn new(arg: ArgumentType, val: u16) -> Self {
-                Self { arg, val }
+            pub fn new(arg: ArgumentType, imm: u16) -> Self {
+                Self { arg, imm }
             }
 
             pub fn name() -> String {
@@ -245,14 +301,14 @@ macro_rules! InstSingleArgImm {
 
         impl Instruction for $op_name {
             fn to_bytes(&self) -> [u8; INST_SIZE] {
-                let imm = self.val.to_be_bytes();
+                let imm = self.imm.to_be_bytes();
                 [Self::OP.to_byte(), self.arg.to_byte(), imm[0], imm[1]]
             }
         }
 
         impl fmt::Display for $op_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{} {} 0x{:04x}", stringify!($op_name), self.arg, self.val)
+                write!(f, "{} {} 0x{:04x}", Self::name(), self.arg, self.imm)
             }
         }
 
@@ -269,6 +325,21 @@ macro_rules! InstSingleArgImm {
                 }
             }
         }
+
+        impl TryFrom<[u8; 4]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(bytes: [u8; 4]) -> Result<Self, Self::Error> {
+                if bytes[0] != Self::OP.to_byte() {
+                    Err(InstructionError::OpcodeMismatch(Self::OP, bytes[0]))
+                } else {
+                    Ok(Self {
+                        arg: ArgumentType::try_from(bytes[1])?,
+                        imm: u16::from_be_bytes([bytes[2], bytes[3]]),
+                    })
+                }
+            }
+        }
     };
 }
 
@@ -281,7 +352,7 @@ macro_rules! InstDoubleArg {
         }
 
         impl $op_name {
-            const OP: Opcode = $opcode;
+            pub const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 2;
 
             pub fn new(arg0: ArgumentRegister, arg1: ArgumentRegister) -> Self {
@@ -306,7 +377,7 @@ macro_rules! InstDoubleArg {
 
         impl fmt::Display for $op_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{} {} {}", stringify!($op_name), self.arg0, self.arg1)
+                write!(f, "{} {} {}", Self::name(), self.arg0, self.arg1)
             }
         }
 
@@ -323,6 +394,21 @@ macro_rules! InstDoubleArg {
                 }
             }
         }
+
+        impl TryFrom<[u8; 4]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(bytes: [u8; 4]) -> Result<Self, Self::Error> {
+                if bytes[0] != Self::OP.to_byte() {
+                    Err(InstructionError::OpcodeMismatch(Self::OP, bytes[0]))
+                } else {
+                    Ok(Self {
+                        arg0: ArgumentRegister::try_from(bytes[1])?,
+                        arg1: ArgumentRegister::try_from(bytes[2])?,
+                    })
+                }
+            }
+        }
     };
 }
 
@@ -335,7 +421,7 @@ macro_rules! InstDoubleArgType {
         }
 
         impl $op_name {
-            const OP: Opcode = $opcode;
+            pub const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 2;
 
             pub fn new(arg0: ArgumentType, arg1: ArgumentRegister) -> Self {
@@ -360,7 +446,7 @@ macro_rules! InstDoubleArgType {
 
         impl fmt::Display for $op_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{} {} {}", stringify!($op_name), self.arg0, self.arg1)
+                write!(f, "{} {} {}", Self::name(), self.arg0, self.arg1)
             }
         }
 
@@ -377,6 +463,21 @@ macro_rules! InstDoubleArgType {
                 }
             }
         }
+
+        impl TryFrom<[u8; 4]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(bytes: [u8; 4]) -> Result<Self, Self::Error> {
+                if bytes[0] != Self::OP.to_byte() {
+                    Err(InstructionError::OpcodeMismatch(Self::OP, bytes[0]))
+                } else {
+                    Ok(Self {
+                        arg0: ArgumentType::try_from(bytes[1])?,
+                        arg1: ArgumentRegister::try_from(bytes[2])?,
+                    })
+                }
+            }
+        }
     };
 }
 
@@ -389,7 +490,7 @@ macro_rules! InstDoubleArgDoubleType {
         }
 
         impl $op_name {
-            const OP: Opcode = $opcode;
+            pub const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 2;
 
             pub fn new(arg0: ArgumentType, arg1: ArgumentType) -> Self {
@@ -414,7 +515,7 @@ macro_rules! InstDoubleArgDoubleType {
 
         impl fmt::Display for $op_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{} {} {}", stringify!($op_name), self.arg0, self.arg1)
+                write!(f, "{} {} {}", Self::name(), self.arg0, self.arg1)
             }
         }
 
@@ -431,6 +532,21 @@ macro_rules! InstDoubleArgDoubleType {
                 }
             }
         }
+
+        impl TryFrom<[u8; 4]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(bytes: [u8; 4]) -> Result<Self, Self::Error> {
+                if bytes[0] != Self::OP.to_byte() {
+                    Err(InstructionError::OpcodeMismatch(Self::OP, bytes[0]))
+                } else {
+                    Ok(Self {
+                        arg0: ArgumentType::try_from(bytes[1])?,
+                        arg1: ArgumentType::try_from(bytes[2])?,
+                    })
+                }
+            }
+        }
     };
 }
 
@@ -444,7 +560,7 @@ macro_rules! InstArith {
         }
 
         impl $op_name {
-            const OP: Opcode = $opcode;
+            pub const OP: Opcode = $opcode;
             const NUM_ARGS: usize = 3;
 
             pub fn new(arg0: ArgumentType, arg1: ArgumentRegister, arg2: ArgumentRegister) -> Self {
@@ -469,7 +585,7 @@ macro_rules! InstArith {
 
         impl fmt::Display for $op_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{} {} {} {}", stringify!($op_name), self.arg0, self.arg1, self.arg2)
+                write!(f, "{} {} {} {}", Self::name(), self.arg0, self.arg1, self.arg2)
             }
         }
 
@@ -484,6 +600,22 @@ macro_rules! InstArith {
                     let a1 = ArgumentRegister::try_from(args[1].as_ref())?;
                     let a2 = ArgumentRegister::try_from(args[2].as_ref())?;
                     Ok(Self::new(a0, a1, a2))
+                }
+            }
+        }
+
+        impl TryFrom<[u8; 4]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(bytes: [u8; 4]) -> Result<Self, Self::Error> {
+                if bytes[0] != Self::OP.to_byte() {
+                    Err(InstructionError::OpcodeMismatch(Self::OP, bytes[0]))
+                } else {
+                    Ok(Self {
+                        arg0: ArgumentType::try_from(bytes[1])?,
+                        arg1: ArgumentRegister::try_from(bytes[2])?,
+                        arg2: ArgumentRegister::try_from(bytes[3])?,
+                    })
                 }
             }
         }

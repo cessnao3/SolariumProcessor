@@ -23,7 +23,7 @@ pub fn build_ui(app: &Application) {
     columns.append(&build_code_column(&tx_ui, &tx_thread));
     let (column_cpu, register_fields, buffer_log) = build_cpu_column(&tx_ui);
     columns.append(&column_cpu);
-    let (column_serial, memory_vals, buffer_serial, instruction_label) = build_serial_column(&tx_ui, &tx_thread);
+    let (column_serial, memory_vals, buffer_serial, instruction_label, instruction_details) = build_serial_column(&tx_ui, &tx_thread);
     columns.append(&column_serial);
 
     // Create a window and set the title
@@ -45,6 +45,9 @@ pub fn build_ui(app: &Application) {
         }
     });
 
+    // Create the
+    let inst = sol32asm::InstructionList::default();
+
     // Setup the UI receiver
     glib::spawn_future_local(async move {
         while let Ok(msg) = rx_ui_async.recv().await {
@@ -58,6 +61,12 @@ pub fn build_ui(app: &Application) {
                     }
                 }
                 ThreadToUi::ProgramCounterValue(pc, val) => {
+                    if let Some(disp_val) = inst.get_display_inst(val) {
+                        instruction_details.set_text(&disp_val);
+                    } else {
+                        instruction_details.set_text("??");
+                    }
+
                     instruction_label.set_text(&format!("Mem[0x{:08x}] = 0x{:08x}", pc, val));
                 }
                 ThreadToUi::LogMessage(msg) => {
@@ -331,7 +340,7 @@ impl MemoryLocationData {
 fn build_serial_column(
     tx_ui: &std::sync::mpsc::Sender<UiToThread>,
     tx_thread: &std::sync::mpsc::Sender<ThreadToUi>,
-) -> (gtk::Box, MemoryLocationData, gtk::TextBuffer, gtk::Label) {
+) -> (gtk::Box, MemoryLocationData, gtk::TextBuffer, gtk::Label, gtk::Label) {
     let column_serial = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
@@ -401,7 +410,12 @@ fn build_serial_column(
         .label("")
         .margin_end(6)
         .build();
+    let instruction_details = gtk::Label::builder()
+        .label("")
+        .margin_end(6)
+        .build();
     instruction_box.append(&overall_instruction);
+    instruction_box.append(&instruction_details);
 
     column_serial.append(&instruction_frame);
 
@@ -461,5 +475,5 @@ fn build_serial_column(
 
     column_serial.append(&text_input_frame);
 
-    (column_serial, memory, buffer_serial, overall_instruction)
+    (column_serial, memory, buffer_serial, overall_instruction, instruction_details)
 }

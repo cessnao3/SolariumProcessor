@@ -4,13 +4,14 @@ mod register;
 
 use core::fmt;
 use std::cell::RefCell;
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
-pub use crate::cpu::instruction::DataType;
+pub use crate::cpu::instruction::{DataType, DataTypeError};
 use crate::device::{DeviceAction, ProcessorDevice};
 use crate::memory::{MemoryError, MemoryMap, MemorySegment};
 
-use self::instruction::{DataTypeError, Instruction};
+use self::instruction::Instruction;
 use self::operations::{
     ArithmeticOperations, BinaryOperations, FloatOperations, IntegerI16Operations,
     IntegerI32Operations, IntegerI8Operations, IntegerU16Operations, IntegerU32Operations,
@@ -91,12 +92,25 @@ impl Opcode {
     }
 }
 
+impl fmt::Display for Opcode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{} ({})", self.base, self.code, self.to_byte())
+    }
+}
+
 impl From<u8> for Opcode {
     fn from(value: u8) -> Self {
         Self {
             base: (value >> 4) & 0xF,
             code: value & 0xF,
         }
+    }
+}
+
+impl Hash for Opcode {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.base.hash(state);
+        self.code.hash(state);
     }
 }
 

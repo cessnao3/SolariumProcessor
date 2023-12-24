@@ -12,6 +12,8 @@ use instructions::{
     OpSav, OpSavr, OpSub, OpTeq, OpTgeq, OpTgt, OpTleq, OpTlt, OpTneq, OpTnz, OpTz,
 };
 
+use sol32::cpu::Opcode;
+
 use immediate::{
     parse_imm_i16, parse_imm_i32, parse_imm_i8, parse_imm_u16, parse_imm_u32, parse_imm_u8,
     ImmediateError,
@@ -82,6 +84,7 @@ impl fmt::Display for AssemblerErrorLoc {
 }
 
 type FnInst = fn(Vec<String>) -> Result<Rc<dyn Instruction>, InstructionError>;
+type FnDisp = fn([u8; 4]) -> Option<String>;
 
 #[derive(Clone)]
 pub enum Token {
@@ -100,32 +103,76 @@ pub struct TokenLoc {
     pub loc: LocationInfo,
 }
 
-struct TokenList {
-    tokens: Vec<TokenLoc>,
-    inst: HashMap<String, FnInst>,
-    label_regex: regex::Regex,
+pub struct InstructionList {
+    inst_map: HashMap<String, FnInst>,
+    name_map: HashMap<Opcode, String>,
+    disp_map: HashMap<Opcode, FnDisp>,
 }
 
-macro_rules! create_operation_map {
+macro_rules! create_instruction_map {
     ($($op:ident),*) => {
-        HashMap::<String, FnInst>::from([
-            $( { ( $op::name().into(), (|a| Ok(Rc::new($op::try_from(a)?) as Rc<dyn Instruction>)) as FnInst ) } ),*
+        Vec::<(Opcode, String, FnInst, FnDisp)>::from([
+            $( { (
+                $op::OP,
+                $op::name().into(),
+                (|a| Ok(Rc::new($op::try_from(a)?) as Rc<dyn Instruction>)) as FnInst,
+                (|b| { if let Ok(s) = $op::try_from(b) { Some(s.to_string()) } else { None } }) as FnDisp )
+            } ),*
         ])
     };
 }
 
-impl TokenList {
-    pub fn new() -> Self {
-        let inst = create_operation_map!(
+impl InstructionList {
+    pub fn get_name_for_opcode(&self, op: &Opcode) -> Option<&String> {
+        self.name_map.get(op)
+    }
+
+    pub fn get_instruction(&self, s: &str) -> Option<&FnInst> {
+        self.inst_map.get(s)
+    }
+
+    pub fn get_display(&self, inst: [u8; 4]) -> Option<String> {
+        let op = Opcode::from(inst[0]);
+        if let Some(f) = self.disp_map.get(&op) {
+            f(inst)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_display_inst(&self, inst: u32) -> Option<String> {
+        self.get_display(inst.to_be_bytes())
+    }
+}
+
+impl Default for InstructionList {
+    fn default() -> Self {
+        let inst = create_instruction_map!(
             OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall, OpConv, OpCopy, OpDiv,
             OpHalt, OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLd, OpLdn, OpLdi, OpLdr, OpLdri,
             OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt, OpSav,
             OpSavr, OpSub, OpTeq, OpTgeq, OpTgt, OpTleq, OpTlt, OpTneq, OpTnz, OpTz
         );
 
+        let inst_map = inst.iter().map(|(_, n, f, _)| (n.to_owned(), *f)).collect();
+        let name_map = inst.iter().map(|(o, n, _, _)| (*o, n.to_owned())).collect();
+        let disp_map = inst.iter().map(|(o, _, _, d)| (*o, *d)).collect();
+
+        Self { inst_map, name_map, disp_map }
+    }
+}
+
+struct TokenList {
+    tokens: Vec<TokenLoc>,
+    inst: InstructionList,
+    label_regex: regex::Regex,
+}
+
+impl TokenList {
+    pub fn new() -> Self {
         Self {
             tokens: Vec::new(),
-            inst,
+            inst: InstructionList::default(),
             label_regex: regex::Regex::new("^[a-z](a-z0-9_)*").unwrap(),
         }
     }
@@ -188,7 +235,7 @@ impl TokenList {
             }
 
             Token::CreateLabel(lbl.to_string())
-        } else if let Some(inst_fn) = self.inst.get(words[0]) {
+        } else if let Some(inst_fn) = self.inst.get_instruction(words[0]) {
             let args = &words[1..];
             Token::Operation(*inst_fn, args.iter().map(|s| s.to_string()).collect())
         } else {

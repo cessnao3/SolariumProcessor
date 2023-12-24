@@ -1,6 +1,6 @@
 use core::fmt;
 
-use sol32::cpu::{DataType, Register, RegisterManager};
+use sol32::cpu::{DataType, DataTypeError, Register, RegisterManager};
 
 use crate::immediate::ImmediateError;
 
@@ -8,7 +8,9 @@ use crate::immediate::ImmediateError;
 pub enum ArgumentError {
     Immediate(ImmediateError),
     UnknownRegister(String),
+    UnknownRegisterIndex(usize),
     UnknownDataType(String),
+    DataType(DataTypeError),
     ExpectedTypeInformation(String),
 }
 
@@ -16,9 +18,13 @@ impl fmt::Display for ArgumentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Immediate(i) => write!(f, "Immediate Error => {i}"),
-            Self::UnknownRegister(r) => write!(f, "Unknown Argument Register {r}"),
-            Self::UnknownDataType(d) => write!(f, "Unknown Argument Data Type {d}"),
-            Self::ExpectedTypeInformation(r) => write!(f, "Expected Argument Type Information in '{r}'"),
+            Self::UnknownRegister(r) => write!(f, "Unknown Register {r}"),
+            Self::UnknownRegisterIndex(i) => write!(f, "Unknown Register Index {i}"),
+            Self::UnknownDataType(d) => write!(f, "Unknown Data Type {d}"),
+            Self::DataType(e) => write!(f, "Data Type => {e}"),
+            Self::ExpectedTypeInformation(r) => {
+                write!(f, "Expected Argument Type Information in '{r}'")
+            }
         }
     }
 }
@@ -26,6 +32,12 @@ impl fmt::Display for ArgumentError {
 impl From<ImmediateError> for ArgumentError {
     fn from(value: ImmediateError) -> Self {
         ArgumentError::Immediate(value)
+    }
+}
+
+impl From<DataTypeError> for ArgumentError {
+    fn from(value: DataTypeError) -> Self {
+        ArgumentError::DataType(value)
     }
 }
 
@@ -56,18 +68,36 @@ impl TryFrom<&str> for ArgumentRegister {
             let reg = Register::GeneralPurpose(i);
             if let Some((name, reg)) = reg.get_special() {
                 if format!("${}", name) == value {
-                    return Ok(Self { reg })
+                    return Ok(Self { reg });
                 }
             }
         }
 
         let reg = if let Ok(val) = value.parse() {
-            Register::GeneralPurpose(val)
+            if val == (val & Self::REGISTER_MASK as usize) {
+                Register::GeneralPurpose(val)
+            } else {
+                return Err(ArgumentError::UnknownRegisterIndex(val));
+            }
         } else {
             return Err(ArgumentError::UnknownRegister(value.to_string()));
         };
 
         Ok(Self { reg })
+    }
+}
+
+impl TryFrom<u8> for ArgumentRegister {
+    type Error = ArgumentError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        if (value & ArgumentRegister::REGISTER_MASK) != value {
+            return Err(ArgumentError::UnknownRegisterIndex(value as usize));
+        }
+
+        Ok(Self {
+            reg: Register::GeneralPurpose(value as usize),
+        })
     }
 }
 
@@ -114,5 +144,19 @@ impl TryFrom<&str> for ArgumentType {
         } else {
             Err(ArgumentError::ExpectedTypeInformation(value.to_string()))
         }
+    }
+}
+
+impl TryFrom<u8> for ArgumentType {
+    type Error = ArgumentError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        let dt_val = (value & Self::DT_MASK) >> Self::DT_OFFSET;
+        let dt = DataType::try_from(dt_val)?;
+
+        Ok(Self {
+            reg: ArgumentRegister::try_from(value)?,
+            data_type: dt,
+        })
     }
 }
