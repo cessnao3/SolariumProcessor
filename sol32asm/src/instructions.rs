@@ -669,7 +669,7 @@ InstArith!(OpBshr, Processor::OP_BSHR);
 
 InstArith!(OpTeq, Processor::OP_EQ);
 InstArith!(OpTneq, Processor::OP_NEQ);
-InstArith!(OpTgt, Processor::OP_GREATER);
-InstArith!(OpTgeq, Processor::OP_GREATER_EQ);
-InstArith!(OpTlt, Processor::OP_LESS);
-InstArith!(OpTleq, Processor::OP_LESS_EQ);
+InstArith!(OpTg, Processor::OP_GREATER);
+InstArith!(OpTge, Processor::OP_GREATER_EQ);
+InstArith!(OpTl, Processor::OP_LESS);
+InstArith!(OpTle, Processor::OP_LESS_EQ);

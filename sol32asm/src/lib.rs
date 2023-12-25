@@ -9,7 +9,7 @@ use instructions::{
     Instruction, InstructionError, OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall,
     OpConv, OpCopy, OpDiv, OpHalt, OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLd, OpLdi, OpLdn,
     OpLdr, OpLdri, OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt,
-    OpSav, OpSavr, OpSub, OpTeq, OpTgeq, OpTgt, OpTleq, OpTlt, OpTneq, OpTnz, OpTz,
+    OpSav, OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq, OpTnz, OpTz,
 };
 
 use sol32::cpu::Opcode;
@@ -151,7 +151,7 @@ impl Default for InstructionList {
             OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall, OpConv, OpCopy, OpDiv,
             OpHalt, OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLd, OpLdn, OpLdi, OpLdr, OpLdri,
             OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt, OpSav,
-            OpSavr, OpSub, OpTeq, OpTgeq, OpTgt, OpTleq, OpTlt, OpTneq, OpTnz, OpTz
+            OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq, OpTnz, OpTz
         );
 
         let inst_map = inst.iter().map(|(_, n, f, _)| (n.to_owned(), *f)).collect();
