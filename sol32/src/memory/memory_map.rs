@@ -57,21 +57,29 @@ pub struct MemoryMap {
     segments: Vec<SegmentData>,
 }
 
-macro_rules! GetSetUnsignedType {
-    ( $get_name: ident, $set_name: ident, $type: ident ) => {
+macro_rules! GetSetInspectUnsignedType {
+    ( $get_name: ident, $set_name: ident, $inspect_name: ident, $type: ident ) => {
         pub fn $get_name(&mut self, address: u32) -> Result<$type, MemoryError> {
             let mut bytes = [0; size_of::<$type>()];
-            for i in 0..size_of::<$type>() {
-                bytes[i] = self.get_u8(address + i as u32)?;
+            for i in 0..bytes.len() {
+                bytes[i] = self.get(address + i as u32)?;
             }
             Ok($type::from_be_bytes(bytes))
         }
 
         pub fn $set_name(&mut self, address: u32, val: $type) -> Result<(), MemoryError> {
             for (i, v) in val.to_be_bytes().iter().enumerate() {
-                self.set_u8(address + i as u32, *v)?;
+                self.set(address + i as u32, *v)?;
             }
             Ok(())
+        }
+
+        pub fn $inspect_name(&self, address: u32) -> Result<$type, MemoryError> {
+            let mut bytes = [0; size_of::<$type>()];
+            for i in 0..bytes.len() {
+                bytes[i] = self.inspect(address + i as u32)?;
+            }
+            Ok($type::from_be_bytes(bytes))
         }
     };
 }
@@ -111,7 +119,7 @@ impl MemoryMap {
         Ok(())
     }
 
-    pub fn get_u8(&self, address: u32) -> Result<u8, MemoryError> {
+    pub fn get(&self, address: u32) -> Result<u8, MemoryError> {
         let data = self.get_segment(address)?;
         data.get(address)
     }
@@ -121,7 +129,7 @@ impl MemoryMap {
         data.inspect(address)
     }
 
-    pub fn set_u8(&mut self, address: u32, val: u8) -> Result<(), MemoryError> {
+    pub fn set(&mut self, address: u32, val: u8) -> Result<(), MemoryError> {
         let data = self.get_segment(address)?;
         data.set(address, val)
     }
@@ -142,8 +150,8 @@ impl MemoryMap {
         }
     }
 
-    GetSetUnsignedType!(get_u32, set_u32, u32);
-    GetSetUnsignedType!(get_u16, set_u16, u16);
+    GetSetInspectUnsignedType!(get_u32, set_u32, inspect_u32, u32);
+    GetSetInspectUnsignedType!(get_u16, set_u16, inspect_u16, u16);
 }
 
 impl Default for MemoryMap {

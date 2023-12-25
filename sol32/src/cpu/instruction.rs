@@ -178,3 +178,9 @@ impl Instruction {
         val as i32
     }
 }
+
+impl From<u32> for Instruction {
+    fn from(value: u32) -> Self {
+        Self::new(value.to_be_bytes())
+    }
+}

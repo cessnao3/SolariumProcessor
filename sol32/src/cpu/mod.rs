@@ -45,7 +45,7 @@ impl fmt::Display for ProcessorError {
             Self::UnsupportedDataType(i, dt) => write!(f, "Unsupported Data Type {dt} for Instruction {i}"),
             Self::Operation(o) => write!(f, "Operation Error => {o}"),
             Self::StackUnderflow => write!(f, "Stack Underflow"),
-            Self::OpcodeAlignment(o) => write!(f, "Opcode Alignment Error => {o}"),
+            Self::OpcodeAlignment(o) => write!(f, "Opcode Alignment Error => 0x{o:08x}"),
         }
     }
 }
@@ -128,15 +128,26 @@ pub struct Processor {
 }
 
 impl Processor {
-    pub const INIT_DATA_SIZE: u32 = 0x1000;
+    /// Defines the number of bytes per memory address (size of the default memory word)
     pub const BYTES_PER_ADDRESS: u32 = std::mem::size_of::<u32>() as u32;
 
+    /// Defines the hard reset vector number
     pub const HARD_RESET_VECTOR: u32 = 0;
-    pub const SOFT_RESET_VECTOR: u32 = 1;
 
+    /// Defines the hard reset vector number
+    pub const SOFT_RESET_VECTOR: u32 = Self::BYTES_PER_ADDRESS;
+
+    /// Defines the number of supported interrupts
     pub const NUM_INTERRUPT: u32 = 32;
+
+    ///Providesthe base address for the hardware interrupts
     pub const BASE_HW_INT_ADDR: u32 = 0x100;
+
+    /// Provides the base address for the software interrupts
     pub const BASE_SW_INT_ADDR: u32 = Self::BYTES_PER_ADDRESS * Self::NUM_INTERRUPT;
+
+    /// Provides the top address (next free address) after the vector memory segments
+    pub const TOP_VEC_SEG_ADDR: u32 = Self::BASE_SW_INT_ADDR * Self::NUM_INTERRUPT;
 
     const OP_BASE_CPU: u8 = 0;
     pub const OP_NOOP: Opcode = Opcode {
@@ -352,7 +363,7 @@ impl Processor {
             self.memory.reset();
         }
 
-        let reset_vec = match reset_type {
+        let reset_vec_addr = match reset_type {
             ResetType::Hard => Self::HARD_RESET_VECTOR,
             ResetType::Soft => Self::SOFT_RESET_VECTOR,
         };
@@ -360,7 +371,7 @@ impl Processor {
         self.registers.reset();
         self.registers.set(
             Register::ProgramCounter,
-            self.memory.get_u32(self.get_reset_vector(reset_vec)?)?,
+            self.memory.get_u32(reset_vec_addr)?,
         )?;
         self.registers.set_flag(RegisterFlag::InterruptEnable, true)?;
 
@@ -423,7 +434,7 @@ impl Processor {
     }
 
     pub fn memory_set(&mut self, address: u32, val: u8) -> Result<(), ProcessorError> {
-        self.memory.set_u8(address, val)?;
+        self.memory.set(address, val)?;
         Ok(())
     }
 
@@ -432,11 +443,7 @@ impl Processor {
     }
 
     pub fn memory_inspect_u32(&self, address: u32) -> Result<u32, ProcessorError> {
-        let mut bytes = [0; Self::BYTES_PER_ADDRESS as usize];
-        for (i, v) in bytes.iter_mut().enumerate() {
-            *v = self.memory.inspect(address + i as u32)?;
-        }
-        Ok(u32::from_be_bytes(bytes))
+        Ok(self.memory.inspect_u32(address)?)
     }
 
     pub fn memory_add_segment(&mut self, address: u32, seg: Rc<RefCell<dyn MemorySegment>>) -> Result<(), ProcessorError> {
@@ -503,12 +510,7 @@ impl Processor {
             return Err(ProcessorError::OpcodeAlignment(pc));
         }
 
-        let inst = Instruction::new([
-            self.memory.get_u8(pc)?,
-            self.memory.get_u8(pc + 1)?,
-            self.memory.get_u8(pc + 2)?,
-            self.memory.get_u8(pc + 3)?,
-        ]);
+        let inst = Instruction::from(self.memory.get_u32(pc)?);
 
         let opcode = Opcode::from(inst.opcode());
 
@@ -628,7 +630,7 @@ impl Processor {
                     match dt.word_size() {
                         1 => self
                             .registers
-                            .set(reg_target, (self.memory.get_u8(addr)? as i32) as u32)?,
+                            .set(reg_target, (self.memory.get(addr)? as i32) as u32)?,
                         2 => self
                             .registers
                             .set(reg_target, (self.memory.get_u16(addr)? as i32) as u32)?,
@@ -639,7 +641,7 @@ impl Processor {
                     match dt.word_size() {
                         1 => self
                             .registers
-                            .set(reg_target, self.memory.get_u8(addr)? as u32)?,
+                            .set(reg_target, self.memory.get(addr)? as u32)?,
                         2 => self
                             .registers
                             .set(reg_target, self.memory.get_u16(addr)? as u32)?,
@@ -662,7 +664,7 @@ impl Processor {
                 };
 
                 match dt.word_size() {
-                    1 => self.memory.set_u8(addr, (source_reg & 0xFF) as u8)?,
+                    1 => self.memory.set(addr, (source_reg & 0xFF) as u8)?,
                     2 => self.memory.set_u16(addr, (source_reg & 0xFFFF) as u16)?,
                     4 => self.memory.set_u32(addr, source_reg)?,
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
@@ -863,14 +865,6 @@ impl Processor {
         self.registers.set(Register::StackPointer, sp_curr)?;
 
         Ok(self.memory.get_u32(sp_curr)?)
-    }
-
-    pub fn get_reset_vector(&self, index: u32) -> Result<u32, ProcessorError> {
-        if index < 64 {
-            Ok(index * 4)
-        } else {
-            Err(ProcessorError::UnsupportedInterrupt(index))
-        }
     }
 }
 

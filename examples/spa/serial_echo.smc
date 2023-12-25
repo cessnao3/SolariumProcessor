@@ -17,7 +17,7 @@ retint
 .oper 0x4000
 :program_start
 ldn $sp:u32
-.u32 0x400
+.u32 0x1000
 ldn 13:u32
 .u32 0xA000
 

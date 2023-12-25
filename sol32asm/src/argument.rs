@@ -91,12 +91,10 @@ impl TryFrom<u8> for ArgumentRegister {
     type Error = ArgumentError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if (value & ArgumentRegister::REGISTER_MASK) != value {
-            return Err(ArgumentError::UnknownRegisterIndex(value as usize));
-        }
+        let reg = value & Self::REGISTER_MASK;
 
         Ok(Self {
-            reg: Register::GeneralPurpose(value as usize),
+            reg: Register::GeneralPurpose(reg as usize),
         })
     }
 }

@@ -42,6 +42,10 @@ impl From<ArgumentError> for InstructionError {
 
 pub trait Instruction {
     fn to_bytes(&self) -> [u8; INST_SIZE];
+
+    fn to_u32(&self) -> u32 {
+        u32::from_be_bytes(self.to_bytes())
+    }
 }
 
 macro_rules! InstNoArg {

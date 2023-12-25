@@ -36,7 +36,7 @@ impl ThreadState {
     }
 
     fn reset(&mut self) -> Result<(), ProcessorError> {
-        const INIT_RO_LEN: u32 = Processor::INIT_DATA_SIZE;
+        const INIT_RO_LEN: u32 = Processor::TOP_VEC_SEG_ADDR;
 
         self.cpu = Processor::new();
         self.serial_io_dev.borrow_mut().reset();
@@ -110,6 +110,7 @@ impl ThreadState {
                     state.multiplier = m;
                 }
                 UiToThread::SetCode(data) => {
+                    state.running = false;
                     state.last_code = data;
                     state.reset()?;
                     return Ok(Some(ThreadToUi::ProcessorReset));

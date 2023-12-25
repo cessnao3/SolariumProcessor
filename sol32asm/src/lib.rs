@@ -12,7 +12,7 @@ use instructions::{
     OpSav, OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq, OpTnz, OpTz,
 };
 
-use sol32::cpu::Opcode;
+use sol32::cpu::{Opcode, Processor};
 
 use immediate::{
     parse_imm_i16, parse_imm_i32, parse_imm_i8, parse_imm_u16, parse_imm_u32, parse_imm_u8,
@@ -22,7 +22,7 @@ use immediate::{
 #[derive(Debug, Clone)]
 pub enum AssemblerError {
     UnknownLabel(String),
-    UnknownInstruction(String),
+    UnknownInstruction(String, Option<usize>),
     Instruction(InstructionError),
     ArgumentCountMismatch(usize, usize),
     InvalidLabel(String),
@@ -35,7 +35,10 @@ impl fmt::Display for AssemblerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnknownLabel(l) => write!(f, "Unknown Label {l}"),
-            Self::UnknownInstruction(i) => write!(f, "Unknown Instruction {i}"),
+            Self::UnknownInstruction(i, None) => write!(f, "Unknown Instruction {i}"),
+            Self::UnknownInstruction(i, Some(len)) => {
+                write!(f, "Unknown Instruction {i} with length {len}")
+            }
             Self::ArgumentCountMismatch(num, expected) => {
                 write!(f, "Argument Count Expected {expected}, found {num}")
             }
@@ -64,6 +67,17 @@ impl From<InstructionError> for AssemblerError {
 pub struct LocationInfo {
     pub line: usize,
     pub full_line: Option<String>,
+}
+
+impl fmt::Display for LocationInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}]", self.line)?;
+        if let Some(txt) = &self.full_line {
+            write!(f, " {}", txt)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +109,7 @@ pub enum Token {
     Immediate1(u8),
     Immediate2(u16),
     Immediate4(u32),
+    AlignInstruction,
 }
 
 #[derive(Clone)]
@@ -116,7 +131,7 @@ macro_rules! create_instruction_map {
                 $op::OP,
                 $op::name().into(),
                 (|a| Ok(Rc::new($op::try_from(a)?) as Rc<dyn Instruction>)) as FnInst,
-                (|b| { if let Ok(s) = $op::try_from(b) { Some(s.to_string()) } else { None } }) as FnDisp )
+                (|b| { let res = $op::try_from(b); if let Ok(s) = res { Some(s.to_string()) } else { None } }) as FnDisp )
             } ),*
         ])
     };
@@ -158,7 +173,11 @@ impl Default for InstructionList {
         let name_map = inst.iter().map(|(o, n, _, _)| (*o, n.to_owned())).collect();
         let disp_map = inst.iter().map(|(o, _, _, d)| (*o, *d)).collect();
 
-        Self { inst_map, name_map, disp_map }
+        Self {
+            inst_map,
+            name_map,
+            disp_map,
+        }
     }
 }
 
@@ -201,29 +220,44 @@ impl TokenList {
         let tok = if let Some(op) = first.strip_prefix('.') {
             let args = &words[1..];
 
-            if args.len() != 1 {
-                return Err(AssemblerError::ArgumentCountMismatch(args.len(), 1));
-            }
-
-            let arg = args[0];
-
-            match op {
-                "oper" => Token::ChangeAddress(parse_imm_u32(arg)?),
-                "loadloc" => Token::LoadLoc(arg.to_string()),
-                "u8" => Token::Immediate1(parse_imm_u8(arg)?),
-                "u16" => Token::Immediate2(parse_imm_u16(arg)?),
-                "u32" => Token::Immediate4(parse_imm_u32(arg)?),
-                "i8" => Token::Immediate1(parse_imm_i8(arg)? as u8),
-                "i16" => Token::Immediate2(parse_imm_i16(arg)? as u16),
-                "i32" => Token::Immediate4(parse_imm_i32(arg)? as u32),
-                "f32" => Token::Immediate4(
-                    match arg.parse::<f32>() {
-                        Ok(v) => v,
-                        Err(_) => return Err(ImmediateError(arg.to_string()).into()),
+            if args.is_empty() {
+                match op {
+                    "align" => Token::AlignInstruction,
+                    _ => {
+                        return Err(AssemblerError::UnknownInstruction(
+                            op.to_string(),
+                            Some(args.len()),
+                        ))
                     }
-                    .to_bits(),
-                ),
-                _ => return Err(AssemblerError::UnknownInstruction(op.to_string())),
+                }
+            } else if args.len() == 1 {
+                let arg = args[0];
+
+                match op {
+                    "oper" => Token::ChangeAddress(parse_imm_u32(arg)?),
+                    "loadloc" => Token::LoadLoc(arg.to_string()),
+                    "u8" => Token::Immediate1(parse_imm_u8(arg)?),
+                    "u16" => Token::Immediate2(parse_imm_u16(arg)?),
+                    "u32" => Token::Immediate4(parse_imm_u32(arg)?),
+                    "i8" => Token::Immediate1(parse_imm_i8(arg)? as u8),
+                    "i16" => Token::Immediate2(parse_imm_i16(arg)? as u16),
+                    "i32" => Token::Immediate4(parse_imm_i32(arg)? as u32),
+                    "f32" => Token::Immediate4(
+                        match arg.parse::<f32>() {
+                            Ok(v) => v,
+                            Err(_) => return Err(ImmediateError(arg.to_string()).into()),
+                        }
+                        .to_bits(),
+                    ),
+                    _ => {
+                        return Err(AssemblerError::UnknownInstruction(
+                            op.to_string(),
+                            Some(args.len()),
+                        ))
+                    }
+                }
+            } else {
+                return Err(AssemblerError::ArgumentCountMismatch(args.len(), 1));
             }
         } else if let Some(lbl) = first.strip_prefix(':') {
             if !self.label_regex.is_match(lbl) {
@@ -239,7 +273,7 @@ impl TokenList {
             let args = &words[1..];
             Token::Operation(*inst_fn, args.iter().map(|s| s.to_string()).collect())
         } else {
-            return Err(AssemblerError::UnknownInstruction(line.into()));
+            return Err(AssemblerError::UnknownInstruction(line.into(), None));
         };
 
         self.tokens.push(TokenLoc { tok, loc });
@@ -256,6 +290,7 @@ impl TokenList {
 
         for t in self.tokens.iter() {
             match &t.tok {
+                Token::AlignInstruction => state.align_boundary(Processor::BYTES_PER_ADDRESS),
                 Token::ChangeAddress(new_addr) => {
                     if *new_addr < state.addr {
                         panic!("cannot backup address");
@@ -282,57 +317,21 @@ impl TokenList {
                     state.labels.insert(lbl.into(), state.addr);
                 }
                 Token::LoadLoc(lbl) => {
-                    state.loadloc_vals.insert(state.addr, lbl.into());
-                    state.add_bytes(&0u32.to_be_bytes());
+                    state.add_delay(DelayToken::LoadLoc { label: lbl.into() }, t.loc.clone());
                 }
                 Token::Operation(func, args) => {
-                    state
-                        .oper_vals
-                        .insert(state.addr, (*func, args.to_owned(), t.loc.clone()));
-                    state.add_bytes(&0u32.to_be_bytes());
+                    state.add_delay(
+                        DelayToken::Operation {
+                            inst: *func,
+                            args: args.to_owned(),
+                        },
+                        t.loc.clone(),
+                    );
                 }
             }
         }
 
-        for (addr, lbl) in state.loadloc_vals {
-            if let Some(loc) = state.labels.get(&lbl) {
-                for (i, val) in loc.to_be_bytes().iter().enumerate() {
-                    state.values.insert(addr + i as u32, *val);
-                }
-            } else {
-                panic!("no label for {lbl} found");
-            }
-        }
-
-        for (addr, (inst_fn, args, loc)) in state.oper_vals {
-            let mut new_args = Vec::new();
-
-            for a in args.iter() {
-                let na = if let Some(v) = state.labels.get(a) {
-                    format!("{}", (*v as i32) - (addr as i32))
-                } else {
-                    a.to_string()
-                };
-
-                new_args.push(na);
-            }
-
-            let val = match inst_fn(new_args) {
-                Ok(v) => v,
-                Err(err) => {
-                    return Err(AssemblerErrorLoc {
-                        err: err.into(),
-                        loc,
-                    })
-                }
-            };
-
-            let inst = val.to_bytes();
-
-            for (i, val) in inst.iter().enumerate() {
-                state.values.insert(addr + i as u32, *val);
-            }
-        }
+        state.process_delays()?;
 
         let mut bytes = Vec::new();
 
@@ -348,13 +347,18 @@ impl TokenList {
     }
 }
 
+#[derive(Debug, Clone)]
+enum DelayToken {
+    LoadLoc { label: String },
+    Operation { inst: FnInst, args: Vec<String> },
+}
+
 #[derive(Default)]
-pub struct ParserState {
+struct ParserState {
     addr: u32,
     labels: HashMap<String, u32>,
     values: HashMap<u32, u8>,
-    loadloc_vals: HashMap<u32, String>,
-    oper_vals: HashMap<u32, (FnInst, Vec<String>, LocationInfo)>,
+    delay_vals: HashMap<u32, (DelayToken, LocationInfo)>,
 }
 
 impl ParserState {
@@ -362,18 +366,78 @@ impl ParserState {
         Self::default()
     }
 
-    fn add_bytes(&mut self, vals: &[u8]) {
+    fn add_delay(&mut self, delay: DelayToken, loc: LocationInfo) {
+        let base = self.add_bytes(&0u32.to_be_bytes());
+        self.delay_vals.insert(base, (delay, loc));
+    }
+
+    fn add_bytes(&mut self, vals: &[u8]) -> u32 {
         self.align_boundary(vals.len() as u32);
+        let base = self.addr;
         for v in vals {
             self.values.insert(self.addr, *v);
             self.addr += 1;
         }
+        base
     }
 
     fn align_boundary(&mut self, val: u32) {
         if val > 0 && self.addr % val != 0 {
             self.addr += val - (self.addr % val);
         }
+    }
+
+    fn process_delays(&mut self) -> Result<(), AssemblerErrorLoc> {
+        for (addr, (tok, loc)) in self.delay_vals.iter() {
+            let insert_value = match tok {
+                DelayToken::LoadLoc { label } => {
+                    if let Some(loc) = self.labels.get(label) {
+                        *loc
+                    } else {
+                        return Err(AssemblerErrorLoc {
+                            err: AssemblerError::UnknownLabel(label.into()),
+                            loc: loc.clone(),
+                        });
+                    }
+                }
+                DelayToken::Operation { inst, args } => {
+                    // Create new arguments to get relative values for any label parameters
+                    let mut new_args = Vec::new();
+
+                    for a in args.iter() {
+                        let na = if let Some(v) = self.labels.get(a) {
+                            format!("{}", (*v as i32) - (*addr as i32))
+                        } else {
+                            a.to_string()
+                        };
+
+                        new_args.push(na);
+                    }
+
+                    // Call the instruction function and obtain the resulting parameters
+                    let val = match inst(new_args) {
+                        Ok(v) => v,
+                        Err(err) => {
+                            return Err(AssemblerErrorLoc {
+                                err: err.into(),
+                                loc: loc.clone(),
+                            })
+                        }
+                    };
+
+                    // Replace the
+                    val.to_u32()
+                }
+            };
+
+            for (i, b) in insert_value.to_be_bytes().iter().enumerate() {
+                self.values.insert(addr + i as u32, *b);
+            }
+        }
+
+        self.delay_vals.clear();
+
+        Ok(())
     }
 }
 
