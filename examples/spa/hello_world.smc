@@ -31,27 +31,26 @@ jmpri loop
 
 .oper 0x1200
 :func_print_str
+    ldn 13:u16
+    .u16 0xA000
 
-ldn 13:u16
-.u16 0xA000
+    ; Mark the location to write serial values to
+    ldi 15:u16 3
+    add 15:u32 15 13
 
-; Mark the location to write serial values to
-ldi 15:u16 3
-add 15:u32 15 13
+    ; Load the argument value
+    copy 6 $arg
+    ldi 8:u16 1
 
-; Load the argument value
-copy 6 $arg
-ldi 8:u16 1
+    :func_print_str_loop
+        ld 7:u8 6
+        tz 7
+            jmpri func_print_str_end
+            sav 15:u8 7
+        add 6:u32 8 6
+        jmpri func_print_str_loop
 
-:func_print_str_loop
-ld 7:u8 6
-tz 7
-jmpri func_print_str_end
-sav 15:u8 7
-add 6:u32 8 6
-jmpri func_print_str_loop
-
-:func_print_str_end
-ldi 7:u16 10
-sav 15:u8 7
-ret
+    :func_print_str_end
+    ldi 7:u16 10
+    sav 15:u8 7
+    ret

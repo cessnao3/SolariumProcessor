@@ -1,27 +1,18 @@
+;; Infinite Counter Program
+
 ; Define the starting location
 .loadloc start
 
 ; Move to the starting location
-.oper 0x20
+.oper 0x2000
 :start
-ldn $sp
-.load 0x400
-
-:register_reset
-ldri 5, addloc
-add $pc, $pc, 5
-reset
-ldi $sp, 22
-ldi $ret, 33
+ldn $sp:u32
+.u32 0x1000
 
 ; Load initial values
-ldi 6, 1
-ldi 7, 0
+ldi 6:u16 1
+ldi 7:u16 0
 
 :loop ; define the main loop
-add 7, 7, 6
+add 7:u32 7 6
 jmpri loop
-
-; define the addition value
-:addloc
-.load 1
