@@ -42,7 +42,9 @@ impl fmt::Display for ProcessorError {
             Self::UnsupportedInterrupt(i) => write!(f, "Unsupported Interrupt => {i}"),
             Self::Register(r) => write!(f, "Register Error => {r}"),
             Self::UnknownInstruction(i) => write!(f, "Unknown Instruction => {i}"),
-            Self::UnsupportedDataType(i, dt) => write!(f, "Unsupported Data Type {dt} for Instruction {i}"),
+            Self::UnsupportedDataType(i, dt) => {
+                write!(f, "Unsupported Data Type {dt} for Instruction {i}")
+            }
             Self::Operation(o) => write!(f, "Operation Error => {o}"),
             Self::StackUnderflow => write!(f, "Stack Underflow"),
             Self::OpcodeAlignment(o) => write!(f, "Opcode Alignment Error => 0x{o:08x}"),
@@ -373,7 +375,8 @@ impl Processor {
             Register::ProgramCounter,
             self.memory.get_u32(reset_vec_addr)?,
         )?;
-        self.registers.set_flag(RegisterFlag::InterruptEnable, true)?;
+        self.registers
+            .set_flag(RegisterFlag::InterruptEnable, true)?;
 
         Ok(())
     }
@@ -415,20 +418,26 @@ impl Processor {
     }
 
     fn push_all_registers(&mut self) -> Result<(), ProcessorError> {
-        for i in 0..RegisterManager::REGISTER_COUNT {
-            self.stack_push(self.registers.get(Register::GeneralPurpose(i))?)?;
+        let reg_vals = self.registers.get_state();
+
+        for r in reg_vals {
+            self.stack_push(r)?;
         }
 
         Ok(())
     }
 
     fn pop_all_registers(&mut self, save_return_register: bool) -> Result<(), ProcessorError> {
-        for i in (0..RegisterManager::REGISTER_COUNT).rev() {
+        let mut current_state = self.registers.get_state();
+
+        for (i, v) in current_state.iter_mut().enumerate().rev() {
             let val = self.stack_pop()?;
             if !save_return_register || i != Register::Return.get_index() {
-                self.registers.set(Register::GeneralPurpose(i), val)?;
+                *v = val;
             }
         }
+
+        self.registers.set_state(current_state);
 
         Ok(())
     }
@@ -446,12 +455,19 @@ impl Processor {
         Ok(self.memory.inspect_u32(address)?)
     }
 
-    pub fn memory_add_segment(&mut self, address: u32, seg: Rc<RefCell<dyn MemorySegment>>) -> Result<(), ProcessorError> {
+    pub fn memory_add_segment(
+        &mut self,
+        address: u32,
+        seg: Rc<RefCell<dyn MemorySegment>>,
+    ) -> Result<(), ProcessorError> {
         self.memory.add_segment(address, seg)?;
         Ok(())
     }
 
-    pub fn device_add(&mut self, seg: Rc<RefCell<dyn ProcessorDevice>>) -> Result<(), ProcessorError> {
+    pub fn device_add(
+        &mut self,
+        seg: Rc<RefCell<dyn ProcessorDevice>>,
+    ) -> Result<(), ProcessorError> {
         self.devices.push(seg);
         Ok(())
     }
@@ -519,23 +535,38 @@ impl Processor {
         match opcode {
             Self::OP_NOOP => (),
             Self::OP_RESET => self.reset(ResetType::Soft)?,
-            Self::OP_INTON => self.registers.set_flag(RegisterFlag::InterruptEnable, true)?,
-            Self::OP_INTOFF => self.registers.set_flag(RegisterFlag::InterruptEnable, false)?,
+            Self::OP_INTON => self
+                .registers
+                .set_flag(RegisterFlag::InterruptEnable, true)?,
+            Self::OP_INTOFF => self
+                .registers
+                .set_flag(RegisterFlag::InterruptEnable, false)?,
             Self::OP_INTERRUPT => {
                 self.software_interrupt(inst.arg0() as u32)?;
-            },
+                inst_jump = None;
+            }
             Self::OP_INTERRUPT_REGISTER => {
                 self.software_interrupt(self.registers.get(inst.arg0_register())?)?;
             }
             Self::OP_CALL => {
+                // Increment the program counter before pushing registers so we return to the next instruction
+                self.registers
+                    .set(Register::ProgramCounter, pc + Self::BYTES_PER_ADDRESS)?;
+
+                // Push all registers
                 self.push_all_registers()?;
+
+                // Set the new program counter and ensure that the next instruction
+                // starts incrementing directly from the new value
                 self.registers.set(
                     Register::ProgramCounter,
                     self.registers.get(inst.arg0_register())?,
                 )?;
+                inst_jump = None;
             }
             Self::OP_RETURN | Self::OP_INTERRUPT_RETURN => {
                 self.pop_all_registers(opcode == Self::OP_RETURN)?;
+                inst_jump = None;
             }
             Self::OP_PUSH => {
                 let val = self.registers.get(inst.arg0_register())?;
@@ -841,7 +872,7 @@ impl Processor {
 
         if let Some(jmp_val) = inst_jump {
             self.registers
-            .set(Register::ProgramCounter, pc + jmp_val * 4)?;
+                .set(Register::ProgramCounter, pc + jmp_val * 4)?;
         }
 
         Ok(())

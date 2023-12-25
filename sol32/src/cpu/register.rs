@@ -108,6 +108,16 @@ impl RegisterManager {
         self.registers.fill(0);
     }
 
+    pub fn get_state(&self) -> [u32; Self::REGISTER_COUNT] {
+        self.registers
+    }
+
+    pub fn set_state(&mut self, values: [u32; Self::REGISTER_COUNT]) {
+        for (i, v) in values.into_iter().enumerate() {
+            self.registers[i] = v;
+        }
+    }
+
     pub fn get_flag(&self, flag: RegisterFlag) -> Result<bool, RegisterError> {
         let val = self.get(Register::Status)?;
         Ok((val & flag.get_mask()) != 0)

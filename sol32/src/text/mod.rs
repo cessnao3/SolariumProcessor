@@ -14,7 +14,7 @@ impl std::fmt::Display for CharacterError {
 }
 
 /// Converts an input character into a memory-word supported by the SProc
-pub fn character_to_word(c: char) -> Result<u8, CharacterError> {
+pub fn character_to_byte(c: char) -> Result<u8, CharacterError> {
     const NULL: u8 = b'\0';
     const NEWLINE: u8 = b'\n';
 
@@ -29,7 +29,7 @@ pub fn character_to_word(c: char) -> Result<u8, CharacterError> {
 }
 
 /// Converts a memory word into a text character
-pub fn word_to_character(b: u8) -> Result<char, CharacterError> {
+pub fn byte_to_character(b: u8) -> Result<char, CharacterError> {
     let char_val = match b {
         0 => '\0',
         0x0A => '\n',

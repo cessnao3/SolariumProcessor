@@ -29,6 +29,9 @@ pub enum AssemblerError {
     Immediate(ImmediateError),
     BadLabel(String),
     DuplicateLabel(String),
+    Character(sol32::text::CharacterError),
+    AddressTaken(u32),
+    Parser(ParseError),
 }
 
 impl fmt::Display for AssemblerError {
@@ -47,6 +50,9 @@ impl fmt::Display for AssemblerError {
             Self::Immediate(i) => write!(f, "Immediate Error => {i}"),
             Self::BadLabel(l) => write!(f, "Bad Label '{l}'"),
             Self::DuplicateLabel(l) => write!(f, "Duplicate Label '{l}'"),
+            Self::Character(c) => write!(f, "Character Error => {c}"),
+            Self::AddressTaken(addr) => write!(f, "Address 0x{addr:08x} Taken"),
+            Self::Parser(e) => write!(f, "Parser Error - {e}"),
         }
     }
 }
@@ -60,6 +66,18 @@ impl From<ImmediateError> for AssemblerError {
 impl From<InstructionError> for AssemblerError {
     fn from(value: InstructionError) -> Self {
         Self::Instruction(value)
+    }
+}
+
+impl From<sol32::text::CharacterError> for AssemblerError {
+    fn from(value: sol32::text::CharacterError) -> Self {
+        Self::Character(value)
+    }
+}
+
+impl From<ParseError> for AssemblerError {
+    fn from(value: ParseError) -> Self {
+        Self::Parser(value)
     }
 }
 
@@ -106,9 +124,10 @@ pub enum Token {
     Operation(FnInst, Vec<String>),
     CreateLabel(String),
     LoadLoc(String),
-    Immediate1(u8),
-    Immediate2(u16),
-    Immediate4(u32),
+    Literal1(u8),
+    Literal2(u16),
+    Literal4(u32),
+    LiteralText(String),
     AlignInstruction,
 }
 
@@ -181,6 +200,25 @@ impl Default for InstructionList {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum ParseError {
+    UnknownEscapeCode(char),
+    WithinQuote,
+    WithinEscape,
+    ExpectedSpaceBetweenQuote,
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnknownEscapeCode(c) => write!(f, "Unknown escape code '\\{c}'"),
+            Self::WithinQuote => write!(f, "Parser ended within a quote"),
+            Self::WithinEscape => write!(f, "Parser ending with an unfinished escape code"),
+            Self::ExpectedSpaceBetweenQuote => write!(f, "Expected space between quote"),
+        }
+    }
+}
+
 struct TokenList {
     tokens: Vec<TokenLoc>,
     inst: InstructionList,
@@ -205,11 +243,79 @@ impl TokenList {
         }
     }
 
+    fn split_tokens(s: &str) -> Result<Vec<String>, ParseError> {
+        let mut within_quote = false;
+        let mut is_escape = false;
+        let mut last_was_quote = false;
+
+        let mut so_far = Vec::<char>::new();
+        let mut words = Vec::new();
+
+        for c in s.chars() {
+            if last_was_quote {
+                if c.is_whitespace() {
+                    last_was_quote = false;
+                } else {
+                return Err(ParseError::ExpectedSpaceBetweenQuote);
+                }
+            } else if within_quote {
+                if is_escape {
+                    if c == '\\' {
+                        so_far.push('\\');
+                    } else if c == 'n' {
+                        so_far.push('\n');
+                    } else if c == '"' {
+                        so_far.push('"')
+                    } else {
+                        return Err(ParseError::UnknownEscapeCode(c));
+                    }
+
+                    is_escape = false;
+                } else if c == '\\' {
+                    is_escape = true;
+                } else if c == '"' {
+                    within_quote = false;
+                    last_was_quote = true;
+                    if !so_far.is_empty() {
+                        words.push(so_far.iter().collect());
+                        so_far.clear();
+                    }
+                } else {
+                    so_far.push(c);
+                }
+            } else if c == '"' {
+                if !so_far.is_empty() {
+                    return Err(ParseError::ExpectedSpaceBetweenQuote);
+                }
+                within_quote = true;
+            } else if c.is_whitespace() {
+                if !so_far.is_empty() {
+                    words.push(so_far.iter().collect());
+                    so_far.clear();
+                }
+            } else {
+                so_far.push(c);
+            }
+        }
+
+        if within_quote {
+            return Err(ParseError::WithinQuote);
+        } else if is_escape {
+            return Err(ParseError::WithinEscape);
+        }
+
+        if !so_far.is_empty() {
+            words.push(so_far.into_iter().collect());
+        }
+
+        Ok(words)
+    }
+
     pub fn parse_line(&mut self, line: &str, loc: LocationInfo) -> Result<(), AssemblerError> {
         // Trim Comments
         let s = Self::trim_line(line);
 
-        let words = s.split_whitespace().collect::<Vec<_>>();
+        let words = Self::split_tokens(s)?;
 
         let first: &str = if let Some(w) = words.first() {
             w
@@ -231,18 +337,19 @@ impl TokenList {
                     }
                 }
             } else if args.len() == 1 {
-                let arg = args[0];
+                let arg = args[0].as_ref();
 
                 match op {
                     "oper" => Token::ChangeAddress(parse_imm_u32(arg)?),
-                    "loadloc" => Token::LoadLoc(arg.to_string()),
-                    "u8" => Token::Immediate1(parse_imm_u8(arg)?),
-                    "u16" => Token::Immediate2(parse_imm_u16(arg)?),
-                    "u32" => Token::Immediate4(parse_imm_u32(arg)?),
-                    "i8" => Token::Immediate1(parse_imm_i8(arg)? as u8),
-                    "i16" => Token::Immediate2(parse_imm_i16(arg)? as u16),
-                    "i32" => Token::Immediate4(parse_imm_i32(arg)? as u32),
-                    "f32" => Token::Immediate4(
+                    "loadloc" => Token::LoadLoc(arg.into()),
+                    "text" => Token::LiteralText(arg.into()),
+                    "u8" => Token::Literal1(parse_imm_u8(arg)?),
+                    "u16" => Token::Literal2(parse_imm_u16(arg)?),
+                    "u32" => Token::Literal4(parse_imm_u32(arg)?),
+                    "i8" => Token::Literal1(parse_imm_i8(arg)? as u8),
+                    "i16" => Token::Literal2(parse_imm_i16(arg)? as u16),
+                    "i32" => Token::Literal4(parse_imm_i32(arg)? as u32),
+                    "f32" => Token::Literal4(
                         match arg.parse::<f32>() {
                             Ok(v) => v,
                             Err(_) => return Err(ImmediateError(arg.to_string()).into()),
@@ -269,7 +376,7 @@ impl TokenList {
             }
 
             Token::CreateLabel(lbl.to_string())
-        } else if let Some(inst_fn) = self.inst.get_instruction(words[0]) {
+        } else if let Some(inst_fn) = self.inst.get_instruction(&words[0]) {
             let args = &words[1..];
             Token::Operation(*inst_fn, args.iter().map(|s| s.to_string()).collect())
         } else {
@@ -289,6 +396,8 @@ impl TokenList {
         let mut state = ParserState::new();
 
         for t in self.tokens.iter() {
+            let loc = t.loc.clone();
+
             match &t.tok {
                 Token::AlignInstruction => state.align_boundary(Processor::BYTES_PER_ADDRESS),
                 Token::ChangeAddress(new_addr) => {
@@ -298,26 +407,40 @@ impl TokenList {
                         state.addr = *new_addr;
                     }
                 }
-                Token::Immediate1(i) => {
-                    state.add_bytes(&[*i]);
+                Token::LiteralText(s) => {
+                    for c in s.chars() {
+                        let bv = match sol32::text::character_to_byte(c) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                return Err(AssemblerErrorLoc {
+                                    err: AssemblerError::from(e),
+                                    loc,
+                                })
+                            }
+                        };
+                        state.add_bytes(&[bv], loc.clone())?;
+                    }
                 }
-                Token::Immediate2(i) => {
-                    state.add_bytes(&i.to_be_bytes());
+                Token::Literal1(i) => {
+                    state.add_bytes(&[*i], loc)?;
                 }
-                Token::Immediate4(i) => {
-                    state.add_bytes(&i.to_be_bytes());
+                Token::Literal2(i) => {
+                    state.add_bytes(&i.to_be_bytes(), loc)?;
+                }
+                Token::Literal4(i) => {
+                    state.add_bytes(&i.to_be_bytes(), loc)?;
                 }
                 Token::CreateLabel(lbl) => {
                     if state.labels.contains_key(lbl) {
                         return Err(AssemblerErrorLoc {
                             err: AssemblerError::DuplicateLabel(lbl.to_string()),
-                            loc: t.loc.clone(),
+                            loc,
                         });
                     }
                     state.labels.insert(lbl.into(), state.addr);
                 }
                 Token::LoadLoc(lbl) => {
-                    state.add_delay(DelayToken::LoadLoc { label: lbl.into() }, t.loc.clone());
+                    state.add_delay(DelayToken::LoadLoc { label: lbl.into() }, t.loc.clone())?;
                 }
                 Token::Operation(func, args) => {
                     state.add_delay(
@@ -326,7 +449,7 @@ impl TokenList {
                             args: args.to_owned(),
                         },
                         t.loc.clone(),
-                    );
+                    )?;
                 }
             }
         }
@@ -366,19 +489,32 @@ impl ParserState {
         Self::default()
     }
 
-    fn add_delay(&mut self, delay: DelayToken, loc: LocationInfo) {
-        let base = self.add_bytes(&0u32.to_be_bytes());
-        self.delay_vals.insert(base, (delay, loc));
+    fn add_delay(&mut self, delay: DelayToken, loc: LocationInfo) -> Result<(), AssemblerErrorLoc> {
+        let base = self.add_bytes(&0u32.to_be_bytes(), loc.clone())?;
+
+        if self.delay_vals.insert(base, (delay, loc.clone())).is_some() {
+            return Err(AssemblerErrorLoc {
+                err: AssemblerError::AddressTaken(base),
+                loc,
+            });
+        }
+
+        Ok(())
     }
 
-    fn add_bytes(&mut self, vals: &[u8]) -> u32 {
+    fn add_bytes(&mut self, vals: &[u8], loc: LocationInfo) -> Result<u32, AssemblerErrorLoc> {
         self.align_boundary(vals.len() as u32);
         let base = self.addr;
         for v in vals {
-            self.values.insert(self.addr, *v);
+            if self.values.insert(self.addr, *v).is_some() {
+                return Err(AssemblerErrorLoc {
+                    err: AssemblerError::AddressTaken(self.addr),
+                    loc,
+                });
+            }
             self.addr += 1;
         }
-        base
+        Ok(base)
     }
 
     fn align_boundary(&mut self, val: u32) {

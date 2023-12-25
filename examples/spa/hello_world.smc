@@ -1,3 +1,5 @@
+;; Hello World Program
+
 ; Define the hard-reset vector location
 .loadloc start
 
@@ -7,53 +9,49 @@
 ; Define the starting location
 .oper 0x1000
 :start
-ldn $sp
-.load 0x400
+ldn $sp:u16
+.u16 0x2000
 
 ; Load the string location into memory
-jmpri 2
+ldn 14:u32
 .loadloc str_hello_world
-ldri 14, -1
 
 ; Load the function location into memory
-jmpri 2
+ldn 15:u32
 .loadloc func_print_str
-ldri 15, -1
 
 :loop
-push 14
+copy $arg 14
 call 15
-pop
 jmpri loop
 
 .oper 0x1100
 :str_hello_world
-.loadtext "hello, world!"
+.text "hello, world!"
 
 .oper 0x1200
 :func_print_str
 
-jmpri 2
-.load 0xA000
-ldri 13, -1
+ldn 13:u16
+.u16 0xA000
 
 ; Mark the location to write serial values to
-ldi 15, 3
-add 15, 15, 13
+ldi 15:u16 3
+add 15:u32 15 13
 
 ; Load the argument value
-arg 6, 0
+copy 6 $arg
+ldi 8:u16 1
 
 :func_print_str_loop
-ld 7, 6
-ldi 8, 1
+ld 7:u8 6
 tz 7
 jmpri func_print_str_end
-sav 15, 7
-add 6, 8, 6
+sav 15:u8 7
+add 6:u32 8 6
 jmpri func_print_str_loop
 
 :func_print_str_end
-ldi 7, 10
-sav 15, 7
+ldi 7:u16 10
+sav 15:u8 7
 ret

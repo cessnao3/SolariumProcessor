@@ -117,7 +117,7 @@ impl ThreadState {
                 }
                 UiToThread::SerialInput(s) => {
                     for c in s.chars().chain(['\n'; 1]) {
-                        match sol32::text::character_to_word(c) {
+                        match sol32::text::character_to_byte(c) {
                             Ok(word) => {
                                 if !state.serial_io_dev.borrow_mut().push_input(word) {
                                     return Ok(Some(ThreadToUi::LogMessage(
@@ -177,7 +177,7 @@ pub fn cpu_thread(rx: Receiver<UiToThread>, tx: Sender<ThreadToUi>) {
         // Check for serial output
         let mut char_vec = Vec::new();
         while let Some(w) = state.serial_io_dev.borrow_mut().pop_output() {
-            let c = match sol32::text::word_to_character(w) {
+            let c = match sol32::text::byte_to_character(w) {
                 Ok(v) => v,
                 Err(e) => {
                     tx.send(ThreadToUi::LogMessage(format!("{e}"))).unwrap();
