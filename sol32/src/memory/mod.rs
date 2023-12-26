@@ -23,13 +23,13 @@ pub enum MemoryError {
 impl fmt::Display for MemoryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidMemoryAccess(loc) => write!(f, "Invalid Memory Access {loc}"),
-            Self::InvalidMemoryWrite(loc, data) => write!(f, "Invalid Memory Access {loc}[{data}]"),
-            Self::ReadOnlyMemory(loc) => write!(f, "Read Only Memory {loc}"),
-            Self::OverlappingSegment(loc) => write!(f, "Overlapping Segment at {loc}"),
-            Self::EmptySegment(loc) => write!(f, "Empty Segment {loc}"),
-            Self::InvalidAddress(loc) => write!(f, "Invalid Address {loc}"),
-            Self::IndexBounds(loc) => write!(f, "Index Bounds {loc}"),
+            Self::InvalidMemoryAccess(loc) => write!(f, "Invalid Memory Access 0x{loc:08x}"),
+            Self::InvalidMemoryWrite(loc, data) => write!(f, "Invalid Memory Access 0x{loc:08x}[{data}]"),
+            Self::ReadOnlyMemory(loc) => write!(f, "Read Only Memory 0x{loc:08x}"),
+            Self::OverlappingSegment(loc) => write!(f, "Overlapping Segment at 0x{loc:08x}"),
+            Self::EmptySegment(loc) => write!(f, "Empty Segment 0x{loc:08x}"),
+            Self::InvalidAddress(loc) => write!(f, "Invalid Address 0x{loc:08x}"),
+            Self::IndexBounds(loc) => write!(f, "Index Bounds 0x{loc:08x}"),
         }
     }
 }

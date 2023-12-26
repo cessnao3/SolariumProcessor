@@ -10,9 +10,10 @@ use instructions::{
     OpConv, OpCopy, OpDiv, OpHalt, OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLd, OpLdi, OpLdn,
     OpLdr, OpLdri, OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt,
     OpSav, OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq, OpTnz, OpTz,
+    OpInton, OpIntoff
 };
 
-use sol32::cpu::{Opcode, Processor};
+use sol32::cpu::{Opcode, Processor, ProcessorError};
 
 use immediate::{
     parse_imm_i16, parse_imm_i32, parse_imm_i8, parse_imm_u16, parse_imm_u32, parse_imm_u8,
@@ -32,6 +33,7 @@ pub enum AssemblerError {
     Character(sol32::text::CharacterError),
     AddressTaken(u32),
     Parser(ParseError),
+    Processor(ProcessorError),
 }
 
 impl fmt::Display for AssemblerError {
@@ -53,6 +55,7 @@ impl fmt::Display for AssemblerError {
             Self::Character(c) => write!(f, "Character Error => {c}"),
             Self::AddressTaken(addr) => write!(f, "Address 0x{addr:08x} Taken"),
             Self::Parser(e) => write!(f, "Parser Error - {e}"),
+            Self::Processor(e) => write!(f, "Processor Error - {e}"),
         }
     }
 }
@@ -72,6 +75,12 @@ impl From<InstructionError> for AssemblerError {
 impl From<sol32::text::CharacterError> for AssemblerError {
     fn from(value: sol32::text::CharacterError) -> Self {
         Self::Character(value)
+    }
+}
+
+impl From<ProcessorError> for AssemblerError {
+    fn from(value: ProcessorError) -> Self {
+        Self::Processor(value)
     }
 }
 
@@ -185,7 +194,8 @@ impl Default for InstructionList {
             OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall, OpConv, OpCopy, OpDiv,
             OpHalt, OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLd, OpLdn, OpLdi, OpLdr, OpLdri,
             OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt, OpSav,
-            OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq, OpTnz, OpTz
+            OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq, OpTnz, OpTz,
+            OpInton, OpIntoff
         );
 
         let inst_map = inst.iter().map(|(_, n, f, _)| (n.to_owned(), *f)).collect();
@@ -256,7 +266,7 @@ impl TokenList {
                 if c.is_whitespace() {
                     last_was_quote = false;
                 } else {
-                return Err(ParseError::ExpectedSpaceBetweenQuote);
+                    return Err(ParseError::ExpectedSpaceBetweenQuote);
                 }
             } else if within_quote {
                 if is_escape {
@@ -337,10 +347,20 @@ impl TokenList {
                     }
                 }
             } else if args.len() == 1 {
-                let arg = args[0].as_ref();
+                let arg = &args[0];
 
                 match op {
-                    "oper" => Token::ChangeAddress(parse_imm_u32(arg)?),
+                    "oper" => {
+                        let addr = if let Some(r) = arg.strip_prefix('#') {
+                            Processor::interrupt_address(sol32::cpu::Interrupt::Hardware(parse_imm_u32(r)?))?
+                        } else if let Some(r) = arg.strip_prefix('@') {
+                            Processor::interrupt_address(sol32::cpu::Interrupt::Software(parse_imm_u32(r)?))?
+                        } else {
+                            parse_imm_u32(arg)?
+                        };
+
+                        Token::ChangeAddress(addr)
+                    }
                     "loadloc" => Token::LoadLoc(arg.into()),
                     "text" => Token::LiteralText(arg.into()),
                     "u8" => Token::Literal1(parse_imm_u8(arg)?),

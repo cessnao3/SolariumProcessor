@@ -69,8 +69,10 @@ impl ThreadState {
 
         self.cpu.device_add(self.serial_io_dev.clone())?;
 
-        self.cpu
-            .device_add(Rc::new(RefCell::new(InterruptClockDevice::new(1000, 0))))?;
+        let dev_interrupt = Rc::new(RefCell::new(InterruptClockDevice::new(0)));
+
+        self.cpu.device_add(dev_interrupt.clone())?;
+        self.cpu.memory_add_segment(Self::DEVICE_START_IND + self.serial_io_dev.borrow().len(), dev_interrupt)?;
 
         self.cpu.reset(sol32::cpu::ResetType::Hard)?;
 
@@ -100,7 +102,7 @@ impl ThreadState {
                     return Ok(Some(ThreadToUi::ProcessorReset));
                 }
                 UiToThread::CpuIrq(irq) => {
-                    if !state.cpu.hardware_interrupt(irq as u32)? {
+                    if !state.cpu.trigger_hardware_interrupt(irq as u32)? {
                         return Ok(Some(ThreadToUi::LogMessage(format!(
                             "irq {irq} not triggered"
                         ))));

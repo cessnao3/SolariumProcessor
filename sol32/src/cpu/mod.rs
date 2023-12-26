@@ -24,7 +24,7 @@ pub use self::register::{Register, RegisterError, RegisterManager};
 #[derive(Debug, Clone)]
 pub enum ProcessorError {
     Memory(MemoryError),
-    UnsupportedInterrupt(u32),
+    UnsupportedInterrupt(Interrupt),
     Register(RegisterError),
     UnknownInstruction(Instruction),
     UnsupportedDataType(Instruction, DataType),
@@ -113,6 +113,21 @@ impl Hash for Opcode {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.base.hash(state);
         self.code.hash(state);
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Interrupt {
+    Software(u32),
+    Hardware(u32),
+}
+
+impl fmt::Display for Interrupt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Software(v) => write!(f, "Software({v}"),
+            Self::Hardware(v) => write!(f, "Hardware({v}"),
+        }
     }
 }
 
@@ -292,11 +307,11 @@ impl Processor {
     };
 
     const OP_BASE_STATUS_FLAGS: u8 = 4;
-    pub const OP_INTON: Opcode = Opcode {
+    pub const OP_INTERRUPT_ENABLE: Opcode = Opcode {
         base: Self::OP_BASE_STATUS_FLAGS,
         code: 0,
     };
-    pub const OP_INTOFF: Opcode = Opcode {
+    pub const OP_INTERRUPT_DISABLE: Opcode = Opcode {
         base: Self::OP_BASE_STATUS_FLAGS,
         code: 1,
     };
@@ -385,22 +400,31 @@ impl Processor {
         self.registers
     }
 
-    pub fn hardware_interrupt(&mut self, interrupt_num: u32) -> Result<bool, ProcessorError> {
-        self.call_interrupt(Self::BASE_HW_INT_ADDR + interrupt_num * Self::BYTES_PER_ADDRESS)
+    pub fn interrupt_address(int: Interrupt) -> Result<u32, ProcessorError> {
+        let (base, num) = match int {
+            Interrupt::Software(n) => (Self::BASE_SW_INT_ADDR, n),
+            Interrupt::Hardware(n) => (Self::BASE_HW_INT_ADDR, n),
+        };
+
+        if num < Self::NUM_INTERRUPT {
+            Ok(base + num * Self::BYTES_PER_ADDRESS)
+        } else {
+            Err(ProcessorError::UnsupportedInterrupt(int))
+        }
     }
 
-    pub fn software_interrupt(&mut self, interrupt_num: u32) -> Result<bool, ProcessorError> {
-        self.call_interrupt(Self::BASE_SW_INT_ADDR + interrupt_num * Self::BYTES_PER_ADDRESS)
+    pub fn trigger_hardware_interrupt(&mut self, num: u32) -> Result<bool, ProcessorError> {
+        self.call_interrupt(Interrupt::Hardware(num))
     }
 
-    fn call_interrupt(&mut self, interrupt_loc: u32) -> Result<bool, ProcessorError> {
+    fn call_interrupt(&mut self, int: Interrupt) -> Result<bool, ProcessorError> {
         // Return false if interrupts are not allowed
         if !self.registers.get_flag(RegisterFlag::InterruptEnable)? {
             return Ok(false);
         }
 
         // Obtain the desired value from the program counter
-        let new_pc = self.memory.get_u32(interrupt_loc)?;
+        let new_pc = self.memory.get_u32(Self::interrupt_address(int)?)?;
 
         // Return false if the vector value is 0 (Disabled)
         if new_pc == 0 {
@@ -535,18 +559,18 @@ impl Processor {
         match opcode {
             Self::OP_NOOP => (),
             Self::OP_RESET => self.reset(ResetType::Soft)?,
-            Self::OP_INTON => self
+            Self::OP_INTERRUPT_ENABLE => self
                 .registers
                 .set_flag(RegisterFlag::InterruptEnable, true)?,
-            Self::OP_INTOFF => self
+            Self::OP_INTERRUPT_DISABLE => self
                 .registers
                 .set_flag(RegisterFlag::InterruptEnable, false)?,
             Self::OP_INTERRUPT => {
-                self.software_interrupt(inst.arg0() as u32)?;
+                self.call_interrupt(Interrupt::Software(inst.arg0() as u32))?;
                 inst_jump = None;
             }
             Self::OP_INTERRUPT_REGISTER => {
-                self.software_interrupt(self.registers.get(inst.arg0_register())?)?;
+                self.call_interrupt(Interrupt::Software(self.registers.get(inst.arg0_register())?))?;
             }
             Self::OP_CALL => {
                 // Increment the program counter before pushing registers so we return to the next instruction
@@ -865,7 +889,7 @@ impl Processor {
         for action in dev_action_queue {
             match action {
                 DeviceAction::CallInterrupt(num) => {
-                    self.hardware_interrupt(num)?;
+                    self.call_interrupt(Interrupt::Hardware(num))?;
                 }
             }
         }

@@ -631,12 +631,14 @@ InstNoArg!(OpReset, Processor::OP_RESET);
 InstNoArg!(OpRetInt, Processor::OP_INTERRUPT_RETURN);
 InstNoArg!(OpRet, Processor::OP_RETURN);
 InstNoArg!(OpHalt, Processor::OP_HALT);
+InstNoArg!(OpInton, Processor::OP_INTERRUPT_ENABLE);
+InstNoArg!(OpIntoff, Processor::OP_INTERRUPT_DISABLE);
 
 InstSingleArg!(OpInt, Processor::OP_INTERRUPT);
 InstSingleArg!(OpIntr, Processor::OP_INTERRUPT_REGISTER);
 InstSingleArg!(OpCall, Processor::OP_CALL);
 InstSingleArg!(OpPush, Processor::OP_PUSH);
-InstSingleArg!(OpPop, Processor::OP_POP);
+InstNoArg!(OpPop, Processor::OP_POP);
 InstSingleArg!(OpPopr, Processor::OP_POP_REG);
 InstSingleArg!(OpJmp, Processor::OP_JUMP);
 InstSingleArg!(OpJmpr, Processor::OP_JUMP_REL);
