@@ -1,7 +1,7 @@
 .loadloc program_start
 .loadloc program_start
 
-.oper 0x20
+.oper #0
 .loadloc hw_int_0
 
 .oper 0x1000
@@ -47,6 +47,7 @@
     ldn 13:u32
     .loadloc global_num_threads
     ld 14:u32 13
+    mul 14:u32 14 7
 
     ldn 12:u32
     .loadloc global_thread_pc_stack
@@ -94,26 +95,31 @@
     pop
 
     ; Load constants
-    ldn 9:u32
+    ldn 9:u32 ; Current Thread Loc
     .loadloc global_current_thread
-    ld 10:u32 9
+    ld 10:u32 9 ; Current Thread Value
     ldn 11:u32
     .loadloc global_num_threads
-    ld 11:u32 11
-    ldn 12:u32
+    ld 11:u32 11 ; Global Thread Count
+    ldn 12:u32 ; Global Thread Stack
     .loadloc global_thread_pc_stack
 
     ; Save the current stack
-    add 13:u32 12 10
+    ldi 14:u16 4
+    mul 15:u32 10 14 ; Compute the correct location to save the new stack value to
+    add 13:u32 12 15
     sav 13:u32 $sp
 
-    ; Increment to the next stack
-    ldi 14:u16 4
-    add 10:u32 10 14
+    ; Add the new current thread value to get the new selected thread
+    ldi 7:u16 1
+    add 10:u32 10 7
     rem 10:u32 10 11
-    add 13:u32 12 10
-    ld $sp:u32 13
     sav 9:u32 10
+
+    ; Increment to the next stack
+    mul 15:u32 10 7
+    add 13:u32 12 15
+    ld $sp:u32 13
 
     ; Resume the next thread
     retint
