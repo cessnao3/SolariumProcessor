@@ -20,7 +20,7 @@ pub enum ThreadToUi {
     ResponseMemory(u32, Vec<u8>),
     SerialOutput(String),
     LogMessage(String),
-    RegisterState(RegisterManager),
+    RegisterState(Box<RegisterManager>),
     ProgramCounterValue(u32, u32),
     ProcessorReset,
     ThreadExit,

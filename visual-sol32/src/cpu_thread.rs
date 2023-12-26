@@ -311,7 +311,7 @@ pub fn cpu_thread(rx: Receiver<UiToThread>, tx: Sender<ThreadToUi>) {
         }
 
         // Send Registers
-        tx.send(ThreadToUi::RegisterState(state.cpu.get_register_state()))
+        tx.send(ThreadToUi::RegisterState(Box::new(state.cpu.get_register_state())))
             .unwrap();
 
         let pc = state
