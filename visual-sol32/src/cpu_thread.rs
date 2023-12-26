@@ -60,6 +60,7 @@ struct ThreadState {
     last_code: Vec<u8>,
     inst_history: CircularBuffer<String>,
     inst_map: InstructionList,
+    breakpoint: Option<u32>,
 }
 
 impl ThreadState {
@@ -76,21 +77,18 @@ impl ThreadState {
             memory_request: (0, 0),
             inst_history: CircularBuffer::<String>::new(10),
             inst_map: InstructionList::default(),
+            breakpoint: None,
         };
 
         s.reset()?;
         Ok(s)
     }
 
-    fn step_cpu(&mut self) -> Result<(), ThreadToUi> {
+    fn step_cpu(&mut self, enable_breakpoints: bool) -> Result<(), ThreadToUi> {
         let mut inst_details = "??".to_string();
 
-        let pc = self
-            .cpu
-            .get_register_state()
-            .get(sol32::cpu::Register::ProgramCounter)
-            .unwrap_or(0);
-        if let Ok(mem) = self.cpu.memory_inspect_u32(pc) {
+        let pc = self.cpu.get_current_pc().unwrap_or(0);
+        if let Ok(mem) = self.cpu.get_current_inst() {
             if let Some(disp_val) = self.inst_map.get_display_inst(mem) {
                 inst_details = disp_val;
             }
@@ -99,10 +97,17 @@ impl ThreadState {
         inst_details = format!("0x{pc:08x} = {inst_details}");
         self.inst_history.push(inst_details);
 
+        if let Some(brk) = self.breakpoint {
+            if brk == pc && enable_breakpoints {
+                self.running = false;
+                return Err(ThreadToUi::LogMessage(format!("Breaking at 0x{brk:08x}")));
+            }
+        }
+
         if let Err(e) = self.cpu.step() {
             let msg = format!(
                 "{}\n{}",
-                e.to_string(),
+                e,
                 self.inst_history
                     .list()
                     .into_iter()
@@ -180,8 +185,12 @@ impl ThreadState {
             msg: UiToThread,
         ) -> Result<Option<ThreadToUi>, ProcessorError> {
             match msg {
+                UiToThread::SetBreakpoint(brk) => {
+                    state.breakpoint = if brk == 0 { None } else { Some(brk) };
+                    return Ok(Some(ThreadToUi::LogMessage(format!("Setting Breakpoint to 0x{brk:08x}"))));
+                }
                 UiToThread::CpuStep => {
-                    if let Err(e) = state.step_cpu() {
+                    if let Err(e) = state.step_cpu(false) {
                         return Ok(Some(e));
                     }
                 }
@@ -293,7 +302,7 @@ pub fn cpu_thread(rx: Receiver<UiToThread>, tx: Sender<ThreadToUi>) {
             let step_repeat_count = state.multiplier as i64;
 
             for _ in 0..step_repeat_count {
-                if let Err(msg) = state.step_cpu() {
+                if let Err(msg) = state.step_cpu(true) {
                     state.running = false;
                     tx.send(msg).unwrap();
                     break;

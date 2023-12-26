@@ -419,7 +419,7 @@ impl TokenList {
             let loc = t.loc.clone();
 
             match &t.tok {
-                Token::AlignInstruction => state.align_boundary(Processor::BYTES_PER_ADDRESS),
+                Token::AlignInstruction => state.align_boundary(Processor::BYTES_PER_WORD),
                 Token::ChangeAddress(new_addr) => {
                     if *new_addr < state.addr {
                         panic!("cannot backup address");
@@ -440,6 +440,7 @@ impl TokenList {
                         };
                         state.add_bytes(&[bv], loc.clone())?;
                     }
+                    state.add_bytes(&[0], loc.clone())?;
                 }
                 Token::Literal1(i) => {
                     state.add_bytes(&[*i], loc)?;

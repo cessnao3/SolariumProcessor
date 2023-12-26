@@ -146,13 +146,13 @@ pub struct Processor {
 
 impl Processor {
     /// Defines the number of bytes per memory address (size of the default memory word)
-    pub const BYTES_PER_ADDRESS: u32 = std::mem::size_of::<u32>() as u32;
+    pub const BYTES_PER_WORD: u32 = std::mem::size_of::<u32>() as u32;
 
     /// Defines the hard reset vector number
     pub const HARD_RESET_VECTOR: u32 = 0;
 
     /// Defines the hard reset vector number
-    pub const SOFT_RESET_VECTOR: u32 = Self::BYTES_PER_ADDRESS;
+    pub const SOFT_RESET_VECTOR: u32 = Self::BYTES_PER_WORD;
 
     /// Defines the number of supported interrupts
     pub const NUM_INTERRUPT: u32 = 32;
@@ -161,7 +161,7 @@ impl Processor {
     pub const BASE_HW_INT_ADDR: u32 = 0x100;
 
     /// Provides the base address for the software interrupts
-    pub const BASE_SW_INT_ADDR: u32 = Self::BYTES_PER_ADDRESS * Self::NUM_INTERRUPT;
+    pub const BASE_SW_INT_ADDR: u32 = Self::BYTES_PER_WORD * Self::NUM_INTERRUPT;
 
     /// Provides the top address (next free address) after the vector memory segments
     pub const TOP_VEC_SEG_ADDR: u32 = Self::BASE_SW_INT_ADDR * Self::NUM_INTERRUPT;
@@ -407,7 +407,7 @@ impl Processor {
         };
 
         if num < Self::NUM_INTERRUPT {
-            Ok(base + num * Self::BYTES_PER_ADDRESS)
+            Ok(base + num * Self::BYTES_PER_WORD)
         } else {
             Err(ProcessorError::UnsupportedInterrupt(int))
         }
@@ -570,12 +570,14 @@ impl Processor {
                 inst_jump = None;
             }
             Self::OP_INTERRUPT_REGISTER => {
-                self.call_interrupt(Interrupt::Software(self.registers.get(inst.arg0_register())?))?;
+                self.call_interrupt(Interrupt::Software(
+                    self.registers.get(inst.arg0_register())?,
+                ))?;
             }
             Self::OP_CALL => {
                 // Increment the program counter before pushing registers so we return to the next instruction
                 self.registers
-                    .set(Register::ProgramCounter, pc + Self::BYTES_PER_ADDRESS)?;
+                    .set(Register::ProgramCounter, pc + Self::BYTES_PER_WORD)?;
 
                 // Push all registers
                 self.push_all_registers()?;
@@ -597,9 +599,7 @@ impl Processor {
                 self.stack_push(val)?;
             }
             Self::OP_POP => {
-                for _ in 0..inst.arg0() {
-                    self.stack_pop()?;
-                }
+                self.stack_pop()?;
             }
             Self::OP_POP_REG => {
                 let val = self.stack_pop()?;
@@ -905,21 +905,32 @@ impl Processor {
     fn stack_push(&mut self, val: u32) -> Result<(), ProcessorError> {
         let sp_curr = self.registers.get(Register::StackPointer)?;
         self.memory.set_u32(sp_curr, val)?;
-        self.registers.set(Register::StackPointer, sp_curr + 4)?;
+        assert_eq!(self.memory.inspect_u32(sp_curr)?, val);
+        self.registers
+            .set(Register::StackPointer, sp_curr + Self::BYTES_PER_WORD)?;
         Ok(())
     }
 
     fn stack_pop(&mut self) -> Result<u32, ProcessorError> {
-        let sp_curr = self.registers.get(Register::StackPointer)?;
+        let mut sp_curr = self.registers.get(Register::StackPointer)?;
 
-        if sp_curr < 4 {
+        if sp_curr < Self::BYTES_PER_WORD {
             return Err(ProcessorError::StackUnderflow);
         }
 
-        let sp_curr = sp_curr - 4;
-        self.registers.set(Register::StackPointer, sp_curr)?;
+        sp_curr -= Self::BYTES_PER_WORD;
 
+        self.registers
+            .set(Register::StackPointer, sp_curr)?;
         Ok(self.memory.get_u32(sp_curr)?)
+    }
+
+    pub fn get_current_pc(&self) -> Result<u32, ProcessorError> {
+        Ok(self.registers.get(Register::ProgramCounter)?)
+    }
+
+    pub fn get_current_inst(&self) -> Result<u32, ProcessorError> {
+        self.memory_inspect_u32(self.get_current_pc()?)
     }
 }
 

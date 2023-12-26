@@ -10,6 +10,7 @@ pub enum UiToThread {
     SetCode(Vec<u8>),
     SerialInput(String),
     RequestMemory(u32, u32),
+    SetBreakpoint(u32),
     SetMultiplier(f64),
     Exit,
 }

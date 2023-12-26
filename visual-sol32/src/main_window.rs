@@ -23,8 +23,8 @@ pub fn build_ui(app: &Application) {
     columns.append(&build_code_column(&tx_ui, &tx_thread));
     let (column_cpu, register_fields, buffer_log) = build_cpu_column(&tx_ui);
     columns.append(&column_cpu);
-    let (column_serial, memory_vals, buffer_serial, instruction_label, instruction_details) = build_serial_column(&tx_ui, &tx_thread);
-    columns.append(&column_serial);
+    let serial_details = build_serial_column(&tx_ui, &tx_thread);
+    columns.append(&serial_details.column_serial);
 
     // Create a window and set the title
     let window = ApplicationWindow::builder()
@@ -53,7 +53,7 @@ pub fn build_ui(app: &Application) {
         while let Ok(msg) = rx_ui_async.recv().await {
             match msg {
                 ThreadToUi::ProcessorReset => {
-                    buffer_serial.set_text("");
+                    serial_details.text_serial.set_text("");
                 }
                 ThreadToUi::RegisterState(regs) => {
                     for (i, r) in regs.registers.iter().enumerate() {
@@ -62,25 +62,25 @@ pub fn build_ui(app: &Application) {
                 }
                 ThreadToUi::ProgramCounterValue(pc, val) => {
                     if let Some(disp_val) = inst.get_display_inst(val) {
-                        instruction_details.set_text(&disp_val);
+                        serial_details.label_instruction_details.set_text(&disp_val);
                     } else {
-                        instruction_details.set_text("??");
+                        serial_details.label_instruction_details.set_text("??");
                     }
 
-                    instruction_label.set_text(&format!("Mem[0x{:08x}] = 0x{:08x}", pc, val));
+                    serial_details.label_instruction.set_text(&format!("Mem[0x{:08x}] = 0x{:08x}", pc, val));
                 }
                 ThreadToUi::LogMessage(msg) => {
                     buffer_log.insert(&mut buffer_log.end_iter(), &format!("{msg}\n"));
                 }
                 ThreadToUi::SerialOutput(msg) => {
-                    buffer_serial.insert(&mut buffer_serial.end_iter(), msg.as_str());
+                    serial_details.text_serial.insert(&mut serial_details.text_serial.end_iter(), msg.as_str());
                 }
                 ThreadToUi::ResponseMemory(base, vals) => {
-                    for (i, l) in memory_vals.labels.iter().enumerate() {
-                        l.set_text(&format!("L{:08x}", base + 4 * i as u32));
+                    for (i, l) in serial_details.memory.labels.iter().enumerate() {
+                        l.set_text(&format!("L{:08x}", base + serial_details.memory.num_cols as u32 * i as u32));
                     }
 
-                    for (i, m) in memory_vals.locations.iter().enumerate() {
+                    for (i, m) in serial_details.memory.locations.iter().enumerate() {
                         if i < vals.len() {
                             m.set_text(&format!("{:02x}", vals[i]));
                         } else {
@@ -102,7 +102,7 @@ pub fn build_ui(app: &Application) {
     std::thread::spawn(move || cpu_thread(rx_thread, tx_thread));
 
     // Activate the memory
-    memory_vals.base_input.unwrap().emit_activate();
+    serial_details.memory.base_input.unwrap().emit_activate();
 
     // Present window
     window.present();
@@ -114,7 +114,7 @@ fn build_code_column(
 ) -> gtk::Box {
     let code_stack = gtk::Stack::builder().build();
 
-    let default_asm = include_str!("../../examples/spa/serial_echo.smc");
+    let default_asm = include_str!("../../examples/spa/thread_test.smc");
 
     let code_options = vec![
         (default_asm, "Assemble", "ASM", true),
@@ -325,22 +325,34 @@ struct MemoryLocationData {
     labels: Vec<gtk::Label>,
     locations: Vec<gtk::Label>,
     base_input: Option<gtk::Entry>,
+    num_rows: usize,
+    num_cols: usize,
 }
 
 impl MemoryLocationData {
-    fn new() -> Self {
+    fn new(rows: usize, cols: usize) -> Self {
         Self {
             labels: Vec::new(),
             locations: Vec::new(),
             base_input: None,
+            num_rows: rows,
+            num_cols: cols,
         }
     }
+}
+
+struct SerialElements {
+    column_serial: gtk::Box,
+    memory: MemoryLocationData,
+    text_serial: gtk::TextBuffer,
+    label_instruction: gtk::Label,
+    label_instruction_details: gtk::Label,
 }
 
 fn build_serial_column(
     tx_ui: &std::sync::mpsc::Sender<UiToThread>,
     tx_thread: &std::sync::mpsc::Sender<ThreadToUi>,
-) -> (gtk::Box, MemoryLocationData, gtk::TextBuffer, gtk::Label, gtk::Label) {
+) -> SerialElements {
     let column_serial = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
@@ -350,7 +362,8 @@ fn build_serial_column(
         .orientation(gtk::Orientation::Vertical)
         .build();
     let memory_base_entry = gtk::Entry::builder().text("0").build();
-    let mut memory: MemoryLocationData = MemoryLocationData::new();
+
+    let mut memory = MemoryLocationData::new(6, 8);
 
     {
         let memory_frame = gtk::Frame::builder()
@@ -364,20 +377,17 @@ fn build_serial_column(
             .column_spacing(6)
             .build();
 
-        const NUM_ROWS: i32 = 6;
-        const NUM_COLS: i32 = 8;
-
-        for i in 0..NUM_ROWS {
+        for i in 0..memory.num_rows {
             let label = gtk::Label::builder().label(format!("L{i}")).build();
-            memory_grid.attach(&label, 0, i, 1, 1);
+            memory_grid.attach(&label, 0, i as i32, 1, 1);
             memory.labels.push(label);
 
-            for j in 0..NUM_COLS {
+            for j in 0..memory.num_cols {
                 let mem_lbl = gtk::Label::builder()
-                    .label(format!("{:02x}", i * NUM_COLS + j))
+                    .label(format!("{:02x}", i * memory.num_cols + j))
                     .hexpand(true)
                     .build();
-                memory_grid.attach(&mem_lbl, 1 + j, i, 1, 1);
+                memory_grid.attach(&mem_lbl, 1 + j as i32, i as i32, 1, 1);
                 memory.locations.push(mem_lbl);
             }
         }
@@ -401,19 +411,33 @@ fn build_serial_column(
 
     let instruction_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
+        .spacing(4)
         .build();
     let instruction_frame = gtk::Frame::builder()
         .label("Instruction")
         .child(&instruction_box)
+        .margin_start(4)
+            .margin_end(4)
         .build();
     let overall_instruction = gtk::Label::builder()
         .label("")
-        .margin_end(6)
         .build();
     let instruction_details = gtk::Label::builder()
         .label("")
-        .margin_end(6)
         .build();
+
+    let breakpoint_text = gtk::Entry::builder().text("0").build();
+    breakpoint_text.connect_activate(clone!(@strong tx_ui, @strong tx_thread => move |t| {
+        match u32::from_str_radix(&t.text(), 16) {
+            Ok(v) => tx_ui.send(UiToThread::SetBreakpoint(v)).unwrap(),
+            Err(_) => {
+                tx_thread.send(ThreadToUi::LogMessage(format!("Unable to set '{}' as base in hex", t.text()))).unwrap();
+            }
+        }
+    }));
+
+    instruction_box.append(&breakpoint_text);
+
     instruction_box.append(&overall_instruction);
     instruction_box.append(&instruction_details);
 
@@ -475,5 +499,11 @@ fn build_serial_column(
 
     column_serial.append(&text_input_frame);
 
-    (column_serial, memory, buffer_serial, overall_instruction, instruction_details)
+    SerialElements {
+        column_serial,
+        memory,
+        text_serial: buffer_serial,
+        label_instruction: overall_instruction,
+        label_instruction_details: instruction_details,
+    }
 }

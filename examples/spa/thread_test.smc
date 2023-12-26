@@ -24,10 +24,13 @@
 
 :init_thread
 ; args (start_loc, stack_ptr_loc)
-    ; Load useful parameters to registers
+    ; Load word size into array
     ldi 7:u16 4
-    ldi 10:u16 0
-    ldi 11:u16 16
+    ldi 10:u16 1
+
+    ; Stack Size
+    ldi 11:u16 32
+    mul 11:u32 11 7
 
     ; Load the main start location into register 8
     ld 8:u32 $arg
@@ -36,7 +39,8 @@
     add $arg:u32 $arg 7
     ld 9:u32 $arg
 
-    ; Copy the base SP into a register with the ending location
+    ; Copy the base SP into a register with the ending
+    ; location by adding stack size
     add 11:u32 9 11
 
     ; Save the stack location to the global PC stack
@@ -49,7 +53,8 @@
     add 12:u32 12 14
     sav 12:u32 11
 
-    add 14:u32 14 7
+    ; Add one to the global thread count
+    add 14:u32 14 10
     sav 13:u32 14
 
     ; Push PC (R0) to the new stack
@@ -68,12 +73,14 @@
     add 9:u32 9 7
 
     ; Push return and argument registers (R4, R5)
+    ldi 10:u16 0
     sav 9:u32 10
     add 9:u32 9 7
     sav 9:u32 10
 
     ret
 
+.oper 0x3200
 :hw_int_0
     ; Write Switch
     ldn 9:u32
@@ -101,7 +108,7 @@
     sav 13:u32 $sp
 
     ; Increment to the next stack
-    ldi 14:u16 1
+    ldi 14:u16 4
     add 10:u32 10 14
     rem 10:u32 10 11
     add 13:u32 12 10
@@ -111,6 +118,7 @@
     ; Resume the next thread
     retint
 
+.oper 0x3400
 ; Define the location for the serial device
 :dev_serial_loc
     .u32 0xA000
@@ -130,6 +138,8 @@
 :msg_task_b
 .text "TSK_B"
 
+.oper 0x3500
+; print_str(start_addr)
 :func_print_str
     ldn 13:u32
     .loadloc dev_serial_loc
@@ -142,18 +152,20 @@
     ; Load the argument value
     ld 6:u32 $arg
 
+    ; Load the bytes-per-address value
+    ldi 8:u16 1
+
     :func_print_str_loop
-        ld 7:u32 6
-        ldi 8:u16 1
+        ld 7:u8 6
         tz 7
         jmpri func_print_str_end
-        sav 15:u32 7
+        sav 15:u8 7
         add 6:u32 8 6
         jmpri func_print_str_loop
 
     :func_print_str_end
     ldi 7:u16 10
-    sav 15:u32 7
+    sav 15:u8 7
     ret
 
 .oper 0x4000

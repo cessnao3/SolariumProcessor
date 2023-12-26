@@ -9,7 +9,7 @@ pub struct InterruptClockDevice {
 }
 
 impl InterruptClockDevice {
-    const DEVICE_MEM_SIZE: u32 = 3 * Processor::BYTES_PER_ADDRESS;
+    const DEVICE_MEM_SIZE: u32 = 3 * Processor::BYTES_PER_WORD;
 
     pub fn new(interrupt: u32) -> Self {
         Self {
@@ -28,8 +28,8 @@ impl MemorySegment for InterruptClockDevice {
 
     /// Provides the word at the requested memory location without affecting the device state
     fn inspect(&self, offset: u32) -> Result<u8, MemorySegmentError> {
-        let index = offset / Processor::BYTES_PER_ADDRESS;
-        let within = offset % Processor::BYTES_PER_ADDRESS;
+        let index = offset / Processor::BYTES_PER_WORD;
+        let within = offset % Processor::BYTES_PER_WORD;
 
         let mem = [
             self.clock_interval,
@@ -48,8 +48,8 @@ impl MemorySegment for InterruptClockDevice {
     /// Sets the word at the requested memory location with the given data
     /// Returns true if the value could be set; otherwise returns false
     fn set(&mut self, offset: u32, data: u8) -> Result<(), MemorySegmentError> {
-        let index = offset / Processor::BYTES_PER_ADDRESS;
-        let within = offset % Processor::BYTES_PER_ADDRESS;
+        let index = offset / Processor::BYTES_PER_WORD;
+        let within = offset % Processor::BYTES_PER_WORD;
 
         let mut mem = [
             self.clock_interval,
