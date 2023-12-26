@@ -76,15 +76,17 @@ This provides both a means to set and to read the current processor state values
 
 \subsection{Overall Instruction Syntax}
 
-Since the architecture of the Sol32 is 32-bit, this means that the basic word, and therefore instruction format, exists in a 32-bit format. Note that, however, memory addresses are with respect to byte boundaries. Words are stored in big-endian format, meaning the most-significant component of the word is associated with the first byte in the word, while the least-significant component of the word is associated with the last byte in the word. Instructions must be placed with a base at a memory location with a byte alignment of four (e.g. 0, 4, 8, 12, etc.). General data may be placed and accessed from any byte alignment. The general instruction format is listed  in Table \ref{table:instruction-formatting}.
+Since the architecture of the Sol32 is 32-bit, this means that the basic word, and therefore instruction format, exists in a 32-bit format. Note that, however, memory addresses are with respect to byte boundaries. Words are stored in big-endian format, meaning the most-significant component of the word is associated with the first byte in the word, while the least-significant component of the word is associated with the last byte in the word. Instructions must be placed with a base at a memory location with a byte alignment of four (e.g. 0, 4, 8, 12, etc.). General data may be placed and accessed from any byte alignment. The general instruction format is listed  in Table \ref{table:instruction-formatting}. The first byte, Byte 0, is always split into two components - the ID, composing the first 4 bits of the instruction, and the SubID, composing the next 4 bits of the instruction.
 
 \begin{table}[h!]
     \centering
     \begin{tabular}{l|cccc}
         \hline
+        {} & Byte 0 & Byte 1 & Byte 2 & Byte 3 \\
         Location & 0xFF000000 & 0x00FF0000 & 0x0000FF00 & 0x000000FF \\
         \hline
         Usage & opcode & arg0 & arg1 & arg2 \\
+        Details & ID (\texttt{0xF0}), SubID (\texttt{0x0F}) & - & - & - \\
         \hline
     \end{tabular}
     \caption{The Sol32 instruction format typically has one opcode and three possible arguments associated with a particular opcode}
@@ -120,8 +122,6 @@ Certain arguments require type information. When this is present, the type code 
 	\label{table:type-codes}
 \end{table}
 
-There are several different types of instruction formats, which make use of the four byte spots in the instruction opcode slightly differently. \alert{These are provided below.}
-
 \subsection{Resetting}
 
 On a hard-reset, all registers will be reset to 0 and memory values will be reset to their default values. The data parameter in memory at the hard-reset vector, stored at memory location 0, will be used as the reset vector.
@@ -137,7 +137,7 @@ The stack pointer provides the absolute address of the stack pointer. The pointe
 
 \subsection{Interrupts}
 
-Interrupts provide a means to interrupt the current flow of execution and run a separate method. There are two types of interrupts - hardware interrupts, which originate by request of an external hardware device, and software interrupts, which originate from a specific instruction. When an interrupt is triggered, the flow of program execution is interrupted before the next instruction is started. The current register state is stored on the stack, and the program counter is replaced with the value in the corresponding interrupt vector. Then, the program execution continues from this new location.
+\comment{Interrupts provide a means to interrupt}{Interrupt queue? Multiple interrupts triggered at the same time?} the current flow of execution and run a separate method. There are two types of interrupts - hardware interrupts, which originate by request of an external hardware device, and software interrupts, which originate from a specific instruction. When an interrupt is triggered, the flow of program execution is interrupted before the next instruction is started. The current register state is stored on the stack, and the program counter is replaced with the value in the corresponding interrupt vector. Then, the program execution continues from this new location.
 
 At the conclusion of any interrupt, the \texttt{retint} instruction should be called. This will replace the current register state with the values provided off the stack and resume program execution from the location right after the interrupt was called.
 
@@ -166,75 +166,95 @@ Note that, if a vector has a value of zero, that interrupt vector is considered 
 \section{Instructions and Assembly Code}
 \label{sec:instructions}
 
-All \comment{available instructions}{Update instructions} are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field.
+All available instructions are listed in Table \ref{table:instruction-table}. Note that any invalid instruction that is not provided in the table below results in an immediate halt of the processor. Note that, in the below logic, any indication where PC is incremented indicates that the standard \texttt{PC += 1} to move to the next instruction will be replaced by the logic provided in the description field. Note that, based on the type, for addresses, this can affect either just the memory location assigned by the register (for a single-byte type), the register byte and the following byte (for a two-byte type), or the register byte and the following three bytes (for a four-byte type). The user must ensure that the appropriate locations are valid and able to be written to when setting up the registers and types for particular instructions. Instruction formats, as denoted in the ``Format ID'' column, are located in Table \ref{table:instruction-format-types}.
 
 \begin{table}[h!]
-    \centering
-    \begin{footnotesize}
-        \begin{tabular}{cccc|l|l}
-            \hline
-            \multicolumn{4}{c|}{Instruction Word} & Assembly & Description \\
-            opcode & arg2 & arg1 & arg0 & & \\
-            {} & opcode & arg1 & arg0 & & \\
-            {} & {} & opcode & arg0 & & \\
-            {} & {} & {} & opcode & & \\
-            \hline
-            0 & 0 & 0 & 0 & \texttt{noop} & No Operation \\
-            0 & 0 & 0 & 1 & \texttt{inton} & Turn Interrupts On \\
-            0 & 0 & 0 & 2 & \texttt{intoff} & Turn Interrupts Off \\
-            0 & 0 & 0 & 3 & \texttt{reset} & \texttt{PC = Reset Vector}, \texttt{R[0-15] = 0} \\
-            0 & 0 & 0 & 4 & \texttt{pop} & \texttt{--SP} \\
-            0 & 0 & 0 & 5 & \texttt{ret} & \texttt{x = R[ret]} \\
-            {} & {} & {} & {} & {} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
-            {} & {} & {} & {} & {} & \texttt{R[ret] = x} \\
-            0 & 0 & 0 & 6 & \texttt{retint} & $\forall_{i \in [15 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
-            0 & 0 & 0 & 7 & \texttt{halt} & Stop Program Execution \\
-            0 & 0 & 1 & R[a] & \texttt{jmp [a]} & \texttt{PC = R[a]} \\
-            0 & 0 & 2 & R[a] & \texttt{jmpr [a]} & \texttt{PC += R[a]} \\
-            0 & 0 & 3 & R[a] & \texttt{push [a]} & \texttt{mem[SP++] = R[a]} \\
-            0 & 0 & 4 & R[a] & \texttt{popr [a]} & \texttt{R[a] = mem[--SP]} \\
-            0 & 0 & 5 & R[a] & \texttt{call [a]} & $\forall_{i \in [0 \rightarrow 15]}$
-            \texttt{mem[SP++] = R[i]}; \texttt{PC = R[a]} \\
-            0 & 0 & 6 & 0xI & \texttt{int <imm>} & Trigger software interrupt number \texttt{imm} \\
-            0 & 0 & 7 & R[a] & \texttt{intr [a]} & Trigger software interrupt number in \texttt{R[a]} \\
-            0 & 0 & 8 & R[a] & \texttt{tz [a]} & If \texttt{R[a] == 0} \texttt{PC += 1}, Else \texttt{PC += 2} \\
-            0 & 0 & 9 & R[a] & \texttt{tnz [a]} & If \texttt{R[a] != 0} \texttt{PC += 1}, Else \texttt{PC += 2} \\
-            0 & 0 & 10 & R[a] & \texttt{bool [a]} & If \texttt{R[a] != 0} \texttt{R[a] = 1}, Else \texttt{R[a] = 0} \\
-            0 & 0 & 11 & R[a] & \texttt{not [a]} & If \texttt{R[a] != 0} \texttt{R[a] = 0}, Else \texttt{R[a] = 1} \\
-            0 & 0 & 12 & R[a] & \texttt{ldn [a]} & \texttt{R[a] = mem[PC + 1]}, \texttt{PC += 2} \\
-            0 & 0 & 13 & R[a] & \texttt{neg [a]} & \texttt{R[a] = -R[a]} \\
-            0 & 1 & 0xI0 & 0x0I & \texttt{jmpri <imm>} & \texttt{PC += Im} \\
-            0 & 2 & R[b] & R[a] & \texttt{ld [a], [b]} & \texttt{R[a] = mem[R[b]]} \\
-            0 & 3 & R[b] & R[a] & \texttt{sav [a], [b]} & \texttt{mem[R[a]] = R[b]} \\
-            0 & 4 & R[b] & R[a] & \texttt{ldr [a], [b]} & \texttt{R[a] = mem[PC + R[b]]} \\
-            0 & 5 & R[b] & R[a] & \texttt{savr [a], [b]} & \texttt{mem[PC + R[a]] = R[b]} \\
-            0 & 6 & R[b] & R[a] & \texttt{cpy [a], [b]} & \texttt{R[a] = R[b]} \\
-            0 & 7 & R[b] & R[a] & \texttt{tg [a], [b]} & If \texttt{R[a] > R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
-            0 & 8 & R[b] & R[a] & \texttt{tgs [a], [b]} & If \texttt{R[a] > R[b]} (signed) \texttt{PC += 1}, Else \texttt{PC += 2} \\
-            0 & 9 & R[b] & R[a] & \texttt{tl [a], [b]} & If \texttt{R[a] < R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
-            0 & 10 & R[b] & R[a] & \texttt{tls [a], [b]} & If \texttt{R[a] >= R[b]} (signed) \texttt{PC += 1}, Else \texttt{PC += 2} \\
-            0 & 11 & R[b] & R[a] & \texttt{teq [a], [b]} & If \texttt{R[a] == R[b]} \texttt{PC += 1}, Else \texttt{PC += 2} \\
-            0 & 12 & 0x0I & R[a] & \texttt{arg [a], <imm-unsigned>} & \texttt{R[a] = ARG + <imm-unsigned>} \\
-            1 & 0xI0 & 0x0I & R[dst] & \texttt{ldi [dst], <imm>} & \texttt{R[dst] = Im} \\
-            2 & 0xI0 & 0x0I & R[dst] & \texttt{ldri [dst], <imm>} & \texttt{R[dst] = mem[PC + Im]} \\
-            3 & R[b] & R[a] & R[dst] & \texttt{add [dst], [a], [b]} & \texttt{R[dst] = R[a] + R[b]} \\
-            4 & R[b] & R[a] & R[dst] & \texttt{sub [dst], [a], [b]} & \texttt{R[dst] = R[a] - R[b]} \\
-            5 & R[b] & R[a] & R[dst] & \texttt{mul [dst], [a], [b]} & \texttt{R[dst] = R[a] * R[b]} \\
-            6 & R[b] & R[a] & R[dst] & \texttt{div [dst], [a], [b]} & \texttt{R[dst] = R[a] / R[b]} \\
-            7 & R[b] & R[a] & R[dst] & \texttt{mod [dst], [a], [b]} & \texttt{R[dst] = R[a] \% R[b]} \\
-            8 & R[b] & R[a] & R[dst] & \texttt{muls [dst], [a], [b]} & \texttt{R[dst] = R[a] * R[b]} (signed) \\
-            9 & R[b] & R[a] & R[dst] & \texttt{divs [dst], [a], [b]} & \texttt{R[dst] = R[a] / R[b]} (signed) \\
-            10 & R[b] & R[a] & R[dst] & \texttt{mods [dst], [a], [b]} & \texttt{R[dst] = R[a] \% R[b]} (signed) \\
-            11 & R[b] & R[a] & R[dst] & \texttt{band [dst], [a], [b]} & \texttt{R[dst] = R[a] \& R[b]} \\
-            12 & R[b] & R[a] & R[dst] & \texttt{bor [dst], [a], [b]} & \texttt{R[dst] = R[a] | R[b]} \\
-            13 & R[b] & R[a] & R[dst] & \texttt{bxor [dst], [a], [b]} & \texttt{R[dst] = R[a] $\wedge$ R[b]} \\
-            14 & R[b] & R[a] & R[dst] & \texttt{bshft [dst], [a], [b]} & \texttt{R[dst] = R[a] << R[b]} (Negative shifts right) \\
-            15 & R[b] & R[a] & R[dst] & \texttt{ashft [dst], [a], [b]} & \texttt{R[dst] = R[a] <<< R[b]} (Negative shifts right) \\
-            \hline
-        \end{tabular}
-    \end{footnotesize}
-    \caption{Available instruction list for the Sol32 provides a variety of commands.}
-    \label{table:instruction-table}
+	\centering
+	\begin{footnotesize}
+		\begin{tabular}{c|cc|l|l}
+			\hline
+			Format ID & \multicolumn{2}{c|}{Opcode} & Assembly & Description \\
+			{} & ID & SubID & {} & {} \\
+			\hline
+			A & 0 & 0 & \texttt{noop} & No Operation \\
+			A & 0 & 1 & \texttt{reset} & \texttt{PC = Reset Vector}, \texttt{R[0-15] = 0} \\
+			B & 0 & 2 & \texttt{int <imm>} & Trigger software interrupt number \texttt{imm} \\
+			C & 0 & 3 & \texttt{intr [a]} & Trigger software interrupt number \texttt{R[a]} \\
+			A & 0 & 4 & \texttt{retint} & $\forall_{i \in [31 \rightarrow 0]}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
+			C & 0 & 5 & \texttt{call [a]} &  $\forall_{i \in [0 \rightarrow 31]}$ \texttt{mem[SP++] = R[i]}; \texttt{PC = R[a]} \\
+			A & 0 & 6 & \texttt{ret} & $\forall_{i \in [31 \rightarrow 0], i \not= \$ret}$ \texttt{R[i] = mem[--SP]}, \texttt{++PC} \\
+			C & 0 & 7 & \texttt{push [a]} & \texttt{mem[SP += 4] = R[a]} \\
+			A & 0 & 8 & \texttt{pop} & \texttt{SP -= 4} \\
+			C & 0 & 9 & \texttt{popr [a]} & \texttt{R[a] = mem[SP -= 4]} \\
+			C & 0 & 10 & \texttt{jmp [a]} & \texttt{PC = R[a]} \\
+			C & 0 & 11 & \texttt{jmpr [a]} & \texttt{PC += R[a]} \\
+			B & 0 & 12 & \texttt{jmpri <imm>} & \texttt{PC += Imm} (Signed) \\
+			A & 0 & 15 & \texttt{halt} & Stop Program Execution \\
+
+			G & 1 & 0 & \texttt{ld [a] [b]} & \texttt{R[a] = mem[R[b]]} \\
+			G & 1 & 1 & \texttt{ldr [a] [b]} & \texttt{R[a] = mem[PC + R[b]]} \\
+			E & 1 & 2 & \texttt{ldi [dst] <imm>} & \texttt{R[dst] = Im} \\
+			E & 1 & 3 & \texttt{ldri [dst] <imm>} & \texttt{R[dst] = mem[PC + Im]} \\
+			D & 1 & 4 & \texttt{ldn [a]} & \texttt{R[a] = mem[PC + 1]}, \texttt{PC += 2} \\
+			G & 1 & 5 & \texttt{sav [a] [b]} & \texttt{mem[R[a]] = R[b]} \\
+			G & 1 & 6 & \texttt{savr [a] [b]} & \texttt{mem[PC + R[a]] = R[b]} \\
+			F & 1 & 7 & \texttt{copy [a] [b]} & \texttt{R[a] = R[b]} \\
+			H & 1 & 8 & \texttt{conv [a] [b]} & \texttt{R[a] = R[b]} \\
+
+			I & 2 & 0 & \texttt{teq [dst] [a] [b]} & If \texttt{R[a] == R[b]} \texttt{R[dst] = 1}, Else \texttt{R[dst] = 0} \\
+			I & 2 & 1 & \texttt{tneq [dst] [a] [b]} & If \texttt{R[a] != R[b]} \texttt{R[dst] = 1}, Else \texttt{R[dst] = 0} \\
+			I & 2 & 2 & \texttt{tg [dst] [a] [b]} & If \texttt{R[a] > R[b]} \texttt{R[dst] = 1}, Else \texttt{R[dst] = 0} \\
+			I & 2 & 3 & \texttt{tge [dst] [a] [b]} & If \texttt{R[a] >= R[b]} \texttt{R[dst] = 1}, Else \texttt{R[dst] = 0} \\
+			I & 2 & 4 & \texttt{tl [dst] [a] [b]} & If \texttt{R[a] < R[b]} \texttt{R[dst] = 1}, Else \texttt{R[dst] = 0} \\
+			I & 2 & 5 & \texttt{tle [dst] [a] [b]} & If \texttt{R[a] <= R[b]} \texttt{R[dst] = 1}, Else \texttt{R[dst] = 0} \\
+
+			F & 3 & 0 & \texttt{not [dst] [a]} & If \texttt{R[a] != 0} \texttt{R[dst] = 0}, Else \texttt{R[dst] = 1} \\
+			F & 3 & 1 & \texttt{bool [dst] [a]} & If \texttt{R[a] != 0} \texttt{R[dst] = 1}, Else \texttt{R[dst] = 0} \\
+			C & 3 & 2 & \texttt{tz [a]} & If \texttt{R[a] == 0} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+			C & 3 & 3 & \texttt{tnz [a]} & If \texttt{R[a] != 0} \texttt{PC += 1}, Else \texttt{PC += 2} \\
+
+			A & 4 & 0 & \texttt{inton} & Turn Interrupts On \\
+			A & 4 & 1 & \texttt{intoff} & Turn Interrupts Off \\
+
+			I & 10 & 0 & \texttt{add [dst] [a] [b]} & \texttt{R[dst] = R[a] + R[b]} \\
+			I & 10 & 1 & \texttt{sub [dst] [a] [b]} & \texttt{R[dst] = R[a] - R[b]} \\
+			I & 10 & 2 & \texttt{mul [dst] [a] [b]} & \texttt{R[dst] = R[a] * R[b]} \\
+			I & 10 & 3 & \texttt{div [dst] [a] [b]} & \texttt{R[dst] = R[a] / R[b]} \\
+			I & 10 & 4 & \texttt{rem [dst] [a] [b]} & \texttt{R[dst] = R[a] \% R[b]} \\
+
+			I & 11 & 0 & \texttt{band [dst] [a] [b]} & \texttt{R[dst] = R[a] \& R[b]} \\
+			I & 11 & 1 & \texttt{bor [dst] [a] [b]} & \texttt{R[dst] = R[a] | R[b]} \\
+			I & 11 & 2 & \texttt{bxor [dst] [a] [b]} & \texttt{R[dst] = R[a] $\wedge$ R[b]} \\
+			I & 11 & 3 & \texttt{bshl [dst] [a] [b]} & \texttt{R[dst] = R[a] << R[b]} \\
+			I & 11 & 4 & \texttt{bshr [dst] [a] [b]} & \texttt{R[dst] = R[a] >> R[b]} \\
+			\hline
+		\end{tabular}
+	\end{footnotesize}
+	\caption{Available instruction list for the Sol32 provides a variety of commands.}
+	\label{table:instruction-table}
+\end{table}
+
+There are several different types of instruction formats, which make use of the four byte spots in the instruction opcode slightly differently. These are provided below in Table \ref{table:instruction-format-types}. As the first byte, Byte 0, is always the same, it is omitted from the table below. See Table \ref{table:instruction-formatting} for more details on Byte 0. Most commonly, and instruction will only use a single type for all registers present in the operation. Some instructions, in particular conversion instructions, will use multiple type codes for different registers.
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{cc|ccc}
+		\hline
+		ID & Name & Byte 1 & Byte 2 & Byte 3 \\
+		\hline
+		A & No Argument & - & - & - \\
+		B & Immediate (i16) & - & Imm (\texttt{0xF0}) & Imm (\texttt{0x0F}) \\
+		C & Single Register & Register & - & - \\
+		D & Single Register Type & Register Type & - & - \\
+		E & Single Register Immediate & Register Type & Imm (\texttt{0xF0}) & Imm (\texttt{0x0F}) \\
+		F & Double Register & Register & Register & - \\
+		G & Double Register Type & Register Type & Register & - \\
+		H & Conversion & Register Type & Register Type & - \\
+		I & Arithmetic & Register Type & Register & Register \\
+		\hline
+	\end{tabular}
+	\caption{Instructions can take a variety of different forms depending on the needs of the operation}
+	\label{table:instruction-format-types}
 \end{table}
 
 \pagebreak
@@ -344,7 +364,7 @@ Sol32 computers, by default, utilize the following character map. This is simila
 \section{Devices}
 \label{sec:devices}
 
-Devices are memory-mapped in the SolariumProcessor. This means that reading or writing to special regions in memory facilitate the communication with these external devices. In a typical Solarium computer, the device region consists of up to 64 devices, starting at memory address \texttt{0xA000}, with each device allocating up to 32 words of memory. Not all devices will make use all the available memory slots for a given device. In these cases, a memory exception will be provided if any of these invalid addresses are read from or written to. \todo{add device ID}
+Devices are memory-mapped in Sol32. This means that reading or writing to special regions in memory facilitate the communication with these external devices. In a typical Sol32 computer, the device region consists of up to 64 devices, starting at memory address \texttt{0xA000}, with each device allocating up to 32 bytes of memory. Not all devices will make use all the available memory slots for a given device. In these cases, a memory exception will be provided if any of these invalid addresses are read from or written to. \todo{add device ID}
 
 \subsection{Serial Input and Output}
 
@@ -371,6 +391,8 @@ The current memory mapping structure for the serial input and output device is p
     \label{table:dev-serial-io}
 \end{table}
 
+\subsection{IRQ Clock}
+
 \pagebreak
 
 \section{Examples}
@@ -383,6 +405,7 @@ The program listed in Listing \ref{listing:example-counter} provides a basic cou
 
 \lstinputlisting[caption={Limited counter program}, label={listing:example-counter}]{../examples/spa/counter.smc}
 
+\pagebreak
 \subsection{Infinite Counter}
 
 Listing \ref{listing:example-infinite-counter} makes use of some additional functionality, including the use of the register reference names, to test register reset functionality. It also modifies the program counter outside of the standard jump command.
@@ -463,7 +486,7 @@ Several tools can help in the development of Sol32 programs.
 
 \subsection{V/SProc}
 
-One useful tool is \texttt{V/SProc}, which is a program that combines together a basic assembler, CPU emulator, and memory inspector into a single program. The main window can be seen in Figure \ref{fig:visual-sproc-main-page}.
+One useful tool is \texttt{V/SProc}, \comment{which is a program that}{Update image!} combines together a basic assembler, CPU emulator, and memory inspector into a single program. The main window can be seen in Figure \ref{fig:visual-sproc-main-page}.
 
 \begin{figure}[h!]
     \centering

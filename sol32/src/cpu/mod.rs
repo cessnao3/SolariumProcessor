@@ -4,7 +4,6 @@ mod register;
 
 use core::fmt;
 use std::cell::RefCell;
-use std::collections::VecDeque;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
@@ -143,15 +142,12 @@ pub struct Processor {
     op_i8: IntegerI8Operations,
     op_i16: IntegerI16Operations,
     op_i32: IntegerI32Operations,
-    interrupt_queue: VecDeque<Interrupt>,
+    interrupt_hold: Option<Interrupt>,
 }
 
 impl Processor {
     /// Defines the number of bytes per memory address (size of the default memory word)
     pub const BYTES_PER_WORD: u32 = std::mem::size_of::<u32>() as u32;
-
-    /// Defines the maximum size of the interrupt queue
-    const INTERRUPT_QUEUE_MAX_SIZE: usize = 10;
 
     /// Defines the hard reset vector number
     pub const HARD_RESET_VECTOR: u32 = 0;
@@ -377,7 +373,7 @@ impl Processor {
             op_i8: IntegerI8Operations,
             op_i16: IntegerI16Operations,
             op_i32: IntegerI32Operations,
-            interrupt_queue: VecDeque::new(),
+            interrupt_hold: None,
         }
     }
 
@@ -399,7 +395,7 @@ impl Processor {
         self.registers
             .set_flag(RegisterFlag::InterruptEnable, true)?;
 
-        self.interrupt_queue.clear();
+        self.interrupt_hold = None;
 
         Ok(())
     }
@@ -421,15 +417,20 @@ impl Processor {
         }
     }
 
+    fn queue_interrupt(&mut self, int: Interrupt) -> Result<bool, ProcessorError> {
+        if self.interrupt_hold.is_none() {
+            self.interrupt_hold = Some(int);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     pub fn trigger_hardware_interrupt(&mut self, num: u32) -> Result<bool, ProcessorError> {
-        let res = self.call_interrupt(Interrupt::Hardware(num));
+        let int = Interrupt::Hardware(num);
+        let res = self.call_interrupt(int);
         if let Ok(false) = res {
-            if self.interrupt_queue.len() < Self::INTERRUPT_QUEUE_MAX_SIZE {
-                self.interrupt_queue.push_back(Interrupt::Hardware(num));
-                Ok(true)
-            } else {
-                Ok(false)
-            }
+            self.queue_interrupt(int)
         } else {
             res
         }
@@ -584,13 +585,12 @@ impl Processor {
                 .registers
                 .set_flag(RegisterFlag::InterruptEnable, false)?,
             Self::OP_INTERRUPT => {
-                self.interrupt_queue
-                    .push_back(Interrupt::Software(inst.arg0() as u32));
+                self.queue_interrupt(Interrupt::Software(inst.imm_unsigned()))?;
             }
             Self::OP_INTERRUPT_REGISTER => {
-                self.interrupt_queue.push_back(Interrupt::Software(
+                self.queue_interrupt(Interrupt::Software(
                     self.registers.get(inst.arg0_register())?,
-                ));
+                ))?;
             }
             Self::OP_CALL => {
                 // Increment the program counter before pushing registers so we return to the next instruction
@@ -910,21 +910,15 @@ impl Processor {
         for action in dev_action_queue {
             match action {
                 DeviceAction::CallInterrupt(num) => {
-                    self.interrupt_queue.push_back(Interrupt::Hardware(num));
+                    self.queue_interrupt(Interrupt::Hardware(num))?;
                 }
             }
         }
 
-        // Trim the interrupt queue to the appropriate size
-        if self.interrupt_queue.len() > Self::INTERRUPT_QUEUE_MAX_SIZE {
-            self.interrupt_queue
-                .resize(Self::INTERRUPT_QUEUE_MAX_SIZE, Interrupt::Software(0));
-        }
-
         // Save the resulting values
-        if let Some(int) = self.interrupt_queue.front() {
-            if self.call_interrupt(*int)? {
-                self.interrupt_queue.pop_front();
+        if let Some(int) = self.interrupt_hold {
+            if self.call_interrupt(int)? {
+                self.interrupt_hold = None;
             }
         }
 

@@ -634,7 +634,7 @@ InstNoArg!(OpHalt, Processor::OP_HALT);
 InstNoArg!(OpInton, Processor::OP_INTERRUPT_ENABLE);
 InstNoArg!(OpIntoff, Processor::OP_INTERRUPT_DISABLE);
 
-InstSingleArg!(OpInt, Processor::OP_INTERRUPT);
+InstImmediateArg!(OpInt, Processor::OP_INTERRUPT);
 InstSingleArg!(OpIntr, Processor::OP_INTERRUPT_REGISTER);
 InstSingleArg!(OpCall, Processor::OP_CALL);
 InstSingleArg!(OpPush, Processor::OP_PUSH);
