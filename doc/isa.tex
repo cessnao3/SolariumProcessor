@@ -87,7 +87,7 @@ Since the architecture of the Sol32 is 32-bit, this means that the basic word, a
         Usage & opcode & arg0 & arg1 & arg2 \\
         \hline
     \end{tabular}
-    \caption{The S/Proc instruction format typically has one opcode and three possible arguments associated with a particular opcode}
+    \caption{The Sol32 instruction format typically has one opcode and three possible arguments associated with a particular opcode}
     \label{table:instruction-formatting}
 \end{table}
 
@@ -99,7 +99,28 @@ This is contrasted with the typical assembly language formatting, which is provi
 
 where the number of arguments depends on the required number of arguments for the instruction.
 
-\alert{Certain arguments require type information. When this is present, }
+Certain arguments require type information. When this is present, the type code resides in the upper 3 bits of the argument byte (\texttt{0xE0}), while the register resides in the lower 5 bits (\texttt{0x1F}). Type codes are provided in Table \ref{table:type-codes}.
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{c|cc|c}
+		\hline
+		Type & Code & Size in Bytes & Description \\
+		\hline
+		 U8 & 1 & 1 & Unsigned byte \\
+		 I8 & 2 & 1 & Signed byte \\
+		 U16 & 3 & 2 & Unsigned short\\
+		 I16 & 4 & 2 & Signed short \\
+		 U32 & 5 & 4 & Unsigned integer \\
+		 I32 & 6 & 4 & Signed integer \\
+		 F32 & 7 & 4 & 32-bit floating point \\
+		\hline
+	\end{tabular}
+	\caption{The supported type codes that are associated with certain instruction codes}
+	\label{table:type-codes}
+\end{table}
+
+There are several different types of instruction formats, which make use of the four byte spots in the instruction opcode slightly differently. \alert{These are provided below.}
 
 \subsection{Resetting}
 
@@ -122,7 +143,7 @@ At the conclusion of any interrupt, the \texttt{retint} instruction should be ca
 
 It should be noted that, if any values were pushed onto the stack during the interrupt handler, they should be popped off the stack prior to the \texttt{retint} call to avoid corrupting the program state.
 
-The S/Proc supports 32 software and 32 hardware interrupts, as shown in Table \ref{table:interrupt-vector-locations}. The hardware interrupt vectors are stored in memory at locations \texttt{0x100} for interrupt 0 though \texttt{0x180}, exclusive, for interrupt 31. Similarly, the software interrupts are stored in memory at memory addresses \texttt{0x180} for interrupt 0 through \texttt{0x200}, exclusive, for interrupt 31.
+The Sol32 supports 32 software and 32 hardware interrupts, as shown in Table \ref{table:interrupt-vector-locations}. The hardware interrupt vectors are stored in memory at locations \texttt{0x100} for interrupt 0 though \texttt{0x180}, exclusive, for interrupt 31. Similarly, the software interrupts are stored in memory at memory addresses \texttt{0x180} for interrupt 0 through \texttt{0x200}, exclusive, for interrupt 31.
 
 \begin{table}[h!]
     \centering
@@ -212,7 +233,7 @@ All \comment{available instructions}{Update instructions} are listed in Table \r
             \hline
         \end{tabular}
     \end{footnotesize}
-    \caption{Available instruction list for the S/Proc provides a variety of commands.}
+    \caption{Available instruction list for the Sol32 provides a variety of commands.}
     \label{table:instruction-table}
 \end{table}
 
@@ -266,7 +287,7 @@ Reference names are available to link to the special register values, as listed 
 \section{Character Mapping}
 \label{sec:character-map}
 
-S/Proc computers, by default, utilize the following character map. This is similar to the American Standard Code for Information Interchange (ASCII) format. The S/Proc character map is defined in Table \ref{table:sproc-character-map}. Any undefined entries in the character map are considered invalid characters.
+Sol32 computers, by default, utilize the following character map. This is similar to the American Standard Code for Information Interchange (ASCII) format. The Sol32 character map is defined in Table \ref{table:sproc-character-map}. Any undefined entries in the character map are considered invalid characters.
 
 \newcommand{\charmap}[1]{\texttt{#1}}
 
@@ -314,7 +335,7 @@ S/Proc computers, by default, utilize the following character map. This is simil
         1F & {} & 3F & \charmap{?} & 5F & \charmap{\textunderscore} & 7F & {} \\
         \hline
     \end{tabular}
-    \caption{S/Proc character mapping}
+    \caption{Sol32 character mapping}
     \label{table:sproc-character-map}
 \end{table}
 
@@ -354,7 +375,7 @@ The current memory mapping structure for the serial input and output device is p
 
 \section{Examples}
 
-The following list some simple example programs that can be run on the S/Proc.
+The following list some simple example programs that can be run on the Sol32.
 
 \subsection{Counter}
 
@@ -370,7 +391,7 @@ Listing \ref{listing:example-infinite-counter} makes use of some additional func
 
 \subsection{Hello World}
 
-Listing  \ref{listing:hello-world} provides a program that will infinitely write "hello, world" to the serial device, expected to be memory-mapped into the S/Proc at \texttt{0xA000}. This makes use of the \texttt{.loadtext} command, which loads the text, and an additional null-terminator at the end, directly into memory. It also makes use of a print-string function call to handle printing string values to the serial output devices.
+Listing  \ref{listing:hello-world} provides a program that will infinitely write "hello, world" to the serial device, expected to be memory-mapped into the Sol32 at \texttt{0xA000}. This makes use of the \texttt{.loadtext} command, which loads the text, and an additional null-terminator at the end, directly into memory. It also makes use of a print-string function call to handle printing string values to the serial output devices.
 
 \lstinputlisting[caption={Infinite "hello, world!" program}, label={listing:hello-world}]{../examples/spa/hello_world.smc}
 
@@ -438,7 +459,7 @@ Note that, in this case, both functions and variables share the same namespace. 
 
 \section{Tools}
 
-Several tools can help in the development of S/Proc programs.
+Several tools can help in the development of Sol32 programs.
 
 \subsection{V/SProc}
 
