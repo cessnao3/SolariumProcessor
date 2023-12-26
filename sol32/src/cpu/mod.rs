@@ -825,8 +825,7 @@ impl Processor {
                 };
 
                 self.registers.set(inst.arg0_register(), res.val)?;
-                self.registers
-                    .set(Register::Status, if res.carry { 1 } else { 0 })?;
+                self.registers.set_flag(RegisterFlag::Carry, res.carry)?;
             }
             Opcode {
                 base: Self::OP_BASE_BITS,
@@ -847,8 +846,7 @@ impl Processor {
                 };
 
                 self.registers.set(inst.arg0_register(), res.val)?;
-                self.registers
-                    .set(Register::Status, if res.carry { 1 } else { 0 })?;
+                self.registers.set_flag(RegisterFlag::Carry, res.carry)?;
             }
             Opcode {
                 base: Self::OP_BASE_TEST,

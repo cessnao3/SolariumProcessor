@@ -63,12 +63,14 @@ impl fmt::Display for RegisterError {
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum RegisterFlag {
     InterruptEnable,
+    Carry,
 }
 
 impl RegisterFlag {
     pub fn get_bit(&self) -> i32 {
         match self {
             Self::InterruptEnable => 0,
+            Self::Carry => 1,
         }
     }
 
