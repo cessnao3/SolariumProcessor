@@ -152,7 +152,7 @@ fn build_code_column(
         if is_assembly {
             btn_build.connect_clicked(clone!(@strong tx_thread, @strong tx_ui => move |_| {
                 let asm = buffer_assembly_code.text(&buffer_assembly_code.start_iter(), &buffer_assembly_code.end_iter(), false);
-                match sol32asm::parse_text(asm.as_str()) {
+                match sol32asm::assemble_text(asm.as_str()) {
                     Ok(v) => {
                         tx_ui.send(UiToThread::SetCode(v)).unwrap();
                         tx_thread.send(ThreadToUi::LogMessage(format!("{short_name} Successful"))).unwrap();

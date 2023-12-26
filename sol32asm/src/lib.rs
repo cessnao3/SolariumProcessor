@@ -598,11 +598,11 @@ impl ParserState {
     }
 }
 
-pub fn parse_text(txt: &str) -> Result<Vec<u8>, AssemblerErrorLoc> {
-    parse_lines(&txt.lines().collect::<Vec<_>>())
+pub fn assemble_text(txt: &str) -> Result<Vec<u8>, AssemblerErrorLoc> {
+    assemble_lines(&txt.lines().collect::<Vec<_>>())
 }
 
-pub fn parse_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
+pub fn assemble_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
     let mut state = TokenList::new();
     for (i, l) in txt.iter().enumerate() {
         let loc: LocationInfo = LocationInfo {
@@ -617,10 +617,55 @@ pub fn parse_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
     state.to_bytes()
 }
 
-pub fn assemble(tokens: &[TokenLoc]) -> Result<Vec<u8>, AssemblerErrorLoc> {
+pub fn assemble_tokens(tokens: &[TokenLoc]) -> Result<Vec<u8>, AssemblerErrorLoc> {
     let mut state = TokenList::new();
     for t in tokens {
         state.add_token(t.clone());
     }
     state.to_bytes()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_counter() {
+        let txt = include_str!("../../examples/spa/counter.smc");
+        let res = assemble_text(txt);
+        assert!(res.is_ok());
+        assert!(!res.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_hello_world() {
+        let txt = include_str!("../../examples/spa/hello_world.smc");
+        let res = assemble_text(txt);
+        assert!(res.is_ok());
+        assert!(!res.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_infinite_counter() {
+        let txt = include_str!("../../examples/spa/infinite_counter.smc");
+        let res = assemble_text(txt);
+        assert!(res.is_ok());
+        assert!(!res.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_serial_echo() {
+        let txt = include_str!("../../examples/spa/serial_echo.smc");
+        let res = assemble_text(txt);
+        assert!(res.is_ok());
+        assert!(!res.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_thread_test() {
+        let txt = include_str!("../../examples/spa/thread_test.smc");
+        let res = assemble_text(txt);
+        assert!(res.is_ok());
+        assert!(!res.unwrap().is_empty());
+    }
 }
