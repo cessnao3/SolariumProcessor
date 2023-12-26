@@ -2,10 +2,53 @@ use crate::messages::{ThreadToUi, UiToThread};
 use sol32::cpu::{Processor, ProcessorError};
 use sol32::device::{InterruptClockDevice, SerialInputOutputDevice};
 use sol32::memory::{MemorySegment, ReadOnlySegment, ReadWriteSegment};
+use sol32asm::InstructionList;
 use std::sync::mpsc::{Receiver, RecvError, Sender, TryRecvError};
 
 use std::cell::RefCell;
 use std::rc::Rc;
+
+struct CircularBuffer<T> {
+    history: Vec<Option<T>>,
+    index: usize,
+}
+
+impl<T: Clone> CircularBuffer<T> {
+    pub fn new(len: usize) -> Self {
+        if len == 0 {
+            panic!("size may not be 0");
+        }
+
+        Self {
+            history: (0..len).map(|_| None).collect(),
+            index: 0,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.history.fill(None);
+        self.index = 0;
+    }
+
+    pub fn push(&mut self, val: T) {
+        self.history[self.index] = Some(val);
+        self.index = (self.index + 1) % self.history.len();
+    }
+
+    pub fn list(&self) -> Vec<T> {
+        let mut vals = Vec::new();
+
+        for i in 0..self.history.len() {
+            let iv = (self.index + i) % self.history.len();
+
+            if let Some(t) = self.history[iv].as_ref() {
+                vals.push(t.clone());
+            }
+        }
+
+        vals
+    }
+}
 
 struct ThreadState {
     running: bool,
@@ -15,6 +58,8 @@ struct ThreadState {
     cpu: Processor,
     serial_io_dev: Rc<RefCell<SerialInputOutputDevice>>,
     last_code: Vec<u8>,
+    inst_history: CircularBuffer<String>,
+    inst_map: InstructionList,
 }
 
 impl ThreadState {
@@ -29,10 +74,47 @@ impl ThreadState {
             serial_io_dev: Rc::new(RefCell::new(SerialInputOutputDevice::new(2048))),
             last_code: Vec::new(),
             memory_request: (0, 0),
+            inst_history: CircularBuffer::<String>::new(10),
+            inst_map: InstructionList::default(),
         };
 
         s.reset()?;
         Ok(s)
+    }
+
+    fn step_cpu(&mut self) -> Result<(), ThreadToUi> {
+        let mut inst_details = "??".to_string();
+
+        let pc = self
+            .cpu
+            .get_register_state()
+            .get(sol32::cpu::Register::ProgramCounter)
+            .unwrap_or(0);
+        if let Ok(mem) = self.cpu.memory_inspect_u32(pc) {
+            if let Some(disp_val) = self.inst_map.get_display_inst(mem) {
+                inst_details = disp_val;
+            }
+        }
+
+        inst_details = format!("0x{pc:08x} = {inst_details}");
+        self.inst_history.push(inst_details);
+
+        if let Err(e) = self.cpu.step() {
+            let msg = format!(
+                "{}\n{}",
+                e.to_string(),
+                self.inst_history
+                    .list()
+                    .into_iter()
+                    .map(|s| format!("    {s}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            );
+
+            Err(ThreadToUi::LogMessage(msg))
+        } else {
+            Ok(())
+        }
     }
 
     fn reset(&mut self) -> Result<(), ProcessorError> {
@@ -40,6 +122,8 @@ impl ThreadState {
 
         self.cpu = Processor::new();
         self.serial_io_dev.borrow_mut().reset();
+
+        self.inst_history.reset();
 
         let reset_vec_data: Vec<u8> = (0..INIT_RO_LEN)
             .map(|i| {
@@ -72,7 +156,10 @@ impl ThreadState {
         let dev_interrupt = Rc::new(RefCell::new(InterruptClockDevice::new(0)));
 
         self.cpu.device_add(dev_interrupt.clone())?;
-        self.cpu.memory_add_segment(Self::DEVICE_START_IND + self.serial_io_dev.borrow().len(), dev_interrupt)?;
+        self.cpu.memory_add_segment(
+            Self::DEVICE_START_IND + self.serial_io_dev.borrow().len(),
+            dev_interrupt,
+        )?;
 
         self.cpu.reset(sol32::cpu::ResetType::Hard)?;
 
@@ -93,7 +180,11 @@ impl ThreadState {
             msg: UiToThread,
         ) -> Result<Option<ThreadToUi>, ProcessorError> {
             match msg {
-                UiToThread::CpuStep => state.cpu.step()?,
+                UiToThread::CpuStep => {
+                    if let Err(e) = state.step_cpu() {
+                        return Ok(Some(e));
+                    }
+                }
                 UiToThread::CpuStart => state.running = true,
                 UiToThread::CpuStop => state.running = false,
                 UiToThread::Exit => state.run_thread = false,
@@ -202,9 +293,9 @@ pub fn cpu_thread(rx: Receiver<UiToThread>, tx: Sender<ThreadToUi>) {
             let step_repeat_count = state.multiplier as i64;
 
             for _ in 0..step_repeat_count {
-                if let Err(e) = state.cpu.step() {
+                if let Err(msg) = state.step_cpu() {
                     state.running = false;
-                    tx.send(ThreadToUi::LogMessage(format!("{e}"))).unwrap();
+                    tx.send(msg).unwrap();
                     break;
                 }
             }

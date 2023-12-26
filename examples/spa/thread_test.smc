@@ -25,7 +25,7 @@
 :init_thread
 ; args (start_loc, stack_ptr_loc)
     ; Load useful parameters to registers
-    ldi 7:u16 1
+    ldi 7:u16 4
     ldi 10:u16 0
     ldi 11:u16 16
 
