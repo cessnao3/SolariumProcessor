@@ -544,6 +544,7 @@ impl Processor {
 
     pub fn step(&mut self) -> Result<(), ProcessorError> {
         let mut inst_jump = Some(1);
+        let mut interrupt_call = None;
 
         let pc = self.registers.get(Register::ProgramCounter)?;
         if pc % 4 != 0 {
@@ -566,13 +567,10 @@ impl Processor {
                 .registers
                 .set_flag(RegisterFlag::InterruptEnable, false)?,
             Self::OP_INTERRUPT => {
-                self.call_interrupt(Interrupt::Software(inst.arg0() as u32))?;
-                inst_jump = None;
+                interrupt_call = Some(Interrupt::Software(inst.arg0() as u32));
             }
             Self::OP_INTERRUPT_REGISTER => {
-                self.call_interrupt(Interrupt::Software(
-                    self.registers.get(inst.arg0_register())?,
-                ))?;
+                interrupt_call = Some(Interrupt::Software(self.registers.get(inst.arg0_register())?));
             }
             Self::OP_CALL => {
                 // Increment the program counter before pushing registers so we return to the next instruction
@@ -883,18 +881,23 @@ impl Processor {
             }
         }
 
+        if let Some(jmp_val) = inst_jump {
+            self.registers
+                .set(Register::ProgramCounter, pc + jmp_val * 4)?;
+        }
+
         // Perform requested actions
         for action in dev_action_queue {
             match action {
                 DeviceAction::CallInterrupt(num) => {
-                    self.call_interrupt(Interrupt::Hardware(num))?;
+                    interrupt_call = Some(Interrupt::Hardware(num));
                 }
             }
         }
 
-        if let Some(jmp_val) = inst_jump {
-            self.registers
-                .set(Register::ProgramCounter, pc + jmp_val * 4)?;
+        // Save the resulting values
+        if let Some(int) = interrupt_call {
+            self.call_interrupt(int)?;
         }
 
         Ok(())
