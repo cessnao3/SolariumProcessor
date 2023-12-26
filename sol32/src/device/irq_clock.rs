@@ -64,7 +64,7 @@ impl MemorySegment for InterruptClockDevice {
             mem[index as usize] = u32::from_be_bytes(val);
 
             self.clock_interval = mem[0];
-            self.current_count = mem[1];
+            // self.current_count = mem[1]; // Do not set the current count
             self.interrupt = mem[2];
 
             Ok(())

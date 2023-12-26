@@ -101,8 +101,15 @@ impl ThreadState {
             if brk == pc && enable_breakpoints {
                 self.running = false;
 
-                let msg = format!("Breaking at 0x{brk:08x}\n{}",
-                    self.inst_history.list().into_iter().map(|s| format!("    {s}")).collect::<Vec<_>>().join("\n"));
+                let msg = format!(
+                    "Breaking at 0x{brk:08x}\n{}",
+                    self.inst_history
+                        .list()
+                        .into_iter()
+                        .map(|s| format!("    {s}"))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                );
                 return Err(ThreadToUi::LogMessage(msg));
             }
         }
@@ -190,7 +197,12 @@ impl ThreadState {
             match msg {
                 UiToThread::SetBreakpoint(brk) => {
                     state.breakpoint = if brk == 0 { None } else { Some(brk) };
-                    return Ok(Some(ThreadToUi::LogMessage(format!("Setting Breakpoint to 0x{brk:08x}"))));
+                    let msg = if brk == 0 {
+                        "Disabling Breakpoint".into()
+                    } else {
+                        format!("Setting Breakpoint to 0x{brk:08x}")
+                    };
+                    return Ok(Some(ThreadToUi::LogMessage(msg)));
                 }
                 UiToThread::CpuStep => {
                     if let Err(e) = state.step_cpu(false) {
@@ -314,8 +326,10 @@ pub fn cpu_thread(rx: Receiver<UiToThread>, tx: Sender<ThreadToUi>) {
         }
 
         // Send Registers
-        tx.send(ThreadToUi::RegisterState(Box::new(state.cpu.get_register_state())))
-            .unwrap();
+        tx.send(ThreadToUi::RegisterState(Box::new(
+            state.cpu.get_register_state(),
+        )))
+        .unwrap();
 
         let pc = state
             .cpu
