@@ -14,6 +14,15 @@ impl From<(u32, bool)> for OperationValue {
     }
 }
 
+impl From<f32> for OperationValue {
+    fn from(value: f32) -> Self {
+        Self {
+            val: value.to_bits(),
+            carry: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperationError {
     DivideByZero,
@@ -195,17 +204,17 @@ pub struct FloatOperations;
 impl ArithmeticOperations for FloatOperations {
     fn add(&self, a: u32, b: u32) -> Result<OperationValue, OperationError> {
         let r = f32::from_bits(a) + f32::from_bits(b);
-        Ok((r.to_bits(), false).into())
+        Ok(r.into())
     }
 
     fn sub(&self, a: u32, b: u32) -> Result<OperationValue, OperationError> {
         let r = f32::from_bits(a) - f32::from_bits(b);
-        Ok((r.to_bits(), false).into())
+        Ok(r.into())
     }
 
     fn mul(&self, a: u32, b: u32) -> Result<OperationValue, OperationError> {
         let r = f32::from_bits(a) * f32::from_bits(b);
-        Ok((r.to_bits(), false).into())
+        Ok(r.into())
     }
 
     fn div(&self, a: u32, b: u32) -> Result<OperationValue, OperationError> {
@@ -214,7 +223,7 @@ impl ArithmeticOperations for FloatOperations {
             return Err(OperationError::DivideByZero);
         }
         let r = f32::from_bits(a) / bf;
-        Ok((r.to_bits(), false).into())
+        Ok(r.into())
     }
 
     fn rem(&self, a: u32, b: u32) -> Result<OperationValue, OperationError> {
@@ -223,7 +232,7 @@ impl ArithmeticOperations for FloatOperations {
             return Err(OperationError::DivideByZero);
         }
         let r = f32::from_bits(a) % bf;
-        Ok((r.to_bits(), false).into())
+        Ok(r.into())
     }
 }
 

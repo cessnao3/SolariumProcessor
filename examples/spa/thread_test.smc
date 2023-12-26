@@ -1,3 +1,5 @@
+;; Threading Example
+
 .loadloc program_start
 .loadloc program_start
 
@@ -47,11 +49,11 @@
     ldn 13:u32
     .loadloc global_num_threads
     ld 14:u32 13
-    mul 14:u32 14 7
+    mul 15:u32 14 7
 
     ldn 12:u32
     .loadloc global_thread_pc_stack
-    add 12:u32 12 14
+    add 12:u32 12 15
     sav 12:u32 11
 
     ; Add one to the global thread count

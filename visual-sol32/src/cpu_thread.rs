@@ -100,7 +100,10 @@ impl ThreadState {
         if let Some(brk) = self.breakpoint {
             if brk == pc && enable_breakpoints {
                 self.running = false;
-                return Err(ThreadToUi::LogMessage(format!("Breaking at 0x{brk:08x}")));
+
+                let msg = format!("Breaking at 0x{brk:08x}\n{}",
+                    self.inst_history.list().into_iter().map(|s| format!("    {s}")).collect::<Vec<_>>().join("\n"));
+                return Err(ThreadToUi::LogMessage(msg));
             }
         }
 
