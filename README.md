@@ -2,7 +2,7 @@
 
 <img src="doc/images/logo.png" alt="VisualSProc Program" width="100"/>
 
-SolariumProcessor, or SProc, is a simple 16-bit hypothetical processor that implements a basic Instruction Set Architecture (ISA). See the isa.tex document in the doc/ folder for more information.
+SolariumProcessor, or Sol32, is a simple 16-bit hypothetical processor that implements a basic Instruction Set Architecture (ISA). See the isa.tex document in the doc/ folder for more information.
 
 ## Libraries
 

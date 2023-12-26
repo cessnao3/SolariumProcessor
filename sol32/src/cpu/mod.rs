@@ -4,6 +4,7 @@ mod register;
 
 use core::fmt;
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
@@ -142,11 +143,15 @@ pub struct Processor {
     op_i8: IntegerI8Operations,
     op_i16: IntegerI16Operations,
     op_i32: IntegerI32Operations,
+    interrupt_queue: VecDeque<Interrupt>,
 }
 
 impl Processor {
     /// Defines the number of bytes per memory address (size of the default memory word)
     pub const BYTES_PER_WORD: u32 = std::mem::size_of::<u32>() as u32;
+
+    /// Defines the maximum size of the interrupt queue
+    const INTERRUPT_QUEUE_MAX_SIZE: usize = 10;
 
     /// Defines the hard reset vector number
     pub const HARD_RESET_VECTOR: u32 = 0;
@@ -372,6 +377,7 @@ impl Processor {
             op_i8: IntegerI8Operations,
             op_i16: IntegerI16Operations,
             op_i32: IntegerI32Operations,
+            interrupt_queue: VecDeque::new(),
         }
     }
 
@@ -392,6 +398,8 @@ impl Processor {
         )?;
         self.registers
             .set_flag(RegisterFlag::InterruptEnable, true)?;
+
+        self.interrupt_queue.clear();
 
         Ok(())
     }
@@ -414,7 +422,17 @@ impl Processor {
     }
 
     pub fn trigger_hardware_interrupt(&mut self, num: u32) -> Result<bool, ProcessorError> {
-        self.call_interrupt(Interrupt::Hardware(num))
+        let res = self.call_interrupt(Interrupt::Hardware(num));
+        if let Ok(false) = res {
+            if self.interrupt_queue.len() < Self::INTERRUPT_QUEUE_MAX_SIZE {
+                self.interrupt_queue.push_back(Interrupt::Hardware(num));
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        } else {
+            res
+        }
     }
 
     fn call_interrupt(&mut self, int: Interrupt) -> Result<bool, ProcessorError> {
@@ -544,7 +562,6 @@ impl Processor {
 
     pub fn step(&mut self) -> Result<(), ProcessorError> {
         let mut inst_jump = Some(1);
-        let mut interrupt_call = None;
 
         let pc = self.registers.get(Register::ProgramCounter)?;
         if pc % 4 != 0 {
@@ -567,10 +584,13 @@ impl Processor {
                 .registers
                 .set_flag(RegisterFlag::InterruptEnable, false)?,
             Self::OP_INTERRUPT => {
-                interrupt_call = Some(Interrupt::Software(inst.arg0() as u32));
+                self.interrupt_queue
+                    .push_back(Interrupt::Software(inst.arg0() as u32));
             }
             Self::OP_INTERRUPT_REGISTER => {
-                interrupt_call = Some(Interrupt::Software(self.registers.get(inst.arg0_register())?));
+                self.interrupt_queue.push_back(Interrupt::Software(
+                    self.registers.get(inst.arg0_register())?,
+                ));
             }
             Self::OP_CALL => {
                 // Increment the program counter before pushing registers so we return to the next instruction
@@ -890,14 +910,22 @@ impl Processor {
         for action in dev_action_queue {
             match action {
                 DeviceAction::CallInterrupt(num) => {
-                    interrupt_call = Some(Interrupt::Hardware(num));
+                    self.interrupt_queue.push_back(Interrupt::Hardware(num));
                 }
             }
         }
 
+        // Trim the interrupt queue to the appropriate size
+        if self.interrupt_queue.len() > Self::INTERRUPT_QUEUE_MAX_SIZE {
+            self.interrupt_queue
+                .resize(Self::INTERRUPT_QUEUE_MAX_SIZE, Interrupt::Software(0));
+        }
+
         // Save the resulting values
-        if let Some(int) = interrupt_call {
-            self.call_interrupt(int)?;
+        if let Some(int) = self.interrupt_queue.front() {
+            if self.call_interrupt(*int)? {
+                self.interrupt_queue.pop_front();
+            }
         }
 
         Ok(())
@@ -921,8 +949,7 @@ impl Processor {
 
         sp_curr -= Self::BYTES_PER_WORD;
 
-        self.registers
-            .set(Register::StackPointer, sp_curr)?;
+        self.registers.set(Register::StackPointer, sp_curr)?;
         Ok(self.memory.get_u32(sp_curr)?)
     }
 

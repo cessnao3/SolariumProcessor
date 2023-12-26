@@ -85,6 +85,7 @@
 
 .oper 0x3200
 :hw_int_0
+    intoff
     ; Write Switch
     ldn 9:u32
     .loadloc msg_switch
@@ -124,6 +125,7 @@
     ld $sp:u32 13
 
     ; Resume the next thread
+    inton
     retint
 
 .oper 0x3400
