@@ -370,21 +370,21 @@ Devices are memory-mapped in Sol32. This means that reading or writing to specia
 
 The serial input and output device is one of the simplest devices. It essentially consists of a device two queues, one for input, and another for output. Each of these queues has an internal buffer size of 256 words. If any words are attempted to be added to the queue once either queue is full, no additional data is read and that data is lost.
 
-The current memory mapping structure for the serial input and output device is provided in Table \ref{table:dev-serial-io}. \todo{Create the ability for devices to access full memory map, for things like async writing?}
+The memory mapping for the serial input and output device is provided in Table \ref{table:dev-serial-io}.
 
 \begin{table}[h!]
     \centering
-    \begin{tabular}{l|ll}
+    \begin{tabular}{l|lll}
         \hline
-        Offset & Read/Write & Usage \\
+        Offset & Type & Read/Write & Usage \\
         \hline
-        \texttt{0} & Read & Provides the current input queue size \\
-        \texttt{1} & Read & Pops and provides a word off the front of the input queue \\
-        & & If no data is available, will return \texttt{0} by default \\
-        \texttt{2} & Read & Provides the current output queue size \\
-        \texttt{3} & Write & Pushes a word onto the output queue \\
-        \texttt{4} & Write & Clears the input queue if the value written is nonzero \\
-        \texttt{5} & Write & Clears the output queue if the value written is nonzero \\
+        \texttt{0} & u8 & Read & Provides the current input queue size \\
+        \texttt{1} & u8 & Read & Pops and provides a word off the front of the input queue \\
+        & & & If no data is available, will return \texttt{0} by default \\
+        \texttt{2} & u8 & Read & Provides the current output queue size \\
+        \texttt{3} & u8 & Write & Pushes a word onto the output queue \\
+        \texttt{4} & u8 & Write & Clears the input queue if the value written is nonzero \\
+        \texttt{5} & u8 & Write & Clears the output queue if the value written is nonzero \\
         \hline
     \end{tabular}
     \caption{Serial Input and Output device provides a simple data structure to read and write data streams}
@@ -392,6 +392,24 @@ The current memory mapping structure for the serial input and output device is p
 \end{table}
 
 \subsection{IRQ Clock}
+
+The IRQ clock provides a means to trigger a specific hardware interrupt at a regular interval of clock cycles. This consists of a settable interval (or set to 0 to disable), as well as a settable interrupt to trigger. Available in memory is the ability to read any of these two settable parameters, as well as a readable indication of the current clock cycle count. The memory mapping is provided in Table \ref{table:dev-irq-clock}.
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{l|lll}
+		\hline
+		Offset & Type & Read/Write & Usage \\
+		\hline
+		\texttt{0} & u32 & Read/Write & Gets/sets the clock interval in CPU cycles. Set to 0 to disable. \\
+		\texttt{4} & u32 & Read & Provides the current clock counter in CPU cycles. \\
+		{} & {} & {} & Will be between 0 and the above interval. \\
+		\texttt{8} & u32 & Read/Write & The hardware IRQ to trigger. \\
+		\hline
+	\end{tabular}
+	\caption{Serial Input and Output device provides a simple data structure to read and write data streams}
+	\label{table:dev-irq-clock}
+\end{table}
 
 \pagebreak
 

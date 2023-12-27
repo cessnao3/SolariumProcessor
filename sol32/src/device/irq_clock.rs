@@ -1,6 +1,9 @@
-use crate::{memory::{MemorySegment, MemorySegmentError}, cpu::Processor};
+use crate::{
+    cpu::Processor,
+    memory::{MemorySegment, MemorySegmentError},
+};
 
-use super::{DeviceAction, ProcessorDevice};
+use super::{DeviceAction, ProcessorDevice, DEVICE_MEM_SIZE};
 
 pub struct InterruptClockDevice {
     clock_interval: u32,
@@ -9,8 +12,6 @@ pub struct InterruptClockDevice {
 }
 
 impl InterruptClockDevice {
-    const DEVICE_MEM_SIZE: u32 = 3 * Processor::BYTES_PER_WORD;
-
     pub fn new(interrupt: u32) -> Self {
         Self {
             clock_interval: 0,
@@ -31,11 +32,7 @@ impl MemorySegment for InterruptClockDevice {
         let index = offset / Processor::BYTES_PER_WORD;
         let within = offset % Processor::BYTES_PER_WORD;
 
-        let mem = [
-            self.clock_interval,
-            self.current_count,
-            self.interrupt,
-        ];
+        let mem = [self.clock_interval, self.current_count, self.interrupt];
 
         if (index as usize) < mem.len() {
             let val = mem[index as usize].to_be_bytes();
@@ -51,11 +48,7 @@ impl MemorySegment for InterruptClockDevice {
         let index = offset / Processor::BYTES_PER_WORD;
         let within = offset % Processor::BYTES_PER_WORD;
 
-        let mut mem = [
-            self.clock_interval,
-            self.current_count,
-            self.interrupt,
-        ];
+        let mut mem = [self.clock_interval, self.current_count, self.interrupt];
 
         if (index as usize) < mem.len() {
             let mut val = mem[index as usize].to_be_bytes();
@@ -81,7 +74,7 @@ impl MemorySegment for InterruptClockDevice {
 
     /// Provides the length of the memory segment
     fn len(&self) -> u32 {
-        Self::DEVICE_MEM_SIZE
+        DEVICE_MEM_SIZE
     }
 }
 

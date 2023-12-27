@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
 
-use super::{DeviceAction, ProcessorDevice};
+use super::{DeviceAction, ProcessorDevice, DEVICE_MEM_SIZE};
 
 use crate::memory::{MemorySegment, MemorySegmentError};
 
@@ -16,7 +16,6 @@ pub struct SerialInputOutputDevice {
 /// Defines constant values for the memory address offsets
 impl SerialInputOutputDevice {
     // Define memory size and offset values
-    const DEVICE_MEM_SIZE: u32 = 32;
     const OFFSET_INPUT_SIZE: u32 = 0;
     const OFFSET_INPUT_GET: u32 = 1;
     const OFFSET_OUTPUT_SIZE: u32 = 2;
@@ -137,7 +136,7 @@ impl MemorySegment for SerialInputOutputDevice {
 
     /// Provides the length of the memory segment
     fn len(&self) -> u32 {
-        Self::DEVICE_MEM_SIZE
+        DEVICE_MEM_SIZE
     }
 }
 
