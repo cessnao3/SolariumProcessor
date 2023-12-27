@@ -57,30 +57,49 @@ pub fn build_ui(app: &Application) {
                 }
                 ThreadToUi::RegisterState(regs) => {
                     for (i, r) in regs.registers.iter().enumerate() {
-                        register_fields[i].set_text(&format!("0x{:08x}", r));
+                        register_fields[i].set_markup(&format!("<tt>0x{:08x}</tt>", r));
                     }
                 }
                 ThreadToUi::ProgramCounterValue(pc, val) => {
                     if let Some(disp_val) = inst.get_display_inst(val) {
-                        serial_details.label_instruction_details.set_text(&disp_val);
+                        serial_details.label_instruction_details.set_markup(&format!("<tt>{disp_val}</tt>"));
                     } else {
-                        serial_details.label_instruction_details.set_text("??");
+                        serial_details.label_instruction_details.set_markup("<tt>??</tt>");
                     }
 
-                    serial_details.label_instruction.set_text(&format!("Mem[0x{:08x}] = 0x{:08x}", pc, val));
+                    serial_details
+                        .label_instruction
+                        .set_markup(&format!("<tt>Mem[0x{:08x}] = 0x{:08x}</tt>", pc, val));
                 }
                 ThreadToUi::LogMessage(msg) => {
-                    text_log.buffer().insert(&mut text_log.buffer().end_iter(), &format!("{msg}\n"));
-                    text_log.scroll_to_iter(&mut text_log.buffer().end_iter(), 0.0, false, 0.0, 0.0);
+                    text_log
+                        .buffer()
+                        .insert(&mut text_log.buffer().end_iter(), &format!("{msg}\n"));
+                    text_log.scroll_to_iter(
+                        &mut text_log.buffer().end_iter(),
+                        0.0,
+                        false,
+                        0.0,
+                        0.0,
+                    );
                 }
                 ThreadToUi::SerialOutput(msg) => {
                     let buf = serial_details.text_serial.buffer().clone();
                     buf.insert(&mut buf.end_iter(), msg.as_str());
-                    serial_details.text_serial.scroll_to_iter(&mut buf.end_iter(), 0.0, false, 0.0, 0.0);
+                    serial_details.text_serial.scroll_to_iter(
+                        &mut buf.end_iter(),
+                        0.0,
+                        false,
+                        0.0,
+                        0.0,
+                    );
                 }
                 ThreadToUi::ResponseMemory(base, vals) => {
                     for (i, l) in serial_details.memory.labels.iter().enumerate() {
-                        l.set_text(&format!("L{:08x}", base + serial_details.memory.num_cols as u32 * i as u32));
+                        l.set_text(&format!(
+                            "L{:08x}",
+                            base + serial_details.memory.num_cols as u32 * i as u32
+                        ));
                     }
 
                     for (i, m) in serial_details.memory.locations.iter().enumerate() {
@@ -189,7 +208,7 @@ fn build_code_column(
 
 fn build_cpu_column(
     tx_ui: &std::sync::mpsc::Sender<UiToThread>,
-) -> (gtk::Box, Vec<gtk::EditableLabel>, gtk::TextView) {
+) -> (gtk::Box, Vec<gtk::Label>, gtk::TextView) {
     let column_cpu = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
@@ -198,6 +217,10 @@ fn build_cpu_column(
     let cpu_controls_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
+        .margin_start(4)
+        .margin_end(4)
+        .margin_top(4)
+        .margin_bottom(4)
         .build();
     let cpu_controls_frame = gtk::Frame::builder()
         .label("CPU Controls")
@@ -247,6 +270,10 @@ fn build_cpu_column(
     let register_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .spacing(4)
+        .margin_start(4)
+        .margin_end(4)
+        .margin_top(4)
+        .margin_bottom(4)
         .build();
     let register_box_a = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
@@ -280,13 +307,14 @@ fn build_cpu_column(
             .build();
 
         let label = gtk::Label::builder()
-            .label(&format!("R{i:02}"))
+            .use_markup(true)
+            .label(&format!("<tt>R{i:02}</tt>"))
             .margin_end(6)
             .build();
-        let text = gtk::EditableLabel::builder()
-            .text(&format!("0x{:04x}", 0))
+        let text = gtk::Label::builder()
+            .use_markup(true)
+            .label(&format!("<tt>0x{:04x}</tt>", 0))
             .hexpand(true)
-            .editable(false)
             .build();
 
         inner_box.append(&label);
@@ -363,6 +391,10 @@ fn build_serial_column(
 
     let memory_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
+        .margin_start(4)
+        .margin_end(4)
+        .margin_top(4)
+        .margin_bottom(4)
         .build();
     let memory_base_entry = gtk::Entry::builder().text("0").build();
 
@@ -415,19 +447,19 @@ fn build_serial_column(
     let instruction_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
+        .margin_start(4)
+        .margin_end(4)
+        .margin_top(4)
+        .margin_bottom(4)
         .build();
     let instruction_frame = gtk::Frame::builder()
         .label("Instruction")
         .child(&instruction_box)
         .margin_start(4)
-            .margin_end(4)
+        .margin_end(4)
         .build();
-    let overall_instruction = gtk::Label::builder()
-        .label("")
-        .build();
-    let instruction_details = gtk::Label::builder()
-        .label("")
-        .build();
+    let overall_instruction = gtk::Label::builder().label("").xalign(0.0).build();
+    let instruction_details = gtk::Label::builder().label("").xalign(0.0).build();
 
     let breakpoint_text = gtk::Entry::builder().text("0").build();
     breakpoint_text.connect_activate(clone!(@strong tx_ui, @strong tx_thread => move |t| {
@@ -456,7 +488,6 @@ fn build_serial_column(
         .hexpand(true)
         .vexpand(true)
         .editable(false)
-        .monospace(true)
         .tooltip_text("Serial log")
         .monospace(true)
         .build();
@@ -471,6 +502,10 @@ fn build_serial_column(
     let text_input_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
+        .margin_start(4)
+        .margin_end(4)
+        .margin_top(4)
+        .margin_bottom(4)
         .build();
 
     let text_input_frame = gtk::Frame::builder()
