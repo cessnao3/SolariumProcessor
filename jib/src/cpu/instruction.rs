@@ -30,7 +30,7 @@ impl fmt::Display for DataType {
 }
 
 impl DataType {
-    pub fn word_size(&self) -> usize {
+    pub fn byte_size(&self) -> usize {
         match self {
             Self::U8 | Self::I8 => 1,
             Self::U16 | Self::I16 => 2,

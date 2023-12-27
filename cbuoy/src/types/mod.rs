@@ -1,23 +1,4 @@
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum BuiltinTypes {
-    U16,
-    I16,
-}
-
-impl BuiltinTypes {
-    pub fn word_count(&self) -> usize {
-        1
-    }
-}
-
-impl std::fmt::Display for BuiltinTypes {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::U16 => write!(f, "u16"),
-            Self::I16 => write!(f, "i16"),
-        }
-    }
-}
+use jib::cpu::DataType;
 
 #[derive(Debug)]
 pub enum SpTypeError {
@@ -58,7 +39,7 @@ pub enum SpType {
         name: String,
     },
     Primitive {
-        base: BuiltinTypes,
+        base: DataType,
     },
     Alias {
         name: String,
@@ -102,11 +83,11 @@ impl SpType {
     pub fn word_count(&self) -> Result<usize, SpTypeError> {
         match self {
             Self::OpaqueType { .. } => Err(SpTypeError::MissingTypeSize(self.clone())),
-            Self::Primitive { base, .. } => Ok(base.word_count()),
+            Self::Primitive { base, .. } => Ok(base.byte_size()),
             Self::Array { base, size } => Ok(base.word_count()? * size),
             Self::Struct { fields, .. } => fields.iter().map(|(_, t)| t.word_count()).sum(),
-            Self::Pointer { .. } => Ok(BuiltinTypes::U16.word_count()),
-            Self::Function { .. } => Ok(BuiltinTypes::U16.word_count()),
+            Self::Pointer { .. } => Ok(DataType::U32.byte_size()),
+            Self::Function { .. } => Ok(DataType::U32.byte_size()),
             Self::Constant { base } => base.word_count(),
             Self::Alias { base, .. } => base.word_count(),
         }
@@ -115,10 +96,10 @@ impl SpType {
     pub fn base_primitive(&self) -> Option<SpType> {
         match self {
             Self::Pointer { .. } => Some(SpType::Primitive {
-                base: BuiltinTypes::U16,
+                base: DataType::U32,
             }),
             Self::Array { .. } => Some(SpType::Primitive {
-                base: BuiltinTypes::U16,
+                base: DataType::U32,
             }),
             Self::Primitive { .. } => Some(self.clone()),
             Self::Alias { base, .. } => base.base_primitive(),
@@ -250,24 +231,26 @@ impl Default for SpTypeDict {
             types: std::collections::HashMap::new(),
         };
 
+        let type_vals = [
+            ("u8", DataType::U8),
+            ("i8", DataType::I8),
+            ("u16", DataType::U16),
+            ("i16", DataType::I16),
+            ("u32", DataType::U32),
+            ("i32", DataType::I32),
+            ("f32", DataType::F32),
+        ];
+
         s.types.insert(
             "void".into(),
             SpType::OpaqueType {
                 name: "void".to_string(),
             },
         );
-        s.types.insert(
-            "u16".into(),
-            SpType::Primitive {
-                base: BuiltinTypes::U16,
-            },
-        );
-        s.types.insert(
-            "i16".into(),
-            SpType::Primitive {
-                base: BuiltinTypes::I16,
-            },
-        );
+
+        for (n, t) in type_vals {
+            s.types.insert(n.into(), SpType::Primitive { base: t });
+        }
 
         s
     }

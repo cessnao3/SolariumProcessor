@@ -1,4 +1,4 @@
-mod argument;
+pub mod argument;
 mod immediate;
 pub mod instructions;
 
@@ -97,6 +97,7 @@ impl From<ParseError> for AssemblerError {
 pub struct LocationInfo {
     pub line: usize,
     pub full_line: Option<String>,
+    pub base_loc: Option<String>,
 }
 
 impl fmt::Display for LocationInfo {
@@ -141,6 +142,32 @@ pub enum Token {
     Literal4(u32),
     LiteralText(String),
     AlignInstruction,
+}
+
+impl Token {
+    pub fn literal_u32(value: u32) -> Self {
+        Self::Literal4(value)
+    }
+
+    pub fn literal_i32(value: i32) -> Self {
+        Self::Literal4(value as u32)
+    }
+
+    pub fn literal_u16(value: u16) -> Self {
+        Self::Literal2(value)
+    }
+
+    pub fn literal_i16(value: i16) -> Self {
+        Self::Literal2(value as u16)
+    }
+
+    pub fn literal_u8(value: u8) -> Self {
+        Self::Literal1(value)
+    }
+
+    pub fn literal_i8(value: i8) -> Self {
+        Self::Literal1(value as u8)
+    }
 }
 
 pub struct TokenLoc {
@@ -230,21 +257,13 @@ impl fmt::Display for ParseError {
     }
 }
 
-struct TokenList {
+pub struct TokenList {
     tokens: Vec<TokenLoc>,
     inst: InstructionList,
     label_regex: regex::Regex,
 }
 
 impl TokenList {
-    pub fn new() -> Self {
-        Self {
-            tokens: Vec::new(),
-            inst: InstructionList::default(),
-            label_regex: regex::Regex::new("^[a-z](a-z0-9_)*").unwrap(),
-        }
-    }
-
     fn trim_line(line: &str) -> &str {
         let s = line.trim();
         if let Some(ind) = s.find(';') {
@@ -502,6 +521,17 @@ impl TokenList {
     }
 }
 
+impl Default for TokenList {
+    fn default() -> Self {
+        Self {
+            tokens: Vec::new(),
+            inst: InstructionList::default(),
+            label_regex: regex::Regex::new("^[a-z](a-z0-9_)*").unwrap(),
+        }
+    }
+
+}
+
 #[derive(Debug, Clone)]
 enum DelayToken {
     LoadLoc { label: String },
@@ -613,12 +643,17 @@ pub fn assemble_text(txt: &str) -> Result<Vec<u8>, AssemblerErrorLoc> {
     assemble_lines(&txt.lines().collect::<Vec<_>>())
 }
 
+pub fn parse_lines(txt: &[&str], base_loc: Option<LocationInfo>) -> Result<Vec<TokenLoc>, AssemblerErrorLoc> {
+    panic!("not implemented")
+}
+
 pub fn assemble_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
-    let mut state = TokenList::new();
+    let mut state = TokenList::default();
     for (i, l) in txt.iter().enumerate() {
         let loc: LocationInfo = LocationInfo {
             line: i + 1,
             full_line: Some(l.to_string()),
+            base_loc: None,
         };
         if let Err(e) = state.parse_line(&l.to_lowercase(), loc.clone()) {
             return Err(AssemblerErrorLoc { err: e, loc });
@@ -632,7 +667,7 @@ pub fn assemble_tokens<T>(tokens: T) -> Result<Vec<u8>, AssemblerErrorLoc>
 where
     T: IntoIterator<Item = TokenLoc>,
 {
-    let mut state = TokenList::new();
+    let mut state = TokenList::default();
     for t in tokens.into_iter() {
         state.add_token(t);
     }

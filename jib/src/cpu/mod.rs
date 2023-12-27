@@ -700,7 +700,7 @@ impl Processor {
                 let reg_target = inst.arg0_register();
 
                 if dt.signed() {
-                    match dt.word_size() {
+                    match dt.byte_size() {
                         1 => self
                             .registers
                             .set(reg_target, (self.memory.get(addr)? as i32) as u32)?,
@@ -711,7 +711,7 @@ impl Processor {
                         _ => return Err(ProcessorError::UnknownInstruction(inst)),
                     }
                 } else {
-                    match dt.word_size() {
+                    match dt.byte_size() {
                         1 => self
                             .registers
                             .set(reg_target, self.memory.get(addr)? as u32)?,
@@ -736,7 +736,7 @@ impl Processor {
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 };
 
-                match dt.word_size() {
+                match dt.byte_size() {
                     1 => self.memory.set(addr, (source_reg & 0xFF) as u8)?,
                     2 => self.memory.set_u16(addr, (source_reg & 0xFFFF) as u16)?,
                     4 => self.memory.set_u32(addr, source_reg)?,

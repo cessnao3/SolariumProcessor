@@ -59,6 +59,12 @@ impl fmt::Display for ArgumentRegister {
     }
 }
 
+impl From<Register> for ArgumentRegister {
+    fn from(value: Register) -> Self {
+        Self { reg: value }
+    }
+}
+
 impl TryFrom<&str> for ArgumentRegister {
     type Error = ArgumentError;
 
@@ -107,6 +113,13 @@ pub struct ArgumentType {
 impl ArgumentType {
     const DT_OFFSET: i32 = 5;
     const DT_MASK: u8 = 0xE0;
+
+    pub fn new(reg: Register, data_type: DataType) -> Self {
+        Self {
+            reg: reg.into(),
+            data_type,
+        }
+    }
 
     pub fn to_byte(self) -> u8 {
         ((self.data_type.get_id() << Self::DT_OFFSET) & Self::DT_MASK) | self.reg.to_byte()

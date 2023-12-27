@@ -1,4 +1,4 @@
-use spc::compile;
+use cbuoy::compile;
 
 fn main() {
     let code = match std::fs::read_to_string("examples/test.spc") {
