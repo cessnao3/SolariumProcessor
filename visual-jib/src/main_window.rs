@@ -140,7 +140,7 @@ fn build_code_column(
 
     let code_options = vec![
         (default_asm, "Assemble", "ASM", true),
-        ("// SPC Code", "Build", "SPC", false),
+        ("// C/Buoy Code", "Build", "C/B", false),
     ];
 
     for (comment, button_verb, short_name, is_assembly) in code_options.into_iter() {
