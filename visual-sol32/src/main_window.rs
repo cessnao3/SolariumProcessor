@@ -21,7 +21,7 @@ pub fn build_ui(app: &Application) {
         .build();
 
     columns.append(&build_code_column(&tx_ui, &tx_thread));
-    let (column_cpu, register_fields, buffer_log) = build_cpu_column(&tx_ui);
+    let (column_cpu, register_fields, text_log) = build_cpu_column(&tx_ui);
     columns.append(&column_cpu);
     let serial_details = build_serial_column(&tx_ui, &tx_thread);
     columns.append(&serial_details.column_serial);
@@ -53,7 +53,7 @@ pub fn build_ui(app: &Application) {
         while let Ok(msg) = rx_ui_async.recv().await {
             match msg {
                 ThreadToUi::ProcessorReset => {
-                    serial_details.text_serial.set_text("");
+                    serial_details.text_serial.buffer().set_text("");
                 }
                 ThreadToUi::RegisterState(regs) => {
                     for (i, r) in regs.registers.iter().enumerate() {
@@ -70,10 +70,13 @@ pub fn build_ui(app: &Application) {
                     serial_details.label_instruction.set_text(&format!("Mem[0x{:08x}] = 0x{:08x}", pc, val));
                 }
                 ThreadToUi::LogMessage(msg) => {
-                    buffer_log.insert(&mut buffer_log.end_iter(), &format!("{msg}\n"));
+                    text_log.buffer().insert(&mut text_log.buffer().end_iter(), &format!("{msg}\n"));
+                    text_log.scroll_to_iter(&mut text_log.buffer().end_iter(), 0.0, false, 0.0, 0.0);
                 }
                 ThreadToUi::SerialOutput(msg) => {
-                    serial_details.text_serial.insert(&mut serial_details.text_serial.end_iter(), msg.as_str());
+                    let buf = serial_details.text_serial.buffer().clone();
+                    buf.insert(&mut buf.end_iter(), msg.as_str());
+                    serial_details.text_serial.scroll_to_iter(&mut buf.end_iter(), 0.0, false, 0.0, 0.0);
                 }
                 ThreadToUi::ResponseMemory(base, vals) => {
                     for (i, l) in serial_details.memory.labels.iter().enumerate() {
@@ -186,7 +189,7 @@ fn build_code_column(
 
 fn build_cpu_column(
     tx_ui: &std::sync::mpsc::Sender<UiToThread>,
-) -> (gtk::Box, Vec<gtk::EditableLabel>, gtk::TextBuffer) {
+) -> (gtk::Box, Vec<gtk::EditableLabel>, gtk::TextView) {
     let column_cpu = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
@@ -318,7 +321,7 @@ fn build_cpu_column(
 
     column_cpu.append(&text_log_frame);
 
-    (column_cpu, register_fields, buffer_log)
+    (column_cpu, register_fields, text_log)
 }
 
 struct MemoryLocationData {
@@ -344,7 +347,7 @@ impl MemoryLocationData {
 struct SerialElements {
     column_serial: gtk::Box,
     memory: MemoryLocationData,
-    text_serial: gtk::TextBuffer,
+    text_serial: gtk::TextView,
     label_instruction: gtk::Label,
     label_instruction_details: gtk::Label,
 }
@@ -502,7 +505,7 @@ fn build_serial_column(
     SerialElements {
         column_serial,
         memory,
-        text_serial: buffer_serial,
+        text_serial,
         label_instruction: overall_instruction,
         label_instruction_details: instruction_details,
     }
