@@ -130,10 +130,10 @@ impl fmt::Display for AssemblerErrorLoc {
 type FnInst = fn(Vec<String>) -> Result<Rc<dyn Instruction>, InstructionError>;
 type FnDisp = fn([u8; 4]) -> Option<String>;
 
-#[derive(Clone)]
 pub enum Token {
     ChangeAddress(u32),
     Operation(FnInst, Vec<String>),
+    OperationLiteral(Box<dyn Instruction>),
     CreateLabel(String),
     LoadLoc(String),
     Literal1(u8),
@@ -143,7 +143,6 @@ pub enum Token {
     AlignInstruction,
 }
 
-#[derive(Clone)]
 pub struct TokenLoc {
     pub tok: Token,
     pub loc: LocationInfo,
@@ -426,6 +425,9 @@ impl TokenList {
 
             match &t.tok {
                 Token::AlignInstruction => state.align_boundary(Processor::BYTES_PER_WORD),
+                Token::OperationLiteral(op) => {
+                    state.add_bytes(&op.to_u32().to_be_bytes(), loc)?;
+                }
                 Token::ChangeAddress(new_addr) => {
                     if *new_addr < state.addr {
                         return Err(AssemblerErrorLoc {
@@ -626,10 +628,13 @@ pub fn assemble_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
     state.to_bytes()
 }
 
-pub fn assemble_tokens(tokens: &[TokenLoc]) -> Result<Vec<u8>, AssemblerErrorLoc> {
+pub fn assemble_tokens<T>(tokens: T) -> Result<Vec<u8>, AssemblerErrorLoc>
+where
+    T: IntoIterator<Item = TokenLoc>,
+{
     let mut state = TokenList::new();
-    for t in tokens {
-        state.add_token(t.clone());
+    for t in tokens.into_iter() {
+        state.add_token(t);
     }
     state.to_bytes()
 }
