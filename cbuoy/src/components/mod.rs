@@ -1,6 +1,6 @@
 use jasm::{
-    instruction::{Add, Ld, Ldn},
-    AssemblerCommand,
+    instructions::{OpAdd, OpLd, OpLdn},
+    TokenLoc,
 };
 use jib::cpu::Register;
 use std::collections::HashMap;
@@ -119,7 +119,7 @@ impl BaseStatement for DefinitionStatement {}
 pub trait Expression {
     fn get_type(&self) -> SpType;
 
-    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<sda::ParsedValue>;
+    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<jasm::Token>;
 }
 
 pub struct BinaryExpression {
@@ -141,14 +141,14 @@ impl Expression for AsExpression {
         return self.new_type.as_ref().clone();
     }
 
-    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<sda::ParsedValue> {
+    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<jasm::Token> {
         // TODO - Update? Or is this okay (e.g., a struct saving pointers, to be copied later?)
         return self.expr.save_value_to(reg, spare);
     }
 }
 
 pub trait Addressable {
-    fn get_address(&self, reg: Register) -> Vec<sda::ParsedValue>;
+    fn get_address(&self, reg: Register) -> Vec<jasm::Token>;
 }
 
 pub trait Variable: Addressable + Expression {}
@@ -163,9 +163,9 @@ impl Expression for LocalVariable {
         self.var_type.clone()
     }
 
-    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<sda::ParsedValue> {
+    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<jasm::Token> {
         let mut res = self.get_address(reg);
-        res.push(sda::ParsedValue::InstructionValue(Box::new(Ld::new(
+        res.push(jasm::Token::Inst(Box::new(Ld::new(
             reg, reg,
         ))));
         res
@@ -173,13 +173,13 @@ impl Expression for LocalVariable {
 }
 
 impl Addressable for LocalVariable {
-    fn get_address(&self, reg: Register) -> Vec<sda::ParsedValue> {
+    fn get_address(&self, reg: Register) -> Vec<jasm::Token> {
         let mut a = Vec::new();
-        a.push(sda::ParsedValue::InstructionValue(Box::new(Ldn::new(reg))));
-        a.push(sda::ParsedValue::Command(AssemblerCommand::Load(
+        a.push(jasm::Token::OperationLiteral(Box::new(OpLdn::new(reg))));
+        a.push(jasm::Token::Command(AssemblerCommand::Load(
             MemoryWord::from(self.base_offset),
         )));
-        a.push(sda::ParsedValue::InstructionValue(Box::new(Add::new(
+        a.push(jasm::Token::InstructionValue(Box::new(Add::new(
             reg,
             reg,
             Register::ArgumentBase,
@@ -200,9 +200,9 @@ impl Expression for GlobalVariable {
         self.var_type.clone()
     }
 
-    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<sda::ParsedValue> {
+    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<jasm::Token> {
         let mut res = self.get_address(reg);
-        res.push(sda::ParsedValue::InstructionValue(Box::new(Ld::new(
+        res.push(jasm::Token::InstructionValue(Box::new(Ld::new(
             reg, reg,
         ))));
         res
@@ -210,10 +210,10 @@ impl Expression for GlobalVariable {
 }
 
 impl Addressable for GlobalVariable {
-    fn get_address(&self, reg: Register) -> Vec<sda::ParsedValue> {
+    fn get_address(&self, reg: Register) -> Vec<jasm::Token> {
         let mut a = Vec::new();
-        a.push(sda::ParsedValue::InstructionValue(Box::new(Ldn::new(reg))));
-        a.push(sda::ParsedValue::Command(AssemblerCommand::LoadLoc(
+        a.push(jasm::Token::InstructionValue(Box::new(Ldn::new(reg))));
+        a.push(jasm::Token::Command(AssemblerCommand::LoadLoc(
             self.var_label.clone(),
         )));
         a
@@ -249,7 +249,7 @@ impl AsmFunction {
         }
     }
 
-    pub fn get_assembly(&self) -> Vec<(jasm::LocationInfo, sda::ParsedValue)> {
+    pub fn get_assembly(&self) -> Vec<(jasm::LocationInfo, jasm::Token)> {
         // TODO - Mangle label names?
         let res = sda::parse_lines(&self.lines.iter().map(|v| v.as_ref()).collect::<Vec<_>>());
         res.unwrap()
