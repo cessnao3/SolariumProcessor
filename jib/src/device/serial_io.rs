@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
 
-use super::{DeviceAction, ProcessorDevice, DEVICE_MEM_SIZE};
+use super::{ProcessorDevice, DEVICE_MEM_SIZE, DEVICE_ID_SIZE};
 
 use crate::memory::{MemorySegment, MemorySegmentError};
 
@@ -16,12 +16,14 @@ pub struct SerialInputOutputDevice {
 /// Defines constant values for the memory address offsets
 impl SerialInputOutputDevice {
     // Define memory size and offset values
-    const OFFSET_INPUT_SIZE: u32 = 0;
-    const OFFSET_INPUT_GET: u32 = 1;
-    const OFFSET_OUTPUT_SIZE: u32 = 2;
-    const OFFSET_OUTPUT_SET: u32 = 3;
-    const OFFSET_INPUT_RESET_IN: u32 = 4;
-    const OFFSET_INPUT_RESET_OUT: u32 = 5;
+    const OFFSET_INPUT_SIZE: u32 = 2;
+    const OFFSET_INPUT_GET: u32 = 3;
+    const OFFSET_OUTPUT_SIZE: u32 = 4;
+    const OFFSET_OUTPUT_SET: u32 = 5;
+    const OFFSET_INPUT_RESET_IN: u32 = 6;
+    const OFFSET_INPUT_RESET_OUT: u32 = 7;
+
+    const DEVICE_ID: u16 = 1;
 
     /// Constructs a new serial device
     pub fn new(buffer_size: usize) -> SerialInputOutputDevice {
@@ -61,6 +63,7 @@ impl SerialInputOutputDevice {
     fn common_get(&self, offset: u32) -> Result<u8, MemorySegmentError> {
         // Use the offset values to determine the action to take
         return match offset {
+            n if n < DEVICE_ID_SIZE => Ok(Self::DEVICE_ID.to_be_bytes()[offset as usize]),
             Self::OFFSET_INPUT_SIZE => Ok((u8::MAX as usize).min(self.input_queue.borrow().len()) as u8),
             Self::OFFSET_OUTPUT_SIZE => Ok((u8::MAX as usize).min(self.output_queue.len()) as u8),
             Self::OFFSET_OUTPUT_SET => Ok(0),
@@ -141,7 +144,7 @@ impl MemorySegment for SerialInputOutputDevice {
 }
 
 impl ProcessorDevice for SerialInputOutputDevice {
-    fn on_step(&mut self) -> Option<DeviceAction> {
-        None
+    fn device_id(&self) -> u16 {
+        Self::DEVICE_ID
     }
 }

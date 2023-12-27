@@ -7,10 +7,9 @@ use std::{collections::HashMap, rc::Rc};
 
 use instructions::{
     Instruction, InstructionError, OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall,
-    OpConv, OpCopy, OpDiv, OpHalt, OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLd, OpLdi, OpLdn,
-    OpLdr, OpLdri, OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt,
-    OpSav, OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq, OpTnz, OpTz,
-    OpInton, OpIntoff
+    OpConv, OpCopy, OpDiv, OpHalt, OpInt, OpIntoff, OpInton, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLd,
+    OpLdi, OpLdn, OpLdr, OpLdri, OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset,
+    OpRet, OpRetInt, OpSav, OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq, OpTnz, OpTz,
 };
 
 use jib::cpu::{Opcode, Processor, ProcessorError};
@@ -26,6 +25,7 @@ pub enum AssemblerError {
     UnknownInstruction(String, Option<usize>),
     Instruction(InstructionError),
     ArgumentCountMismatch(usize, usize),
+    CannotBackupAddress(u32),
     InvalidLabel(String),
     Immediate(ImmediateError),
     BadLabel(String),
@@ -56,6 +56,9 @@ impl fmt::Display for AssemblerError {
             Self::AddressTaken(addr) => write!(f, "Address 0x{addr:08x} Taken"),
             Self::Parser(e) => write!(f, "Parser Error - {e}"),
             Self::Processor(e) => write!(f, "Processor Error - {e}"),
+            Self::CannotBackupAddress(addr) => {
+                write!(f, "Cannot Backup Address - Already Passed {addr}")
+            }
         }
     }
 }
@@ -194,8 +197,7 @@ impl Default for InstructionList {
             OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall, OpConv, OpCopy, OpDiv,
             OpHalt, OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLd, OpLdn, OpLdi, OpLdr, OpLdri,
             OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt, OpSav,
-            OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq, OpTnz, OpTz,
-            OpInton, OpIntoff
+            OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq, OpTnz, OpTz, OpInton, OpIntoff
         );
 
         let inst_map = inst.iter().map(|(_, n, f, _)| (n.to_owned(), *f)).collect();
@@ -352,9 +354,13 @@ impl TokenList {
                 match op {
                     "oper" => {
                         let addr = if let Some(r) = arg.strip_prefix('#') {
-                            Processor::interrupt_address(jib::cpu::Interrupt::Hardware(parse_imm_u32(r)?))?
+                            Processor::interrupt_address(jib::cpu::Interrupt::Hardware(
+                                parse_imm_u32(r)?,
+                            ))?
                         } else if let Some(r) = arg.strip_prefix('@') {
-                            Processor::interrupt_address(jib::cpu::Interrupt::Software(parse_imm_u32(r)?))?
+                            Processor::interrupt_address(jib::cpu::Interrupt::Software(
+                                parse_imm_u32(r)?,
+                            ))?
                         } else {
                             parse_imm_u32(arg)?
                         };
@@ -422,7 +428,10 @@ impl TokenList {
                 Token::AlignInstruction => state.align_boundary(Processor::BYTES_PER_WORD),
                 Token::ChangeAddress(new_addr) => {
                     if *new_addr < state.addr {
-                        panic!("cannot backup address");
+                        return Err(AssemblerErrorLoc {
+                            err: AssemblerError::CannotBackupAddress(*new_addr),
+                            loc,
+                        });
                     } else {
                         state.addr = *new_addr;
                     }

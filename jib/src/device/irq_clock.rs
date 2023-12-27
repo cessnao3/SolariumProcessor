@@ -3,7 +3,7 @@ use crate::{
     memory::{MemorySegment, MemorySegmentError},
 };
 
-use super::{DeviceAction, ProcessorDevice, DEVICE_MEM_SIZE};
+use super::{DeviceAction, ProcessorDevice, DEVICE_MEM_SIZE, DEVICE_ID_SIZE};
 
 pub struct InterruptClockDevice {
     clock_interval: u32,
@@ -12,6 +12,8 @@ pub struct InterruptClockDevice {
 }
 
 impl InterruptClockDevice {
+    pub const DEVICE_ID: u16 = 2;
+
     pub fn new(interrupt: u32) -> Self {
         Self {
             clock_interval: 0,
@@ -29,16 +31,22 @@ impl MemorySegment for InterruptClockDevice {
 
     /// Provides the word at the requested memory location without affecting the device state
     fn inspect(&self, offset: u32) -> Result<u8, MemorySegmentError> {
-        let index = offset / Processor::BYTES_PER_WORD;
-        let within = offset % Processor::BYTES_PER_WORD;
-
-        let mem = [self.clock_interval, self.current_count, self.interrupt];
-
-        if (index as usize) < mem.len() {
-            let val = mem[index as usize].to_be_bytes();
-            Ok(val[within as usize])
+        if offset < DEVICE_ID_SIZE {
+            Ok(Self::DEVICE_ID.to_be_bytes()[offset as usize])
         } else {
-            Err(MemorySegmentError::InvalidMemoryAccess(offset))
+            let offset = offset - DEVICE_ID_SIZE;
+
+            let index = offset / Processor::BYTES_PER_WORD;
+            let within = offset % Processor::BYTES_PER_WORD;
+
+            let mem = [self.clock_interval, self.current_count, self.interrupt];
+
+            if (index as usize) < mem.len() {
+                let val = mem[index as usize].to_be_bytes();
+                Ok(val[within as usize])
+            } else {
+                Err(MemorySegmentError::InvalidMemoryAccess(offset))
+            }
         }
     }
 
@@ -91,5 +99,9 @@ impl ProcessorDevice for InterruptClockDevice {
             self.current_count = 0;
             None
         }
+    }
+
+    fn device_id(&self) -> u16 {
+        Self::DEVICE_ID
     }
 }

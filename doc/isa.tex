@@ -51,11 +51,11 @@ There are 32 total registers present on the Jib. These are defined generally as 
     \label{table:register-setup}
 \end{table}
 
-The program counter indicates the next instruction to be read. At the beginning of the processor cycle, the instruction at the memory address of the program counter is read in and processed. Then, the program counter is incremented at the end of each instruction cycle. If this value is needed to be modified, it is recommended to use the absolute \alert{jump instruction}, \texttt{jmp}, or the \alert{relative jump instruction}, \texttt{jmpr} (see Section \ref{sec:instructions}), as opposed to writing directly to the register. This will automatically account for the increment at the end of the instruction cycle.
+The program counter indicates the next instruction to be read. At the beginning of the processor cycle, the instruction at the memory address of the program counter is read in and processed. Then, the program counter is incremented at the end of each instruction cycle. If this value is needed to be modified, it is recommended to use the absolute \texttt{jmp}, or the relative jump instruction \texttt{jmpr} (see Section \ref{sec:instructions}), as opposed to writing to the register directly. This will automatically account for the increment at the end of the instruction cycle.
 
-The global stack pointer maintains the global stack, as defined in Section \ref{sec:the-stack}. This provides the absolute address of the current stack location. Thus, when the stack is empty, it points to the stack base address, and when the stack is completely full it points to the memory location just above the last stack entry, or the base address plus the stack size. This value should not be edited by-hand to maintain the consistency of the program execution, but is instead modified by the \alert{stack instructions} \texttt{push}, \texttt{pop}, \texttt{popr}, \texttt{call}, \texttt{ret}, \texttt{retint}, and \texttt{int}, as well as hardware interrupts. This should be loaded by the init program by assembly, however, to provide the default base location for the stack.
+The global stack pointer maintains the global stack, as defined in Section \ref{sec:the-stack}. This provides the absolute address of the current stack location. Thus, when the stack is empty, it points to the stack base address, and when the stack is completely full it points to the memory location just above the last stack entry, or the base address plus the stack size. This value should not be edited by-hand to maintain the consistency of the program execution, but is instead modified by the stack instructions \texttt{push}, \texttt{pop}, \texttt{popr}, \texttt{call}, \texttt{ret}, \texttt{retint}, and \texttt{int}, as well as hardware interrupts. This should be loaded by the init program by assembly, however, to provide the default base location for the stack.
 
-The return value instruction is intended to store the result of a function call, made using the \texttt{call} instruction. When the processor status flags are replaced with the caller's flags after the \texttt{ret} \alert{instruction} is called, the return value is the only register that remains unchanged.
+The return value instruction is intended to store the result of a function call, made using the \texttt{call} instruction. When the processor status flags are replaced with the caller's flags after the \texttt{ret} instruction is called, the return value is the only register that remains unchanged.
 
 The processor status flags indicate the current setup for the processor. Currently, the following flags are assigned, as noted in Table \ref{table:processor-flags}.
 
@@ -72,7 +72,7 @@ The processor status flags indicate the current setup for the processor. Current
     \label{table:processor-flags}
 \end{table}
 
-This provides both a means to set and to read the current processor state values to ensure that the proper operating mode is configured for the currently-running program. \alert{This is maintained and replaced} when \texttt{ret} and \texttt{retint} are called, so within an interrupt or function call, it is not necessary to replace the processor flags with those of the caller.
+This provides both a means to set and to read the current processor state values to ensure that the proper operating mode is configured for the currently-running program. This is maintained and replaced when \texttt{ret} and \texttt{retint} are called, so within an interrupt or function call, it is not necessary to replace the processor flags with those of the caller.
 
 \subsection{Overall Instruction Syntax}
 
@@ -137,7 +137,7 @@ The stack pointer provides the absolute address of the stack pointer. The pointe
 
 \subsection{Interrupts}
 
-\comment{Interrupts provide a means to interrupt}{Interrupt queue? Multiple interrupts triggered at the same time?} the current flow of execution and run a separate method. There are two types of interrupts - hardware interrupts, which originate by request of an external hardware device, and software interrupts, which originate from a specific instruction. When an interrupt is triggered, the flow of program execution is interrupted before the next instruction is started. The current register state is stored on the stack, and the program counter is replaced with the value in the corresponding interrupt vector. Then, the program execution continues from this new location.
+Interrupts provide a means to interrupt the current flow of execution and run a separate method. There are two types of interrupts - hardware interrupts, which originate by request of an external hardware device, and software interrupts, which originate from a specific instruction. When an interrupt is triggered, the flow of program execution is interrupted before the next instruction is started. The current register state is stored on the stack, and the program counter is replaced with the value in the corresponding interrupt vector. Then, the program execution continues from this new location.
 
 At the conclusion of any interrupt, the \texttt{retint} instruction should be called. This will replace the current register state with the values provided off the stack and resume program execution from the location right after the interrupt was called.
 
@@ -366,7 +366,7 @@ Jib computers, by default, utilize the following character map. This is similar 
 \section{Devices}
 \label{sec:devices}
 
-Devices are memory-mapped in Jib. This means that reading or writing to special regions in memory facilitate the communication with these external devices. In a typical Jib computer, the device region consists of up to 64 devices, starting at memory address \texttt{0xA000}, with each device allocating up to 32 bytes of memory. Not all devices will make use all the available memory slots for a given device. In these cases, a memory exception will be provided if any of these invalid addresses are read from or written to. \todo{add device ID}
+Devices are memory-mapped in Jib. This means that reading or writing to special regions in memory facilitate the communication with these external devices. In a typical Jib computer, the device region consists of up to 64 devices, starting at memory address \texttt{0xA000}, with each device allocating up to 32 bytes of memory. Not all devices will make use all the available memory slots for a given device. In these cases, a memory exception will be provided if any of these invalid addresses are read from or written to.
 
 \subsection{Serial Input and Output}
 
@@ -380,13 +380,14 @@ The memory mapping for the serial input and output device is provided in Table \
         \hline
         Offset & Type & Read/Write & Usage \\
         \hline
-        \texttt{0} & u8 & Read & Provides the current input queue size \\
-        \texttt{1} & u8 & Read & Pops and provides a word off the front of the input queue \\
+        \texttt{0} & u16 & Read & Device ID 1 \\
+        \texttt{2} & u8 & Read & Provides the current input queue size \\
+        \texttt{3} & u8 & Read & Pops and provides a word off the front of the input queue \\
         & & & If no data is available, will return \texttt{0} by default \\
-        \texttt{2} & u8 & Read & Provides the current output queue size \\
-        \texttt{3} & u8 & Write & Pushes a word onto the output queue \\
-        \texttt{4} & u8 & Write & Clears the input queue if the value written is nonzero \\
-        \texttt{5} & u8 & Write & Clears the output queue if the value written is nonzero \\
+        \texttt{4} & u8 & Read & Provides the current output queue size \\
+        \texttt{5} & u8 & Write & Pushes a word onto the output queue \\
+        \texttt{6} & u8 & Write & Clears the input queue if the value written is nonzero \\
+        \texttt{7} & u8 & Write & Clears the output queue if the value written is nonzero \\
         \hline
     \end{tabular}
     \caption{Serial Input and Output device provides a simple data structure to read and write data streams}
@@ -403,10 +404,11 @@ The IRQ clock provides a means to trigger a specific hardware interrupt at a reg
 		\hline
 		Offset & Type & Read/Write & Usage \\
 		\hline
-		\texttt{0} & u32 & Read/Write & Gets/sets the clock interval in CPU cycles. Set to 0 to disable. \\
-		\texttt{4} & u32 & Read & Provides the current clock counter in CPU cycles. \\
+		\texttt{0} & u16 & Read & Device ID 2 \\
+		\texttt{2} & u32 & Read/Write & Gets/sets the clock interval in CPU cycles. Set to 0 to disable. \\
+		\texttt{6} & u32 & Read & Provides the current clock counter in CPU cycles. \\
 		{} & {} & {} & Will be between 0 and the above interval. \\
-		\texttt{8} & u32 & Read/Write & The hardware IRQ to trigger. \\
+		\texttt{10} & u32 & Read/Write & The hardware IRQ to trigger. \\
 		\hline
 	\end{tabular}
 	\caption{Serial Input and Output device provides a simple data structure to read and write data streams}

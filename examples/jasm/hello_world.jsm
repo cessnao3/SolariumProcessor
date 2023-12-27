@@ -35,7 +35,7 @@ jmpri loop
     .u16 0xA000
 
     ; Mark the location to write serial values to
-    ldi 15:u16 3
+    ldi 15:u16 5
     add 15:u32 15 13
 
     ; Load the argument value
