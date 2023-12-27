@@ -1,8 +1,8 @@
 use crate::messages::{ThreadToUi, UiToThread};
-use sol32::cpu::{Processor, ProcessorError};
-use sol32::device::{InterruptClockDevice, SerialInputOutputDevice};
-use sol32::memory::{MemorySegment, ReadOnlySegment, ReadWriteSegment};
-use sol32asm::InstructionList;
+use jib::cpu::{Processor, ProcessorError};
+use jib::device::{InterruptClockDevice, SerialInputOutputDevice};
+use jib::memory::{MemorySegment, ReadOnlySegment, ReadWriteSegment};
+use jasm::InstructionList;
 use std::sync::mpsc::{Receiver, RecvError, Sender, TryRecvError};
 
 use std::cell::RefCell;
@@ -176,7 +176,7 @@ impl ThreadState {
             dev_interrupt,
         )?;
 
-        self.cpu.reset(sol32::cpu::ResetType::Hard)?;
+        self.cpu.reset(jib::cpu::ResetType::Hard)?;
 
         for (i, val) in self.last_code.iter().enumerate() {
             if i < INIT_RO_LEN as usize {
@@ -234,7 +234,7 @@ impl ThreadState {
                 }
                 UiToThread::SerialInput(s) => {
                     for c in s.chars().chain(['\n'; 1]) {
-                        match sol32::text::character_to_byte(c) {
+                        match jib::text::character_to_byte(c) {
                             Ok(word) => {
                                 if !state.serial_io_dev.borrow_mut().push_input(word) {
                                     return Ok(Some(ThreadToUi::LogMessage(
@@ -294,7 +294,7 @@ pub fn cpu_thread(rx: Receiver<UiToThread>, tx: Sender<ThreadToUi>) {
         // Check for serial output
         let mut char_vec = Vec::new();
         while let Some(w) = state.serial_io_dev.borrow_mut().pop_output() {
-            let c = match sol32::text::byte_to_character(w) {
+            let c = match jib::text::byte_to_character(w) {
                 Ok(v) => v,
                 Err(e) => {
                     tx.send(ThreadToUi::LogMessage(format!("{e}"))).unwrap();
@@ -334,7 +334,7 @@ pub fn cpu_thread(rx: Receiver<UiToThread>, tx: Sender<ThreadToUi>) {
         let pc = state
             .cpu
             .get_register_state()
-            .get(sol32::cpu::Register::ProgramCounter)
+            .get(jib::cpu::Register::ProgramCounter)
             .unwrap_or(0);
         let mem = state.cpu.memory_inspect_u32(pc).unwrap_or(0);
 

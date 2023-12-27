@@ -1,5 +1,5 @@
 # Temporary files
-*.smc
+*.jsm
 
 # IDE Items
 /.idea/

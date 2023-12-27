@@ -13,7 +13,7 @@ use instructions::{
     OpInton, OpIntoff
 };
 
-use sol32::cpu::{Opcode, Processor, ProcessorError};
+use jib::cpu::{Opcode, Processor, ProcessorError};
 
 use immediate::{
     parse_imm_i16, parse_imm_i32, parse_imm_i8, parse_imm_u16, parse_imm_u32, parse_imm_u8,
@@ -30,7 +30,7 @@ pub enum AssemblerError {
     Immediate(ImmediateError),
     BadLabel(String),
     DuplicateLabel(String),
-    Character(sol32::text::CharacterError),
+    Character(jib::text::CharacterError),
     AddressTaken(u32),
     Parser(ParseError),
     Processor(ProcessorError),
@@ -72,8 +72,8 @@ impl From<InstructionError> for AssemblerError {
     }
 }
 
-impl From<sol32::text::CharacterError> for AssemblerError {
-    fn from(value: sol32::text::CharacterError) -> Self {
+impl From<jib::text::CharacterError> for AssemblerError {
+    fn from(value: jib::text::CharacterError) -> Self {
         Self::Character(value)
     }
 }
@@ -352,9 +352,9 @@ impl TokenList {
                 match op {
                     "oper" => {
                         let addr = if let Some(r) = arg.strip_prefix('#') {
-                            Processor::interrupt_address(sol32::cpu::Interrupt::Hardware(parse_imm_u32(r)?))?
+                            Processor::interrupt_address(jib::cpu::Interrupt::Hardware(parse_imm_u32(r)?))?
                         } else if let Some(r) = arg.strip_prefix('@') {
-                            Processor::interrupt_address(sol32::cpu::Interrupt::Software(parse_imm_u32(r)?))?
+                            Processor::interrupt_address(jib::cpu::Interrupt::Software(parse_imm_u32(r)?))?
                         } else {
                             parse_imm_u32(arg)?
                         };
@@ -429,7 +429,7 @@ impl TokenList {
                 }
                 Token::LiteralText(s) => {
                     for c in s.chars() {
-                        let bv = match sol32::text::character_to_byte(c) {
+                        let bv = match jib::text::character_to_byte(c) {
                             Ok(v) => v,
                             Err(e) => {
                                 return Err(AssemblerErrorLoc {
@@ -631,7 +631,7 @@ mod test {
 
     #[test]
     fn test_counter() {
-        let txt = include_str!("../../examples/spa/counter.smc");
+        let txt = include_str!("../../examples/jasm/counter.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
         assert!(!res.unwrap().is_empty());
@@ -639,7 +639,7 @@ mod test {
 
     #[test]
     fn test_hello_world() {
-        let txt = include_str!("../../examples/spa/hello_world.smc");
+        let txt = include_str!("../../examples/jasm/hello_world.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
         assert!(!res.unwrap().is_empty());
@@ -647,7 +647,7 @@ mod test {
 
     #[test]
     fn test_infinite_counter() {
-        let txt = include_str!("../../examples/spa/infinite_counter.smc");
+        let txt = include_str!("../../examples/jasm/infinite_counter.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
         assert!(!res.unwrap().is_empty());
@@ -655,7 +655,7 @@ mod test {
 
     #[test]
     fn test_serial_echo() {
-        let txt = include_str!("../../examples/spa/serial_echo.smc");
+        let txt = include_str!("../../examples/jasm/serial_echo.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
         assert!(!res.unwrap().is_empty());
@@ -663,7 +663,7 @@ mod test {
 
     #[test]
     fn test_thread_test() {
-        let txt = include_str!("../../examples/spa/thread_test.smc");
+        let txt = include_str!("../../examples/jasm/thread_test.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
         assert!(!res.unwrap().is_empty());

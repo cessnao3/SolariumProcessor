@@ -14,7 +14,7 @@
 \end{figure}}
 
 %opening
-\title{Sol32 Instruction Set Architecture}
+\title{Jib Instruction Set Architecture}
 \author{Ian O'Rourke}
 \date{\today \\ \titlelogoimage}
 
@@ -26,11 +26,11 @@
 
 \section{Overview}
 
-Sol32 is a general-purpose Instruction Set Architecture (ISA). Each processor instruction is designed to take up exactly one word of memory. For Sol32, each word takes up 32 bits; however, memory is addressable at the byte level. In cases where signed arithmetic is performed, signed integers are encoded using the two's-complement format. Sol32 also supports 32-bit floating point numeric algebra.
+The Jib processor is a general-purpose Instruction Set Architecture (ISA). Each processor instruction is designed to take up exactly one word of memory. For Jib, each word takes up 32 bits; however, memory is addressable at the byte level. In cases where signed arithmetic is performed, signed integers are encoded using the two's-complement format. Jib also supports 32-bit floating point numeric algebra.
 
 \subsection{Registers}
 
-There are 32 total registers present on the Sol32. These are defined generally as follows in Table \ref{table:register-setup}. Note that, as Sol32 is a 32-bit architecture, this means that each register is 32 bits wide. While there are specifications between general-purpose and system-level registers, any register is addressable and usable via standard instructions equally.
+There are 32 total registers present on the Jib. These are defined generally as follows in Table \ref{table:register-setup}. Note that, as Jib is a 32-bit architecture, this means that each register is 32 bits wide. While there are specifications between general-purpose and system-level registers, any register is addressable and usable via standard instructions equally.
 
 \begin{table}[h!]
     \centering
@@ -76,7 +76,7 @@ This provides both a means to set and to read the current processor state values
 
 \subsection{Overall Instruction Syntax}
 
-Since the architecture of the Sol32 is 32-bit, this means that the basic word, and therefore instruction format, exists in a 32-bit format. Note that, however, memory addresses are with respect to byte boundaries. Words are stored in big-endian format, meaning the most-significant component of the word is associated with the first byte in the word, while the least-significant component of the word is associated with the last byte in the word. Instructions must be placed with a base at a memory location with a byte alignment of four (e.g. 0, 4, 8, 12, etc.). General data may be placed and accessed from any byte alignment. The general instruction format is listed  in Table \ref{table:instruction-formatting}. The first byte, Byte 0, is always split into two components - the ID, composing the first 4 bits of the instruction, and the SubID, composing the next 4 bits of the instruction.
+Since the architecture of the Jib is 32-bit, this means that the basic word, and therefore instruction format, exists in a 32-bit format. Note that, however, memory addresses are with respect to byte boundaries. Words are stored in big-endian format, meaning the most-significant component of the word is associated with the first byte in the word, while the least-significant component of the word is associated with the last byte in the word. Instructions must be placed with a base at a memory location with a byte alignment of four (e.g. 0, 4, 8, 12, etc.). General data may be placed and accessed from any byte alignment. The general instruction format is listed  in Table \ref{table:instruction-formatting}. The first byte, Byte 0, is always split into two components - the ID, composing the first 4 bits of the instruction, and the SubID, composing the next 4 bits of the instruction.
 
 \begin{table}[h!]
     \centering
@@ -89,7 +89,7 @@ Since the architecture of the Sol32 is 32-bit, this means that the basic word, a
         Details & ID (\texttt{0xF0}), SubID (\texttt{0x0F}) & - & - & - \\
         \hline
     \end{tabular}
-    \caption{The Sol32 instruction format typically has one opcode and three possible arguments associated with a particular opcode}
+    \caption{The Jib instruction format typically has one opcode and three possible arguments associated with a particular opcode}
     \label{table:instruction-formatting}
 \end{table}
 
@@ -143,7 +143,7 @@ At the conclusion of any interrupt, the \texttt{retint} instruction should be ca
 
 It should be noted that, if any values were pushed onto the stack during the interrupt handler, they should be popped off the stack prior to the \texttt{retint} call to avoid corrupting the program state.
 
-The Sol32 supports 32 software and 32 hardware interrupts, as shown in Table \ref{table:interrupt-vector-locations}. The hardware interrupt vectors are stored in memory at locations \texttt{0x100} for interrupt 0 though \texttt{0x180}, exclusive, for interrupt 31. Similarly, the software interrupts are stored in memory at memory addresses \texttt{0x180} for interrupt 0 through \texttt{0x200}, exclusive, for interrupt 31.
+The Jib supports 32 software and 32 hardware interrupts, as shown in Table \ref{table:interrupt-vector-locations}. The hardware interrupt vectors are stored in memory at locations \texttt{0x100} for interrupt 0 though \texttt{0x180}, exclusive, for interrupt 31. Similarly, the software interrupts are stored in memory at memory addresses \texttt{0x180} for interrupt 0 through \texttt{0x200}, exclusive, for interrupt 31.
 
 \begin{table}[h!]
     \centering
@@ -230,7 +230,7 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			\hline
 		\end{tabular}
 	\end{footnotesize}
-	\caption{Available instruction list for the Sol32 provides a variety of commands.}
+	\caption{Available instruction list for the Jib provides a variety of commands.}
 	\label{table:instruction-table}
 \end{table}
 
@@ -307,7 +307,7 @@ Reference names are available to link to the special register values, as listed 
 \section{Character Mapping}
 \label{sec:character-map}
 
-Sol32 computers, by default, utilize the following character map. This is similar to the American Standard Code for Information Interchange (ASCII) format. The Sol32 character map is defined in Table \ref{table:sproc-character-map}. Any undefined entries in the character map are considered invalid characters.
+Jib computers, by default, utilize the following character map. This is similar to the American Standard Code for Information Interchange (ASCII) format. The Jib character map is defined in Table \ref{table:character-map}. Any undefined entries in the character map are considered invalid characters.
 
 \newcommand{\charmap}[1]{\texttt{#1}}
 
@@ -355,8 +355,8 @@ Sol32 computers, by default, utilize the following character map. This is simila
         1F & {} & 3F & \charmap{?} & 5F & \charmap{\textunderscore} & 7F & {} \\
         \hline
     \end{tabular}
-    \caption{Sol32 character mapping}
-    \label{table:sproc-character-map}
+    \caption{Jib character mapping}
+    \label{table:character-map}
 \end{table}
 
 \pagebreak
@@ -364,7 +364,7 @@ Sol32 computers, by default, utilize the following character map. This is simila
 \section{Devices}
 \label{sec:devices}
 
-Devices are memory-mapped in Sol32. This means that reading or writing to special regions in memory facilitate the communication with these external devices. In a typical Sol32 computer, the device region consists of up to 64 devices, starting at memory address \texttt{0xA000}, with each device allocating up to 32 bytes of memory. Not all devices will make use all the available memory slots for a given device. In these cases, a memory exception will be provided if any of these invalid addresses are read from or written to. \todo{add device ID}
+Devices are memory-mapped in Jib. This means that reading or writing to special regions in memory facilitate the communication with these external devices. In a typical Jib computer, the device region consists of up to 64 devices, starting at memory address \texttt{0xA000}, with each device allocating up to 32 bytes of memory. Not all devices will make use all the available memory slots for a given device. In these cases, a memory exception will be provided if any of these invalid addresses are read from or written to. \todo{add device ID}
 
 \subsection{Serial Input and Output}
 
@@ -415,26 +415,26 @@ The IRQ clock provides a means to trigger a specific hardware interrupt at a reg
 
 \section{Examples}
 
-The following list some simple example programs that can be run on the Sol32.
+The following list some simple example programs that can be run on the Jib.
 
 \subsection{Counter}
 
 The program listed in Listing \ref{listing:example-counter} provides a basic counter. A target value is placed in register four, and the value in register three is incremented from 0 to the target value in register four by adding one to the register each loop. Once the target value has been reached and register three is equal to register four, the program halts by entering an infinite loop.
 
-\lstinputlisting[caption={Limited counter program}, label={listing:example-counter}]{../examples/spa/counter.smc}
+\lstinputlisting[caption={Limited counter program}, label={listing:example-counter}]{../examples/jasm/counter.jsm}
 
 \pagebreak
 \subsection{Infinite Counter}
 
 Listing \ref{listing:example-infinite-counter} makes use of some additional functionality, including the use of the register reference names, to test register reset functionality. It also modifies the program counter outside of the standard jump command.
 
-\lstinputlisting[caption={Infinite counter program with register reference names}, label={listing:example-infinite-counter}]{../examples/spa/infinite_counter.smc}
+\lstinputlisting[caption={Infinite counter program with register reference names}, label={listing:example-infinite-counter}]{../examples/jasm/infinite_counter.jsm}
 
 \subsection{Hello World}
 
-Listing  \ref{listing:hello-world} provides a program that will infinitely write "hello, world" to the serial device, expected to be memory-mapped into the Sol32 at \texttt{0xA000}. This makes use of the \texttt{.loadtext} command, which loads the text, and an additional null-terminator at the end, directly into memory. It also makes use of a print-string function call to handle printing string values to the serial output devices.
+Listing  \ref{listing:hello-world} provides a program that will infinitely write "hello, world" to the serial device, expected to be memory-mapped into the Jib at \texttt{0xA000}. This makes use of the \texttt{.loadtext} command, which loads the text, and an additional null-terminator at the end, directly into memory. It also makes use of a print-string function call to handle printing string values to the serial output devices.
 
-\lstinputlisting[caption={Infinite "hello, world!" program}, label={listing:hello-world}]{../examples/spa/hello_world.smc}
+\lstinputlisting[caption={Infinite "hello, world!" program}, label={listing:hello-world}]{../examples/jasm/hello_world.jsm}
 
 \pagebreak
 
@@ -442,13 +442,13 @@ Listing  \ref{listing:hello-world} provides a program that will infinitely write
 
 Listing \ref{listing:serial-echo} provides a serial echo program, which echos any text provided by the default serial input device back out via the serial echo device. This serial device is expected to be provided at the starting location \texttt{0xA000}.
 
-\lstinputlisting[caption={Serial echo program reads in text characters and immediately outputs via the output device}, label={listing:serial-echo}]{../examples/spa/serial_echo.smc}
+\lstinputlisting[caption={Serial echo program reads in text characters and immediately outputs via the output device}, label={listing:serial-echo}]{../examples/jasm/serial_echo.jsm}
 
 \pagebreak
 
-\section{Solarium Processor Advanced Computing Environment}
+\section{C/Buoy}
 
-The Solarium Processor Advanced Computing Environment, or \texttt{sp/ACE}, is a higher-level language than the raw assembly that provides some nicer tools to program applications in, at the cost of being less space and time efficient than programming in assembly directly. It does offer a slightly safer method of computing, however, as it provides a more traditional function call structure, variables, and scopes that help abstract away some of the hardware and provide some simple limits on what the user is allowed to do.
+C/Buoy is a higher-level language than the raw assembly that provides some nicer tools to program applications in, at the cost of being less space and time efficient than programming in assembly directly. It does offer a slightly safer method of computing, however, as it provides a more traditional function call structure, variables, and scopes that help abstract away some of the hardware and provide some simple limits on what the user is allowed to do.
 
 Note that, in this case, both functions and variables share the same namespace. This allows for easy use of function pointers by variable names, though currently only names are allowed, and no expressions may be used as yet.
 
@@ -500,17 +500,17 @@ Note that, in this case, both functions and variables share the same namespace. 
 
 \section{Tools}
 
-Several tools can help in the development of Sol32 programs.
+Several tools can help in the development of Jib programs.
 
-\subsection{V/SProc}
+\subsection{V/Jib}
 
-One useful tool is \texttt{V/SProc}, \comment{which is a program that}{Update image!} combines together a basic assembler, CPU emulator, and memory inspector into a single program. The main window can be seen in Figure \ref{fig:visual-sproc-main-page}.
+One useful tool is \texttt{V/Jib}, combines together a basic assembler, CPU emulator, and memory inspector into a single program. The main window can be seen in Figure \ref{fig:visual-jib-main-page}.
 
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=5in]{images/visual-sproc.png}
-    \caption{Main window of \texttt{V/SProc} provides common tools for program writing}
-    \label{fig:visual-sproc-main-page}
+    \includegraphics[width=5in]{images/visual-jib.png}
+    \caption{Main window of \texttt{V/Jib} provides common tools for program writing}
+    \label{fig:visual-jib-main-page}
 \end{figure}
 
 

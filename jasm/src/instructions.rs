@@ -5,7 +5,7 @@ use crate::{
     argument::{ArgumentError, ArgumentRegister, ArgumentType},
     immediate::{parse_imm_i16, ImmediateError},
 };
-use sol32::cpu::{Opcode, Processor};
+use jib::cpu::{Opcode, Processor};
 
 const INST_SIZE: usize = 4;
 

@@ -1,4 +1,4 @@
-use sol32asm::{AssemblerErrorLoc, TokenLoc};
+use jasm::{AssemblerErrorLoc, TokenLoc};
 
 mod components;
 mod parser;

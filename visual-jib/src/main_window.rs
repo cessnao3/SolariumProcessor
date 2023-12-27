@@ -4,7 +4,7 @@ use crate::messages::{ThreadToUi, UiToThread};
 use gtk::glib::clone;
 use gtk::{glib, prelude::*};
 use gtk::{Application, ApplicationWindow};
-use sol32::cpu::RegisterManager;
+use jib::cpu::RegisterManager;
 
 pub fn build_ui(app: &Application) {
     // Create the tx/rx for the secondary thread
@@ -29,7 +29,7 @@ pub fn build_ui(app: &Application) {
     // Create a window and set the title
     let window = ApplicationWindow::builder()
         .application(app)
-        .title("V/SProc")
+        .title("V/Jib")
         .child(&columns)
         .build();
 
@@ -46,7 +46,7 @@ pub fn build_ui(app: &Application) {
     });
 
     // Create the
-    let inst = sol32asm::InstructionList::default();
+    let inst = jasm::InstructionList::default();
 
     // Setup the UI receiver
     glib::spawn_future_local(async move {
@@ -136,7 +136,7 @@ fn build_code_column(
 ) -> gtk::Box {
     let code_stack = gtk::Stack::builder().build();
 
-    let default_asm = include_str!("../../examples/spa/thread_test.smc");
+    let default_asm = include_str!("../../examples/jasm/thread_test.jsm");
 
     let code_options = vec![
         (default_asm, "Assemble", "ASM", true),
@@ -174,7 +174,7 @@ fn build_code_column(
         if is_assembly {
             btn_build.connect_clicked(clone!(@strong tx_thread, @strong tx_ui => move |_| {
                 let asm = buffer_assembly_code.text(&buffer_assembly_code.start_iter(), &buffer_assembly_code.end_iter(), false);
-                match sol32asm::assemble_text(asm.as_str()) {
+                match jasm::assemble_text(asm.as_str()) {
                     Ok(v) => {
                         tx_ui.send(UiToThread::SetCode(v)).unwrap();
                         tx_thread.send(ThreadToUi::LogMessage(format!("{short_name} Successful"))).unwrap();

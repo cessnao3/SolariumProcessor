@@ -1,16 +1,15 @@
 [package]
-name = "visual-sol32"
+name = "visual-jib"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-channel = "2.1.1"
+async-channel = "2"
 gtk = { version = "0.7", package = "gtk4", features = ["v4_8"] }
-sol32 = { path = "../sol32", version = "*" }
-sol32asm = { path = "../sol32asm", version = "*" }
-#spcc = { path = "../spcc", version = "*" }
+jib = { path = "../jib", version = "*" }
+jasm = { path = "../jasm", version = "*" }
 
 [profile.release]
 lto = true

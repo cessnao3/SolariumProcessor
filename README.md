@@ -1,18 +1,19 @@
-# SolariumProcessor
+# Solarium
 
 <img src="doc/images/logo.png" alt="VisualSProc Program" width="100"/>
 
-SolariumProcessor, or Sol32, is a simple 16-bit hypothetical processor that implements a basic Instruction Set Architecture (ISA). See the isa.tex document in the doc/ folder for more information.
+Solarium provides interfaces to provide a processor (jib), assembler (jasm), and basic high-level language (c/buoy) around a hypothetical 32-bit processor that provides a simple ISA. See the isa.tex document in the doc/ folder for more information.
 
 ## Libraries
 
-Two basic libraries are provided:
-* libsproc implements the processor and ISA itself in a simple virtual machine
-* libsproc-assemble implements a basic assembler.
+Several libraries are provided:
+* jib implements the processor and ISA itself in a simple virtual machine
+* jasm implements a basic assembler.
+* cbuoy implements the high-level language
 
 ## Programs
 
 Programs included are listed below:
-* virtual-sproc provides a visual test-bench to compile and run SolariumCPU programs
+* virtual-jib provides a visual test-bench to compile and run programs
 
-<img src="doc/images/visual-sproc.png" alt="VisualSProc Program" width="700"/>
+<img src="doc/images/visual-jib.png" alt="VisualSProc Program" width="700"/>

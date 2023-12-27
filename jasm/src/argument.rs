@@ -1,6 +1,5 @@
 use core::fmt;
-
-use sol32::cpu::{DataType, DataTypeError, Register, RegisterManager};
+use jib::cpu::{DataType, DataTypeError, Register, RegisterManager};
 
 use crate::immediate::ImmediateError;
 

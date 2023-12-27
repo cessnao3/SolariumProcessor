@@ -1,4 +1,4 @@
-use sol32::cpu::RegisterManager;
+use jib::cpu::RegisterManager;
 
 #[derive(Clone)]
 pub enum UiToThread {
