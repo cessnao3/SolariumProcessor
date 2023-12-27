@@ -161,6 +161,8 @@ The Jib supports 32 software and 32 hardware interrupts, as shown in Table \ref{
 
 Note that, if a vector has a value of zero, that interrupt vector is considered to be disabled and that interrupt will effectively be disabled and not able to be run.
 
+If an interrupt is not able to run immediately, due to interrupts being disabled, an interrupt request is placed into a single buffer. Once interrupts are re-enabled, if this queue is not empty, then that interrupt will be run. As this queue only has a size of one, if two interrupts are triggered at the same time, only the first interrupt will run. Any interrupt triggered while the queue is full will be silently discarded.
+
 \pagebreak
 
 \section{Instructions and Assembly Code}
