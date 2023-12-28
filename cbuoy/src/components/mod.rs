@@ -1,10 +1,11 @@
-use jasm::{
-    argument::ArgumentType,
-    instructions::{OpAdd, OpLd, OpLdn, OpLdi, OpNeg, OpNot, OpBnot},
-    AssemblerErrorLoc, LocationInfo, Token, TokenList, TokenLoc,
-};
-use jib::cpu::Register;
-use std::{collections::HashMap, panic::Location};
+mod addressable;
+mod expression;
+mod variable;
+
+use jasm::{AssemblerErrorLoc, LocationInfo, TokenList};
+use std::collections::HashMap;
+
+use self::{expression::Expression, variable::{GlobalVariable, Variable}, addressable::Addressable};
 
 use super::types::{SpType, SpTypeDict};
 
@@ -60,13 +61,6 @@ pub trait CodeComponent {
     fn generate_code(&self, state: &mut TokenList);
 }
 
-pub struct Literal {
-    words: Vec<u8>,
-    var_type: Box<SpType>,
-}
-
-impl Literal {}
-
 pub trait BaseStatement {}
 
 pub trait Statement {}
@@ -94,158 +88,6 @@ impl DefinitionStatement {
 impl Statement for DefinitionStatement {}
 
 impl BaseStatement for DefinitionStatement {}
-
-pub trait Expression {
-    fn get_type(&self) -> SpType;
-
-    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<Token>;
-}
-
-pub struct BinaryExpression {
-    lhs: Box<dyn Expression>,
-    rhs: Box<dyn Expression>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UnaryOperator {
-    Dereference,
-    Positive,
-    Negative,
-    Not,
-    BitwiseNot,
-    AddressOf,
-}
-
-pub struct UnaryExpression {
-    expr: Box<dyn Expression>,
-    operator: UnaryOperator,
-}
-
-impl Expression for UnaryExpression {
-    fn get_type(&self) -> SpType {
-        self.expr.get_type()
-    }
-
-    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<Token> {
-        let mut res = self.expr.save_value_to(reg, spare);
-        let mut reg_type = ArgumentType::new(reg, self.expr.get_type().base_primitive().unwrap());
-        match self.operator {
-            UnaryOperator::Dereference => {
-                res.push(Token::OperationLiteral(Box::new(OpLd::new(reg_type, reg.into()))));
-            },
-            UnaryOperator::AddressOf => panic!("not supported (yet?)"),
-            UnaryOperator::Positive => (),
-            UnaryOperator::Negative => {
-                res.push(Token::OperationLiteral(Box::new(OpNeg::new(reg_type, reg.into()))));
-            }
-            UnaryOperator::Not => {
-                res.push(Token::OperationLiteral(Box::new(OpNot::new(reg.into(), reg.into()))));
-            }
-            UnaryOperator::BitwiseNot => {
-                res.push(Token::OperationLiteral(Box::new(OpBnot::new(reg_type, reg.into()))));
-            }
-        }
-        res
-    }
-}
-
-pub struct AsExpression {
-    expr: Box<dyn Expression>,
-    new_type: Box<SpType>,
-}
-
-impl Expression for AsExpression {
-    fn get_type(&self) -> SpType {
-        self.new_type.as_ref().clone()
-    }
-
-    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<Token> {
-        // TODO - Update? Or is this okay (e.g., a struct saving pointers, to be copied later?)
-        return self.expr.save_value_to(reg, spare); // TODO - Convert?
-    }
-}
-
-pub trait Addressable {
-    fn get_address(&self, reg: Register) -> Vec<Token>;
-}
-
-pub trait Variable: Addressable + Expression {}
-
-pub struct LocalVariable {
-    var_type: SpType,
-    base_offset: i32,
-}
-
-impl Expression for LocalVariable {
-    fn get_type(&self) -> SpType {
-        self.var_type.clone()
-    }
-
-    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<Token> {
-        let base_type = match self.get_type().base_primitive() {
-            Some(base) => base,
-            _ => panic!("Unknown parameter found!"),
-        };
-
-        let mut res = self.get_address(reg);
-        res.push(Token::OperationLiteral(Box::new(OpLd::new(
-            ArgumentType::new(reg, base_type),
-            reg.into(),
-        ))));
-        res
-    }
-}
-
-impl Addressable for LocalVariable {
-    fn get_address(&self, reg: Register) -> Vec<Token> {
-        let mut a = Vec::new();
-        a.push(Token::OperationLiteral(Box::new(OpLdn::new(
-            ArgumentType::new(reg, jib::cpu::DataType::U32),
-        ))));
-        a.push(Token::literal_i32(self.base_offset));
-        a.push(Token::OperationLiteral(Box::new(OpAdd::new(
-            ArgumentType::new(reg, jib::cpu::DataType::U32),
-            reg.into(),
-            Register::ArgumentBase.into(),
-        ))));
-        a
-    }
-}
-
-impl Variable for LocalVariable {}
-
-pub struct GlobalVariable {
-    var_type: SpType,
-    var_label: String,
-}
-
-impl Expression for GlobalVariable {
-    fn get_type(&self) -> SpType {
-        self.var_type.clone()
-    }
-
-    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<Token> {
-        let mut res = self.get_address(reg);
-        res.push(Token::OperationLiteral(Box::new(OpLd::new(
-            ArgumentType::new(reg, jib::cpu::DataType::U32),
-            reg.into(),
-        ))));
-        res
-    }
-}
-
-impl Addressable for GlobalVariable {
-    fn get_address(&self, reg: Register) -> Vec<Token> {
-        let mut a = Vec::new();
-        a.push(Token::OperationLiteral(Box::new(OpLdn::new(
-            ArgumentType::new(reg, jib::cpu::DataType::U32),
-        ))));
-        a.push(Token::LoadLoc(self.var_label.clone()));
-        a
-    }
-}
-
-impl Variable for GlobalVariable {}
 
 pub trait Function: Addressable {
     fn get_input_parameters(&self) -> Vec<(String, SpType)>;

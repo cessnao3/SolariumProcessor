@@ -103,6 +103,28 @@ impl SpType {
             _ => None,
         }
     }
+
+    pub fn as_const(&self) -> SpType {
+        if let Self::Constant { base } = self {
+            self.clone()
+        } else {
+            Self::Constant { base: Box::new(self.clone()) }
+        }
+    }
+
+    pub fn as_mut(&self) -> SpType {
+        if let Self::Constant { base } = self {
+            *base.clone()
+        } else {
+            self.clone()
+        }
+    }
+}
+
+impl From<DataType> for SpType {
+    fn from(value: DataType) -> Self {
+        SpType::Primitive { base: value }
+    }
 }
 
 impl std::fmt::Display for SpType {
