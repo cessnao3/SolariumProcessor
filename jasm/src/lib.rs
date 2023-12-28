@@ -6,10 +6,11 @@ use core::fmt;
 use std::{collections::HashMap, rc::Rc};
 
 use instructions::{
-    Instruction, InstructionError, OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall,
-    OpConv, OpCopy, OpDiv, OpHalt, OpInt, OpIntoff, OpInton, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLd,
-    OpLdi, OpLdn, OpLdr, OpLdri, OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset,
-    OpRet, OpRetInt, OpSav, OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq, OpTnz, OpTz,
+    Instruction, InstructionError, OpAdd, OpBand, OpBnot, OpBool, OpBor, OpBshl, OpBshr, OpBxor,
+    OpCall, OpConv, OpCopy, OpDiv, OpHalt, OpInt, OpIntoff, OpInton, OpIntr, OpJmp, OpJmpr,
+    OpJmpri, OpLd, OpLdi, OpLdn, OpLdr, OpLdri, OpMul, OpNeg, OpNoop, OpNot, OpPop, OpPopr, OpPush,
+    OpRem, OpReset, OpRet, OpRetInt, OpSav, OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq,
+    OpTnz, OpTz,
 };
 
 use jib::cpu::{Opcode, Processor, ProcessorError};
@@ -97,7 +98,7 @@ impl From<ParseError> for AssemblerError {
 pub struct LocationInfo {
     pub line: usize,
     pub full_line: Option<String>,
-    pub base_loc: Option<String>,
+    pub base_loc: Option<Box<LocationInfo>>,
 }
 
 impl fmt::Display for LocationInfo {
@@ -220,10 +221,11 @@ impl InstructionList {
 impl Default for InstructionList {
     fn default() -> Self {
         let inst = create_instruction_map!(
-            OpAdd, OpBand, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall, OpConv, OpCopy, OpDiv,
-            OpHalt, OpInt, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLd, OpLdn, OpLdi, OpLdr, OpLdri,
-            OpMul, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem, OpReset, OpRet, OpRetInt, OpSav,
-            OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq, OpTnz, OpTz, OpInton, OpIntoff
+            OpAdd, OpBand, OpBnot, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall, OpConv, OpCopy,
+            OpDiv, OpHalt, OpInt, OpIntoff, OpInton, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLd, OpLdi,
+            OpLdn, OpLdr, OpLdri, OpMul, OpNeg, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem,
+            OpReset, OpRet, OpRetInt, OpSav, OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle,
+            OpTneq, OpTnz, OpTz
         );
 
         let inst_map = inst.iter().map(|(_, n, f, _)| (n.to_owned(), *f)).collect();
@@ -273,7 +275,7 @@ impl TokenList {
         }
     }
 
-    fn split_tokens(s: &str) -> Result<Vec<String>, ParseError> {
+    fn split_asm_delim(s: &str) -> Result<Vec<String>, ParseError> {
         let mut within_quote = false;
         let mut is_escape = false;
         let mut last_was_quote = false;
@@ -345,7 +347,7 @@ impl TokenList {
         // Trim Comments
         let s = Self::trim_line(line);
 
-        let words = Self::split_tokens(s)?;
+        let words = Self::split_asm_delim(s)?;
 
         let first: &str = if let Some(w) = words.first() {
             w
@@ -529,7 +531,6 @@ impl Default for TokenList {
             label_regex: regex::Regex::new("^[a-z](a-z0-9_)*").unwrap(),
         }
     }
-
 }
 
 #[derive(Debug, Clone)]
@@ -643,14 +644,11 @@ pub fn assemble_text(txt: &str) -> Result<Vec<u8>, AssemblerErrorLoc> {
     assemble_lines(&txt.lines().collect::<Vec<_>>())
 }
 
-pub fn parse_lines(txt: &[&str], base_loc: Option<LocationInfo>) -> Result<Vec<TokenLoc>, AssemblerErrorLoc> {
-    panic!("not implemented")
-}
-
 pub fn assemble_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
     let mut state = TokenList::default();
+
     for (i, l) in txt.iter().enumerate() {
-        let loc: LocationInfo = LocationInfo {
+        let loc = LocationInfo {
             line: i + 1,
             full_line: Some(l.to_string()),
             base_loc: None,

@@ -1,9 +1,10 @@
 use jasm::{
-    instructions::{OpAdd, OpLd, OpLdn},
-    TokenLoc, argument::ArgumentType, Token, LocationInfo, AssemblerErrorLoc,
+    argument::ArgumentType,
+    instructions::{OpAdd, OpLd, OpLdn, OpLdi, OpNeg, OpNot, OpBnot},
+    AssemblerErrorLoc, LocationInfo, Token, TokenList, TokenLoc,
 };
 use jib::cpu::Register;
-use std::collections::HashMap;
+use std::{collections::HashMap, panic::Location};
 
 use super::types::{SpType, SpTypeDict};
 
@@ -56,37 +57,15 @@ impl Default for CompilerState {
 }
 
 pub trait CodeComponent {
-    fn generate_code(&self, state: &mut CompilerState);
+    fn generate_code(&self, state: &mut TokenList);
 }
 
 pub struct Literal {
-    words: Vec<u16>,
+    words: Vec<u8>,
     var_type: Box<SpType>,
 }
 
 impl Literal {}
-
-impl From<Literal> for u16 {
-    fn from(value: Literal) -> Self {
-        value.words[0]
-    }
-}
-
-impl From<Literal> for i16 {
-    fn from(value: Literal) -> Self {
-        value.words[0] as i16
-    }
-}
-
-impl From<Literal> for String {
-    fn from(value: Literal) -> Self {
-        return value
-            .words
-            .iter()
-            .map(|v| (*v as u8) as char)
-            .collect::<String>();
-    }
-}
 
 pub trait BaseStatement {}
 
@@ -127,8 +106,47 @@ pub struct BinaryExpression {
     rhs: Box<dyn Expression>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnaryOperator {
+    Dereference,
+    Positive,
+    Negative,
+    Not,
+    BitwiseNot,
+    AddressOf,
+}
+
 pub struct UnaryExpression {
     expr: Box<dyn Expression>,
+    operator: UnaryOperator,
+}
+
+impl Expression for UnaryExpression {
+    fn get_type(&self) -> SpType {
+        self.expr.get_type()
+    }
+
+    fn save_value_to(&self, reg: Register, spare: Register) -> Vec<Token> {
+        let mut res = self.expr.save_value_to(reg, spare);
+        let mut reg_type = ArgumentType::new(reg, self.expr.get_type().base_primitive().unwrap());
+        match self.operator {
+            UnaryOperator::Dereference => {
+                res.push(Token::OperationLiteral(Box::new(OpLd::new(reg_type, reg.into()))));
+            },
+            UnaryOperator::AddressOf => panic!("not supported (yet?)"),
+            UnaryOperator::Positive => (),
+            UnaryOperator::Negative => {
+                res.push(Token::OperationLiteral(Box::new(OpNeg::new(reg_type, reg.into()))));
+            }
+            UnaryOperator::Not => {
+                res.push(Token::OperationLiteral(Box::new(OpNot::new(reg.into(), reg.into()))));
+            }
+            UnaryOperator::BitwiseNot => {
+                res.push(Token::OperationLiteral(Box::new(OpBnot::new(reg_type, reg.into()))));
+            }
+        }
+        res
+    }
 }
 
 pub struct AsExpression {
@@ -138,12 +156,12 @@ pub struct AsExpression {
 
 impl Expression for AsExpression {
     fn get_type(&self) -> SpType {
-        return self.new_type.as_ref().clone();
+        self.new_type.as_ref().clone()
     }
 
     fn save_value_to(&self, reg: Register, spare: Register) -> Vec<Token> {
         // TODO - Update? Or is this okay (e.g., a struct saving pointers, to be copied later?)
-        return self.expr.save_value_to(reg, spare);
+        return self.expr.save_value_to(reg, spare); // TODO - Convert?
     }
 }
 
@@ -165,7 +183,7 @@ impl Expression for LocalVariable {
 
     fn save_value_to(&self, reg: Register, spare: Register) -> Vec<Token> {
         let base_type = match self.get_type().base_primitive() {
-            Some(SpType::Primitive { base }) => base,
+            Some(base) => base,
             _ => panic!("Unknown parameter found!"),
         };
 
@@ -181,7 +199,9 @@ impl Expression for LocalVariable {
 impl Addressable for LocalVariable {
     fn get_address(&self, reg: Register) -> Vec<Token> {
         let mut a = Vec::new();
-        a.push(Token::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(reg, jib::cpu::DataType::U32)))));
+        a.push(Token::OperationLiteral(Box::new(OpLdn::new(
+            ArgumentType::new(reg, jib::cpu::DataType::U32),
+        ))));
         a.push(Token::literal_i32(self.base_offset));
         a.push(Token::OperationLiteral(Box::new(OpAdd::new(
             ArgumentType::new(reg, jib::cpu::DataType::U32),
@@ -206,7 +226,10 @@ impl Expression for GlobalVariable {
 
     fn save_value_to(&self, reg: Register, spare: Register) -> Vec<Token> {
         let mut res = self.get_address(reg);
-        res.push(Token::OperationLiteral(Box::new(OpLd::new(ArgumentType::new(reg, jib::cpu::DataType::U32), reg.into()))));
+        res.push(Token::OperationLiteral(Box::new(OpLd::new(
+            ArgumentType::new(reg, jib::cpu::DataType::U32),
+            reg.into(),
+        ))));
         res
     }
 }
@@ -214,10 +237,10 @@ impl Expression for GlobalVariable {
 impl Addressable for GlobalVariable {
     fn get_address(&self, reg: Register) -> Vec<Token> {
         let mut a = Vec::new();
-        a.push(Token::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(reg, jib::cpu::DataType::U32)))));
-        a.push(Token::LoadLoc(
-            self.var_label.clone(),
-        ));
+        a.push(Token::OperationLiteral(Box::new(OpLdn::new(
+            ArgumentType::new(reg, jib::cpu::DataType::U32),
+        ))));
+        a.push(Token::LoadLoc(self.var_label.clone()));
         a
     }
 }
@@ -251,9 +274,28 @@ impl AsmFunction {
         }
     }
 
-    pub fn get_assembly(&self) -> Result<Vec<TokenLoc>, AssemblerErrorLoc> {
+    pub fn get_assembly(&self, state: &mut TokenList) -> Result<(), AssemblerErrorLoc> {
         // TODO - Mangle label names?
-        jasm::parse_lines(&self.lines.iter().map(|v| v.as_ref()).collect::<Vec<_>>(), None)
+        for l in self.lines.iter() {
+            let loc = LocationInfo {
+                line: 0,
+                full_line: Some(l.into()),
+                base_loc: None,
+            };
+
+            if let Err(err) = state.parse_line(l, loc) {
+                return Err(AssemblerErrorLoc {
+                    err,
+                    loc: LocationInfo {
+                        base_loc: None,
+                        full_line: Some(l.into()),
+                        line: 0,
+                    },
+                });
+            }
+        }
+
+        Ok(())
     }
 }
 

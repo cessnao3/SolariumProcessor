@@ -338,6 +338,10 @@ impl Processor {
         base: Self::OP_BASE_MATH,
         code: 4,
     };
+    pub const OP_NEG: Opcode = Opcode {
+        base: Self::OP_BASE_MATH,
+        code: 5,
+    };
 
     const OP_BASE_BITS: u8 = 11;
     pub const OP_BAND: Opcode = Opcode {
@@ -359,6 +363,11 @@ impl Processor {
     pub const OP_BSHR: Opcode = Opcode {
         base: Self::OP_BASE_BITS,
         code: 4,
+    };
+
+    pub const OP_BNOT: Opcode = Opcode {
+        base: Self::OP_BASE_BITS,
+        code: 5,
     };
 
     pub fn new() -> Self {
@@ -839,6 +848,7 @@ impl Processor {
                     Self::OP_MUL => arith.mul(val_a, val_b)?,
                     Self::OP_DIV => arith.div(val_a, val_b)?,
                     Self::OP_REM => arith.rem(val_a, val_b)?,
+                    Self::OP_NEG => arith.neg(val_a)?,
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 };
 
@@ -860,6 +870,7 @@ impl Processor {
                     Self::OP_BXOR => bitwise.bxor(val_a, val_b)?,
                     Self::OP_BSHL => bitwise.bsftl(val_a, val_b)?,
                     Self::OP_BSHR => bitwise.bsftr(val_a, val_b)?,
+                    Self::OP_BNOT => bitwise.bnot(val_a)?,
                     _ => return Err(ProcessorError::UnknownInstruction(inst)),
                 };
 

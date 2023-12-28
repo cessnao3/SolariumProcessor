@@ -667,11 +667,13 @@ InstArith!(OpSub, Processor::OP_SUB);
 InstArith!(OpMul, Processor::OP_MUL);
 InstArith!(OpDiv, Processor::OP_DIV);
 InstArith!(OpRem, Processor::OP_REM);
+InstDoubleArgType!(OpNeg, Processor::OP_NEG);
 InstArith!(OpBand, Processor::OP_BAND);
 InstArith!(OpBor, Processor::OP_BOR);
 InstArith!(OpBxor, Processor::OP_BXOR);
 InstArith!(OpBshl, Processor::OP_BSHL);
 InstArith!(OpBshr, Processor::OP_BSHR);
+InstDoubleArgType!(OpBnot, Processor::OP_BNOT);
 
 InstArith!(OpTeq, Processor::OP_EQ);
 InstArith!(OpTneq, Processor::OP_NEQ);

@@ -93,15 +93,11 @@ impl SpType {
         }
     }
 
-    pub fn base_primitive(&self) -> Option<SpType> {
+    pub fn base_primitive(&self) -> Option<DataType> {
         match self {
-            Self::Pointer { .. } => Some(SpType::Primitive {
-                base: DataType::U32,
-            }),
-            Self::Array { .. } => Some(SpType::Primitive {
-                base: DataType::U32,
-            }),
-            Self::Primitive { .. } => Some(self.clone()),
+            Self::Pointer { .. } => Some(DataType::U32),
+            Self::Array { .. } => Some(DataType::U32),
+            Self::Primitive { base } => Some(*base),
             Self::Alias { base, .. } => base.base_primitive(),
             Self::Constant { base } => base.base_primitive(),
             _ => None,
