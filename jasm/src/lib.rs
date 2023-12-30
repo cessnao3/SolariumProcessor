@@ -132,6 +132,10 @@ impl fmt::Display for AssemblerErrorLoc {
 type FnInst = fn(Vec<String>) -> Result<Rc<dyn Instruction>, InstructionError>;
 type FnDisp = fn([u8; 4]) -> Option<String>;
 
+pub trait FromLiteral<T> {
+    fn from_literal(v: T) -> Self;
+}
+
 pub enum Token {
     ChangeAddress(u32),
     Operation(FnInst, Vec<String>),
@@ -145,29 +149,45 @@ pub enum Token {
     AlignInstruction,
 }
 
-impl Token {
-    pub fn literal_u32(value: u32) -> Self {
-        Self::Literal4(value)
+impl FromLiteral<u8> for Token {
+    fn from_literal(v: u8) -> Self {
+        Self::Literal1(v)
     }
+}
 
-    pub fn literal_i32(value: i32) -> Self {
-        Self::Literal4(value as u32)
+impl FromLiteral<i8> for Token {
+    fn from_literal(v: i8) -> Self {
+        Self::Literal1(v as u8)
     }
+}
 
-    pub fn literal_u16(value: u16) -> Self {
-        Self::Literal2(value)
+impl FromLiteral<u16> for Token {
+    fn from_literal(v: u16) -> Self {
+        Self::Literal2(v)
     }
+}
 
-    pub fn literal_i16(value: i16) -> Self {
-        Self::Literal2(value as u16)
+impl FromLiteral<i16> for Token {
+    fn from_literal(v: i16) -> Self {
+        Self::Literal2(v as u16)
     }
+}
 
-    pub fn literal_u8(value: u8) -> Self {
-        Self::Literal1(value)
+impl FromLiteral<u32> for Token {
+    fn from_literal(v: u32) -> Self {
+        Self::Literal4(v)
     }
+}
 
-    pub fn literal_i8(value: i8) -> Self {
-        Self::Literal1(value as u8)
+impl FromLiteral<i32> for Token {
+    fn from_literal(v: i32) -> Self {
+        Self::Literal4(v as u32)
+    }
+}
+
+impl FromLiteral<f32> for Token {
+    fn from_literal(v: f32) -> Self {
+        Self::Literal4(v.to_bits())
     }
 }
 

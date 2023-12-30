@@ -1,6 +1,6 @@
 use jib::cpu::DataType;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SpTypeError {
     ArraySizeError(String),
     ArrayTypeError(String),
@@ -12,6 +12,7 @@ pub enum SpTypeError {
     MissingTypeSize(SpType),
     MissingTypeName(SpType),
     InvalidWhitespace(String),
+    NoBasePrimitiveForType(SpType),
 }
 
 impl std::fmt::Display for SpTypeError {
@@ -29,6 +30,7 @@ impl std::fmt::Display for SpTypeError {
             Self::MissingTypeSize(t) => write!(f, "missing type size for '{t}'"),
             Self::MissingTypeName(t) => write!(f, "missing type name specification for '{t}'"),
             Self::InvalidWhitespace(t) => write!(f, "unexpected whitespace found in '{t}'"),
+            Self::NoBasePrimitiveForType(t) => write!(f, "no base primitive defined for '{t}'"),
         }
     }
 }
@@ -61,7 +63,7 @@ pub enum SpType {
     },
     Function {
         ret: Box<SpType>,
-        args: Vec<Box<SpType>>,
+        args: Vec<SpType>,
     },
 }
 
@@ -80,27 +82,27 @@ impl SpType {
         }
     }
 
-    pub fn word_count(&self) -> Result<usize, SpTypeError> {
+    pub fn byte_count(&self) -> Result<usize, SpTypeError> {
         match self {
             Self::OpaqueType { .. } => Err(SpTypeError::MissingTypeSize(self.clone())),
             Self::Primitive { base, .. } => Ok(base.byte_size()),
-            Self::Array { base, size } => Ok(base.word_count()? * size),
-            Self::Struct { fields, .. } => fields.iter().map(|(_, t)| t.word_count()).sum(),
+            Self::Array { base, size } => Ok(base.byte_count()? * size),
+            Self::Struct { fields, .. } => fields.iter().map(|(_, t)| t.byte_count()).sum(),
             Self::Pointer { .. } => Ok(DataType::U32.byte_size()),
             Self::Function { .. } => Ok(DataType::U32.byte_size()),
-            Self::Constant { base } => base.word_count(),
-            Self::Alias { base, .. } => base.word_count(),
+            Self::Constant { base } => base.byte_count(),
+            Self::Alias { base, .. } => base.byte_count(),
         }
     }
 
-    pub fn base_primitive(&self) -> Option<DataType> {
+    pub fn base_primitive(&self) -> Result<DataType, SpTypeError> {
         match self {
-            Self::Pointer { .. } => Some(DataType::U32),
-            Self::Array { .. } => Some(DataType::U32),
-            Self::Primitive { base } => Some(*base),
+            Self::Pointer { .. } => Ok(DataType::U32),
+            Self::Array { .. } => Ok(DataType::U32),
+            Self::Primitive { base } => Ok(*base),
             Self::Alias { base, .. } => base.base_primitive(),
             Self::Constant { base } => base.base_primitive(),
-            _ => None,
+            _ => Err(SpTypeError::NoBasePrimitiveForType(self.clone())),
         }
     }
 
@@ -108,7 +110,9 @@ impl SpType {
         if let Self::Constant { base } = self {
             self.clone()
         } else {
-            Self::Constant { base: Box::new(self.clone()) }
+            Self::Constant {
+                base: Box::new(self.clone()),
+            }
         }
     }
 

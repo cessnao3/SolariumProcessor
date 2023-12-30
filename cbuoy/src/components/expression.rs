@@ -1,15 +1,21 @@
 use jasm::{
     argument::ArgumentType,
     instructions::{OpAdd, OpBnot, OpConv, OpLd, OpLdi, OpLdn, OpNeg, OpNoop, OpNot},
-    Token,
+    Token, FromLiteral,
 };
 use jib::cpu::{DataType, Register};
 
-use crate::types::SpType;
+use crate::types::{SpType, SpTypeError};
 
 #[derive(Debug, Clone)]
 pub enum ExpressionError {
-    ExpressionRequiresPrimitive(SpType),
+    TypeError(SpTypeError),
+}
+
+impl From<SpTypeError> for ExpressionError {
+    fn from(value: SpTypeError) -> Self {
+        Self::TypeError(value)
+    }
 }
 
 pub trait Expression {
@@ -39,6 +45,30 @@ impl Literal {
             Self::U32(v) => v.to_be_bytes().to_vec(),
             Self::I32(v) => v.to_be_bytes().to_vec(),
             Self::F32(v) => v.to_be_bytes().to_vec(),
+        }
+    }
+
+    pub fn base_type(&self) -> DataType {
+        match self {
+            Self::U8(_) => DataType::U8,
+            Self::I8(_) => DataType::I8,
+            Self::U16(_) => DataType::U16,
+            Self::I16(_) => DataType::I16,
+            Self::U32(_) => DataType::U32,
+            Self::I32(_) => DataType::I32,
+            Self::F32(_) => DataType::F32,
+        }
+    }
+
+    pub fn to_tokens(&self) -> Vec<Token> {
+        match self {
+            Self::U8(v) => vec![Token::from_literal(*v)],
+            Self::I8(v) => vec![Token::from_literal(*v)],
+            Self::U16(v) => vec![Token::from_literal(*v)],
+            Self::I16(v) => vec![Token::from_literal(*v)],
+            Self::U32(v) => vec![Token::from_literal(*v)],
+            Self::I32(v) => vec![Token::from_literal(*v)],
+            Self::F32(v) => vec![Token::from_literal(*v)],
         }
     }
 }
@@ -153,7 +183,7 @@ impl Expression for UnaryExpression {
 
     fn load_to(&self, reg: Register, spare: Register) -> Result<Vec<Token>, ExpressionError> {
         let mut res = self.expr.load_to(reg, spare)?;
-        let mut reg_type = ArgumentType::new(reg, self.expr.get_type().base_primitive().unwrap());
+        let reg_type = ArgumentType::new(reg, self.expr.get_type().base_primitive()?);
         match self.operator {
             UnaryOperator::Dereference => {
                 res.push(Token::OperationLiteral(Box::new(OpLd::new(
@@ -197,21 +227,8 @@ impl Expression for AsExpression {
     }
 
     fn load_to(&self, reg: Register, spare: Register) -> Result<Vec<Token>, ExpressionError> {
-        let from_type = if let Some(dt) = self.expr.get_type().base_primitive() {
-            dt
-        } else {
-            return Err(ExpressionError::ExpressionRequiresPrimitive(
-                self.expr.get_type(),
-            ));
-        };
-
-        let to_type = if let Some(dt) = self.new_type.base_primitive() {
-            dt
-        } else {
-            return Err(ExpressionError::ExpressionRequiresPrimitive(
-                *self.new_type.clone(),
-            ));
-        };
+        let from_type = self.expr.get_type().base_primitive()?;
+        let to_type = self.new_type.base_primitive()?;
 
         let mut res = self.expr.load_to(reg, spare)?;
         res.push(Token::OperationLiteral(Box::new(OpConv::new(

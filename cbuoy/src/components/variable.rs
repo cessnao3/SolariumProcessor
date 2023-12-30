@@ -1,9 +1,9 @@
 use jasm::{
     argument::ArgumentType,
     instructions::{OpAdd, OpLd, OpLdn},
-    Token,
+    Token, FromLiteral,
 };
-use jib::cpu::{DataType, Register};
+use jib::{cpu::{DataType, Register}, text::CharacterError};
 
 use crate::types::{SpType, SpTypeError};
 
@@ -14,6 +14,9 @@ use super::{
 
 pub enum VariableError {
     Type(SpTypeError),
+    Character(CharacterError),
+    InvalidInitializerType(SpType),
+    MismatchingType(DataType, DataType),
 }
 
 impl From<SpTypeError> for VariableError {
@@ -22,11 +25,17 @@ impl From<SpTypeError> for VariableError {
     }
 }
 
+impl From<CharacterError> for VariableError {
+    fn from(value: CharacterError) -> Self {
+        Self::Character(value)
+    }
+}
+
 pub trait Variable: Addressable + Expression {
     fn init(&self) -> Result<Vec<Token>, VariableError>;
 
     fn byte_size(&self) -> Result<usize, VariableError> {
-        Ok(self.get_type().word_count()?)
+        Ok(self.get_type().byte_count()?)
     }
 }
 
@@ -44,6 +53,37 @@ impl VariableInitializer {
             Self::Text(s) => SpType::Array { base: Box::new(DataType::U8.into()), size: s.len() + 1 },
         }
     }
+
+    pub fn get_tokens(&self) -> Result<Vec<Token>, VariableError> {
+        let vals = match self {
+            Self::Literal(l) => l.to_tokens(),
+            Self::Text(s) => {
+                s.chars().chain(['\0'])
+                    .map(jib::text::character_to_byte)
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .flat_map(|c| Literal::U8(c).to_tokens())
+                    .collect::<Vec<_>>()
+            }
+            Self::Array(t, vals) => {
+                let base = t.base_primitive()?;
+                let mut v = Vec::new();
+
+                for l in vals.iter() {
+                    let l_type = l.base_type();
+                    if l_type == base {
+                        v.extend(l.to_tokens())
+                    } else {
+                        return Err(VariableError::MismatchingType(base, l_type))
+                    }
+                }
+
+                v
+            }
+        };
+
+        Ok(vals)
+    }
 }
 
 pub struct LocalVariable {
@@ -58,13 +98,7 @@ impl Expression for LocalVariable {
     }
 
     fn load_to(&self, reg: Register, _spare: Register) -> Result<Vec<Token>, ExpressionError> {
-        let base_type = if let Some(dt) = self.get_type().base_primitive() {
-            dt
-        } else {
-            return Err(ExpressionError::ExpressionRequiresPrimitive(
-                self.get_type(),
-            ));
-        };
+        let base_type = self.get_type().base_primitive()?;
 
         let mut res = self.get_address(reg);
         res.push(Token::OperationLiteral(Box::new(OpLd::new(
@@ -83,7 +117,7 @@ impl Addressable for LocalVariable {
                 reg,
                 jib::cpu::DataType::U32,
             )))),
-            Token::literal_i32(self.base_offset),
+            Token::from_literal(self.base_offset),
             Token::OperationLiteral(Box::new(OpAdd::new(
                 ArgumentType::new(reg, jib::cpu::DataType::U32),
                 reg.into(),
