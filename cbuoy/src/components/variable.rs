@@ -1,7 +1,7 @@
 use jasm::{
     argument::ArgumentType,
     instructions::{OpAdd, OpLd, OpLdn},
-    Token, FromLiteral,
+    AssemblerToken, FromLiteral,
 };
 use jib::{cpu::{DataType, Register}, text::CharacterError};
 
@@ -32,7 +32,7 @@ impl From<CharacterError> for VariableError {
 }
 
 pub trait Variable: Addressable + Expression {
-    fn init(&self) -> Result<Vec<Token>, VariableError>;
+    fn init(&self) -> Result<Vec<AssemblerToken>, VariableError>;
 
     fn byte_size(&self) -> Result<usize, VariableError> {
         Ok(self.get_type().byte_count()?)
@@ -54,7 +54,7 @@ impl VariableInitializer {
         }
     }
 
-    pub fn get_tokens(&self) -> Result<Vec<Token>, VariableError> {
+    pub fn get_tokens(&self) -> Result<Vec<AssemblerToken>, VariableError> {
         let vals = match self {
             Self::Literal(l) => l.to_tokens(),
             Self::Text(s) => {
@@ -97,11 +97,11 @@ impl Expression for LocalVariable {
         self.var_type.clone()
     }
 
-    fn load_to(&self, reg: Register, _spare: Register) -> Result<Vec<Token>, ExpressionError> {
+    fn load_to(&self, reg: Register, _spare: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let base_type = self.get_type().base_primitive()?;
 
         let mut res = self.get_address(reg);
-        res.push(Token::OperationLiteral(Box::new(OpLd::new(
+        res.push(AssemblerToken::OperationLiteral(Box::new(OpLd::new(
             ArgumentType::new(reg, base_type),
             reg.into(),
         ))));
@@ -111,14 +111,14 @@ impl Expression for LocalVariable {
 }
 
 impl Addressable for LocalVariable {
-    fn get_address(&self, reg: Register) -> Vec<Token> {
+    fn get_address(&self, reg: Register) -> Vec<AssemblerToken> {
         vec![
-            Token::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
+            AssemblerToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
                 reg,
                 jib::cpu::DataType::U32,
             )))),
-            Token::from_literal(self.base_offset),
-            Token::OperationLiteral(Box::new(OpAdd::new(
+            AssemblerToken::from_literal(self.base_offset),
+            AssemblerToken::OperationLiteral(Box::new(OpAdd::new(
                 ArgumentType::new(reg, jib::cpu::DataType::U32),
                 reg.into(),
                 Register::ArgumentBase.into(),
@@ -128,7 +128,7 @@ impl Addressable for LocalVariable {
 }
 
 impl Variable for LocalVariable {
-    fn init(&self) -> Result<Vec<Token>, VariableError> {
+    fn init(&self) -> Result<Vec<AssemblerToken>, VariableError> {
 
 
         panic!()
@@ -145,11 +145,11 @@ impl Expression for GlobalVariable {
         self.var_type.clone()
     }
 
-    fn load_to(&self, reg: Register, _spare: Register) -> Result<Vec<Token>, ExpressionError> {
+    fn load_to(&self, reg: Register, _spare: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let res = self
             .get_address(reg)
             .into_iter()
-            .chain([Token::OperationLiteral(Box::new(OpLd::new(
+            .chain([AssemblerToken::OperationLiteral(Box::new(OpLd::new(
                 ArgumentType::new(reg, jib::cpu::DataType::U32),
                 reg.into(),
             )))])
@@ -159,19 +159,19 @@ impl Expression for GlobalVariable {
 }
 
 impl Addressable for GlobalVariable {
-    fn get_address(&self, reg: Register) -> Vec<Token> {
+    fn get_address(&self, reg: Register) -> Vec<AssemblerToken> {
         vec![
-            Token::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
+            AssemblerToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
                 reg,
                 jib::cpu::DataType::U32,
             )))),
-            Token::LoadLoc(self.var_label.clone()),
+            AssemblerToken::LoadLoc(self.var_label.clone()),
         ]
     }
 }
 
 impl Variable for GlobalVariable {
-    fn init(&self) -> Result<Vec<Token>, VariableError> {
+    fn init(&self) -> Result<Vec<AssemblerToken>, VariableError> {
         panic!()
     }
 }

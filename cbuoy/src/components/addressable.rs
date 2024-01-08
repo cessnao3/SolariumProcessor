@@ -1,6 +1,6 @@
-use jasm::Token;
+use jasm::AssemblerToken;
 use jib::cpu::Register;
 
 pub trait Addressable {
-    fn get_address(&self, reg: Register) -> Vec<Token>;
+    fn get_address(&self, reg: Register) -> Vec<AssemblerToken>;
 }

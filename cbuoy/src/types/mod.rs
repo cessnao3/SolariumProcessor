@@ -13,6 +13,7 @@ pub enum SpTypeError {
     MissingTypeName(SpType),
     InvalidWhitespace(String),
     NoBasePrimitiveForType(SpType),
+    FieldNotFound(String, StructDef),
 }
 
 impl std::fmt::Display for SpTypeError {
@@ -31,11 +32,41 @@ impl std::fmt::Display for SpTypeError {
             Self::MissingTypeName(t) => write!(f, "missing type name specification for '{t}'"),
             Self::InvalidWhitespace(t) => write!(f, "unexpected whitespace found in '{t}'"),
             Self::NoBasePrimitiveForType(t) => write!(f, "no base primitive defined for '{t}'"),
+            Self::FieldNotFound(field, def) => write!(f, "no field '{field}' in struct {}", def.name),
         }
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StructDef {
+    pub name: String,
+    pub fields: Vec<(String, Box<SpType>)>,
+}
+
+impl StructDef {
+    pub fn new<T: IntoIterator<Item = (String, Box<SpType>)>>(name: &str, fields: T) -> Self {
+        Self { name: name.into(), fields: fields.into_iter().collect() }
+    }
+
+    pub fn byte_size(&self) -> Result<usize, SpTypeError> {
+        return self.fields.iter().map(|x| x.1.byte_count()).sum()
+    }
+
+    pub fn offset_of(&self, s: &str) -> Result<usize, SpTypeError> {
+        let mut offset = 0;
+        for f in self.fields.iter() {
+            if f.0 == s {
+                return Ok(offset);
+            } else {
+                offset += f.1.byte_count()?;
+            }
+        }
+
+        Err(SpTypeError::FieldNotFound(s.into(), self.clone()))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpType {
     OpaqueType {
         name: String,
@@ -51,10 +82,7 @@ pub enum SpType {
         base: Box<SpType>,
         size: usize,
     },
-    Struct {
-        name: String,
-        fields: Vec<(String, Box<SpType>)>,
-    },
+    Struct(StructDef),
     Pointer {
         base: Box<SpType>,
     },
@@ -87,7 +115,7 @@ impl SpType {
             Self::OpaqueType { .. } => Err(SpTypeError::MissingTypeSize(self.clone())),
             Self::Primitive { base, .. } => Ok(base.byte_size()),
             Self::Array { base, size } => Ok(base.byte_count()? * size),
-            Self::Struct { fields, .. } => fields.iter().map(|(_, t)| t.byte_count()).sum(),
+            Self::Struct(def) => def.byte_size(),
             Self::Pointer { .. } => Ok(DataType::U32.byte_size()),
             Self::Function { .. } => Ok(DataType::U32.byte_size()),
             Self::Constant { base } => base.byte_count(),
@@ -137,7 +165,7 @@ impl std::fmt::Display for SpType {
             Self::OpaqueType { name } => write!(f, "{name}"),
             Self::Primitive { base } => write!(f, "{base}"),
             Self::Array { base, size } => write!(f, "[{size}]{base}"),
-            Self::Struct { name, .. } => write!(f, "{name}"),
+            Self::Struct(def) => write!(f, "{}", def.name),
             Self::Pointer { base, .. } => write!(f, "*{base}"),
             Self::Constant { base, .. } => write!(f, "${base}"),
             Self::Function { ret, args } => write!(
@@ -153,6 +181,7 @@ impl std::fmt::Display for SpType {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpTypeDict {
     types: std::collections::HashMap<String, SpType>,
 }
@@ -202,7 +231,7 @@ impl SpTypeDict {
         let name = match &t {
             SpType::OpaqueType { name } => name,
             SpType::Alias { name, .. } => name,
-            SpType::Struct { name, .. } => name,
+            SpType::Struct(def) => &def.name,
             _ => return Err(SpTypeError::MissingTypeName(t.clone())),
         };
 

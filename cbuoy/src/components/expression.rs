@@ -1,7 +1,7 @@
 use jasm::{
     argument::ArgumentType,
     instructions::{OpAdd, OpBnot, OpConv, OpLd, OpLdi, OpLdn, OpNeg, OpNoop, OpNot},
-    Token, FromLiteral,
+    AssemblerToken, FromLiteral,
 };
 use jib::cpu::{DataType, Register};
 
@@ -21,7 +21,7 @@ impl From<SpTypeError> for ExpressionError {
 pub trait Expression {
     fn get_type(&self) -> SpType;
 
-    fn load_to(&self, reg: Register, spare: Register) -> Result<Vec<Token>, ExpressionError>;
+    fn load_to(&self, reg: Register, spare: Register) -> Result<Vec<AssemblerToken>, ExpressionError>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -60,15 +60,15 @@ impl Literal {
         }
     }
 
-    pub fn to_tokens(&self) -> Vec<Token> {
+    pub fn to_tokens(&self) -> Vec<AssemblerToken> {
         match self {
-            Self::U8(v) => vec![Token::from_literal(*v)],
-            Self::I8(v) => vec![Token::from_literal(*v)],
-            Self::U16(v) => vec![Token::from_literal(*v)],
-            Self::I16(v) => vec![Token::from_literal(*v)],
-            Self::U32(v) => vec![Token::from_literal(*v)],
-            Self::I32(v) => vec![Token::from_literal(*v)],
-            Self::F32(v) => vec![Token::from_literal(*v)],
+            Self::U8(v) => vec![AssemblerToken::from_literal(*v)],
+            Self::I8(v) => vec![AssemblerToken::from_literal(*v)],
+            Self::U16(v) => vec![AssemblerToken::from_literal(*v)],
+            Self::I16(v) => vec![AssemblerToken::from_literal(*v)],
+            Self::U32(v) => vec![AssemblerToken::from_literal(*v)],
+            Self::I32(v) => vec![AssemblerToken::from_literal(*v)],
+            Self::F32(v) => vec![AssemblerToken::from_literal(*v)],
         }
     }
 }
@@ -110,44 +110,44 @@ impl Expression for Literal {
         &self,
         reg: Register,
         _spare: Register,
-    ) -> Result<Vec<Token>, ExpressionError> {
+    ) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let (lit_token, lit_type) = match self {
             Self::U8(val) => (
-                Token::OperationLiteral(Box::new(OpLdi::new(
+                AssemblerToken::OperationLiteral(Box::new(OpLdi::new(
                     ArgumentType::new(reg, DataType::I8),
                     *val as u16,
                 ))),
                 None,
             ),
             Self::I8(val) => (
-                Token::OperationLiteral(Box::new(OpLdi::new(
+                AssemblerToken::OperationLiteral(Box::new(OpLdi::new(
                     ArgumentType::new(reg, DataType::U8),
                     (*val as i16) as u16,
                 ))),
                 None,
             ),
             Self::I16(val) => (
-                Token::OperationLiteral(Box::new(OpLdi::new(
+                AssemblerToken::OperationLiteral(Box::new(OpLdi::new(
                     ArgumentType::new(reg, DataType::U8),
                     *val as u16,
                 ))),
                 None,
             ),
             Self::U16(val) => (
-                Token::OperationLiteral(Box::new(OpLdi::new(
+                AssemblerToken::OperationLiteral(Box::new(OpLdi::new(
                     ArgumentType::new(reg, DataType::U8),
                     (*val as i16) as u16,
                 ))),
                 None,
             ),
-            Self::U32(val) => (Token::Literal4(*val), Some(DataType::U32)),
-            Self::I32(val) => (Token::Literal4(*val as u32), Some(DataType::I32)),
-            Self::F32(val) => (Token::Literal4(val.to_bits()), Some(DataType::F32)),
+            Self::U32(val) => (AssemblerToken::Literal4(*val), Some(DataType::U32)),
+            Self::I32(val) => (AssemblerToken::Literal4(*val as u32), Some(DataType::I32)),
+            Self::F32(val) => (AssemblerToken::Literal4(val.to_bits()), Some(DataType::F32)),
         };
 
         if let Some(dt) = lit_type {
             Ok(vec![
-                Token::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(reg, dt)))),
+                AssemblerToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(reg, dt)))),
                 lit_token,
             ])
         } else {
@@ -181,12 +181,12 @@ impl Expression for UnaryExpression {
         self.expr.get_type()
     }
 
-    fn load_to(&self, reg: Register, spare: Register) -> Result<Vec<Token>, ExpressionError> {
+    fn load_to(&self, reg: Register, spare: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let mut res = self.expr.load_to(reg, spare)?;
         let reg_type = ArgumentType::new(reg, self.expr.get_type().base_primitive()?);
         match self.operator {
             UnaryOperator::Dereference => {
-                res.push(Token::OperationLiteral(Box::new(OpLd::new(
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpLd::new(
                     reg_type,
                     reg.into(),
                 ))));
@@ -194,19 +194,19 @@ impl Expression for UnaryExpression {
             UnaryOperator::AddressOf => panic!("not supported (yet?)"),
             UnaryOperator::Positive => (),
             UnaryOperator::Negative => {
-                res.push(Token::OperationLiteral(Box::new(OpNeg::new(
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpNeg::new(
                     reg_type,
                     reg.into(),
                 ))));
             }
             UnaryOperator::Not => {
-                res.push(Token::OperationLiteral(Box::new(OpNot::new(
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpNot::new(
                     reg.into(),
                     reg.into(),
                 ))));
             }
             UnaryOperator::BitwiseNot => {
-                res.push(Token::OperationLiteral(Box::new(OpBnot::new(
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpBnot::new(
                     reg_type,
                     reg.into(),
                 ))));
@@ -226,12 +226,12 @@ impl Expression for AsExpression {
         self.new_type.as_ref().clone()
     }
 
-    fn load_to(&self, reg: Register, spare: Register) -> Result<Vec<Token>, ExpressionError> {
+    fn load_to(&self, reg: Register, spare: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let from_type = self.expr.get_type().base_primitive()?;
         let to_type = self.new_type.base_primitive()?;
 
         let mut res = self.expr.load_to(reg, spare)?;
-        res.push(Token::OperationLiteral(Box::new(OpConv::new(
+        res.push(AssemblerToken::OperationLiteral(Box::new(OpConv::new(
             ArgumentType::new(reg, to_type),
             ArgumentType::new(reg, from_type),
         ))));
