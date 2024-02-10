@@ -156,6 +156,16 @@ impl Expression for Literal {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinaryOperator {
+    Dereference,
+    Positive,
+    Negative,
+    Not,
+    BitwiseNot,
+    AddressOf,
+}
+
 pub struct BinaryExpression {
     lhs: Box<dyn Expression>,
     rhs: Box<dyn Expression>,

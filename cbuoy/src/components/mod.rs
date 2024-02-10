@@ -1,11 +1,11 @@
-mod addressable;
-mod expression;
-mod variable;
+pub mod addressable;
+pub mod expression;
+pub mod variable;
 
 use jasm::{AssemblerErrorLoc, LocationInfo, TokenList};
 use std::collections::HashMap;
 
-use self::{expression::Expression, variable::{GlobalVariable, Variable}, addressable::Addressable};
+use self::{addressable::Addressable, variable::{GlobalVariable, LocalVariable, Variable}};
 
 use super::types::{SpType, SpTypeDict};
 
@@ -17,7 +17,7 @@ pub struct CompilerState {
 }
 
 pub struct Scope {
-    pub variables: HashMap<String, Box<dyn Variable>>,
+    pub variables: HashMap<String, LocalVariable>,
     pub statements: Vec<Box<dyn Statement>>,
 }
 
@@ -49,6 +49,22 @@ impl CompilerState {
             types: SpTypeDict::new(),
         }
     }
+
+    pub fn get_variable(&self, s: &str) -> Option<Box<dyn Variable>> {
+        for scope in self.scopes.iter().rev() {
+            if let Some(var) = scope.variables.get(s) {
+                let lv = var.clone();
+                return Some(Box::new(lv));
+            }
+        }
+
+        if let Some(var) = self.globals.get(s) {
+            let gv = var.clone();
+            return Some(Box::new(gv));
+        } else {
+            return None;
+        }
+    }
 }
 
 impl Default for CompilerState {
@@ -68,7 +84,7 @@ pub trait Statement {}
 pub struct DefinitionStatement {
     var_type: SpType,
     var_name: String,
-    init_expr: Option<Box<dyn Expression>>,
+    init_expr: Option<Box<dyn expression::Expression>>,
 }
 
 impl DefinitionStatement {
@@ -80,7 +96,7 @@ impl DefinitionStatement {
         }
     }
 
-    pub fn set_init(&mut self, expr: Box<dyn Expression>) {
+    pub fn set_init(&mut self, expr: Box<dyn expression::Expression>) {
         self.init_expr = Some(expr);
     }
 }

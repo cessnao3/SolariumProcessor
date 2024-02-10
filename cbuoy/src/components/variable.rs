@@ -39,6 +39,7 @@ pub trait Variable: Addressable + Expression {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum VariableInitializer {
     Literal(Literal),
     Array(SpType, Vec<Literal>),
@@ -86,6 +87,7 @@ impl VariableInitializer {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct LocalVariable {
     var_type: SpType,
     base_offset: i32,
@@ -135,6 +137,7 @@ impl Variable for LocalVariable {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct GlobalVariable {
     var_type: SpType,
     var_label: String,

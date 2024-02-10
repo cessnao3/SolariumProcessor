@@ -479,15 +479,14 @@ Note that, in this case, both functions and variables share the same namespace. 
     & \textlangle Statement\textrangle \\
     & \textlangle Statement\textrangle \textlangle Statement\textrangle \\
     BaseExpression & $\rightarrow$ \\
-    & \texttt{Variable} = \textlangle BaseExpression\textrangle; \\
+    & \textlangle Expression\textrangle = \textlangle BaseExpression\textrangle \\
     & \textlangle Expression\textrangle \textlangle BinaryOp\textrangle \textlangle Expression\textrangle \\
-    & \textlangle Expression\textrangle := \textlangle BaseExpression\textrangle; \\
     & \textlangle Expression\textrangle \\
     Expression & $\rightarrow$ \\
     & \texttt{Variable} \\
     & \textlangle Literal\textrangle \\
     & \textlangle UnaryOp\textrangle \textlangle Expression\textrangle \\
-    & \& \texttt{Variable} \\
+
     & \texttt{FunctionName}([\textlangle BaseExpression\textrangle[, \textlangle BaseExpression\textrangle,\dots]]) \\
     & (\textlangle BaseExpression\textrangle) \\
     BinaryOp & $\rightarrow$  \\
