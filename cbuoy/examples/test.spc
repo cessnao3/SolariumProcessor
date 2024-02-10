@@ -1,5 +1,5 @@
-def var_name: var_type;
-def array_name: [SIZE]var_type;
+def var_name: i32;
+def array_name: [5]i32;
 def int_test: u16 = 3;
 def ptr_test: *u16 = 6;
 def void_test: *void = 0;
