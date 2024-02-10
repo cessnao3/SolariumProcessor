@@ -100,7 +100,7 @@ impl Expression for LocalVariable {
     fn load_to(&self, reg: Register, _spare: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let base_type = self.get_type().base_primitive()?;
 
-        let mut res = self.get_address(reg);
+        let mut res = self.load_address(reg);
         res.push(AssemblerToken::OperationLiteral(Box::new(OpLd::new(
             ArgumentType::new(reg, base_type),
             reg.into(),
@@ -111,7 +111,7 @@ impl Expression for LocalVariable {
 }
 
 impl Addressable for LocalVariable {
-    fn get_address(&self, reg: Register) -> Vec<AssemblerToken> {
+    fn load_address(&self, reg: Register) -> Vec<AssemblerToken> {
         vec![
             AssemblerToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
                 reg,
@@ -147,7 +147,7 @@ impl Expression for GlobalVariable {
 
     fn load_to(&self, reg: Register, _spare: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let res = self
-            .get_address(reg)
+            .load_address(reg)
             .into_iter()
             .chain([AssemblerToken::OperationLiteral(Box::new(OpLd::new(
                 ArgumentType::new(reg, jib::cpu::DataType::U32),
@@ -159,7 +159,7 @@ impl Expression for GlobalVariable {
 }
 
 impl Addressable for GlobalVariable {
-    fn get_address(&self, reg: Register) -> Vec<AssemblerToken> {
+    fn load_address(&self, reg: Register) -> Vec<AssemblerToken> {
         vec![
             AssemblerToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
                 reg,
