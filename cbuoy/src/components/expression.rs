@@ -7,6 +7,8 @@ use jib::cpu::{DataType, Register};
 
 use crate::types::{SpType, SpTypeError};
 
+use super::addressable::Addressable;
+
 #[derive(Debug, Clone)]
 pub enum ExpressionError {
     TypeError(SpTypeError),
@@ -21,8 +23,14 @@ impl From<SpTypeError> for ExpressionError {
 pub trait Expression {
     fn get_type(&self) -> SpType;
 
-    fn load_to(&self, reg: Register, spare: Register) -> Result<Vec<AssemblerToken>, ExpressionError>;
+    fn load_to(
+        &self,
+        reg: Register,
+        spare: Register,
+    ) -> Result<Vec<AssemblerToken>, ExpressionError>;
 }
+
+pub trait ExpressionLValue: Expression + Addressable {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -186,12 +194,22 @@ pub struct UnaryExpression {
     operator: UnaryOperator,
 }
 
+impl UnaryExpression {
+    pub fn new(operator: UnaryOperator, expr: Box<dyn Expression>) -> Self {
+        Self { expr, operator }
+    }
+}
+
 impl Expression for UnaryExpression {
     fn get_type(&self) -> SpType {
         self.expr.get_type()
     }
 
-    fn load_to(&self, reg: Register, spare: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
+    fn load_to(
+        &self,
+        reg: Register,
+        spare: Register,
+    ) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let mut res = self.expr.load_to(reg, spare)?;
         let reg_type = ArgumentType::new(reg, self.expr.get_type().base_primitive()?);
         match self.operator {
@@ -236,7 +254,11 @@ impl Expression for AsExpression {
         self.new_type.as_ref().clone()
     }
 
-    fn load_to(&self, reg: Register, spare: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
+    fn load_to(
+        &self,
+        reg: Register,
+        spare: Register,
+    ) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let from_type = self.expr.get_type().base_primitive()?;
         let to_type = self.new_type.base_primitive()?;
 

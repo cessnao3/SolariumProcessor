@@ -151,6 +151,14 @@ impl SpType {
             self.clone()
         }
     }
+
+    pub fn is_func(&self) -> bool {
+        match self {
+            Self::Function { .. } => true,
+            Self::Constant { base } => base.is_func(),
+            _ => false,
+        }
+    }
 }
 
 impl From<DataType> for SpType {

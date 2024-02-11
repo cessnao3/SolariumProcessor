@@ -5,7 +5,7 @@ pub mod variable;
 use jasm::{AssemblerErrorLoc, LocationInfo, TokenList};
 use std::collections::HashMap;
 
-use self::{addressable::Addressable, variable::{GlobalVariable, LocalVariable, Variable}};
+use self::{addressable::Addressable, expression::Expression, variable::{GlobalVariable, LocalVariable, Variable}};
 
 use super::types::{SpType, SpTypeDict};
 
@@ -53,14 +53,26 @@ impl CompilerState {
     pub fn get_variable(&self, s: &str) -> Option<Box<dyn Variable>> {
         for scope in self.scopes.iter().rev() {
             if let Some(var) = scope.variables.get(s) {
-                let lv = var.clone();
-                return Some(Box::new(lv));
+                return Some(Box::new(var.clone()));
             }
         }
 
         if let Some(var) = self.globals.get(s) {
-            let gv = var.clone();
-            return Some(Box::new(gv));
+            return Some(Box::new(var.clone()));
+        } else {
+            return None;
+        }
+    }
+
+    pub fn get_variable_expr(&self, s: &str) -> Option<Box<dyn Expression>> {
+        for scope in self.scopes.iter().rev() {
+            if let Some(var) = scope.variables.get(s) {
+                return Some(Box::new(var.clone()));
+            }
+        }
+
+        if let Some(var) = self.globals.get(s) {
+            return Some(Box::new(var.clone()));
         } else {
             return None;
         }

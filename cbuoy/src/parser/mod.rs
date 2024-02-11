@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use crate::components::expression::{Expression, UnaryOperator};
-use crate::components::{AsmFunction, BaseStatement, CompilerState, DefinitionStatement, SpcFunction};
+use crate::components::expression::{Expression, Literal, UnaryExpression, UnaryOperator};
+use crate::components::{
+    AsmFunction, BaseStatement, CompilerState, DefinitionStatement, SpcFunction,
+};
 use crate::tokenizer::{tokenize, Token, TokenIter, TokenIterError, TokenizeError};
 use crate::types::{SpType, SpTypeDict};
 use crate::types::{SpTypeError, StructDef};
@@ -181,18 +183,29 @@ fn parse_struct_statement(
     Ok(())
 }
 
-fn parse_base_expression(tokens: &mut TokenIter, state: &mut ParserState) -> Result<Box<dyn Expression>, ParseError> {
+fn parse_base_expression(
+    tokens: &mut TokenIter,
+    state: &mut ParserState,
+) -> Result<Box<dyn Expression>, ParseError> {
     if let Some(t) = tokens.next() {
+        panic!("not implemented");
     } else {
-        return Err(ParseError::new("no tokens provided to expression!".into()));
+        Err(ParseError::new("no tokens provided to expression!".into()))
     }
 }
 
-fn is_identifier(s : &str) -> bool {
+fn is_identifier(s: &str) -> bool {
     panic!("not supported");
 }
 
-fn parse_expression(tokens: &mut TokenIter, state: &mut ParserState) -> Result<Box<dyn Expression>, ParseError> {
+fn parse_literal(t: &Token) -> Result<Literal, ParseError> {
+    panic!("not supported");
+}
+
+fn parse_expression(
+    tokens: &mut TokenIter,
+    state: &mut ParserState,
+) -> Result<Box<dyn Expression>, ParseError> {
     let mut unary_map = HashMap::new();
     unary_map.insert("+", UnaryOperator::Positive);
     unary_map.insert("-", UnaryOperator::Negative);
@@ -212,27 +225,38 @@ fn parse_expression(tokens: &mut TokenIter, state: &mut ParserState) -> Result<B
 
         if let Some(t) = tokens.next() {
             if t.get_value() == ")" {
-                return expr;
+                expr
             } else {
-                return Err(ParseError::new_tok(t, "expected ending parenthesis".into()));
+                Err(ParseError::new_tok(t, "expected ending parenthesis".into()))
             }
         } else {
-            return Err(ParseError::new("expected ending parenthesis".into()));
+            Err(ParseError::new("expected ending parenthesis".into()))
         }
-    } else if unary_map.contains_key(first.get_value()) {
+    } else if let Some(op) = unary_map.get(first.get_value()) {
+        Ok(Box::new(UnaryExpression::new(
+            *op,
+            parse_expression(tokens, state)?,
+        )))
     } else if is_identifier(first.get_value()) {
-        if let Some(var) = state.compiler.get_variable(first.get_value()) {
-            return Some(var);
+        if let Some(var) = state.compiler.get_variable_expr(first.get_value()) {
+            if var.get_type().is_func() {
+                panic!("check for function call?");
+            } else {
+                Ok(var)
+            }
         } else {
-            panic!("check for function call?");
-            return Err(ParseError::new_tok(first, "unable to find matching variable name".into()));
+            Err(ParseError::new_tok(
+                first,
+                "unknown variable nameprovided".into(),
+            ))
         }
-    } else if let Some(lit) = parse_literal(first) {
+    } else if let Ok(lit) = parse_literal(&first) {
+        panic!("not implemented");
     } else {
-        return Err(ParseError::new_tok(
+        Err(ParseError::new_tok(
             first,
             "unknown token type provided".into(),
-        ));
+        ))
     }
 }
 

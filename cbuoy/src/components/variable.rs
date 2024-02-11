@@ -9,7 +9,7 @@ use crate::types::{SpType, SpTypeError};
 
 use super::{
     addressable::Addressable,
-    expression::{Expression, ExpressionError, Literal},
+    expression::{Expression, ExpressionError, ExpressionLValue, Literal},
 };
 
 pub enum VariableError {
@@ -31,7 +31,7 @@ impl From<CharacterError> for VariableError {
     }
 }
 
-pub trait Variable: Addressable + Expression {
+pub trait Variable: ExpressionLValue {
     fn init(&self) -> Result<Vec<AssemblerToken>, VariableError>;
 
     fn byte_size(&self) -> Result<usize, VariableError> {
@@ -129,10 +129,10 @@ impl Addressable for LocalVariable {
     }
 }
 
+impl ExpressionLValue for LocalVariable {}
+
 impl Variable for LocalVariable {
     fn init(&self) -> Result<Vec<AssemblerToken>, VariableError> {
-
-
         panic!()
     }
 }
@@ -172,6 +172,8 @@ impl Addressable for GlobalVariable {
         ]
     }
 }
+
+impl ExpressionLValue for GlobalVariable {}
 
 impl Variable for GlobalVariable {
     fn init(&self) -> Result<Vec<AssemblerToken>, VariableError> {
