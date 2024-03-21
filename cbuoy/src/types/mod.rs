@@ -1,3 +1,5 @@
+use std::backtrace;
+
 use jib::cpu::DataType;
 
 #[derive(Debug, Clone)]
@@ -14,6 +16,7 @@ pub enum SpTypeError {
     InvalidWhitespace(String),
     NoBasePrimitiveForType(SpType),
     FieldNotFound(String, StructDef),
+    TypeMismatch(SpType, SpType),
 }
 
 impl std::fmt::Display for SpTypeError {
@@ -32,7 +35,10 @@ impl std::fmt::Display for SpTypeError {
             Self::MissingTypeName(t) => write!(f, "missing type name specification for '{t}'"),
             Self::InvalidWhitespace(t) => write!(f, "unexpected whitespace found in '{t}'"),
             Self::NoBasePrimitiveForType(t) => write!(f, "no base primitive defined for '{t}'"),
-            Self::FieldNotFound(field, def) => write!(f, "no field '{field}' in struct {}", def.name),
+            Self::FieldNotFound(field, def) => {
+                write!(f, "no field '{field}' in struct {}", def.name)
+            }
+            Self::TypeMismatch(a, b) => write!(f, "types {a} and {b} do not match"),
         }
     }
 }
@@ -45,11 +51,14 @@ pub struct StructDef {
 
 impl StructDef {
     pub fn new<T: IntoIterator<Item = (String, Box<SpType>)>>(name: &str, fields: T) -> Self {
-        Self { name: name.into(), fields: fields.into_iter().collect() }
+        Self {
+            name: name.into(),
+            fields: fields.into_iter().collect(),
+        }
     }
 
     pub fn byte_size(&self) -> Result<usize, SpTypeError> {
-        return self.fields.iter().map(|x| x.1.byte_count()).sum()
+        return self.fields.iter().map(|x| x.1.byte_count()).sum();
     }
 
     pub fn offset_of(&self, s: &str) -> Result<usize, SpTypeError> {
@@ -68,31 +77,14 @@ impl StructDef {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpType {
-    OpaqueType {
-        name: String,
-    },
-    Primitive {
-        base: DataType,
-    },
-    Alias {
-        name: String,
-        base: Box<SpType>,
-    },
-    Array {
-        base: Box<SpType>,
-        size: usize,
-    },
+    OpaqueType { name: String },
+    Primitive { base: DataType },
+    Alias { name: String, base: Box<SpType> },
+    Array { base: Box<SpType>, size: usize },
     Struct(StructDef),
-    Pointer {
-        base: Box<SpType>,
-    },
-    Constant {
-        base: Box<SpType>,
-    },
-    Function {
-        ret: Box<SpType>,
-        args: Vec<SpType>,
-    },
+    Pointer { base: Box<SpType> },
+    Constant { base: Box<SpType> },
+    Function { ret: Box<SpType>, args: Vec<SpType> },
 }
 
 impl SpType {

@@ -209,8 +209,8 @@ fn parse_expression(
     let mut unary_map = HashMap::new();
     unary_map.insert("+", UnaryOperator::Positive);
     unary_map.insert("-", UnaryOperator::Negative);
-    unary_map.insert("&", UnaryOperator::AddressOf);
-    unary_map.insert("*", UnaryOperator::Dereference);
+    //unary_map.insert("&", UnaryOperator::AddressOf);
+    //unary_map.insert("*", UnaryOperator::Dereference);
     unary_map.insert("!", UnaryOperator::Not);
     unary_map.insert("~", UnaryOperator::BitwiseNot);
 
@@ -236,7 +236,11 @@ fn parse_expression(
         Ok(Box::new(UnaryExpression::new(
             *op,
             parse_expression(tokens, state)?,
-        )))
+        )?))
+    } else if first.get_value() == "*" {
+        panic!("dereference not yet supported")
+    } else if first.get_value() == "&" {
+        panic!("address of not yet supported")
     } else if is_identifier(first.get_value()) {
         if let Some(var) = state.compiler.get_variable_expr(first.get_value()) {
             if var.get_type().is_func() {

@@ -1,6 +1,6 @@
 use jasm::{
     argument::ArgumentType,
-    instructions::{OpAdd, OpBnot, OpConv, OpLd, OpLdi, OpLdn, OpNeg, OpNoop, OpNot},
+    instructions::{OpAdd, OpBand, OpBnot, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpConv, OpDiv, OpLd, OpLdi, OpLdn, OpMul, OpNeg, OpNoop, OpNot, OpRem, OpSub},
     AssemblerToken, FromLiteral,
 };
 use jib::cpu::{DataType, Register};
@@ -166,27 +166,168 @@ impl Expression for Literal {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperator {
-    Dereference,
-    Positive,
-    Negative,
-    Not,
-    BitwiseNot,
-    AddressOf,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Bshl,
+    Bshr,
+    Band,
+    Bor,
+    Bxor,
+    Land,
+    Lor,
 }
 
 pub struct BinaryExpression {
     lhs: Box<dyn Expression>,
     rhs: Box<dyn Expression>,
+    operator: BinaryOperator,
+}
+
+impl BinaryExpression {
+    pub fn new(
+        operator: BinaryOperator,
+        lhs: Box<dyn Expression>,
+        rhs: Box<dyn Expression>,
+    ) -> Result<Self, SpTypeError> {
+        if lhs.get_type() != rhs.get_type() {
+            Err(SpTypeError::TypeMismatch(lhs.get_type(), rhs.get_type()))
+        } else {
+            Ok(Self { lhs, rhs, operator })
+        }
+    }
+}
+
+impl Expression for BinaryExpression {
+    fn get_type(&self) -> SpType {
+        self.lhs.get_type()
+    }
+
+    fn load_to(
+        &self,
+        reg: Register,
+        spare: Register,
+    ) -> Result<Vec<AssemblerToken>, ExpressionError> {
+        let TEMP_REG = Register::GeneralPurpose(32);
+        let mut res = self.lhs.load_to(reg, spare)?;
+        res.extend(self.rhs.load_to(TEMP_REG, spare)?);
+
+        /*
+            Add,
+        Sub,
+        Mul,
+        Div,
+        Rem,
+        Bshl,
+        Bshr,
+        Band,
+        Bor,
+        Land,
+        Lor, */
+
+        let reg_type = ArgumentType::new(reg, self.lhs.get_type().base_primitive()?);
+        match self.operator {
+            BinaryOperator::Add => {
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpAdd::new(
+                    reg_type,
+                    reg.into(),
+                    TEMP_REG.into(),
+                ))));
+            }
+            BinaryOperator::Sub => {
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpSub::new(
+                    reg_type,
+                    reg.into(),
+                    TEMP_REG.into(),
+                ))));
+            }
+            BinaryOperator::Mul => {
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpMul::new(
+                    reg_type,
+                    reg.into(),
+                    TEMP_REG.into(),
+                ))));
+            }
+            BinaryOperator::Div => {
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpDiv::new(
+                    reg_type,
+                    reg.into(),
+                    TEMP_REG.into(),
+                ))));
+            }
+            BinaryOperator::Rem => {
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpRem::new(
+                    reg_type,
+                    reg.into(),
+                    TEMP_REG.into(),
+                ))));
+            }
+            BinaryOperator::Bshl => {
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpBshl::new(
+                    reg_type,
+                    reg.into(),
+                    TEMP_REG.into(),
+                ))));
+            }
+            BinaryOperator::Bshr => {
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpBshr::new(
+                    reg_type,
+                    reg.into(),
+                    TEMP_REG.into(),
+                ))));
+            }
+            BinaryOperator::Band => {
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpBand::new(
+                    reg_type,
+                    reg.into(),
+                    TEMP_REG.into(),
+                ))));
+            }
+            BinaryOperator::Bor => {
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpBor::new(
+                    reg_type,
+                    reg.into(),
+                    TEMP_REG.into(),
+                ))));
+            }
+            BinaryOperator::Bxor => {
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpBxor::new(
+                    reg_type,
+                    reg.into(),
+                    TEMP_REG.into(),
+                ))));
+            }
+            BinaryOperator::Land => {
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpBand::new(
+                    reg_type,
+                    reg.into(),
+                    TEMP_REG.into(),
+                ))));
+                // TODO - Short-Circuiting Versions!
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpBool::new(reg.into(), reg.into()))));
+            }
+            BinaryOperator::Lor => {
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpBor::new(
+                    reg_type,
+                    reg.into(),
+                    TEMP_REG.into(),
+                ))));
+                // TODO - Short-Circuiting Versions!
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpBool::new(reg.into(), reg.into()))));
+            }
+        }
+        Ok(res)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOperator {
-    Dereference,
     Positive,
     Negative,
     Not,
     BitwiseNot,
-    AddressOf,
 }
 
 pub struct UnaryExpression {
@@ -195,8 +336,8 @@ pub struct UnaryExpression {
 }
 
 impl UnaryExpression {
-    pub fn new(operator: UnaryOperator, expr: Box<dyn Expression>) -> Self {
-        Self { expr, operator }
+    pub fn new(operator: UnaryOperator, expr: Box<dyn Expression>) -> Result<Self, SpTypeError> {
+        Ok(Self { expr, operator })
     }
 }
 
@@ -213,13 +354,6 @@ impl Expression for UnaryExpression {
         let mut res = self.expr.load_to(reg, spare)?;
         let reg_type = ArgumentType::new(reg, self.expr.get_type().base_primitive()?);
         match self.operator {
-            UnaryOperator::Dereference => {
-                res.push(AssemblerToken::OperationLiteral(Box::new(OpLd::new(
-                    reg_type,
-                    reg.into(),
-                ))));
-            }
-            UnaryOperator::AddressOf => panic!("not supported (yet?)"),
             UnaryOperator::Positive => (),
             UnaryOperator::Negative => {
                 res.push(AssemblerToken::OperationLiteral(Box::new(OpNeg::new(
