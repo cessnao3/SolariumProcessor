@@ -3,17 +3,24 @@ pub mod expression;
 pub mod variable;
 
 use jasm::{AssemblerErrorLoc, LocationInfo, TokenList};
+use jib::cpu::Register;
 use std::collections::HashMap;
 
 use self::{addressable::Addressable, expression::Expression, variable::{GlobalVariable, LocalVariable, Variable}};
 
 use super::types::{SpType, SpTypeDict};
 
+pub const REGISTER_TEMP: Register = Register::GeneralPurpose(31);
+
 pub struct CompilerState {
     pub globals: HashMap<String, GlobalVariable>,
     //pub functions: HashMap<String, Box<dyn Function>>,
     pub types: SpTypeDict,
     pub scopes: Vec<Scope>,
+}
+
+pub struct CodegenState {
+    pub label_num: u64,
 }
 
 pub struct Scope {

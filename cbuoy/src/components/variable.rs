@@ -9,7 +9,7 @@ use crate::types::{SpType, SpTypeError};
 
 use super::{
     addressable::Addressable,
-    expression::{Expression, ExpressionError, ExpressionLValue, Literal},
+    expression::{Expression, ExpressionError, ExpressionLValue, Literal}, CodegenState,
 };
 
 pub enum VariableError {
@@ -99,7 +99,7 @@ impl Expression for LocalVariable {
         self.var_type.clone()
     }
 
-    fn load_to(&self, reg: Register, _spare: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
+    fn load_to(&self, reg: Register, _spare: Register, _state: &mut CodegenState) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let base_type = self.get_type().base_primitive()?;
 
         let mut res = self.load_address(reg);
@@ -148,7 +148,7 @@ impl Expression for GlobalVariable {
         self.var_type.clone()
     }
 
-    fn load_to(&self, reg: Register, _spare: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
+    fn load_to(&self, reg: Register, _spare: Register, _state: &mut CodegenState,) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let res = self
             .load_address(reg)
             .into_iter()

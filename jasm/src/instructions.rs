@@ -647,7 +647,7 @@ InstSingleArgDataType!(OpLdn, Processor::OP_LOAD_NEXT);
 InstSingleArg!(OpTz, Processor::OP_TEST_ZERO);
 InstSingleArg!(OpTnz, Processor::OP_TEST_NOT_ZERO);
 
-InstImmediateArg!(OpJmpri, Processor::OP_JUMP_REL_IMM); // REL IMMEDIATE NEEDS TO HAVE DELTAS FROM CURRENT!
+InstImmediateArg!(OpJmpri, Processor::OP_JUMP_REL_IMM);
 InstSingleArgImm!(OpLdi, Processor::OP_LOAD_IMM);
 InstSingleArgImm!(OpLdri, Processor::OP_LOAD_IMM_REL);
 
