@@ -14,8 +14,16 @@ pub enum Register {
 impl Register {
     pub const NUM_REGISTERS: usize = 32;
 
+    pub const IDX_PROGRAM_COUNTER: usize = 0;
+    pub const IDX_STATUS: usize = 1;
+    pub const IDX_STACK_POINTER: usize = 2;
+    pub const IDX_OVERFLOW: usize = 3;
+    pub const IDX_RETURN: usize = 4;
+    pub const IDX_ARGUMENT_BASE: usize = 5;
+    pub const IDX_FIRST_GP: usize = 6;
+
     pub const fn first_gp_register() -> Self {
-        Self::GeneralPurpose(6)
+        Self::GeneralPurpose(Self::IDX_FIRST_GP)
     }
 
     pub const fn last_register() -> Self {
@@ -24,33 +32,45 @@ impl Register {
 
     pub const fn get_index(&self) -> usize {
         match self {
-            Self::ProgramCounter => 0,
-            Self::Status => 1,
-            Self::StackPointer => 2,
-            Self::Overflow => 3,
-            Self::Return => 4,
-            Self::ArgumentBase => 5,
+            Self::ProgramCounter => Self::IDX_PROGRAM_COUNTER,
+            Self::Status => Self::IDX_STATUS,
+            Self::StackPointer => Self::IDX_STACK_POINTER,
+            Self::Overflow => Self::IDX_OVERFLOW,
+            Self::Return => Self::IDX_RETURN,
+            Self::ArgumentBase => Self::IDX_ARGUMENT_BASE,
             Self::GeneralPurpose(num) => *num,
         }
     }
 
-    pub const fn get_special(&self) -> Option<(&str, Self)> {
+    pub const fn as_special(&self) -> Option<Self> {
         match self.get_index() {
-            0 => Some(("pc", Self::ProgramCounter)),
-            1 => Some(("stat", Self::Status)),
-            2 => Some(("sp", Self::StackPointer)),
-            3 => Some(("ovf", Self::Overflow)),
-            4 => Some(("ret", Self::Return)),
-            5 => Some(("arg",Self::ArgumentBase)),
+            Self::IDX_PROGRAM_COUNTER => Some(Self::ProgramCounter),
+            Self::IDX_STATUS => Some(Self::Status),
+            Self::IDX_STACK_POINTER => Some(Self::StackPointer),
+            Self::IDX_OVERFLOW => Some(Self::Overflow),
+            Self::IDX_RETURN => Some(Self::Return),
+            Self::IDX_ARGUMENT_BASE => Some(Self::ArgumentBase),
             _ => None,
+        }
+    }
+
+    pub const fn get_special_name(&self) -> &str{
+        match self.as_special() {
+            Some(Self::ProgramCounter) => "pc",
+            Some(Self::Status) => "stat",
+            Some(Self::StackPointer) => "sp",
+            Some(Self::Overflow) => "ovf",
+            Some(Self::Return) => "ret",
+            Some(Self::ArgumentBase) => "arg",
+            _ => ""
         }
     }
 }
 
 impl fmt::Display for Register {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some((name, _)) = self.get_special() {
-            write!(f, "{} ({})", name, self.get_index())
+        if let Some(spr) = self.as_special() {
+            write!(f, "{} ({})", spr.get_special_name(), self.get_index())
         } else {
             write!(f, "{}", self.get_index())
         }
