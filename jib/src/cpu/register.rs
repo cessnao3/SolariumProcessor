@@ -12,7 +12,17 @@ pub enum Register {
 }
 
 impl Register {
-    pub fn get_index(&self) -> usize {
+    pub const NUM_REGISTERS: usize = 32;
+
+    pub const fn first_gp_register() -> Self {
+        Self::GeneralPurpose(6)
+    }
+
+    pub const fn last_register() -> Self {
+        Self::GeneralPurpose(Self::NUM_REGISTERS - 1)
+    }
+
+    pub const fn get_index(&self) -> usize {
         match self {
             Self::ProgramCounter => 0,
             Self::Status => 1,
@@ -24,7 +34,7 @@ impl Register {
         }
     }
 
-    pub fn get_special(&self) -> Option<(&str, Self)> {
+    pub const fn get_special(&self) -> Option<(&str, Self)> {
         match self.get_index() {
             0 => Some(("pc", Self::ProgramCounter)),
             1 => Some(("stat", Self::Status)),
@@ -85,7 +95,7 @@ pub struct RegisterManager {
 }
 
 impl RegisterManager {
-    pub const REGISTER_COUNT: usize = 32;
+    pub const REGISTER_COUNT: usize = Register::NUM_REGISTERS;
 
     pub fn get(&self, reg: Register) -> Result<u32, RegisterError> {
         let ind = reg.get_index();

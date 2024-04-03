@@ -10,7 +10,7 @@ use jib::cpu::{DataType, Register};
 
 use crate::types::{SpType, SpTypeError};
 
-use super::{addressable::Addressable, CodegenState, REGISTER_TEMP};
+use super::{addressable::Addressable, CodegenState};
 
 #[derive(Debug, Clone)]
 pub enum ExpressionError {
@@ -218,7 +218,7 @@ impl Expression for BinaryExpression {
     ) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let mut res = self.lhs.load_to(reg, spare, state)?;
 
-        let load_val_b = self.rhs.load_to(REGISTER_TEMP, spare, state)?;
+        let load_val_b = self.rhs.load_to(state.temporary_register(), spare, state)?;
         let mut uses_val_b = true;
 
         let reg_type = ArgumentType::new(reg, self.lhs.get_type().base_primitive()?);
@@ -227,70 +227,70 @@ impl Expression for BinaryExpression {
                 vec![AssemblerToken::OperationLiteral(Box::new(OpAdd::new(
                     reg_type,
                     reg.into(),
-                    REGISTER_TEMP.into(),
+                    state.temporary_register().into(),
                 )))]
             }
             BinaryOperator::Sub => {
                 vec![AssemblerToken::OperationLiteral(Box::new(OpSub::new(
                     reg_type,
                     reg.into(),
-                    REGISTER_TEMP.into(),
+                    state.temporary_register().into(),
                 )))]
             }
             BinaryOperator::Mul => {
                 vec![AssemblerToken::OperationLiteral(Box::new(OpMul::new(
                     reg_type,
                     reg.into(),
-                    REGISTER_TEMP.into(),
+                    state.temporary_register().into(),
                 )))]
             }
             BinaryOperator::Div => {
                 vec![AssemblerToken::OperationLiteral(Box::new(OpDiv::new(
                     reg_type,
                     reg.into(),
-                    REGISTER_TEMP.into(),
+                    state.temporary_register().into(),
                 )))]
             }
             BinaryOperator::Rem => {
                 vec![AssemblerToken::OperationLiteral(Box::new(OpRem::new(
                     reg_type,
                     reg.into(),
-                    REGISTER_TEMP.into(),
+                    state.temporary_register().into(),
                 )))]
             }
             BinaryOperator::Bshl => {
                 vec![AssemblerToken::OperationLiteral(Box::new(OpBshl::new(
                     reg_type,
                     reg.into(),
-                    REGISTER_TEMP.into(),
+                    state.temporary_register().into(),
                 )))]
             }
             BinaryOperator::Bshr => {
                 vec![AssemblerToken::OperationLiteral(Box::new(OpBshr::new(
                     reg_type,
                     reg.into(),
-                    REGISTER_TEMP.into(),
+                    state.temporary_register().into(),
                 )))]
             }
             BinaryOperator::Band => {
                 vec![AssemblerToken::OperationLiteral(Box::new(OpBand::new(
                     reg_type,
                     reg.into(),
-                    REGISTER_TEMP.into(),
+                    state.temporary_register().into(),
                 )))]
             }
             BinaryOperator::Bor => {
                 vec![AssemblerToken::OperationLiteral(Box::new(OpBor::new(
                     reg_type,
                     reg.into(),
-                    REGISTER_TEMP.into(),
+                    state.temporary_register().into(),
                 )))]
             }
             BinaryOperator::Bxor => {
                 vec![AssemblerToken::OperationLiteral(Box::new(OpBxor::new(
                     reg_type,
                     reg.into(),
-                    REGISTER_TEMP.into(),
+                    state.temporary_register().into(),
                 )))]
             }
             BinaryOperator::Land | BinaryOperator::Lor => {
@@ -318,12 +318,12 @@ impl Expression for BinaryExpression {
                     state.label_num += 1;
 
                     test_code_vals.push(AssemblerToken::OperationLiteral(Box::new(OpLdn::new(
-                        ArgumentType::new(REGISTER_TEMP, DataType::U32),
+                        ArgumentType::new(state.temporary_register(), DataType::U32),
                     ))));
                     test_code_vals.push(AssemblerToken::LoadLoc(label_val.clone()));
                     test_code_vals.push(test_token);
                     test_code_vals.push(AssemblerToken::OperationLiteral(Box::new(OpJmp::new(
-                        REGISTER_TEMP.into(),
+                        state.temporary_register().into(),
                     ))));
                     test_code_vals.extend(load_val_b_new);
                     test_code_vals.push(AssemblerToken::CreateLabel(label_val));

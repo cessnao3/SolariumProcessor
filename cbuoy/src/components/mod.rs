@@ -10,8 +10,6 @@ use self::{addressable::Addressable, expression::Expression, variable::{GlobalVa
 
 use super::types::{SpType, SpTypeDict};
 
-pub const REGISTER_TEMP: Register = Register::GeneralPurpose(31);
-
 pub struct CompilerState {
     pub globals: HashMap<String, GlobalVariable>,
     //pub functions: HashMap<String, Box<dyn Function>>,
@@ -21,6 +19,20 @@ pub struct CompilerState {
 
 pub struct CodegenState {
     pub label_num: u64,
+    pub current_register_count: usize,
+}
+
+impl CodegenState {
+    pub fn new() -> Self {
+        Self {
+            label_num: 0,
+            current_register_count: Register::first_gp_register().get_index(),
+        }
+    }
+
+    pub fn temporary_register(&self) -> Register {
+        Register::last_register()
+    }
 }
 
 pub struct Scope {
