@@ -1,23 +1,24 @@
 use jib::cpu::DataType;
 
 #[derive(Debug, Clone)]
-pub enum SpTypeError {
+pub enum TypeError {
     ArraySizeError(String),
     ArrayTypeError(String),
     NoTypeFound(String),
     InvalidTypeName(String),
     EmptyType(String),
     UnableToModifyBuiltin,
-    CannotOverrideType { new_type: SpType, old_type: SpType },
-    MissingTypeSize(SpType),
-    MissingTypeName(SpType),
+    CannotOverrideType { new_type: Type, old_type: Type },
+    MissingTypeSize(Type),
+    MissingTypeName(Type),
     InvalidWhitespace(String),
-    NoBasePrimitiveForType(SpType),
+    NoBasePrimitiveForType(Type),
     FieldNotFound(String, StructDef),
-    TypeMismatch(SpType, SpType),
+    TypeMismatch(Type, Type),
+    CannotDereference(Type),
 }
 
-impl std::fmt::Display for SpTypeError {
+impl std::fmt::Display for TypeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ArraySizeError(t) => write!(f, "unable to find valid array size for '{t}'"),
@@ -37,6 +38,7 @@ impl std::fmt::Display for SpTypeError {
                 write!(f, "no field '{field}' in struct {}", def.name)
             }
             Self::TypeMismatch(a, b) => write!(f, "types {a} and {b} do not match"),
+            Self::CannotDereference(t) => write!(f, "cannot dereference type '{t}'"),
         }
     }
 }
@@ -44,22 +46,22 @@ impl std::fmt::Display for SpTypeError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructDef {
     pub name: String,
-    pub fields: Vec<(String, Box<SpType>)>,
+    pub fields: Vec<(String, Box<Type>)>,
 }
 
 impl StructDef {
-    pub fn new<T: IntoIterator<Item = (String, Box<SpType>)>>(name: &str, fields: T) -> Self {
+    pub fn new<T: IntoIterator<Item = (String, Box<Type>)>>(name: &str, fields: T) -> Self {
         Self {
             name: name.into(),
             fields: fields.into_iter().collect(),
         }
     }
 
-    pub fn byte_size(&self) -> Result<usize, SpTypeError> {
+    pub fn byte_size(&self) -> Result<usize, TypeError> {
         return self.fields.iter().map(|x| x.1.byte_count()).sum();
     }
 
-    pub fn offset_of(&self, s: &str) -> Result<usize, SpTypeError> {
+    pub fn offset_of(&self, s: &str) -> Result<usize, TypeError> {
         let mut offset = 0;
         for f in self.fields.iter() {
             if f.0 == s {
@@ -69,23 +71,23 @@ impl StructDef {
             }
         }
 
-        Err(SpTypeError::FieldNotFound(s.into(), self.clone()))
+        Err(TypeError::FieldNotFound(s.into(), self.clone()))
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SpType {
+pub enum Type {
     OpaqueType { name: String },
     Primitive { base: DataType },
-    Alias { name: String, base: Box<SpType> },
-    Array { base: Box<SpType>, size: usize },
+    Alias { name: String, base: Box<Type> },
+    Array { base: Box<Type>, size: usize },
     Struct(StructDef),
-    Pointer { base: Box<SpType> },
-    Constant { base: Box<SpType> },
-    Function { ret: Box<SpType>, args: Vec<SpType> },
+    Pointer { base: Box<Type> },
+    Constant { base: Box<Type> },
+    Function { ret: Box<Type>, args: Vec<Type> },
 }
 
-impl SpType {
+impl Type {
     pub fn is_valid_name(s: &str) -> bool {
         // Ensure that the first character is alphabetic and that the only characters are ascii-alphanumeric/_/-
         if !s
@@ -100,9 +102,9 @@ impl SpType {
         }
     }
 
-    pub fn byte_count(&self) -> Result<usize, SpTypeError> {
+    pub fn byte_count(&self) -> Result<usize, TypeError> {
         match self {
-            Self::OpaqueType { .. } => Err(SpTypeError::MissingTypeSize(self.clone())),
+            Self::OpaqueType { .. } => Err(TypeError::MissingTypeSize(self.clone())),
             Self::Primitive { base, .. } => Ok(base.byte_size()),
             Self::Array { base, size } => Ok(base.byte_count()? * size),
             Self::Struct(def) => def.byte_size(),
@@ -113,18 +115,18 @@ impl SpType {
         }
     }
 
-    pub fn base_primitive(&self) -> Result<DataType, SpTypeError> {
+    pub fn base_primitive(&self) -> Result<DataType, TypeError> {
         match self {
             Self::Pointer { .. } => Ok(DataType::U32),
             Self::Array { .. } => Ok(DataType::U32),
             Self::Primitive { base } => Ok(*base),
             Self::Alias { base, .. } => base.base_primitive(),
             Self::Constant { base } => base.base_primitive(),
-            _ => Err(SpTypeError::NoBasePrimitiveForType(self.clone())),
+            _ => Err(TypeError::NoBasePrimitiveForType(self.clone())),
         }
     }
 
-    pub fn as_const(&self) -> SpType {
+    pub fn as_const(&self) -> Type {
         if let Self::Constant { base } = self {
             self.clone()
         } else {
@@ -134,7 +136,7 @@ impl SpType {
         }
     }
 
-    pub fn as_mut(&self) -> SpType {
+    pub fn as_mut(&self) -> Type {
         if let Self::Constant { base } = self {
             *base.clone()
         } else {
@@ -151,13 +153,13 @@ impl SpType {
     }
 }
 
-impl From<DataType> for SpType {
+impl From<DataType> for Type {
     fn from(value: DataType) -> Self {
-        SpType::Primitive { base: value }
+        Type::Primitive { base: value }
     }
 }
 
-impl std::fmt::Display for SpType {
+impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::OpaqueType { name } => write!(f, "{name}"),
@@ -180,83 +182,83 @@ impl std::fmt::Display for SpType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SpTypeDict {
-    types: std::collections::HashMap<String, SpType>,
+pub struct TypeDict {
+    types: std::collections::HashMap<String, Type>,
 }
 
-impl SpTypeDict {
+impl TypeDict {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn parse_type(&self, t: &str) -> Result<SpType, SpTypeError> {
+    pub fn parse_type(&self, t: &str) -> Result<Type, TypeError> {
         match t.chars().next() {
-            Some('*') => Ok(SpType::Pointer {
+            Some('*') => Ok(Type::Pointer {
                 base: Box::new(self.parse_type(&t[1..])?),
             }),
-            Some('$') => Ok(SpType::Constant {
+            Some('$') => Ok(Type::Constant {
                 base: Box::new(self.parse_type(&t[1..])?),
             }),
             Some('[') => {
                 if let Some(ind) = t.find(']') {
                     let size = match t[1..ind].parse::<u16>() {
                         Ok(v) => v,
-                        Err(_) => return Err(SpTypeError::ArraySizeError(t.into())),
+                        Err(_) => return Err(TypeError::ArraySizeError(t.into())),
                     };
 
-                    Ok(SpType::Array {
+                    Ok(Type::Array {
                         base: Box::new(self.parse_type(&t[ind + 1..])?),
                         size: size as usize,
                     })
                 } else {
-                    Err(SpTypeError::ArrayTypeError(t.into()))
+                    Err(TypeError::ArrayTypeError(t.into()))
                 }
             }
             Some(_) => {
                 if t.chars().any(|c| c.is_whitespace()) {
-                    Err(SpTypeError::InvalidWhitespace(t.into()))
+                    Err(TypeError::InvalidWhitespace(t.into()))
                 } else if let Some(t) = self.types.get(t) {
                     Ok(t.clone())
                 } else {
-                    Err(SpTypeError::NoTypeFound(t.into()))
+                    Err(TypeError::NoTypeFound(t.into()))
                 }
             }
-            None => Err(SpTypeError::EmptyType(t.into())),
+            None => Err(TypeError::EmptyType(t.into())),
         }
     }
 
-    pub fn add_type(&mut self, t: SpType) -> Result<(), SpTypeError> {
+    pub fn add_type(&mut self, t: Type) -> Result<(), TypeError> {
         let name = match &t {
-            SpType::OpaqueType { name } => name,
-            SpType::Alias { name, .. } => name,
-            SpType::Struct(def) => &def.name,
-            _ => return Err(SpTypeError::MissingTypeName(t.clone())),
+            Type::OpaqueType { name } => name,
+            Type::Alias { name, .. } => name,
+            Type::Struct(def) => &def.name,
+            _ => return Err(TypeError::MissingTypeName(t.clone())),
         };
 
         if name == "void" {
-            return Err(SpTypeError::UnableToModifyBuiltin);
+            return Err(TypeError::UnableToModifyBuiltin);
         }
 
         // TODO - Check that each struct field is valid!
 
-        if !SpType::is_valid_name(name) {
-            return Err(SpTypeError::InvalidTypeName(name.into()));
+        if !Type::is_valid_name(name) {
+            return Err(TypeError::InvalidTypeName(name.into()));
         }
 
         if let Some(existing_type) = self.types.get(name) {
             match existing_type {
-                SpType::OpaqueType { .. } => match t {
-                    SpType::OpaqueType { .. } => (),
-                    SpType::Struct { .. } => (),
+                Type::OpaqueType { .. } => match t {
+                    Type::OpaqueType { .. } => (),
+                    Type::Struct { .. } => (),
                     _ => {
-                        return Err(SpTypeError::CannotOverrideType {
+                        return Err(TypeError::CannotOverrideType {
                             new_type: t.clone(),
                             old_type: existing_type.clone(),
                         })
                     }
                 },
                 _ => {
-                    return Err(SpTypeError::CannotOverrideType {
+                    return Err(TypeError::CannotOverrideType {
                         new_type: t.clone(),
                         old_type: existing_type.clone(),
                     })
@@ -274,7 +276,7 @@ impl SpTypeDict {
     }
 }
 
-impl Default for SpTypeDict {
+impl Default for TypeDict {
     fn default() -> Self {
         let mut s = Self {
             types: std::collections::HashMap::new(),
@@ -292,13 +294,13 @@ impl Default for SpTypeDict {
 
         s.types.insert(
             "void".into(),
-            SpType::OpaqueType {
+            Type::OpaqueType {
                 name: "void".to_string(),
             },
         );
 
         for (n, t) in type_vals {
-            s.types.insert(n.into(), SpType::Primitive { base: t });
+            s.types.insert(n.into(), Type::Primitive { base: t });
         }
 
         s

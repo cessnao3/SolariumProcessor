@@ -1,13 +1,17 @@
+use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::sync::OnceLock;
+
+use regex::Regex;
 
 use crate::components::expression::{Expression, Literal, UnaryExpression, UnaryOperator};
 use crate::components::{
     AsmFunction, BaseStatement, CompilerState, DefinitionStatement, SpcFunction,
 };
 use crate::tokenizer::{tokenize, Token, TokenIter, TokenIterError, TokenizeError};
-use crate::types::{SpType, SpTypeDict};
-use crate::types::{SpTypeError, StructDef};
+use crate::types::{StructDef, TypeError};
+use crate::types::{Type, TypeDict};
 
 pub fn parse(s: &str) -> Result<(), ParseError> {
     parse_with_state(s, &mut ParserState::new())
@@ -67,7 +71,7 @@ fn parse_struct_statement(
     let first_tok = tokens.expect()?;
     let struct_name = first_tok.get_value().to_string();
 
-    if !SpType::is_valid_name(&struct_name) || struct_name == "void" {
+    if !Type::is_valid_name(&struct_name) || struct_name == "void" {
         return Err(ParseError::new_tok(
             first_tok,
             format!("struct name `{struct_name}` is not a valid type name"),
@@ -77,10 +81,10 @@ fn parse_struct_statement(
     if let Some(end_check) = tokens.next() {
         if end_check.get_value() == ";" {
             match state.compiler.types.parse_type(&struct_name) {
-                Ok(SpType::Struct { .. }) => (),
-                Ok(SpType::OpaqueType { .. }) => (),
+                Ok(Type::Struct { .. }) => (),
+                Ok(Type::OpaqueType { .. }) => (),
                 Err(_) => {
-                    state.compiler.types.add_type(SpType::OpaqueType {
+                    state.compiler.types.add_type(Type::OpaqueType {
                         name: struct_name.to_string(),
                     })?;
                 }
@@ -120,8 +124,6 @@ fn parse_struct_statement(
 
             type_vec.push(tokens.expect()?);
         }
-
-        //expect_token_with_name(tokens, ",")?; -> Check ENDING!
 
         let type_string_combined = type_vec
             .iter()
@@ -165,10 +167,10 @@ fn parse_struct_statement(
         ));
     }
 
-    let type_val = SpType::Struct(StructDef::new(&struct_name, fields));
+    let type_val = Type::Struct(StructDef::new(&struct_name, fields));
 
     match state.compiler.types.parse_type(&struct_name) {
-        Ok(SpType::OpaqueType { .. }) => (),
+        Ok(Type::OpaqueType { .. }) => (),
         Ok(_) => {
             return Err(ParseError::new_tok(
                 first_tok,
@@ -194,12 +196,61 @@ fn parse_base_expression(
     }
 }
 
+static IDENTIFIER_REGEX: OnceLock<Regex> = OnceLock::new();
+
 fn is_identifier(s: &str) -> bool {
-    panic!("not supported");
+    let r = IDENTIFIER_REGEX.get_or_init(|| Regex::new(r"^[a-zA-Z_][\w]*$").unwrap());
+    r.is_match(s)
 }
 
 fn parse_literal(t: &Token) -> Result<Literal, ParseError> {
-    panic!("not supported");
+    macro_rules! gen_parse_literal_type {
+        ($fn_name:ident, $literal_type:ty, $enum_type:ident) => {
+            fn $fn_name(val: &str) -> Option<Result<Literal, String>> {
+                if val.ends_with(stringify!($literal_type)) {
+                    let sp = val.trim_end_matches(stringify!($literal_type));
+                    Some(match sp.parse::<$literal_type>() {
+                        Ok(v) => Ok(Literal::$enum_type(v)),
+                        _ => Err(format!("unable to parse as {}", stringify!($literal_type))),
+                    })
+                } else {
+                    None
+                }
+            }
+        };
+    }
+
+    gen_parse_literal_type!(parse_literal_u8, u8, U8);
+    gen_parse_literal_type!(parse_literal_u16, u16, U16);
+    gen_parse_literal_type!(parse_literal_u32, u32, U32);
+    gen_parse_literal_type!(parse_literal_i8, i8, I8);
+    gen_parse_literal_type!(parse_literal_i16, i16, I16);
+    gen_parse_literal_type!(parse_literal_i32, i32, I32);
+    gen_parse_literal_type!(parse_literal_f32, f32, F32);
+
+    let fn_vec = [
+        parse_literal_u8,
+        parse_literal_u16,
+        parse_literal_u32,
+        parse_literal_i8,
+        parse_literal_i16,
+        parse_literal_i32,
+        parse_literal_f32,
+    ];
+
+    for f in fn_vec {
+        if let Some(res) = f(t.get_value()) {
+            return match res {
+                Ok(v) => Ok(v),
+                Err(e) => Err(ParseError::new_tok(t.clone(), e)),
+            };
+        }
+    }
+
+    Err(ParseError::new_tok(
+        t.clone(),
+        "unable to determine appropriate literal type".into(),
+    ))
 }
 
 fn parse_expression(
@@ -209,10 +260,10 @@ fn parse_expression(
     let mut unary_map = HashMap::new();
     unary_map.insert("+", UnaryOperator::Positive);
     unary_map.insert("-", UnaryOperator::Negative);
-    //unary_map.insert("&", UnaryOperator::AddressOf);
-    //unary_map.insert("*", UnaryOperator::Dereference);
     unary_map.insert("!", UnaryOperator::Not);
     unary_map.insert("~", UnaryOperator::BitwiseNot);
+    unary_map.insert("&", UnaryOperator::AddressOf);
+    unary_map.insert("*", UnaryOperator::Dereference);
 
     let first = if let Some(t) = tokens.next() {
         t
@@ -237,13 +288,9 @@ fn parse_expression(
             *op,
             parse_expression(tokens, state)?,
         )?))
-    } else if first.get_value() == "*" {
-        panic!("dereference not yet supported")
-    } else if first.get_value() == "&" {
-        panic!("address of not yet supported")
     } else if is_identifier(first.get_value()) {
         if let Some(var) = state.compiler.get_variable_expr(first.get_value()) {
-            if var.get_type().is_func() {
+            if var.get_type()?.is_func() {
                 panic!("check for function call?");
             } else {
                 Ok(var)
@@ -271,7 +318,7 @@ fn parse_def_statement(
     let init_tok = tokens.expect()?;
     let name = init_tok.get_value().to_string();
 
-    if !SpType::is_valid_name(&name) {
+    if !Type::is_valid_name(&name) {
         return Err(ParseError::new_tok(
             init_tok,
             format!("variable name '{name}' not valid"),
@@ -397,8 +444,8 @@ impl From<TokenIterError> for ParseError {
     }
 }
 
-impl From<SpTypeError> for ParseError {
-    fn from(value: SpTypeError) -> Self {
+impl From<TypeError> for ParseError {
+    fn from(value: TypeError) -> Self {
         Self::new(format!("type: {value}"))
     }
 }
@@ -429,7 +476,7 @@ mod tests {
 
             assert!(state.compiler.types.parse_type(expected_name).is_ok());
 
-            if let Ok(SpType::Struct(def)) = state.compiler.types.parse_type(expected_name) {
+            if let Ok(Type::Struct(def)) = state.compiler.types.parse_type(expected_name) {
                 assert_eq!(def.name, expected_name);
                 assert_eq!(def.fields.len(), 2);
 
@@ -471,7 +518,7 @@ mod tests {
 
             match &state.compiler.types.parse_type(&type_name) {
                 Ok(t) => match t {
-                    st @ SpType::Struct(def) => {
+                    st @ Type::Struct(def) => {
                         assert_eq!(*def.name, type_name);
                         assert_eq!(def.fields.len(), i + 1);
 
@@ -503,7 +550,7 @@ mod tests {
             panic!("{e}");
         }
 
-        if let Ok(SpType::Struct(def)) = state.compiler.types.parse_type(join_name) {
+        if let Ok(Type::Struct(def)) = state.compiler.types.parse_type(join_name) {
             assert_eq!(def.name, join_name);
             assert_eq!(def.fields.len(), initial_types.len());
             for (i, (t, (f_name, f_type))) in std::iter::zip(initial_types, def.fields).enumerate()
@@ -530,11 +577,11 @@ mod tests {
 
         assert_eq!(state.compiler.types.len(), 2 + init_type_len);
 
-        if let Ok(SpType::OpaqueType { name }) = state.compiler.types.parse_type("type_1") {
+        if let Ok(Type::OpaqueType { name }) = state.compiler.types.parse_type("type_1") {
             assert_eq!(name, "type_1");
         }
 
-        if let Ok(SpType::OpaqueType { name }) = state.compiler.types.parse_type("type_2") {
+        if let Ok(Type::OpaqueType { name }) = state.compiler.types.parse_type("type_2") {
             assert_eq!(name, "type_2");
         }
 
@@ -545,21 +592,21 @@ mod tests {
 
         assert_eq!(state.compiler.types.len(), 2 + init_type_len);
 
-        if let Ok(SpType::Struct(def)) = state.compiler.types.parse_type("type_1") {
+        if let Ok(Type::Struct(def)) = state.compiler.types.parse_type("type_1") {
             assert_eq!(def.name, "type_1");
             assert_eq!(def.fields.len(), 1);
             assert_eq!(def.fields[0].0, "f");
             assert_eq!(
                 def.fields[0].1,
-                Box::new(SpType::Pointer {
-                    base: Box::new(SpType::OpaqueType {
+                Box::new(Type::Pointer {
+                    base: Box::new(Type::OpaqueType {
                         name: "type_2".to_string()
                     })
                 })
             );
         }
 
-        if let Ok(SpType::OpaqueType { name }) = state.compiler.types.parse_type("type_2") {
+        if let Ok(Type::OpaqueType { name }) = state.compiler.types.parse_type("type_2") {
             assert_eq!(name, "type_2");
         }
     }

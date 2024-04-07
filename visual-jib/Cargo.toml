@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 async-channel = "2"
-gtk = { version = "0.7", package = "gtk4", features = ["v4_8"] }
+gtk = { version = "0.8", package = "gtk4", features = ["v4_8"] }
 jib = { path = "../jib", version = "*" }
 jasm = { path = "../jasm", version = "*" }
 

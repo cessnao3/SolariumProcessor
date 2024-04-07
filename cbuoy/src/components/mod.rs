@@ -1,4 +1,3 @@
-pub mod addressable;
 pub mod expression;
 pub mod variable;
 
@@ -6,23 +5,23 @@ use jasm::{AssemblerErrorLoc, LocationInfo, TokenList};
 use jib::cpu::Register;
 use std::collections::HashMap;
 
-use self::{addressable::Addressable, expression::Expression, variable::{GlobalVariable, LocalVariable, Variable}};
+use self::{expression::Expression, variable::{GlobalVariable, LocalVariable, Variable}};
 
-use super::types::{SpType, SpTypeDict};
+use super::types::{Type, TypeDict};
 
 pub struct CompilerState {
     pub globals: HashMap<String, GlobalVariable>,
     //pub functions: HashMap<String, Box<dyn Function>>,
-    pub types: SpTypeDict,
+    pub types: TypeDict,
     pub scopes: Vec<Scope>,
 }
 
-pub struct CodegenState {
+pub struct AsmGenstate {
     pub label_num: u64,
     pub current_register_count: usize,
 }
 
-impl CodegenState {
+impl AsmGenstate {
     pub fn new() -> Self {
         Self {
             label_num: 0,
@@ -65,7 +64,7 @@ impl CompilerState {
             globals: HashMap::new(),
             //functions: HashMap::new(),
             scopes: vec![Scope::new()],
-            types: SpTypeDict::new(),
+            types: TypeDict::new(),
         }
     }
 
@@ -113,13 +112,13 @@ pub trait BaseStatement {}
 pub trait Statement {}
 
 pub struct DefinitionStatement {
-    var_type: SpType,
+    var_type: Type,
     var_name: String,
     init_expr: Option<Box<dyn expression::Expression>>,
 }
 
 impl DefinitionStatement {
-    pub fn new(name: &str, t: SpType) -> Self {
+    pub fn new(name: &str, t: Type) -> Self {
         Self {
             var_type: t,
             var_name: name.into(),
@@ -136,26 +135,26 @@ impl Statement for DefinitionStatement {}
 
 impl BaseStatement for DefinitionStatement {}
 
-pub trait Function: Addressable {
-    fn get_input_parameters(&self) -> Vec<(String, SpType)>;
+pub trait Function: Expression {
+    fn get_input_parameters(&self) -> Vec<(String, Type)>;
 }
 
 pub struct SpcFunction {
-    params: Vec<(String, SpType)>,
-    return_type: SpType,
+    params: Vec<(String, Type)>,
+    return_type: Type,
     statements: Vec<Box<dyn Statement>>,
 }
 
 impl BaseStatement for SpcFunction {}
 
 pub struct AsmFunction {
-    params: Vec<(String, SpType)>,
-    return_type: SpType,
+    params: Vec<(String, Type)>,
+    return_type: Type,
     lines: Vec<String>,
 }
 
 impl AsmFunction {
-    pub fn new(params: &[(String, SpType)], return_type: SpType, lines: &[String]) -> Self {
+    pub fn new(params: &[(String, Type)], return_type: Type, lines: &[String]) -> Self {
         Self {
             params: params.to_vec(),
             return_type,

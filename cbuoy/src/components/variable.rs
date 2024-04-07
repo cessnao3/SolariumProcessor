@@ -5,22 +5,21 @@ use jasm::{
 };
 use jib::{cpu::{DataType, Register}, text::CharacterError};
 
-use crate::types::{SpType, SpTypeError};
+use crate::types::{Type, TypeError};
 
 use super::{
-    addressable::Addressable,
-    expression::{Expression, ExpressionError, ExpressionLValue, Literal}, CodegenState,
+    expression::{Expression, ExpressionError, Literal}, AsmGenstate,
 };
 
 pub enum VariableError {
-    Type(SpTypeError),
+    Type(TypeError),
     Character(CharacterError),
-    InvalidInitializerType(SpType),
+    InvalidInitializerType(Type),
     MismatchingType(DataType, DataType),
 }
 
-impl From<SpTypeError> for VariableError {
-    fn from(value: SpTypeError) -> Self {
+impl From<TypeError> for VariableError {
+    fn from(value: TypeError) -> Self {
         Self::Type(value)
     }
 }
@@ -31,27 +30,27 @@ impl From<CharacterError> for VariableError {
     }
 }
 
-pub trait Variable: ExpressionLValue {
+pub trait Variable: Expression {
     fn init(&self) -> Result<Vec<AssemblerToken>, VariableError>;
 
     fn byte_size(&self) -> Result<usize, VariableError> {
-        Ok(self.get_type().byte_count()?)
+        Ok(self.get_type()?.byte_count()?)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum VariableInitializer {
     Literal(Literal),
-    Array(SpType, Vec<Literal>),
+    Array(Type, Vec<Literal>),
     Text(String),
 }
 
 impl VariableInitializer {
-    pub fn get_type(&self) -> SpType {
+    pub fn get_type(&self) -> Result<Type, TypeError> {
         match self {
             Self::Literal(l) => l.get_type(),
-            Self::Array(t, vals) => SpType::Array { base: Box::new(t.clone()), size: vals.len() },
-            Self::Text(s) => SpType::Array { base: Box::new(DataType::U8.into()), size: s.len() + 1 },
+            Self::Array(t, vals) => Ok(Type::Array { base: Box::new(t.clone()), size: vals.len() }),
+            Self::Text(s) => Ok(Type::Array { base: Box::new(DataType::U8.into()), size: s.len() + 1 }),
         }
     }
 
@@ -89,20 +88,20 @@ impl VariableInitializer {
 
 #[derive(Debug, Clone)]
 pub struct LocalVariable {
-    var_type: SpType,
+    var_type: Type,
     base_offset: i32,
     init: VariableInitializer,
 }
 
 impl Expression for LocalVariable {
-    fn get_type(&self) -> SpType {
-        self.var_type.clone()
+    fn get_type(&self) -> Result<Type, TypeError> {
+        Ok(self.var_type.clone())
     }
 
-    fn load_to(&self, reg: Register, _spare: Register, _state: &mut CodegenState) -> Result<Vec<AssemblerToken>, ExpressionError> {
-        let base_type = self.get_type().base_primitive()?;
+    fn load_to(&self, reg: Register, _spare: Register, _state: &mut AsmGenstate) -> Result<Vec<AssemblerToken>, ExpressionError> {
+        let base_type = self.get_type()?.base_primitive()?;
 
-        let mut res = self.load_address(reg);
+        let mut res = self.load_address(reg)?;
         res.push(AssemblerToken::OperationLiteral(Box::new(OpLd::new(
             ArgumentType::new(reg, base_type),
             reg.into(),
@@ -110,11 +109,9 @@ impl Expression for LocalVariable {
 
         Ok(res)
     }
-}
 
-impl Addressable for LocalVariable {
-    fn load_address(&self, reg: Register) -> Vec<AssemblerToken> {
-        vec![
+    fn load_address(&self, reg: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
+        Ok(vec![
             AssemblerToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
                 reg,
                 jib::cpu::DataType::U32,
@@ -125,11 +122,9 @@ impl Addressable for LocalVariable {
                 reg.into(),
                 Register::ArgumentBase.into(),
             ))),
-        ]
+        ])
     }
 }
-
-impl ExpressionLValue for LocalVariable {}
 
 impl Variable for LocalVariable {
     fn init(&self) -> Result<Vec<AssemblerToken>, VariableError> {
@@ -139,18 +134,18 @@ impl Variable for LocalVariable {
 
 #[derive(Debug, Clone)]
 pub struct GlobalVariable {
-    var_type: SpType,
+    var_type: Type,
     var_label: String,
 }
 
 impl Expression for GlobalVariable {
-    fn get_type(&self) -> SpType {
-        self.var_type.clone()
+    fn get_type(&self) -> Result<Type, TypeError> {
+        Ok(self.var_type.clone())
     }
 
-    fn load_to(&self, reg: Register, _spare: Register, _state: &mut CodegenState,) -> Result<Vec<AssemblerToken>, ExpressionError> {
+    fn load_to(&self, reg: Register, _spare: Register, _state: &mut AsmGenstate,) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let res = self
-            .load_address(reg)
+            .load_address(reg)?
             .into_iter()
             .chain([AssemblerToken::OperationLiteral(Box::new(OpLd::new(
                 ArgumentType::new(reg, jib::cpu::DataType::U32),
@@ -159,21 +154,17 @@ impl Expression for GlobalVariable {
             .collect();
         Ok(res)
     }
-}
 
-impl Addressable for GlobalVariable {
-    fn load_address(&self, reg: Register) -> Vec<AssemblerToken> {
-        vec![
+    fn load_address(&self, reg: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
+        Ok(vec![
             AssemblerToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
                 reg,
                 jib::cpu::DataType::U32,
             )))),
             AssemblerToken::LoadLoc(self.var_label.clone()),
-        ]
+        ])
     }
 }
-
-impl ExpressionLValue for GlobalVariable {}
 
 impl Variable for GlobalVariable {
     fn init(&self) -> Result<Vec<AssemblerToken>, VariableError> {

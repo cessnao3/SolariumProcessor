@@ -1,40 +1,43 @@
 use jasm::{
     argument::ArgumentType,
     instructions::{
-        OpAdd, OpBand, OpBnot, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpConv, OpDiv, OpJmp,
-        OpJmpri, OpLdi, OpLdn, OpMul, OpNeg, OpNot, OpRem, OpSub, OpTnz, OpTz,
+        OpAdd, OpBand, OpBnot, OpBor, OpBshl, OpBshr, OpBxor, OpConv, OpDiv, OpJmp, OpJmpri, OpLd,
+        OpLdi, OpLdn, OpMul, OpNeg, OpNot, OpRem, OpSub, OpTnz, OpTz,
     },
     AssemblerToken, FromLiteral,
 };
 use jib::cpu::{DataType, Register};
 
-use crate::types::{SpType, SpTypeError};
+use crate::types::{Type, TypeError};
 
-use super::{addressable::Addressable, CodegenState};
+use super::AsmGenstate;
 
 #[derive(Debug, Clone)]
 pub enum ExpressionError {
-    TypeError(SpTypeError),
+    TypeError(TypeError),
+    NotAddressable,
 }
 
-impl From<SpTypeError> for ExpressionError {
-    fn from(value: SpTypeError) -> Self {
+impl From<TypeError> for ExpressionError {
+    fn from(value: TypeError) -> Self {
         Self::TypeError(value)
     }
 }
 
 pub trait Expression {
-    fn get_type(&self) -> SpType;
+    fn get_type(&self) -> Result<Type, TypeError>;
 
     fn load_to(
         &self,
         reg: Register,
         spare: Register,
-        state: &mut CodegenState,
+        state: &mut AsmGenstate,
     ) -> Result<Vec<AssemblerToken>, ExpressionError>;
-}
 
-pub trait ExpressionLValue: Expression + Addressable {}
+    fn load_address(&self, reg: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
+        Err(ExpressionError::NotAddressable)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -92,37 +95,37 @@ impl From<u8> for Literal {
 }
 
 impl Expression for Literal {
-    fn get_type(&self) -> SpType {
+    fn get_type(&self) -> Result<Type, TypeError> {
         let init = match self {
-            Self::U8(_) => SpType::Primitive { base: DataType::U8 },
-            Self::I8(_) => SpType::Primitive { base: DataType::I8 },
-            Self::U16(_) => SpType::Primitive {
+            Self::U8(_) => Type::Primitive { base: DataType::U8 },
+            Self::I8(_) => Type::Primitive { base: DataType::I8 },
+            Self::U16(_) => Type::Primitive {
                 base: DataType::U16,
             },
-            Self::I16(_) => SpType::Primitive {
+            Self::I16(_) => Type::Primitive {
                 base: DataType::I16,
             },
-            Self::U32(_) => SpType::Primitive {
+            Self::U32(_) => Type::Primitive {
                 base: DataType::U32,
             },
-            Self::I32(_) => SpType::Primitive {
+            Self::I32(_) => Type::Primitive {
                 base: DataType::I32,
             },
-            Self::F32(_) => SpType::Primitive {
+            Self::F32(_) => Type::Primitive {
                 base: DataType::F32,
             },
         };
 
-        SpType::Constant {
+        Ok(Type::Constant {
             base: Box::new(init),
-        }
+        })
     }
 
     fn load_to(
         &self,
         reg: Register,
         _spare: Register,
-        _state: &mut CodegenState,
+        _state: &mut AsmGenstate,
     ) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let (lit_token, lit_type) = match self {
             Self::U8(val) => (
@@ -196,9 +199,12 @@ impl BinaryExpression {
         operator: BinaryOperator,
         lhs: Box<dyn Expression>,
         rhs: Box<dyn Expression>,
-    ) -> Result<Self, SpTypeError> {
-        if lhs.get_type() != rhs.get_type() {
-            Err(SpTypeError::TypeMismatch(lhs.get_type(), rhs.get_type()))
+    ) -> Result<Self, TypeError> {
+        let tl = lhs.get_type()?;
+        let tr = rhs.get_type()?;
+
+        if tl != tr {
+            Err(TypeError::TypeMismatch(tl, tr))
         } else {
             Ok(Self { lhs, rhs, operator })
         }
@@ -206,7 +212,7 @@ impl BinaryExpression {
 }
 
 impl Expression for BinaryExpression {
-    fn get_type(&self) -> SpType {
+    fn get_type(&self) -> Result<Type, TypeError> {
         self.lhs.get_type()
     }
 
@@ -214,14 +220,14 @@ impl Expression for BinaryExpression {
         &self,
         reg: Register,
         spare: Register,
-        state: &mut CodegenState,
+        state: &mut AsmGenstate,
     ) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let mut res = self.lhs.load_to(reg, spare, state)?;
 
         let load_val_b = self.rhs.load_to(state.temporary_register(), spare, state)?;
         let mut uses_val_b = true;
 
-        let reg_type = ArgumentType::new(reg, self.lhs.get_type().base_primitive()?);
+        let reg_type = ArgumentType::new(reg, self.lhs.get_type()?.base_primitive()?);
         let test_code = match self.operator {
             BinaryOperator::Add => {
                 vec![AssemblerToken::OperationLiteral(Box::new(OpAdd::new(
@@ -348,6 +354,8 @@ pub enum UnaryOperator {
     Negative,
     Not,
     BitwiseNot,
+    AddressOf,
+    Dereference,
 }
 
 pub struct UnaryExpression {
@@ -356,24 +364,33 @@ pub struct UnaryExpression {
 }
 
 impl UnaryExpression {
-    pub fn new(operator: UnaryOperator, expr: Box<dyn Expression>) -> Result<Self, SpTypeError> {
+    pub fn new(operator: UnaryOperator, expr: Box<dyn Expression>) -> Result<Self, TypeError> {
         Ok(Self { expr, operator })
     }
 }
 
 impl Expression for UnaryExpression {
-    fn get_type(&self) -> SpType {
-        self.expr.get_type()
+    fn get_type(&self) -> Result<Type, TypeError> {
+        match self.operator {
+            UnaryOperator::AddressOf => Ok(Type::Pointer {
+                base: Box::new(self.expr.get_type()?),
+            }),
+            UnaryOperator::Dereference => match self.expr.get_type()? {
+                Type::Pointer { base } => Ok(*base.clone()),
+                t => Err(TypeError::CannotDereference(t)),
+            },
+            _ => self.expr.get_type(),
+        }
     }
 
     fn load_to(
         &self,
         reg: Register,
         spare: Register,
-        state: &mut CodegenState,
+        state: &mut AsmGenstate,
     ) -> Result<Vec<AssemblerToken>, ExpressionError> {
         let mut res = self.expr.load_to(reg, spare, state)?;
-        let reg_type = ArgumentType::new(reg, self.expr.get_type().base_primitive()?);
+        let reg_type = ArgumentType::new(reg, self.get_type()?.base_primitive()?);
         match self.operator {
             UnaryOperator::Positive => (),
             UnaryOperator::Negative => {
@@ -394,28 +411,48 @@ impl Expression for UnaryExpression {
                     reg.into(),
                 ))));
             }
+            UnaryOperator::AddressOf => {
+                res.extend(self.expr.load_address(reg)?);
+            }
+            UnaryOperator::Dereference => {
+                res.extend(self.expr.load_address(reg)?);
+                res.push(AssemblerToken::OperationLiteral(Box::new(OpLd::new(
+                    reg_type,
+                    reg.into(),
+                ))));
+            }
         }
         Ok(res)
+    }
+
+    fn load_address(&self, reg: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
+        match self.operator {
+            UnaryOperator::Dereference => match self.expr.get_type()? {
+                Type::Pointer { .. } => self.expr.load_address(reg),
+                _ => Err(ExpressionError::NotAddressable),
+            },
+            _ => Err(ExpressionError::NotAddressable),
+        }
     }
 }
 
 pub struct AsExpression {
     expr: Box<dyn Expression>,
-    new_type: Box<SpType>,
+    new_type: Box<Type>,
 }
 
 impl Expression for AsExpression {
-    fn get_type(&self) -> SpType {
-        self.new_type.as_ref().clone()
+    fn get_type(&self) -> Result<Type, TypeError> {
+        Ok(self.new_type.as_ref().clone())
     }
 
     fn load_to(
         &self,
         reg: Register,
         spare: Register,
-        state: &mut CodegenState,
+        state: &mut AsmGenstate,
     ) -> Result<Vec<AssemblerToken>, ExpressionError> {
-        let from_type = self.expr.get_type().base_primitive()?;
+        let from_type = self.expr.get_type()?.base_primitive()?;
         let to_type = self.new_type.base_primitive()?;
 
         let mut res = self.expr.load_to(reg, spare, state)?;
