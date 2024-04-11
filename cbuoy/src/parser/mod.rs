@@ -50,9 +50,29 @@ fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> 
 }
 
 fn parse_fn_statement(
-    _tokens: &mut TokenIter,
+    tokens: &mut TokenIter,
     _state: &mut ParserState,
 ) -> Result<SpcFunction, ParseError> {
+    // Get function name
+    let name_tok = tokens.expect()?;
+    let name = name_tok.get_value();
+    if !is_identifier(name) {
+        return Err(ParseError::new_tok(name_tok, "fn name must be an identifier".into()));
+    }
+
+    // Get Return Type
+    let ret_type_tok = tokens.expect()?;
+    let ret_type = _state.compiler.types.parse_type(ret_type_tok.get_value())?;
+
+    // Expect a parenthesis
+    tokens.expect_with_value("(")?;
+
+    let mut arg_types = Vec::new();
+    while !tokens.peek_expect(")") {
+        let name = tokens.expect()?;
+        tokens.expect_with_value(":")?;
+    }
+
     panic!("not implemented");
 }
 
@@ -274,12 +294,8 @@ fn parse_expression(
     if first.get_value() == "(" {
         let expr = parse_base_expression(tokens, state);
 
-        if let Some(t) = tokens.next() {
-            if t.get_value() == ")" {
-                expr
-            } else {
-                Err(ParseError::new_tok(t, "expected ending parenthesis".into()))
-            }
+        if let Ok(_) = tokens.expect_with_value(")") {
+            expr
         } else {
             Err(ParseError::new("expected ending parenthesis".into()))
         }
@@ -302,7 +318,7 @@ fn parse_expression(
             ))
         }
     } else if let Ok(lit) = parse_literal(&first) {
-        panic!("not implemented");
+        Ok(Box::new(lit))
     } else {
         Err(ParseError::new_tok(
             first,
@@ -668,8 +684,27 @@ mod tests {
         This is in a comment, but it really isn't!
         */";
 
-        if let Err(e) = parse_with_state(comments, &mut ParserState::new()) {
-            panic!("{e}");
-        }
+        parse_with_state(comments, &mut ParserState::new()).unwrap();
+    }
+
+    #[test]
+    fn test_base_variables()
+    {
+        let code = "def var_name: i32;
+        def array_name: [5]i32;
+        def int_test: u16 = 3u16;
+        def ptr_test: *u16 = 6u32;
+        def void_test: *void = 0u32;
+        def void_er: void;";
+
+        parse_with_state(code, &mut ParserState::new()).unwrap();
+    }
+
+    #[test]
+    fn test_function_pointer()
+    {
+        let code = "def func_ptr: ^u16(*u8, *u16, *u32) = 3049u16; def single_ptr: ^void(); def testPtr: ^*i16();";
+
+        parse_with_state(code, &mut ParserState::new()).unwrap();
     }
 }

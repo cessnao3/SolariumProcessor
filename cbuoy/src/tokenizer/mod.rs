@@ -60,11 +60,19 @@ impl TokenIter {
         }
     }
 
-    pub fn peek(&mut self) -> Option<Token> {
+    pub fn peek(&self) -> Option<Token> {
         if self.ind < self.tokens.len() {
             Some(self.tokens[self.ind].clone())
         } else {
             None
+        }
+    }
+
+    pub fn peek_expect(&self, s: &str) -> bool {
+        if let Some(t) = self.peek() {
+            t.get_value() == s
+        } else {
+            false
         }
     }
 
@@ -76,14 +84,14 @@ impl TokenIter {
         }
     }
 
-    pub fn expect_with_value(&mut self, tok: &str) -> Result<(), TokenIterError> {
+    pub fn expect_with_value(&mut self, tok: &str) -> Result<Token, TokenIterError> {
         let val = self.expect()?;
 
         if val.get_value() != tok {
             return Err(TokenIterError::TokenMismatch(val, tok.to_string()));
         }
 
-        Ok(())
+        Ok(val)
     }
 }
 

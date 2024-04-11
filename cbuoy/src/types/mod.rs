@@ -16,6 +16,7 @@ pub enum TypeError {
     FieldNotFound(String, StructDef),
     TypeMismatch(Type, Type),
     CannotDereference(Type),
+    ParenthesisError,
 }
 
 impl std::fmt::Display for TypeError {
@@ -39,6 +40,7 @@ impl std::fmt::Display for TypeError {
             }
             Self::TypeMismatch(a, b) => write!(f, "types {a} and {b} do not match"),
             Self::CannotDereference(t) => write!(f, "cannot dereference type '{t}'"),
+            Self::ParenthesisError => write!(f, "parenthesis error"),
         }
     }
 }
@@ -212,6 +214,38 @@ impl TypeDict {
                     })
                 } else {
                     Err(TypeError::ArrayTypeError(t.into()))
+                }
+            }
+            Some('^') => {
+                if let Some(i1) = t.find('(') {
+                    if let Some(i2) = t.find(')') {
+                        if i1 >= i2 || i2 + 1 != t.len() {
+                            return Err(TypeError::ParenthesisError);
+                        } else {
+                            let ret_str = &t[1..i1];
+                            let arg_type_str = &t[(i1+1)..i2].trim();
+                            let base_type = self.parse_type(ret_str)?;
+
+                            let arg_types = if arg_type_str.contains(',')
+                            {
+                                arg_type_str.split(',').map(|s| self.parse_type(s.trim())).collect::<Result<Vec<_>, _>>()?
+                            }
+                            else if arg_type_str.is_empty()
+                            {
+                                Vec::new()
+                            }
+                            else
+                            {
+                                vec![self.parse_type(arg_type_str)?]
+                            };
+
+                            return Ok(Type::Function { ret: Box::new(base_type), args: arg_types });
+                        }
+                    } else {
+                        return Err(TypeError::ParenthesisError);
+                    }
+                } else {
+                    return Err(TypeError::ParenthesisError);
                 }
             }
             Some(_) => {
