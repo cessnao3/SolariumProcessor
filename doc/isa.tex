@@ -464,7 +464,7 @@ Note that, in this case, both functions and variables share the same namespace. 
     & \textlangle BaseStatement\textrangle \\
     BaseStatement & $\rightarrow$ \\
     & \textlangle BaseStatement\textrangle \textlangle BaseStatement\textrangle \\
-    & func \texttt{FunctionName}(\texttt{Variable}[, \texttt{Variable}\dots]) \{ \textlangle StatementList\textrangle \} \\
+    & fn \texttt{FunctionName}(\texttt{Variable}[, \texttt{Variable}\dots]) \{ \textlangle StatementList\textrangle \} \\
     & static VarType \texttt{Variable}[ = \textlangle BaseExpression\textrangle]; \\
     Statement & $\rightarrow$ \\
     & \textlangle VarType\textrangle \texttt{Variable}[ = \textlangle BaseExpression\textrangle]; \\
@@ -486,7 +486,6 @@ Note that, in this case, both functions and variables share the same namespace. 
     & \texttt{Variable} \\
     & \textlangle Literal\textrangle \\
     & \textlangle UnaryOp\textrangle \textlangle Expression\textrangle \\
-
     & \texttt{FunctionName}([\textlangle BaseExpression\textrangle[, \textlangle BaseExpression\textrangle,\dots]]) \\
     & (\textlangle BaseExpression\textrangle) \\
     BinaryOp & $\rightarrow$  \\
@@ -499,7 +498,6 @@ Note that, in this case, both functions and variables share the same namespace. 
     & [int, uint] \\
 \end{tabular}
 \end{table}
-
 
 \pagebreak
 
