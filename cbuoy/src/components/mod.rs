@@ -109,7 +109,9 @@ pub trait CodeComponent {
 
 pub trait BaseStatement {}
 
-pub trait Statement {}
+pub trait Statement {
+    fn stack_size(&self) -> usize;
+}
 
 pub struct DefinitionStatement {
     var_type: Type,
@@ -131,21 +133,51 @@ impl DefinitionStatement {
     }
 }
 
-impl Statement for DefinitionStatement {}
+impl Statement for DefinitionStatement {
+    fn stack_size(&self) -> usize {
+        panic!("not implemented!")
+    }
+}
 
 impl BaseStatement for DefinitionStatement {}
+
+pub struct ExpressionStatement {
+    expr: Box<dyn expression::Expression>,
+}
+
+impl ExpressionStatement {
+    pub fn new(expr: Box<dyn expression::Expression>) -> Self {
+        Self { expr }
+    }
+}
+
+impl Statement for ExpressionStatement {
+    fn stack_size(&self) -> usize {
+        0
+    }
+}
 
 pub trait Function: Expression {
     fn get_input_parameters(&self) -> Vec<(String, Type)>;
 }
 
-pub struct SpcFunction {
-    params: Vec<(String, Type)>,
-    return_type: Type,
+pub struct CodeFunction {
+    parameters: Vec<(String, Type)>,
+    return_type: Option<Type>,
     statements: Vec<Box<dyn Statement>>,
 }
 
-impl BaseStatement for SpcFunction {}
+impl CodeFunction {
+    pub fn new(parameters: Vec<(String, Type)>, return_type: Option<Type>, statements: Vec<Box<dyn Statement>>) -> Self {
+        Self {
+            parameters,
+            return_type,
+            statements
+        }
+    }
+}
+
+impl BaseStatement for CodeFunction {}
 
 pub struct AsmFunction {
     params: Vec<(String, Type)>,

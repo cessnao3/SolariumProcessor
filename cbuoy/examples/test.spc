@@ -20,7 +20,7 @@ asmfn asm_func(a, b, c): ret_type
     asm
 }
 
-/* asmfn asm_func(a, b, c): ret_type
+/* asmfn asm_func(a, b, c) ret_type
 {
     asm1
     asm1
@@ -28,9 +28,9 @@ asmfn asm_func(a, b, c): ret_type
 }
 */
 
-fn func_name_ptr(a, b): ret_type = 3943;
+fn func_name_ptr(a, b) ret_type = 3943;
 
-fn func_name(a: u16, b: u32, c: u32): ret_type
+fn func_name(a: u16, b: u32, c: u32) ret_type
 {
     def var_name: var_type;
     var_name = expression;

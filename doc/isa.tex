@@ -467,7 +467,7 @@ Note that, in this case, both functions and variables share the same namespace. 
     & fn \texttt{FunctionName}(\texttt{Variable}[, \texttt{Variable}\dots]) \{ \textlangle StatementList\textrangle \} \\
     & static VarType \texttt{Variable}[ = \textlangle BaseExpression\textrangle]; \\
     Statement & $\rightarrow$ \\
-    & \textlangle VarType\textrangle \texttt{Variable}[ = \textlangle BaseExpression\textrangle]; \\
+    & def \texttt{Variable}: \textlangle VarType\textrangle [ = \textlangle BaseExpression\textrangle]; \\
     & return; \\
     & return \textlangle BaseExpression\textrangle; \\
     & \textlangle BaseExpression\textrangle; \\

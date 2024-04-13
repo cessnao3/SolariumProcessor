@@ -7,7 +7,7 @@ use regex::Regex;
 
 use crate::components::expression::{Expression, Literal, UnaryExpression, UnaryOperator};
 use crate::components::{
-    AsmFunction, BaseStatement, CompilerState, DefinitionStatement, SpcFunction,
+    AsmFunction, BaseStatement, CodeFunction, CompilerState, DefinitionStatement, ExpressionStatement, Statement
 };
 use crate::tokenizer::{tokenize, Token, TokenIter, TokenIterError, TokenizeError};
 use crate::types::{StructDef, TypeError};
@@ -51,8 +51,8 @@ fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> 
 
 fn parse_fn_statement(
     tokens: &mut TokenIter,
-    _state: &mut ParserState,
-) -> Result<SpcFunction, ParseError> {
+    state: &mut ParserState,
+) -> Result<CodeFunction, ParseError> {
     // Get function name
     let name_tok = tokens.expect()?;
     let name = name_tok.get_value();
@@ -60,20 +60,51 @@ fn parse_fn_statement(
         return Err(ParseError::new_tok(name_tok, "fn name must be an identifier".into()));
     }
 
-    // Get Return Type
-    let ret_type_tok = tokens.expect()?;
-    let ret_type = _state.compiler.types.parse_type(ret_type_tok.get_value())?;
-
     // Expect a parenthesis
-    tokens.expect_with_value("(")?;
+    tokens.expect_value("(")?;
 
-    let mut arg_types = Vec::new();
+    let mut parameters = Vec::new();
     while !tokens.peek_expect(")") {
         let name = tokens.expect()?;
-        tokens.expect_with_value(":")?;
+        if !is_identifier(name.get_value()) {
+            return Err(ParseError::new_tok(name, "argument name is not a valid identifier".into()));
+        }
+
+        tokens.expect_value(":")?;
+
+        let mut type_tokens = Vec::new();
+        while !tokens.peek_expect(",") && !tokens.peek_expect(")")
+        {
+            type_tokens.push(tokens.expect()?);
+        }
+
+        let arg_type = state.compiler.types.parse_type(&type_tokens.iter().map(|t| t.get_value()).collect::<Vec<_>>().join(" "))?;
+        parameters.push((name.get_value().to_owned(), arg_type));
     }
 
-    panic!("not implemented");
+    // Get Return Type
+    let mut ret_tokens = Vec::new();
+
+    while !tokens.peek_expect("{") {
+        ret_tokens.push(tokens.expect()?);
+    }
+
+    let ret_type = if ret_tokens.is_empty() {
+        None
+    } else {
+        Some(state.compiler.types.parse_type(&ret_tokens.iter().map(|t| t.get_value()).collect::<Vec<_>>().join(" "))?)
+    };
+
+    tokens.expect_value("{");
+
+    let mut statements = Vec::new();
+    while !tokens.peek_expect("}"){
+        statements.push(parse_statement(tokens, state)?);
+    }
+
+    tokens.expect_value("}");
+
+    Ok(CodeFunction::new(parameters, ret_type, statements))
 }
 
 fn parse_asmfn_statement(
@@ -133,7 +164,7 @@ fn parse_struct_statement(
         }
 
         let field_name = tokens.expect()?;
-        tokens.expect_with_value(":")?;
+        tokens.expect_value(":")?;
 
         let mut type_vec = vec![tokens.expect()?];
 
@@ -178,7 +209,7 @@ fn parse_struct_statement(
         }
     }
 
-    tokens.expect_with_value("}")?;
+    tokens.expect_value("}")?;
 
     if fields.is_empty() {
         return Err(ParseError::new_tok(
@@ -207,13 +238,18 @@ fn parse_struct_statement(
 
 fn parse_base_expression(
     tokens: &mut TokenIter,
-    state: &mut ParserState,
+    _state: &mut ParserState,
 ) -> Result<Box<dyn Expression>, ParseError> {
     if let Some(t) = tokens.next() {
         panic!("not implemented");
     } else {
         Err(ParseError::new("no tokens provided to expression!".into()))
     }
+}
+
+fn parse_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Result<Box<dyn Statement>, ParseError> {
+    // TODO - While, return, etc...
+    Ok(Box::new(ExpressionStatement::new(parse_base_expression(tokens, state)?)))
 }
 
 static IDENTIFIER_REGEX: OnceLock<Regex> = OnceLock::new();
@@ -294,7 +330,7 @@ fn parse_expression(
     if first.get_value() == "(" {
         let expr = parse_base_expression(tokens, state);
 
-        if let Ok(_) = tokens.expect_with_value(")") {
+        if let Ok(_) = tokens.expect_value(")") {
             expr
         } else {
             Err(ParseError::new("expected ending parenthesis".into()))
@@ -385,7 +421,7 @@ fn parse_def_statement(
         }
     }
 
-    tokens.expect_with_value(";")?;
+    tokens.expect_value(";")?;
 
     // TODO - This works for base statements, but not anything else :-(
     let mut def_statement = DefinitionStatement::new(&name, type_val);

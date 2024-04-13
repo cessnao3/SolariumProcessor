@@ -84,7 +84,7 @@ impl TokenIter {
         }
     }
 
-    pub fn expect_with_value(&mut self, tok: &str) -> Result<Token, TokenIterError> {
+    pub fn expect_value(&mut self, tok: &str) -> Result<Token, TokenIterError> {
         let val = self.expect()?;
 
         if val.get_value() != tok {

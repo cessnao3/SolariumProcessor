@@ -17,6 +17,7 @@ pub enum TypeError {
     TypeMismatch(Type, Type),
     CannotDereference(Type),
     ParenthesisError,
+    UnexpectedCharacters(String),
 }
 
 impl std::fmt::Display for TypeError {
@@ -41,6 +42,7 @@ impl std::fmt::Display for TypeError {
             Self::TypeMismatch(a, b) => write!(f, "types {a} and {b} do not match"),
             Self::CannotDereference(t) => write!(f, "cannot dereference type '{t}'"),
             Self::ParenthesisError => write!(f, "parenthesis error"),
+            Self::UnexpectedCharacters(s) => write!(f, "unexpected characters \"{s}\""),
         }
     }
 }
@@ -86,7 +88,7 @@ pub enum Type {
     Struct(StructDef),
     Pointer { base: Box<Type> },
     Constant { base: Box<Type> },
-    Function { ret: Box<Type>, args: Vec<Type> },
+    Function { ret: Option<Box<Type>>, args: Vec<Type> },
 }
 
 impl Type {
@@ -172,11 +174,12 @@ impl std::fmt::Display for Type {
             Self::Constant { base, .. } => write!(f, "${base}"),
             Self::Function { ret, args } => write!(
                 f,
-                "^{ret}({})",
+                "^({}){}",
                 args.iter()
                     .map(|t| format!("{t}"))
                     .reduce(|a, b| format!("{a}, {b}"))
-                    .unwrap_or(String::new())
+                    .unwrap_or(String::new()),
+                ret.as_ref().map(|r| format!(" {r}")).unwrap_or("".into())
             ),
             Self::Alias { name, base } => write!(f, "{name} /* {base} */"),
         }
@@ -218,28 +221,38 @@ impl TypeDict {
             }
             Some('^') => {
                 if let Some(i1) = t.find('(') {
+                    let space_vals = t[1..i1].trim();
+                    if !space_vals.is_empty() {
+                        return Err(TypeError::UnexpectedCharacters(space_vals.into()));
+                    }
+
                     if let Some(i2) = t.find(')') {
                         if i1 >= i2 || i2 + 1 != t.len() {
                             return Err(TypeError::ParenthesisError);
                         } else {
-                            let ret_str = &t[1..i1];
-                            let arg_type_str = &t[(i1+1)..i2].trim();
-                            let base_type = self.parse_type(ret_str)?;
+                            let ret_str = t[(i2 + 1)..].trim();
+                            let arg_type_str = &t[(i1 + 1)..i2].trim();
+                            let ret_type = if ret_str.is_empty() || ret_str == "void" {
+                                None
+                            } else {
+                                Some(self.parse_type(ret_str)?)
+                            };
 
-                            let arg_types = if arg_type_str.contains(',')
-                            {
-                                arg_type_str.split(',').map(|s| self.parse_type(s.trim())).collect::<Result<Vec<_>, _>>()?
-                            }
-                            else if arg_type_str.is_empty()
-                            {
+                            let arg_types = if arg_type_str.contains(',') {
+                                arg_type_str
+                                    .split(',')
+                                    .map(|s| self.parse_type(s.trim()))
+                                    .collect::<Result<Vec<_>, _>>()?
+                            } else if arg_type_str.is_empty() {
                                 Vec::new()
-                            }
-                            else
-                            {
+                            } else {
                                 vec![self.parse_type(arg_type_str)?]
                             };
 
-                            return Ok(Type::Function { ret: Box::new(base_type), args: arg_types });
+                            return Ok(Type::Function {
+                                ret: ret_type.map(|t| Box::new(t)),
+                                args: arg_types,
+                            });
                         }
                     } else {
                         return Err(TypeError::ParenthesisError);
