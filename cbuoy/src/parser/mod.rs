@@ -5,9 +5,12 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
-use crate::components::expression::{Expression, Literal, UnaryExpression, UnaryOperator};
+use crate::components::expression::{
+    BinaryExpression, BinaryOperator, Expression, Literal, UnaryExpression, UnaryOperator,
+};
 use crate::components::{
-    AsmFunction, BaseStatement, CodeFunction, CompilerState, DefinitionStatement, ExpressionStatement, Statement
+    AsmFunction, BaseStatement, CodeFunction, CompilerState, DefinitionStatement,
+    ExpressionStatement, Statement,
 };
 use crate::tokenizer::{tokenize, Token, TokenIter, TokenIterError, TokenizeError};
 use crate::types::{StructDef, TypeError};
@@ -57,7 +60,10 @@ fn parse_fn_statement(
     let name_tok = tokens.expect()?;
     let name = name_tok.get_value();
     if !is_identifier(name) {
-        return Err(ParseError::new_tok(name_tok, "fn name must be an identifier".into()));
+        return Err(ParseError::new_tok(
+            name_tok,
+            "fn name must be an identifier".into(),
+        ));
     }
 
     // Expect a parenthesis
@@ -67,18 +73,26 @@ fn parse_fn_statement(
     while !tokens.peek_expect(")") {
         let name = tokens.expect()?;
         if !is_identifier(name.get_value()) {
-            return Err(ParseError::new_tok(name, "argument name is not a valid identifier".into()));
+            return Err(ParseError::new_tok(
+                name,
+                "argument name is not a valid identifier".into(),
+            ));
         }
 
         tokens.expect_value(":")?;
 
         let mut type_tokens = Vec::new();
-        while !tokens.peek_expect(",") && !tokens.peek_expect(")")
-        {
+        while !tokens.peek_expect(",") && !tokens.peek_expect(")") {
             type_tokens.push(tokens.expect()?);
         }
 
-        let arg_type = state.compiler.types.parse_type(&type_tokens.iter().map(|t| t.get_value()).collect::<Vec<_>>().join(" "))?;
+        let arg_type = state.compiler.types.parse_type(
+            &type_tokens
+                .iter()
+                .map(|t| t.get_value())
+                .collect::<Vec<_>>()
+                .join(" "),
+        )?;
         parameters.push((name.get_value().to_owned(), arg_type));
     }
 
@@ -92,13 +106,21 @@ fn parse_fn_statement(
     let ret_type = if ret_tokens.is_empty() {
         None
     } else {
-        Some(state.compiler.types.parse_type(&ret_tokens.iter().map(|t| t.get_value()).collect::<Vec<_>>().join(" "))?)
+        Some(
+            state.compiler.types.parse_type(
+                &ret_tokens
+                    .iter()
+                    .map(|t| t.get_value())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            )?,
+        )
     };
 
     tokens.expect_value("{");
 
     let mut statements = Vec::new();
-    while !tokens.peek_expect("}"){
+    while !tokens.peek_expect("}") {
         statements.push(parse_statement(tokens, state)?);
     }
 
@@ -238,18 +260,100 @@ fn parse_struct_statement(
 
 fn parse_base_expression(
     tokens: &mut TokenIter,
-    _state: &mut ParserState,
+    state: &mut ParserState,
 ) -> Result<Box<dyn Expression>, ParseError> {
-    if let Some(t) = tokens.next() {
-        panic!("not implemented");
-    } else {
-        Err(ParseError::new("no tokens provided to expression!".into()))
+    let mut binary_map = HashMap::new();
+    binary_map.insert("+", BinaryOperator::Add);
+    binary_map.insert("-", BinaryOperator::Sub);
+    binary_map.insert("*", BinaryOperator::Mul);
+    binary_map.insert("/", BinaryOperator::Div);
+    binary_map.insert("%", BinaryOperator::Rem);
+    binary_map.insert("<<", BinaryOperator::Bshl);
+    binary_map.insert(">>", BinaryOperator::Bshr);
+    binary_map.insert("&", BinaryOperator::Band);
+    binary_map.insert("|", BinaryOperator::Bor);
+    binary_map.insert("^", BinaryOperator::Bxor);
+    binary_map.insert("&&", BinaryOperator::Land);
+    binary_map.insert("||", BinaryOperator::Lor);
+
+    let init_expr = parse_expression(tokens, state)?;
+
+    if let Some(pt) = tokens.peek() {
+        let pt_val = pt.get_value();
+        if pt_val == "=" {
+            tokens.expect()?;
+            panic!("Assignment not yet supported :-(");
+        } else if let Some(op) = binary_map.get(pt_val) {
+            tokens.expect()?;
+            let right_expr = parse_expression(tokens, state)?;
+            return Ok(Box::new(BinaryExpression::new(*op, init_expr, right_expr)?));
+        }
     }
+
+    Ok(init_expr)
 }
 
-fn parse_statement(tokens: &mut TokenIter, state: &mut ParserState) -> Result<Box<dyn Statement>, ParseError> {
-    // TODO - While, return, etc...
-    Ok(Box::new(ExpressionStatement::new(parse_base_expression(tokens, state)?)))
+fn parse_statement(
+    tokens: &mut TokenIter,
+    state: &mut ParserState,
+) -> Result<Box<dyn Statement>, ParseError> {
+    if let Some(pt) = tokens.peek() {
+        let pt_val = pt.get_value();
+
+        if pt_val == "while" {
+            tokens.expect()?;
+            panic!("while statement not yet supported");
+        } else if pt_val == "if" {
+            tokens.expect()?;
+            panic!("if statement not yet supported");
+        } else if pt_val == "def" {
+            tokens.expect()?;
+            let var_name = tokens.expect()?;
+            tokens.expect_value(":")?;
+
+            let mut type_tokens = Vec::new();
+            while !tokens.peek_expect("=") && !tokens.peek_expect(";") {
+                type_tokens.push(tokens.expect()?.get_value().to_owned());
+            }
+
+            let var_type = state.compiler.types.parse_type(&type_tokens.join(" "))?;
+
+            let mut spacer = tokens.expect()?;
+            let var_expr = if spacer.get_value() == "=" {
+                let expr = parse_base_expression(tokens, state)?;
+                spacer = tokens.expect()?;
+                Some(expr)
+            } else {
+                None
+            };
+
+            if spacer.get_value() == ";" {
+                panic!("Create the variable defintion");
+            } else {
+                return Err(ParseError::new_tok(spacer, "unknown spacing token in variable definition".into()));
+            }
+
+        } else if pt_val == "return" {
+            tokens.expect()?;
+            if tokens.peek_expect(";") {
+                tokens.expect()?;
+                panic!("Immediate Return")
+            } else {
+                let expr = parse_base_expression(tokens, state)?;
+                tokens.expect_value(";")?;
+                panic!("Return with Value");
+            }
+        } else if pt_val == "{" {
+            tokens.expect()?;
+        }
+    }
+
+    // Default to just a base expression followed by a semicolon
+    let expr = Box::new(ExpressionStatement::new(parse_base_expression(
+        tokens, state,
+    )?));
+    tokens.expect_value(";")?;
+    Ok(expr)
 }
 
 static IDENTIFIER_REGEX: OnceLock<Regex> = OnceLock::new();
@@ -303,10 +407,14 @@ fn parse_literal(t: &Token) -> Result<Literal, ParseError> {
         }
     }
 
-    Err(ParseError::new_tok(
-        t.clone(),
-        "unable to determine appropriate literal type".into(),
-    ))
+    if let Ok(v) = t.get_value().parse::<u32>() {
+        Ok(Literal::U32(v))
+    } else {
+        Err(ParseError::new_tok(
+            t.clone(),
+            "unable to determine appropriate literal type".into(),
+        ))
+    }
 }
 
 fn parse_expression(
@@ -724,8 +832,7 @@ mod tests {
     }
 
     #[test]
-    fn test_base_variables()
-    {
+    fn test_base_variables() {
         let code = "def var_name: i32;
         def array_name: [5]i32;
         def int_test: u16 = 3u16;
@@ -737,8 +844,7 @@ mod tests {
     }
 
     #[test]
-    fn test_function_pointer()
-    {
+    fn test_function_pointer() {
         let code = "def func_ptr: ^u16(*u8, *u16, *u32) = 3049u16; def single_ptr: ^void(); def testPtr: ^*i16();";
 
         parse_with_state(code, &mut ParserState::new()).unwrap();
