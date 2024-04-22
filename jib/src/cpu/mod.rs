@@ -122,6 +122,27 @@ pub enum Interrupt {
     Hardware(u32),
 }
 
+impl std::cmp::PartialOrd for Interrupt {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl std::cmp::Ord for Interrupt {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self {
+            Interrupt::Hardware(is) => match other {
+                Interrupt::Hardware(io) => is.cmp(io),
+                Interrupt::Software(_) => std::cmp::Ordering::Less,
+            },
+            Interrupt::Software(is) => match other {
+                Interrupt::Hardware(_) => std::cmp::Ordering::Greater,
+                Interrupt::Software(io) => is.cmp(io),
+            },
+        }
+    }
+}
+
 impl fmt::Display for Interrupt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -427,11 +448,16 @@ impl Processor {
     }
 
     fn queue_interrupt(&mut self, int: Interrupt) -> Result<bool, ProcessorError> {
-        if self.interrupt_hold.is_none() {
+        if let Some(current) = self.interrupt_hold {
+            if int < current {
+                self.interrupt_hold = Some(int);
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        } else {
             self.interrupt_hold = Some(int);
             Ok(true)
-        } else {
-            Ok(false)
         }
     }
 
@@ -902,26 +928,19 @@ impl Processor {
             _ => return Err(ProcessorError::UnknownInstruction(inst)),
         };
 
-        // Define an action queue
-        let mut dev_action_queue: Vec<DeviceAction> = Vec::new();
-
-        // Check for any actions
-        for dev in self.devices.iter() {
-            if let Some(action) = dev.borrow_mut().on_step() {
-                dev_action_queue.push(action);
-            }
-        }
-
+        // Step the program counter
         if let Some(jmp_val) = inst_jump {
             self.registers
                 .set(Register::ProgramCounter, pc + jmp_val * 4)?;
         }
 
-        // Perform requested actions
-        for action in dev_action_queue {
-            match action {
-                DeviceAction::CallInterrupt(num) => {
-                    self.queue_interrupt(Interrupt::Hardware(num))?;
+        // Check for any actions
+        for dev in self.devices.clone() {
+            if let Some(action) = dev.borrow_mut().on_step() {
+                match action {
+                    DeviceAction::CallInterrupt(num) => {
+                        self.queue_interrupt(Interrupt::Hardware(num))?;
+                    }
                 }
             }
         }
