@@ -1,4 +1,3 @@
-use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::sync::OnceLock;
@@ -17,7 +16,7 @@ use crate::types::{StructDef, TypeError};
 use crate::types::{Type, TypeDict};
 
 pub fn parse(s: &str) -> Result<(), ParseError> {
-    parse_with_state(s, &mut ParserState::new())
+    parse_with_state(s, &mut ParserState::default())
 }
 
 fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> {
@@ -438,7 +437,7 @@ fn parse_expression(
     if first.get_value() == "(" {
         let expr = parse_base_expression(tokens, state);
 
-        if let Ok(_) = tokens.expect_value(")") {
+        if tokens.expect_value(")").is_ok() {
             expr
         } else {
             Err(ParseError::new("expected ending parenthesis".into()))
@@ -542,26 +541,10 @@ fn parse_def_statement(
     Ok(def_statement)
 }
 
+#[derive(Default)]
 pub struct ParserState {
     pub statements: Vec<Box<dyn BaseStatement>>,
     pub compiler: CompilerState,
-}
-
-impl ParserState {
-    pub fn new() -> Self {
-        Self {
-            ..Default::default()
-        }
-    }
-}
-
-impl Default for ParserState {
-    fn default() -> Self {
-        Self {
-            statements: Vec::new(),
-            compiler: CompilerState::default(),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -623,7 +606,7 @@ mod tests {
     #[test]
     fn test_parse_struct() {
         for use_trailing_comma in [true, false] {
-            let mut state = ParserState::new();
+            let mut state = ParserState::default();
             let expected_name = "type_name";
             let struct_string = format!(
                 "struct {expected_name}\n{{\n    var1: u16,\n    var2: i16{}\n}}",
@@ -661,7 +644,7 @@ mod tests {
 
         let mut initial_types = Vec::new();
 
-        let mut state = ParserState::new();
+        let mut state = ParserState::default();
 
         for i in 0..simple_types.len() {
             let type_name = format!("type_{i}");
@@ -725,7 +708,7 @@ mod tests {
 
     #[test]
     fn test_parse_struct_opaque() {
-        let mut state = ParserState::new();
+        let mut state = ParserState::default();
 
         let init_type_len = state.compiler.types.len();
 
@@ -773,7 +756,7 @@ mod tests {
 
     #[test]
     fn test_parse_struct_void() {
-        let mut state = ParserState::new();
+        let mut state = ParserState::default();
 
         let init_type_len = state.compiler.types.len();
 
@@ -790,7 +773,7 @@ mod tests {
 
         // This is also a comment?";
 
-        let mut state = ParserState::new();
+        let mut state = ParserState::default();
 
         if let Err(e) = parse_with_state(comments, &mut state) {
             panic!("{e}");
@@ -807,7 +790,7 @@ mod tests {
         /* And this is as well
         */";
 
-        if let Err(e) = parse_with_state(comments, &mut ParserState::new()) {
+        if let Err(e) = parse_with_state(comments, &mut ParserState::default()) {
             panic!("{e}");
         }
     }
@@ -816,7 +799,7 @@ mod tests {
     #[should_panic]
     fn test_parse_block_comment_invalid_location() {
         let comments = "*/ /* This is a block comment! */";
-        if let Err(e) = parse_with_state(comments, &mut ParserState::new()) {
+        if let Err(e) = parse_with_state(comments, &mut ParserState::default()) {
             panic!("{e}");
         }
     }
@@ -828,7 +811,7 @@ mod tests {
         This is in a comment, but it really isn't!
         */";
 
-        parse_with_state(comments, &mut ParserState::new()).unwrap();
+        parse_with_state(comments, &mut ParserState::default()).unwrap();
     }
 
     #[test]
@@ -840,13 +823,13 @@ mod tests {
         def void_test: *void = 0u32;
         def void_er: void;";
 
-        parse_with_state(code, &mut ParserState::new()).unwrap();
+        parse_with_state(code, &mut ParserState::default()).unwrap();
     }
 
     #[test]
     fn test_function_pointer() {
         let code = "def func_ptr: ^u16(*u8, *u16, *u32) = 3049u16; def single_ptr: ^void(); def testPtr: ^*i16();";
 
-        parse_with_state(code, &mut ParserState::new()).unwrap();
+        parse_with_state(code, &mut ParserState::default()).unwrap();
     }
 }
