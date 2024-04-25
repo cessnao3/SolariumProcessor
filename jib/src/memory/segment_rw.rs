@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use super::{MemorySegment, MemorySegmentError};
 
 /// Provides a read-write memory segment type

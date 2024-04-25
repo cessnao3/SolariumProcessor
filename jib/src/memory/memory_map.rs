@@ -1,6 +1,10 @@
 use super::{MemoryError, MemorySegment, MemorySegmentError};
 
-use std::{cell::RefCell, mem::size_of, rc::Rc};
+use core::cell::RefCell;
+
+use alloc::vec::Vec;
+use alloc::rc::Rc;
+use core::mem::size_of;
 
 struct SegmentData {
     base: u32,

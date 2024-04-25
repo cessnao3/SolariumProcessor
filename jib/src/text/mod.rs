@@ -1,11 +1,13 @@
+use alloc::fmt;
+
 #[derive(Copy, Clone, Debug)]
 pub enum CharacterError {
     CharacterToByte(char),
     ByteToCharacter(u8),
 }
 
-impl std::fmt::Display for CharacterError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for CharacterError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::CharacterToByte(c) => write!(f, "unable to convert {:02X} to word", *c as u8),
             Self::ByteToCharacter(b) => write!(f, "unable to convert {:02X} to character", b),

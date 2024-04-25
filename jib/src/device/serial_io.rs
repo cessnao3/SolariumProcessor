@@ -1,5 +1,5 @@
-use std::cell::RefCell;
-use std::collections::VecDeque;
+use alloc::collections::VecDeque;
+use core::cell::RefCell;
 
 use super::{ProcessorDevice, DEVICE_MEM_SIZE, DEVICE_ID_SIZE};
 

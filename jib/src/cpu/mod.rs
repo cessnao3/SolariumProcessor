@@ -2,10 +2,9 @@ mod instruction;
 mod operations;
 mod register;
 
-use core::fmt;
-use std::cell::RefCell;
-use std::hash::{Hash, Hasher};
-use std::rc::Rc;
+use alloc::{fmt, rc::Rc, vec::Vec};
+use core::cell::RefCell;
+use core::hash::{Hash, Hasher};
 
 pub use crate::cpu::instruction::{DataType, DataTypeError};
 use crate::device::{DeviceAction, ProcessorDevice};
@@ -122,21 +121,21 @@ pub enum Interrupt {
     Hardware(u32),
 }
 
-impl std::cmp::PartialOrd for Interrupt {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+impl core::cmp::PartialOrd for Interrupt {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl std::cmp::Ord for Interrupt {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+impl core::cmp::Ord for Interrupt {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         match self {
             Interrupt::Hardware(is) => match other {
                 Interrupt::Hardware(io) => is.cmp(io),
-                Interrupt::Software(_) => std::cmp::Ordering::Less,
+                Interrupt::Software(_) => core::cmp::Ordering::Less,
             },
             Interrupt::Software(is) => match other {
-                Interrupt::Hardware(_) => std::cmp::Ordering::Greater,
+                Interrupt::Hardware(_) => core::cmp::Ordering::Greater,
                 Interrupt::Software(io) => is.cmp(io),
             },
         }
@@ -168,7 +167,7 @@ pub struct Processor {
 
 impl Processor {
     /// Defines the number of bytes per memory address (size of the default memory word)
-    pub const BYTES_PER_WORD: u32 = std::mem::size_of::<u32>() as u32;
+    pub const BYTES_PER_WORD: u32 = core::mem::size_of::<u32>() as u32;
 
     /// Defines the hard reset vector number
     pub const HARD_RESET_VECTOR: u32 = 0;
