@@ -828,7 +828,7 @@ mod tests {
 
     #[test]
     fn test_function_pointer() {
-        let code = "def func_ptr: ^u16(*u8, *u16, *u32) = 3049u16; def single_ptr: ^void(); def testPtr: ^*i16();";
+        let code = "def func_ptr: ^(*u8, *u16, *u32)u16 = 3049u16; def single_ptr: ^()void; def testPtr: ^() * i16;";
 
         parse_with_state(code, &mut ParserState::default()).unwrap();
     }

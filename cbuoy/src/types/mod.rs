@@ -227,8 +227,8 @@ impl TypeDict {
                     }
 
                     if let Some(i2) = t.find(')') {
-                        if i1 >= i2 || i2 + 1 != t.len() {
-                            return Err(TypeError::ParenthesisError);
+                        if i1 >= i2 {
+                            Err(TypeError::ParenthesisError)
                         } else {
                             let ret_str = t[(i2 + 1)..].trim();
                             let arg_type_str = &t[(i1 + 1)..i2].trim();
