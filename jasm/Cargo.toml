@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 jib = { path = "../jib", version = "*" }
 regex = "1"
-once_cell = "1"
 clap = { version = "4", features = ["derive"] }
 
 [profile.release]

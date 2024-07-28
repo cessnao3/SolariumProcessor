@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 regex = "1"
-once_cell = "1"
 jib = { path = "../jib", version = "*" }
 jasm = { path = "../jasm", version = "*" }
 
