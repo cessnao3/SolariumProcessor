@@ -9,7 +9,3 @@ edition = "2021"
 regex = "1"
 jib = { path = "../jib", version = "*" }
 jasm = { path = "../jasm", version = "*" }
-
-[profile.release]
-lto = true
-strip = true

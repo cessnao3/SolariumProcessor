@@ -1,5 +1,8 @@
 # IDE Items
 /.vscode/
 /.idea/
-.fleet/
+/.fleet/
 *.kate-swp
+
+target/
+Cargo.lock

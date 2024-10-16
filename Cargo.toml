@@ -1,0 +1,13 @@
+[workspace]
+
+members = [
+    "cbuoy",
+    "jasm",
+    "jib",
+    "visual-jib",
+]
+resolver = "2"
+
+[profile.release]
+lto = true
+strip = true

@@ -9,7 +9,3 @@ edition = "2021"
 jib = { path = "../jib", version = "*" }
 regex = "1"
 clap = { version = "4", features = ["derive"] }
-
-[profile.release]
-lto = true
-strip = true
