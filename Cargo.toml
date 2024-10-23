@@ -6,6 +6,7 @@ members = [
     "jib",
     "visual-jib",
 ]
+default-members = ["visual-jib"]
 resolver = "2"
 
 [profile.release]
