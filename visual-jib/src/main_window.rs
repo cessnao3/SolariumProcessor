@@ -115,7 +115,7 @@ pub fn build_ui(app: &Application) {
         }
     });
 
-    window.connect_close_request(clone!(@strong tx_ui => move |_| {
+    window.connect_close_request(clone!(#[strong] tx_ui, move |_| {
         tx_ui.send(UiToThread::Exit).unwrap();
         glib::Propagation::Proceed
     }));
@@ -172,7 +172,7 @@ fn build_code_column(
         let btn_build = gtk::Button::builder().label(button_verb).build();
 
         if is_assembly {
-            btn_build.connect_clicked(clone!(@strong tx_thread, @strong tx_ui => move |_| {
+            btn_build.connect_clicked(clone!(#[strong] tx_thread, #[strong] tx_ui, move |_| {
                 let asm = buffer_assembly_code.text(&buffer_assembly_code.start_iter(), &buffer_assembly_code.end_iter(), false);
                 match jasm::assemble_text(asm.as_str()) {
                     Ok(v) => {
@@ -183,7 +183,7 @@ fn build_code_column(
                 }
             }));
         } else {
-            btn_build.connect_clicked(clone!(@strong tx_thread => move |_| {
+            btn_build.connect_clicked(clone!(#[strong] tx_thread, move |_| {
                 tx_thread.send(ThreadToUi::LogMessage(format!("{short_name} compiling not supported"))).unwrap();
             }));
         }
@@ -243,7 +243,7 @@ fn build_cpu_column(
 
     for (lbl, action) in cpu_btns.into_iter() {
         let btn = gtk::Button::builder().label(lbl).hexpand(true).build();
-        btn.connect_clicked(clone!(@strong tx_ui => move |_| tx_ui.send(action.clone()).unwrap()));
+        btn.connect_clicked(clone!(#[strong] tx_ui, move |_| tx_ui.send(action.clone()).unwrap()));
         cpu_controls_buttons.append(&btn);
     }
 
@@ -261,7 +261,7 @@ fn build_cpu_column(
         .show_fill_level(true)
         .build();
 
-    cpu_speed_scale.connect_change_value(clone!(@strong tx_ui => move |_, _, val| {
+    cpu_speed_scale.connect_change_value(clone!(#[strong] tx_ui, move |_, _, val| {
         tx_ui.send(UiToThread::SetMultiplier(val)).unwrap();
         glib::Propagation::Proceed
     }));
@@ -428,7 +428,7 @@ fn build_serial_column(
         }
 
         let memory_count = memory.locations.len() as u32;
-        memory_base_entry.connect_activate(clone!(@strong tx_ui, @strong tx_thread => move |t| {
+        memory_base_entry.connect_activate(clone!(#[strong] tx_ui, #[strong] tx_thread, move |t| {
             match u32::from_str_radix(&t.text(), 16) {
                 Ok(v) => tx_ui.send(UiToThread::RequestMemory(v, memory_count)).unwrap(),
                 Err(_) => {
@@ -462,7 +462,7 @@ fn build_serial_column(
     let instruction_details = gtk::Label::builder().label("").xalign(0.0).build();
 
     let breakpoint_text = gtk::Entry::builder().text("0").build();
-    breakpoint_text.connect_activate(clone!(@strong tx_ui, @strong tx_thread => move |t| {
+    breakpoint_text.connect_activate(clone!(#[strong] tx_ui, #[strong] tx_thread, move |t| {
         match u32::from_str_radix(&t.text(), 16) {
             Ok(v) => tx_ui.send(UiToThread::SetBreakpoint(v)).unwrap(),
             Err(_) => {
@@ -514,7 +514,7 @@ fn build_serial_column(
         .build();
 
     let text_input = gtk::Entry::builder().build();
-    text_input.connect_activate(clone!(@strong tx_ui => move |t| {
+    text_input.connect_activate(clone!(#[strong] tx_ui, move |t| {
         tx_ui.send(UiToThread::SerialInput(t.text().to_string())).unwrap();
         t.set_text("");
     }));
@@ -526,7 +526,7 @@ fn build_serial_column(
         .spacing(4)
         .build();
     let text_input_btn_submit = gtk::Button::builder().label("Submit").build();
-    text_input_btn_submit.connect_clicked(clone!(@strong tx_ui => move |_| {
+    text_input_btn_submit.connect_clicked(clone!(#[strong] tx_ui, move |_| {
         tx_ui.send(UiToThread::SerialInput(text_input.text().to_string())).unwrap();
         text_input.set_text("");
     }));
