@@ -1,13 +1,7 @@
 use cbuoy::compile;
 
 fn main() {
-    let code = match std::fs::read_to_string("examples/test.spc") {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("Unable to open provided file... {e}");
-            std::process::exit(1);
-        }
-    };
+    let code = include_str!("../../examples/test.spc");
 
     let code = match compile(&code) {
         Ok(v) => v,

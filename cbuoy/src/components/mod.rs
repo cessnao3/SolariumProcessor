@@ -157,17 +157,19 @@ impl Statement for ExpressionStatement {
     }
 }
 
-pub trait Function: Expression {
+pub trait Function: BaseStatement {
     fn get_input_parameters(&self) -> Vec<(String, Type)>;
+
+    fn get_return_type(&self) -> Option<Type>;
 }
 
-pub struct CodeFunction {
+pub struct FunctionDefinition {
     parameters: Vec<(String, Type)>,
     return_type: Option<Type>,
     statements: Vec<Box<dyn Statement>>,
 }
 
-impl CodeFunction {
+impl FunctionDefinition {
     pub fn new(parameters: Vec<(String, Type)>, return_type: Option<Type>, statements: Vec<Box<dyn Statement>>) -> Self {
         Self {
             parameters,
@@ -177,7 +179,45 @@ impl CodeFunction {
     }
 }
 
-impl BaseStatement for CodeFunction {}
+impl BaseStatement for FunctionDefinition {}
+
+impl Function for FunctionDefinition {
+    fn get_input_parameters(&self) -> Vec<(String, Type)> {
+        self.parameters.clone()
+    }
+
+    fn get_return_type(&self) -> Option<Type> {
+        self.return_type.clone()
+    }
+}
+
+pub struct FunctionPtr {
+    parameters: Vec<(String, Type)>,
+    return_type: Option<Type>,
+    addr: u32, // TODO - Update Type Here
+}
+
+impl FunctionPtr {
+    pub fn new(parameters: Vec<(String, Type)>, return_type: Option<Type>, addr: u32) -> Self {
+        Self {
+            parameters,
+            return_type,
+            addr
+        }
+    }
+}
+
+impl BaseStatement for FunctionPtr {}
+
+impl Function for FunctionPtr {
+    fn get_input_parameters(&self) -> Vec<(String, Type)> {
+        self.parameters.clone()
+    }
+
+    fn get_return_type(&self) -> Option<Type> {
+        self.return_type.clone()
+    }
+}
 
 pub struct AsmFunction {
     params: Vec<(String, Type)>,

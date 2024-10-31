@@ -5,20 +5,28 @@ def ptr_test: *u16 = 6u32;
 def void_test: *void = 0u32;
 def void_er: void;
 
-def func_ptr: ^(*u8, *u16, *u32): u32 = 3049;
+def func_ptr: ^(*u8, *u16, *u32) u32 = 3049;
+
+struct type1 {
+    var1: u32,
+}
+
+struct type2 { var5: u16 }
 
 struct type_name
 {
-    var1: type1;
-    var2: type2;
+    var1: type1,
+    var2: type2,
 }
 
-asmfn asm_func(a, b, c): ret_type
+/*
+asmfn asm_func(a, b, c) ret_type
 {
     asm
     asm
     asm
 }
+*/
 
 /* asmfn asm_func(a, b, c) ret_type
 {
@@ -28,11 +36,11 @@ asmfn asm_func(a, b, c): ret_type
 }
 */
 
-fn func_name_ptr(a, b) ret_type = 3943;
+fn func_name_ptr(a: u32, b: type_name) void = 3943;
 
-fn func_name(a: u16, b: u32, c: u32) ret_type
+fn func_name(a: u16, b: u32, c: u32) void
 {
-    def var_name: var_type;
+    def var_name: u32;
     var_name = expression;
 
     if (a = 3) {

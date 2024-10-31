@@ -8,8 +8,7 @@ use crate::components::expression::{
     BinaryExpression, BinaryOperator, Expression, Literal, UnaryExpression, UnaryOperator,
 };
 use crate::components::{
-    AsmFunction, BaseStatement, CodeFunction, CompilerState, DefinitionStatement,
-    ExpressionStatement, Statement,
+    AsmFunction, BaseStatement, FunctionDefinition, FunctionPtr, CompilerState, DefinitionStatement, ExpressionStatement, Function, Statement
 };
 use crate::tokenizer::{tokenize, Token, TokenIter, TokenIterError, TokenizeError};
 use crate::types::{StructDef, TypeError};
@@ -29,7 +28,7 @@ fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> 
 
     while let Some(tok) = tokens.next() {
         let base: Option<Box<dyn BaseStatement>> = match tok.get_value() {
-            "fn" => Some(Box::new(parse_fn_statement(&mut tokens, state)?)),
+            "fn" => Some(parse_fn_statement(&mut tokens, state)?),
             "asmfn" => Some(Box::new(parse_asmfn_statement(&mut tokens, state)?)),
             "def" => Some(Box::new(parse_def_statement(&mut tokens, state)?)),
             "struct" => {
@@ -54,7 +53,7 @@ fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> 
 fn parse_fn_statement(
     tokens: &mut TokenIter,
     state: &mut ParserState,
-) -> Result<CodeFunction, ParseError> {
+) -> Result<Box<dyn BaseStatement>, ParseError> {
     // Get function name
     let name_tok = tokens.expect()?;
     let name = name_tok.get_value();
@@ -69,7 +68,7 @@ fn parse_fn_statement(
     tokens.expect_value("(")?;
 
     let mut parameters = Vec::new();
-    while !tokens.peek_expect(")") {
+    loop {
         let name = tokens.expect()?;
         if !is_identifier(name.get_value()) {
             return Err(ParseError::new_tok(
@@ -93,12 +92,24 @@ fn parse_fn_statement(
                 .join(" "),
         )?;
         parameters.push((name.get_value().to_owned(), arg_type));
+
+        if tokens.peek_expect(",") {
+            tokens.expect()?;
+        } else if tokens.peek_expect(")") {
+            tokens.expect()?;
+            break;
+        } else {
+            return Err(ParseError::new_tok(
+                tokens.expect()?,
+                "unepxected token found after fn argument".into(),
+            ));
+        }
     }
 
     // Get Return Type
     let mut ret_tokens = Vec::new();
 
-    while !tokens.peek_expect("{") {
+    while !tokens.peek_expect("{") && !tokens.peek_expect("=") {
         ret_tokens.push(tokens.expect()?);
     }
 
@@ -116,16 +127,36 @@ fn parse_fn_statement(
         )
     };
 
-    tokens.expect_value("{");
+    if tokens.peek_expect("=") {
+        tokens.expect_value("=")?;
 
-    let mut statements = Vec::new();
-    while !tokens.peek_expect("}") {
-        statements.push(parse_statement(tokens, state)?);
+        let addr_tok = tokens.expect()?;
+
+        let addr = match addr_tok.get_value().parse() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(ParseError::new_tok(
+                    addr_tok,
+                    "uanble to parse token as address".into(),
+                ))
+            }
+        };
+
+        tokens.expect_value(";")?;
+
+        Ok(Box::new(FunctionPtr::new(parameters, ret_type, addr)))
+    } else {
+        tokens.expect_value("{")?;
+
+        let mut statements = Vec::new();
+        while !tokens.peek_expect("}") {
+            statements.push(parse_statement(tokens, state)?);
+        }
+
+        tokens.expect_value("}")?;
+
+        Ok(Box::new(FunctionDefinition::new(parameters, ret_type, statements)))
     }
-
-    tokens.expect_value("}");
-
-    Ok(CodeFunction::new(parameters, ret_type, statements))
 }
 
 fn parse_asmfn_statement(
@@ -329,9 +360,11 @@ fn parse_statement(
             if spacer.get_value() == ";" {
                 panic!("Create the variable defintion");
             } else {
-                return Err(ParseError::new_tok(spacer, "unknown spacing token in variable definition".into()));
+                return Err(ParseError::new_tok(
+                    spacer,
+                    "unknown spacing token in variable definition".into(),
+                ));
             }
-
         } else if pt_val == "return" {
             tokens.expect()?;
             if tokens.peek_expect(";") {
@@ -572,7 +605,7 @@ impl Display for ParseError {
             write!(
                 f,
                 "{}:{} ({}) => ",
-                tok.get_line(),
+                tok.get_line() + 1,
                 tok.get_column(),
                 tok.get_value()
             )?;
