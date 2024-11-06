@@ -2,8 +2,8 @@ use jib::cpu::DataType;
 
 #[derive(Debug, Clone)]
 pub enum TypeError {
-    ArraySizeError(String),
-    ArrayTypeError(String),
+    ArraySize(String),
+    ArrayType(String),
     NoTypeFound(String),
     InvalidTypeName(String),
     EmptyType(String),
@@ -23,8 +23,8 @@ pub enum TypeError {
 impl std::fmt::Display for TypeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ArraySizeError(t) => write!(f, "unable to find valid array size for '{t}'"),
-            Self::ArrayTypeError(t) => write!(f, "unable to find valid array type for '{t}'"),
+            Self::ArraySize(t) => write!(f, "unable to find valid array size for '{t}'"),
+            Self::ArrayType(t) => write!(f, "unable to find valid array type for '{t}'"),
             Self::NoTypeFound(t) => write!(f, "no type found for name '{t}'"),
             Self::InvalidTypeName(t) => write!(f, "'{t}' is not a valid type name"),
             Self::EmptyType(t) => write!(f, "type specification empty for '{t}'"),
@@ -81,14 +81,31 @@ impl StructDef {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
-    OpaqueType { name: String },
-    Primitive { base: DataType },
-    Alias { name: String, base: Box<Type> },
-    Array { base: Box<Type>, size: usize },
+    Opaque {
+        name: String,
+    },
+    Primitive {
+        base: DataType,
+    },
+    Alias {
+        name: String,
+        base: Box<Type>,
+    },
+    Array {
+        base: Box<Type>,
+        size: usize,
+    },
     Struct(StructDef),
-    Pointer { base: Box<Type> },
-    Constant { base: Box<Type> },
-    Function { ret: Option<Box<Type>>, args: Vec<Type> },
+    Pointer {
+        base: Box<Type>,
+    },
+    Constant {
+        base: Box<Type>,
+    },
+    Function {
+        ret: Option<Box<Type>>,
+        args: Vec<Type>,
+    },
 }
 
 impl Type {
@@ -108,7 +125,7 @@ impl Type {
 
     pub fn byte_count(&self) -> Result<usize, TypeError> {
         match self {
-            Self::OpaqueType { .. } => Err(TypeError::MissingTypeSize(self.clone())),
+            Self::Opaque { .. } => Err(TypeError::MissingTypeSize(self.clone())),
             Self::Primitive { base, .. } => Ok(base.byte_size()),
             Self::Array { base, size } => Ok(base.byte_count()? * size),
             Self::Struct(def) => def.byte_size(),
@@ -131,7 +148,7 @@ impl Type {
     }
 
     pub fn as_const(&self) -> Type {
-        if let Self::Constant { base } = self {
+        if let Self::Constant { .. } = self {
             self.clone()
         } else {
             Self::Constant {
@@ -166,7 +183,7 @@ impl From<DataType> for Type {
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::OpaqueType { name } => write!(f, "{name}"),
+            Self::Opaque { name } => write!(f, "{name}"),
             Self::Primitive { base } => write!(f, "{base}"),
             Self::Array { base, size } => write!(f, "[{size}]{base}"),
             Self::Struct(def) => write!(f, "{}", def.name),
@@ -208,7 +225,7 @@ impl TypeDict {
                 if let Some(ind) = t.find(']') {
                     let size = match t[1..ind].parse::<u16>() {
                         Ok(v) => v,
-                        Err(_) => return Err(TypeError::ArraySizeError(t.into())),
+                        Err(_) => return Err(TypeError::ArraySize(t.into())),
                     };
 
                     Ok(Type::Array {
@@ -216,7 +233,7 @@ impl TypeDict {
                         size: size as usize,
                     })
                 } else {
-                    Err(TypeError::ArrayTypeError(t.into()))
+                    Err(TypeError::ArrayType(t.into()))
                 }
             }
             Some('^') => {
@@ -249,16 +266,16 @@ impl TypeDict {
                                 vec![self.parse_type(arg_type_str)?]
                             };
 
-                            return Ok(Type::Function {
-                                ret: ret_type.map(|t| Box::new(t)),
+                            Ok(Type::Function {
+                                ret: ret_type.map(Box::new),
                                 args: arg_types,
-                            });
+                            })
                         }
                     } else {
-                        return Err(TypeError::ParenthesisError);
+                        Err(TypeError::ParenthesisError)
                     }
                 } else {
-                    return Err(TypeError::ParenthesisError);
+                    Err(TypeError::ParenthesisError)
                 }
             }
             Some(_) => {
@@ -276,7 +293,7 @@ impl TypeDict {
 
     pub fn add_type(&mut self, t: Type) -> Result<(), TypeError> {
         let name = match &t {
-            Type::OpaqueType { name } => name,
+            Type::Opaque { name } => name,
             Type::Alias { name, .. } => name,
             Type::Struct(def) => &def.name,
             _ => return Err(TypeError::MissingTypeName(t.clone())),
@@ -294,8 +311,8 @@ impl TypeDict {
 
         if let Some(existing_type) = self.types.get(name) {
             match existing_type {
-                Type::OpaqueType { .. } => match t {
-                    Type::OpaqueType { .. } => (),
+                Type::Opaque { .. } => match t {
+                    Type::Opaque { .. } => (),
                     Type::Struct { .. } => (),
                     _ => {
                         return Err(TypeError::CannotOverrideType {
@@ -341,7 +358,7 @@ impl Default for TypeDict {
 
         s.types.insert(
             "void".into(),
-            Type::OpaqueType {
+            Type::Opaque {
                 name: "void".to_string(),
             },
         );

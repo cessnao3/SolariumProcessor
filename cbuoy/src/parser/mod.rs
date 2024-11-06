@@ -1,14 +1,21 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::sync::OnceLock;
+use std::rc::Rc;
+use std::sync::{LazyLock, OnceLock};
 
 use regex::Regex;
 
 use crate::components::expression::{
-    BinaryExpression, BinaryOperator, Expression, Literal, UnaryExpression, UnaryOperator,
+    AssignmentExpression, BinaryExpression, BinaryOperator, Expression, Literal, UnaryExpression,
+    UnaryOperator,
 };
+use crate::components::statement::{
+    DefinitionStatement, ExpressionStatement, IfStatement, VariableInitStatement,
+};
+use crate::components::variable::{GlobalVariable, LocalVariable, Variable};
 use crate::components::{
-    AsmFunction, BaseStatement, FunctionDefinition, FunctionPtr, CompilerState, DefinitionStatement, ExpressionStatement, Function, Statement
+    AsmFunction, BaseStatement, Function, FunctionDefinition, FunctionPtr, ParserScope, Statement,
 };
 use crate::tokenizer::{tokenize, Token, TokenIter, TokenIterError, TokenizeError};
 use crate::types::{StructDef, TypeError};
@@ -30,15 +37,20 @@ fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> 
         let base: Option<Box<dyn BaseStatement>> = match tok.get_value() {
             "fn" => Some(parse_fn_statement(&mut tokens, state)?),
             "asmfn" => Some(Box::new(parse_asmfn_statement(&mut tokens, state)?)),
-            "def" => Some(Box::new(parse_def_statement(&mut tokens, state)?)),
+            "def" => Some(Box::new(parse_def_statement(
+                &mut tokens,
+                state,
+                &state.root_scope.clone(),
+            )?)),
             "struct" => {
                 parse_struct_statement(&mut tokens, state)?;
                 None
             }
             word => {
-                return Err(ParseError::new(format!(
-                    "unknown start of base expression {word}"
-                )))
+                return Err(ParseError::new_tok(
+                    tok.clone(),
+                    format!("unknown start of base expression {word}"),
+                ))
             }
         };
 
@@ -50,10 +62,20 @@ fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> 
     Ok(())
 }
 
+fn check_type_error<T>(r: Result<T, TypeError>, toks: &[Token]) -> Result<T, ParseError> {
+    match r {
+        Ok(v) => Ok(v),
+        Err(e) => Err(ParseError::new_type(toks, e)),
+    }
+}
+
 fn parse_fn_statement(
     tokens: &mut TokenIter,
     state: &mut ParserState,
 ) -> Result<Box<dyn BaseStatement>, ParseError> {
+    // Define the scope
+    let scope = Rc::new(RefCell::new(ParserScope::new(state.root_scope.clone())));
+
     // Get function name
     let name_tok = tokens.expect()?;
     let name = name_tok.get_value();
@@ -84,13 +106,8 @@ fn parse_fn_statement(
             type_tokens.push(tokens.expect()?);
         }
 
-        let arg_type = state.compiler.types.parse_type(
-            &type_tokens
-                .iter()
-                .map(|t| t.get_value())
-                .collect::<Vec<_>>()
-                .join(" "),
-        )?;
+        let type_str = Token::tok_str(&type_tokens);
+        let arg_type = check_type_error(state.types.parse_type(&type_str), &type_tokens)?;
         parameters.push((name.get_value().to_owned(), arg_type));
 
         if tokens.peek_expect(",") {
@@ -116,15 +133,10 @@ fn parse_fn_statement(
     let ret_type = if ret_tokens.is_empty() {
         None
     } else {
-        Some(
-            state.compiler.types.parse_type(
-                &ret_tokens
-                    .iter()
-                    .map(|t| t.get_value())
-                    .collect::<Vec<_>>()
-                    .join(" "),
-            )?,
-        )
+        Some(check_type_error(
+            state.types.parse_type(&Token::tok_str(&ret_tokens)),
+            &ret_tokens,
+        )?)
     };
 
     if tokens.peek_expect("=") {
@@ -137,7 +149,7 @@ fn parse_fn_statement(
             Err(e) => {
                 return Err(ParseError::new_tok(
                     addr_tok,
-                    "uanble to parse token as address".into(),
+                    format!("uanble to parse token as address: {e}"),
                 ))
             }
         };
@@ -150,12 +162,14 @@ fn parse_fn_statement(
 
         let mut statements = Vec::new();
         while !tokens.peek_expect("}") {
-            statements.push(parse_statement(tokens, state)?);
+            statements.push(parse_statement(tokens, state, &scope)?);
         }
 
         tokens.expect_value("}")?;
 
-        Ok(Box::new(FunctionDefinition::new(parameters, ret_type, statements)))
+        Ok(Box::new(FunctionDefinition::new(
+            parameters, ret_type, statements,
+        )))
     }
 }
 
@@ -183,13 +197,16 @@ fn parse_struct_statement(
 
     if let Some(end_check) = tokens.next() {
         if end_check.get_value() == ";" {
-            match state.compiler.types.parse_type(&struct_name) {
+            match state.types.parse_type(&struct_name) {
                 Ok(Type::Struct { .. }) => (),
-                Ok(Type::OpaqueType { .. }) => (),
+                Ok(Type::Opaque { .. }) => (),
                 Err(_) => {
-                    state.compiler.types.add_type(Type::OpaqueType {
-                        name: struct_name.to_string(),
-                    })?;
+                    check_type_error(
+                        state.types.add_type(Type::Opaque {
+                            name: struct_name.to_string(),
+                        }),
+                        &[first_tok],
+                    )?;
                 }
                 Ok(_) => {
                     return Err(ParseError::new_tok(
@@ -228,13 +245,8 @@ fn parse_struct_statement(
             type_vec.push(tokens.expect()?);
         }
 
-        let type_string_combined = type_vec
-            .iter()
-            .map(|n| n.get_value().to_string())
-            .reduce(|a, b| format!("{a}{b}"))
-            .unwrap_or(String::new());
-
-        let sp_type = if let Ok(t) = state.compiler.types.parse_type(&type_string_combined) {
+        let type_string_combined = Token::tok_str(&type_vec);
+        let sp_type = if let Ok(t) = state.types.parse_type(&type_string_combined) {
             Box::new(t)
         } else {
             return Err(ParseError::new_tok(
@@ -272,8 +284,8 @@ fn parse_struct_statement(
 
     let type_val = Type::Struct(StructDef::new(&struct_name, fields));
 
-    match state.compiler.types.parse_type(&struct_name) {
-        Ok(Type::OpaqueType { .. }) => (),
+    match state.types.parse_type(&struct_name) {
+        Ok(Type::Opaque { .. }) => (),
         Ok(_) => {
             return Err(ParseError::new_tok(
                 first_tok,
@@ -283,7 +295,7 @@ fn parse_struct_statement(
         _ => (),
     };
 
-    state.compiler.types.add_type(type_val)?;
+    check_type_error(state.types.add_type(type_val), &[first_tok])?;
 
     Ok(())
 }
@@ -291,32 +303,47 @@ fn parse_struct_statement(
 fn parse_base_expression(
     tokens: &mut TokenIter,
     state: &mut ParserState,
+    scope: &Rc<RefCell<ParserScope>>,
 ) -> Result<Box<dyn Expression>, ParseError> {
-    let mut binary_map = HashMap::new();
-    binary_map.insert("+", BinaryOperator::Add);
-    binary_map.insert("-", BinaryOperator::Sub);
-    binary_map.insert("*", BinaryOperator::Mul);
-    binary_map.insert("/", BinaryOperator::Div);
-    binary_map.insert("%", BinaryOperator::Rem);
-    binary_map.insert("<<", BinaryOperator::Bshl);
-    binary_map.insert(">>", BinaryOperator::Bshr);
-    binary_map.insert("&", BinaryOperator::Band);
-    binary_map.insert("|", BinaryOperator::Bor);
-    binary_map.insert("^", BinaryOperator::Bxor);
-    binary_map.insert("&&", BinaryOperator::Land);
-    binary_map.insert("||", BinaryOperator::Lor);
+    static BINARY_EXPR_MAP: LazyLock<HashMap<&str, BinaryOperator>> = LazyLock::new(|| {
+        let mut binary_map = HashMap::new();
+        binary_map.insert("+", BinaryOperator::Add);
+        binary_map.insert("-", BinaryOperator::Sub);
+        binary_map.insert("*", BinaryOperator::Mul);
+        binary_map.insert("/", BinaryOperator::Div);
+        binary_map.insert("%", BinaryOperator::Rem);
+        binary_map.insert("<<", BinaryOperator::Bshl);
+        binary_map.insert(">>", BinaryOperator::Bshr);
+        binary_map.insert("&", BinaryOperator::Band);
+        binary_map.insert("|", BinaryOperator::Bor);
+        binary_map.insert("^", BinaryOperator::Bxor);
+        binary_map.insert("&&", BinaryOperator::Land);
+        binary_map.insert("||", BinaryOperator::Lor);
+        binary_map.insert("==", BinaryOperator::Eq);
+        binary_map.insert("!=", BinaryOperator::Neq);
+        binary_map
+    });
 
-    let init_expr = parse_expression(tokens, state)?;
+    let init_tok = match tokens.peek() {
+        Some(t) => t,
+        None => return Err(ParseError::new_unknown("end of token stream".into())),
+    };
+
+    let init_expr = parse_expression(tokens, state, scope)?;
 
     if let Some(pt) = tokens.peek() {
         let pt_val = pt.get_value();
         if pt_val == "=" {
             tokens.expect()?;
-            panic!("Assignment not yet supported :-(");
-        } else if let Some(op) = binary_map.get(pt_val) {
+            let right_expr = parse_base_expression(tokens, state, scope)?;
+            return Ok(Box::new(AssignmentExpression::new(init_expr, right_expr)));
+        } else if let Some(op) = BINARY_EXPR_MAP.get(pt_val) {
             tokens.expect()?;
-            let right_expr = parse_expression(tokens, state)?;
-            return Ok(Box::new(BinaryExpression::new(*op, init_expr, right_expr)?));
+            let right_expr = parse_expression(tokens, state, scope)?;
+            return Ok(Box::new(check_type_error(
+                BinaryExpression::new(*op, init_expr, right_expr),
+                &[init_tok],
+            )?));
         }
     }
 
@@ -326,6 +353,7 @@ fn parse_base_expression(
 fn parse_statement(
     tokens: &mut TokenIter,
     state: &mut ParserState,
+    scope: &Rc<RefCell<ParserScope>>,
 ) -> Result<Box<dyn Statement>, ParseError> {
     if let Some(pt) = tokens.peek() {
         let pt_val = pt.get_value();
@@ -335,7 +363,39 @@ fn parse_statement(
             panic!("while statement not yet supported");
         } else if pt_val == "if" {
             tokens.expect()?;
-            panic!("if statement not yet supported");
+            tokens.expect_value("(")?;
+
+            let if_expr = parse_base_expression(tokens, state, scope)?;
+
+            tokens.expect_value(")")?;
+
+            let mut statements = Vec::<Box<dyn Statement>>::new();
+
+            if tokens.peek_expect("{") {
+                tokens.expect_value("{")?;
+
+                let new_scope = Rc::new(RefCell::new(ParserScope::new(scope.clone())));
+
+                while !tokens.peek_expect("}") {
+                    statements.push(parse_statement(tokens, state, &new_scope)?);
+                }
+
+                tokens.expect_value("}")?;
+            } else {
+                statements.push(parse_statement(tokens, state, scope)?);
+            }
+
+            let else_statement = if tokens.peek_expect("else") {
+                Some(parse_statement(tokens, state, scope)?)
+            } else {
+                None
+            };
+
+            return Ok(Box::new(IfStatement {
+                conditional: if_expr,
+                statements,
+                else_clause: else_statement,
+            }));
         } else if pt_val == "def" {
             tokens.expect()?;
             let var_name = tokens.expect()?;
@@ -343,14 +403,15 @@ fn parse_statement(
 
             let mut type_tokens = Vec::new();
             while !tokens.peek_expect("=") && !tokens.peek_expect(";") {
-                type_tokens.push(tokens.expect()?.get_value().to_owned());
+                type_tokens.push(tokens.expect()?);
             }
 
-            let var_type = state.compiler.types.parse_type(&type_tokens.join(" "))?;
+            let type_str = Token::tok_str(&type_tokens);
+            let var_type = check_type_error(state.types.parse_type(&type_str), &type_tokens)?;
 
             let mut spacer = tokens.expect()?;
             let var_expr = if spacer.get_value() == "=" {
-                let expr = parse_base_expression(tokens, state)?;
+                let expr = parse_base_expression(tokens, state, scope)?;
                 spacer = tokens.expect()?;
                 Some(expr)
             } else {
@@ -358,7 +419,15 @@ fn parse_statement(
             };
 
             if spacer.get_value() == ";" {
-                panic!("Create the variable defintion");
+                match scope
+                    .borrow_mut()
+                    .add_variable(var_name.get_value(), var_type)
+                {
+                    Err(e) => return Err(ParseError::new_tok(spacer, format!("{e}"))),
+                    Ok(var) => {
+                        return Ok(Box::new(VariableInitStatement::new(var, var_expr)));
+                    }
+                }
             } else {
                 return Err(ParseError::new_tok(
                     spacer,
@@ -371,7 +440,7 @@ fn parse_statement(
                 tokens.expect()?;
                 panic!("Immediate Return")
             } else {
-                let expr = parse_base_expression(tokens, state)?;
+                let expr = parse_base_expression(tokens, state, scope)?;
                 tokens.expect_value(";")?;
                 panic!("Return with Value");
             }
@@ -382,7 +451,7 @@ fn parse_statement(
 
     // Default to just a base expression followed by a semicolon
     let expr = Box::new(ExpressionStatement::new(parse_base_expression(
-        tokens, state,
+        tokens, state, scope,
     )?));
     tokens.expect_value(";")?;
     Ok(expr)
@@ -452,47 +521,59 @@ fn parse_literal(t: &Token) -> Result<Literal, ParseError> {
 fn parse_expression(
     tokens: &mut TokenIter,
     state: &mut ParserState,
+    scope: &Rc<RefCell<ParserScope>>,
 ) -> Result<Box<dyn Expression>, ParseError> {
-    let mut unary_map = HashMap::new();
-    unary_map.insert("+", UnaryOperator::Positive);
-    unary_map.insert("-", UnaryOperator::Negative);
-    unary_map.insert("!", UnaryOperator::Not);
-    unary_map.insert("~", UnaryOperator::BitwiseNot);
-    unary_map.insert("&", UnaryOperator::AddressOf);
-    unary_map.insert("*", UnaryOperator::Dereference);
+    static UNARY_MAP: LazyLock<HashMap<&str, UnaryOperator>> = LazyLock::new(|| {
+        let mut unary_map = HashMap::new();
+        unary_map.insert("+", UnaryOperator::Positive);
+        unary_map.insert("-", UnaryOperator::Negative);
+        unary_map.insert("!", UnaryOperator::Not);
+        unary_map.insert("~", UnaryOperator::BitwiseNot);
+        unary_map.insert("&", UnaryOperator::AddressOf);
+        unary_map.insert("*", UnaryOperator::Dereference);
+        unary_map
+    });
 
     let first = if let Some(t) = tokens.next() {
         t
     } else {
-        return Err(ParseError::new("no tokens provided to expression!".into()));
+        return Err(ParseError::new_unknown(
+            "no tokens provided to expression!".into(),
+        ));
     };
 
     if first.get_value() == "(" {
-        let expr = parse_base_expression(tokens, state);
+        let expr = parse_base_expression(tokens, state, scope);
+        let next = tokens.next();
 
-        if tokens.expect_value(")").is_ok() {
+        if ")"
+            == next
+                .as_ref()
+                .map_or(String::new(), |t| t.get_value().to_string())
+        {
             expr
-        } else {
-            Err(ParseError::new("expected ending parenthesis".into()))
-        }
-    } else if let Some(op) = unary_map.get(first.get_value()) {
-        Ok(Box::new(UnaryExpression::new(
-            *op,
-            parse_expression(tokens, state)?,
-        )?))
-    } else if is_identifier(first.get_value()) {
-        if let Some(var) = state.compiler.get_variable_expr(first.get_value()) {
-            if var.get_type()?.is_func() {
-                panic!("check for function call?");
-            } else {
-                Ok(var)
-            }
         } else {
             Err(ParseError::new_tok(
                 first,
-                "unknown variable nameprovided".into(),
+                "expected ending parenthesis".into(),
             ))
         }
+    } else if let Some(op) = UNARY_MAP.get(first.get_value()) {
+        Ok(Box::new(check_type_error(
+            UnaryExpression::new(*op, parse_expression(tokens, state, scope)?),
+            &[first],
+        )?))
+    } else if is_identifier(first.get_value()) {
+        return match scope.borrow().get_variable_expr(first.get_value()) {
+            Ok(var) => {
+                if check_type_error(var.get_type(), &[first])?.is_func() {
+                    panic!("check for function call?");
+                } else {
+                    Ok(var)
+                }
+            }
+            Err(e) => Err(ParseError::new_tok(first, format!("{e}"))),
+        };
     } else if let Ok(lit) = parse_literal(&first) {
         Ok(Box::new(lit))
     } else {
@@ -506,6 +587,7 @@ fn parse_expression(
 fn parse_def_statement(
     tokens: &mut TokenIter,
     state: &mut ParserState,
+    scope: &Rc<RefCell<ParserScope>>,
 ) -> Result<DefinitionStatement, ParseError> {
     let init_tok = tokens.expect()?;
     let name = init_tok.get_value().to_string();
@@ -549,7 +631,7 @@ fn parse_def_statement(
         .map(|i| i.get_value().to_string())
         .reduce(|a, b| format!("{a}{b}"))
         .unwrap_or(String::new());
-    let type_val = state.compiler.types.parse_type(&type_name)?;
+    let type_val = check_type_error(state.types.parse_type(&type_name), &type_tokens)?;
 
     let mut expr_tokens = Vec::new();
 
@@ -564,50 +646,67 @@ fn parse_def_statement(
     tokens.expect_value(";")?;
 
     // TODO - This works for base statements, but not anything else :-(
-    let mut def_statement = DefinitionStatement::new(&name, type_val);
+    let mut def_statement = DefinitionStatement::new(&name, type_val.clone());
 
     if !expr_tokens.is_empty() {
         let mut expr_iter = TokenIter::new(expr_tokens);
-        def_statement.set_init(parse_expression(&mut expr_iter, state)?);
+        def_statement.set_init(parse_expression(&mut expr_iter, state, scope)?);
     }
 
-    Ok(def_statement)
+    if let Err(e) = scope.borrow_mut().add_variable(&name, type_val) {
+        Err(ParseError::new_tok(init_tok, format!("{e}")))
+    } else {
+        Ok(def_statement)
+    }
 }
 
 #[derive(Default)]
 pub struct ParserState {
     pub statements: Vec<Box<dyn BaseStatement>>,
-    pub compiler: CompilerState,
+    pub types: TypeDict,
+    pub root_scope: Rc<RefCell<ParserScope>>,
 }
 
 #[derive(Debug)]
 pub struct ParseError {
-    tok: Option<Token>,
+    tok: Vec<Token>,
     msg: String,
 }
 
 impl ParseError {
-    pub fn new(msg: String) -> Self {
-        Self { tok: None, msg }
+    pub fn new_unknown(msg: String) -> Self {
+        Self {
+            tok: Vec::new(),
+            msg,
+        }
     }
 
     pub fn new_tok(tok: Token, msg: String) -> Self {
         Self {
-            tok: Some(tok),
+            tok: vec![tok],
             msg,
+        }
+    }
+
+    pub fn new_type(tok: &[Token], t: TypeError) -> Self {
+        Self {
+            tok: tok.to_vec(),
+            msg: format!("type error: {t}"),
         }
     }
 }
 
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(tok) = &self.tok {
+        let tok_str = Token::tok_str(&self.tok);
+
+        if let Some(tok) = self.tok.first() {
             write!(
                 f,
                 "{}:{} ({}) => ",
                 tok.get_line() + 1,
                 tok.get_column(),
-                tok.get_value()
+                tok_str
             )?;
         }
         write!(f, "{}", self.msg)
@@ -616,19 +715,13 @@ impl Display for ParseError {
 
 impl From<TokenIterError> for ParseError {
     fn from(value: TokenIterError) -> Self {
-        Self::new(format!("tokiter: {value}"))
-    }
-}
-
-impl From<TypeError> for ParseError {
-    fn from(value: TypeError) -> Self {
-        Self::new(format!("type: {value}"))
+        Self::new_unknown(format!("tokiter: {value}"))
     }
 }
 
 impl From<TokenizeError> for ParseError {
     fn from(value: TokenizeError) -> Self {
-        Self::new(format!("tokenizer: {value}"))
+        Self::new_unknown(format!("tokenizer: {value}"))
     }
 }
 
@@ -650,21 +743,21 @@ mod tests {
                 panic!("{e}");
             }
 
-            assert!(state.compiler.types.parse_type(expected_name).is_ok());
+            assert!(state.types.parse_type(expected_name).is_ok());
 
-            if let Ok(Type::Struct(def)) = state.compiler.types.parse_type(expected_name) {
+            if let Ok(Type::Struct(def)) = state.types.parse_type(expected_name) {
                 assert_eq!(def.name, expected_name);
                 assert_eq!(def.fields.len(), 2);
 
                 let f1 = &def.fields[0];
 
                 assert_eq!(f1.0, "var1");
-                assert_eq!(*f1.1, state.compiler.types.parse_type("u16").unwrap());
+                assert_eq!(*f1.1, state.types.parse_type("u16").unwrap());
 
                 let f2 = &def.fields[1];
 
                 assert_eq!(f2.0, "var2");
-                assert_eq!(*f2.1, state.compiler.types.parse_type("i16").unwrap());
+                assert_eq!(*f2.1, state.types.parse_type("i16").unwrap());
             } else {
                 panic!("unable to get expected type");
             }
@@ -692,7 +785,7 @@ mod tests {
                 panic!("{e}");
             }
 
-            match &state.compiler.types.parse_type(&type_name) {
+            match &state.types.parse_type(&type_name) {
                 Ok(t) => match t {
                     st @ Type::Struct(def) => {
                         assert_eq!(*def.name, type_name);
@@ -726,7 +819,7 @@ mod tests {
             panic!("{e}");
         }
 
-        if let Ok(Type::Struct(def)) = state.compiler.types.parse_type(join_name) {
+        if let Ok(Type::Struct(def)) = state.types.parse_type(join_name) {
             assert_eq!(def.name, join_name);
             assert_eq!(def.fields.len(), initial_types.len());
             for (i, (t, (f_name, f_type))) in std::iter::zip(initial_types, def.fields).enumerate()
@@ -743,7 +836,7 @@ mod tests {
     fn test_parse_struct_opaque() {
         let mut state = ParserState::default();
 
-        let init_type_len = state.compiler.types.len();
+        let init_type_len = state.types.len();
 
         let struct_dec =
             "struct type_1; struct type_2; struct type_1; struct type_2; struct type_2;";
@@ -751,13 +844,13 @@ mod tests {
             panic!("{e}");
         }
 
-        assert_eq!(state.compiler.types.len(), 2 + init_type_len);
+        assert_eq!(state.types.len(), 2 + init_type_len);
 
-        if let Ok(Type::OpaqueType { name }) = state.compiler.types.parse_type("type_1") {
+        if let Ok(Type::Opaque { name }) = state.types.parse_type("type_1") {
             assert_eq!(name, "type_1");
         }
 
-        if let Ok(Type::OpaqueType { name }) = state.compiler.types.parse_type("type_2") {
+        if let Ok(Type::Opaque { name }) = state.types.parse_type("type_2") {
             assert_eq!(name, "type_2");
         }
 
@@ -766,23 +859,23 @@ mod tests {
             panic!("{e}");
         }
 
-        assert_eq!(state.compiler.types.len(), 2 + init_type_len);
+        assert_eq!(state.types.len(), 2 + init_type_len);
 
-        if let Ok(Type::Struct(def)) = state.compiler.types.parse_type("type_1") {
+        if let Ok(Type::Struct(def)) = state.types.parse_type("type_1") {
             assert_eq!(def.name, "type_1");
             assert_eq!(def.fields.len(), 1);
             assert_eq!(def.fields[0].0, "f");
             assert_eq!(
                 def.fields[0].1,
                 Box::new(Type::Pointer {
-                    base: Box::new(Type::OpaqueType {
+                    base: Box::new(Type::Opaque {
                         name: "type_2".to_string()
                     })
                 })
             );
         }
 
-        if let Ok(Type::OpaqueType { name }) = state.compiler.types.parse_type("type_2") {
+        if let Ok(Type::Opaque { name }) = state.types.parse_type("type_2") {
             assert_eq!(name, "type_2");
         }
     }
@@ -791,12 +884,12 @@ mod tests {
     fn test_parse_struct_void() {
         let mut state = ParserState::default();
 
-        let init_type_len = state.compiler.types.len();
+        let init_type_len = state.types.len();
 
         let s = "struct void;";
 
         assert!(parse_with_state(s, &mut state).is_err());
-        assert_eq!(state.compiler.types.len(), init_type_len);
+        assert_eq!(state.types.len(), init_type_len);
     }
 
     #[test]

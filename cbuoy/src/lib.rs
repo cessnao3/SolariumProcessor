@@ -8,7 +8,7 @@ mod types;
 pub fn compile(s: &str) -> Result<Vec<u16>, String> {
     match parser::parse(s) {
         Ok(_) => (),
-        Err(e) => return Err(format!("parse error - {e}")),
+        Err(e) => return Err(format!("Parse error - {e}")),
     }
     Err("compiling not yet fully supported".into())
 }

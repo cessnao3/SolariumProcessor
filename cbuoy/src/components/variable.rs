@@ -90,7 +90,17 @@ impl VariableInitializer {
 pub struct LocalVariable {
     var_type: Type,
     base_offset: i32,
-    init: VariableInitializer,
+    init: Option<VariableInitializer>,
+}
+
+impl LocalVariable {
+    pub fn new(t: Type, base_offset: i32) -> Self {
+        Self {
+            var_type: t,
+            base_offset,
+            init: None,
+        }
+    }
 }
 
 impl Expression for LocalVariable {
@@ -136,6 +146,15 @@ impl Variable for LocalVariable {
 pub struct GlobalVariable {
     var_type: Type,
     var_label: String,
+}
+
+impl GlobalVariable {
+    pub fn new(name: &str, t: Type) -> Self {
+        Self {
+            var_type: t,
+            var_label: format!("STATIC_VAR_LBL_{name}"),
+        }
+    }
 }
 
 impl Expression for GlobalVariable {

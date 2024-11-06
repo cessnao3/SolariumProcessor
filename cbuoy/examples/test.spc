@@ -40,17 +40,20 @@ fn func_name_ptr(a: u32, b: type_name) void = 3943;
 
 fn func_name(a: u16, b: u32, c: u32) void
 {
-    def var_name: u32;
-    var_name = expression;
+    var_name = 1 + 3;
+
+    def a: u32;
+    def b: u32;
+    def c: u32;
 
     if (a = 3) {
     }
 
-    if (b = 3 && c == 3) {
+    if ((b = 8) && (c == 5)) {
         return 5;
     }
 
-    if (b=4&&c==6) {
+    if ((b=4)&&(c==6)) {
         return 5;
     }
 

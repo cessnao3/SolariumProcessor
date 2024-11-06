@@ -29,6 +29,13 @@ impl Token {
     pub fn is_comment(&self) -> bool {
         self.value.starts_with("//") || self.value.starts_with("/*")
     }
+
+    pub fn tok_str(toks: &[Token]) -> String {
+        toks.iter()
+            .map(|t| t.get_value().into())
+            .reduce(|a, b| format!("{a} {b}"))
+            .unwrap_or(String::new())
+    }
 }
 
 impl std::fmt::Display for Token {
@@ -44,10 +51,7 @@ pub struct TokenIter {
 
 impl TokenIter {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self {
-            tokens,
-            ind: 0,
-        }
+        Self { tokens, ind: 0 }
     }
 
     pub fn next(&mut self) -> Option<Token> {
@@ -105,7 +109,13 @@ impl std::fmt::Display for TokenIterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EndOfStream => write!(f, "unexpected end of tokens"),
-            Self::TokenMismatch(tok, expected) => write!(f, "expected token with value '{expected}', found '{tok}'"),
+            Self::TokenMismatch(tok, expected) => write!(
+                f,
+                "expected token with value '{expected}', found '{}' [{}:{}]",
+                tok.get_value(),
+                tok.get_line() + 1,
+                tok.get_column()
+            ),
         }
     }
 }
@@ -227,35 +237,29 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenizeError> {
     let mut builder = TokenBuilder::new();
     let mut tokens = Vec::new();
 
-    let mut it = s.lines().enumerate().flat_map(|(line_idx, l)| l.char_indices().map(move |(char_idx, c)| (line_idx, char_idx, c))).peekable();
+    let mut it = s
+        .lines()
+        .enumerate()
+        .flat_map(|(line_idx, l)| {
+            l.char_indices()
+                .map(move |(char_idx, c)| (line_idx, char_idx, c))
+        })
+        .peekable();
 
-    let double_char_separators = [
-        "&&",
-        "||",
-    ];
+    let double_char_separators = ["&&", "||"];
 
     let single_char_separators = [
-        '+',
-        '-',
-        '.',
-        ',',
-        '*',
-        '/',
-        '&',
-        '|',
-        '[',
-        ']',
-        '(',
-        ')',
-        '{',
-        '}',
-        ':',
-        ';',
+        '+', '-', '.', ',', '*', '/', '&', '|', '[', ']', '(', ')', '{', '}', ':', ';',
     ];
 
-    let all_separator_init_char = single_char_separators.iter()
+    let all_separator_init_char = single_char_separators
+        .iter()
         .copied()
-        .chain(double_char_separators.iter().filter_map(|s| s.chars().next()))
+        .chain(
+            double_char_separators
+                .iter()
+                .filter_map(|s| s.chars().next()),
+        )
         .collect::<std::collections::BTreeSet<_>>();
 
     while let Some((idx_line, idx_col, c)) = it.next() {
@@ -303,7 +307,8 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenizeError> {
             }
 
             let next_char_is_sep = if let Some(c2) = peek_c {
-                !within_line_comment && (c2.is_whitespace() || all_separator_init_char.contains(&c2))
+                !within_line_comment
+                    && (c2.is_whitespace() || all_separator_init_char.contains(&c2))
             } else {
                 false
             };
@@ -324,7 +329,8 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenizeError> {
             builder.push(c)?;
 
             let next_char_is_sep = if let Some(c2) = peek_c {
-                !within_line_comment && (c2.is_whitespace() || all_separator_init_char.contains(&c2))
+                !within_line_comment
+                    && (c2.is_whitespace() || all_separator_init_char.contains(&c2))
             } else {
                 false
             };
@@ -353,7 +359,11 @@ mod tests {
             "var a: int; // This is a comment test!",
             "/* This\nis a block comment\n*/",
             "fn block_test(): ret_type { return 0; }",
-        ].iter().map(|i| i.to_string()).reduce(|a, b| format!("{a}\n{b}")).unwrap_or("".into());
+        ]
+        .iter()
+        .map(|i| i.to_string())
+        .reduce(|a, b| format!("{a}\n{b}"))
+        .unwrap_or("".into());
 
         let tokens = tokenize(&test_code);
         assert!(tokens.is_ok());
@@ -391,7 +401,10 @@ mod tests {
             ("0", 5, 35),
             (";", 5, 36),
             ("}", 5, 38),
-        ].into_iter().map(|(val, line, col)| Token::new(line, col, val.into())).collect::<Vec<_>>();
+        ]
+        .into_iter()
+        .map(|(val, line, col)| Token::new(line, col, val.into()))
+        .collect::<Vec<_>>();
 
         for (tok, exp_tok) in tokens.iter().zip(expected_tokens.iter()) {
             assert_eq!(tok, exp_tok);
@@ -404,19 +417,7 @@ mod tests {
     fn test_tokenizer_struct() {
         let test_code = "struct s1 { var1: u16, var2: u56 } struct s2;";
         let expected_tokens = [
-            "struct",
-            "s1",
-            "{",
-            "var1",
-            ":",
-            "u16",
-            ",",
-            "var2",
-            ":",
-            "u56",
-            "}",
-            "struct",
-            "s2",
+            "struct", "s1", "{", "var1", ":", "u16", ",", "var2", ":", "u56", "}", "struct", "s2",
             ";",
         ];
 
@@ -426,8 +427,8 @@ mod tests {
                     assert_eq!(tok.get_value(), *exp_tok);
                 }
                 assert_eq!(v.len(), expected_tokens.len());
-            },
-            Err(e) => panic!("{e}")
+            }
+            Err(e) => panic!("{e}"),
         }
     }
 }

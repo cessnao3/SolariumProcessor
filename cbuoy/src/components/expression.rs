@@ -1,3 +1,5 @@
+use std::fmt::Binary;
+
 use jasm::{
     argument::ArgumentType,
     instructions::{
@@ -34,7 +36,7 @@ pub trait Expression {
         state: &mut AsmGenstate,
     ) -> Result<Vec<AssemblerToken>, ExpressionError>;
 
-    fn load_address(&self, reg: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
+    fn load_address(&self, _reg: Register) -> Result<Vec<AssemblerToken>, ExpressionError> {
         Err(ExpressionError::NotAddressable)
     }
 }
@@ -186,6 +188,8 @@ pub enum BinaryOperator {
     Bxor,
     Land,
     Lor,
+    Eq,
+    Neq,
 }
 
 pub struct BinaryExpression {
@@ -200,8 +204,16 @@ impl BinaryExpression {
         lhs: Box<dyn Expression>,
         rhs: Box<dyn Expression>,
     ) -> Result<Self, TypeError> {
-        let tl = lhs.get_type()?;
-        let tr = rhs.get_type()?;
+        let mut tl = lhs.get_type()?;
+        let mut tr = rhs.get_type()?;
+
+        if let Ok(t) = tl.base_primitive() {
+            tl = Type::Primitive { base: t };
+        }
+
+        if let Ok(t) = tr.base_primitive() {
+            tr = Type::Primitive { base: t };
+        }
 
         if tl != tr {
             Err(TypeError::TypeMismatch(tl, tr))
@@ -336,6 +348,10 @@ impl Expression for BinaryExpression {
                 }
                 test_code_vals
             }
+            BinaryOperator::Eq | BinaryOperator::Neq =>
+            {
+                panic!("NOT SUPPORTED YET!");
+            }
         };
 
         if uses_val_b {
@@ -345,6 +361,41 @@ impl Expression for BinaryExpression {
         res.extend(test_code);
 
         Ok(res)
+    }
+}
+
+
+pub struct AssignmentExpression {
+    rval: Box<dyn Expression>,
+    lval: Box<dyn Expression>,
+}
+
+impl AssignmentExpression {
+    pub fn new(rval: Box<dyn Expression>, lval: Box<dyn Expression>) -> Self {
+        // TODO - Check type error?
+        Self {
+            rval,
+            lval,
+        }
+    }
+}
+
+impl Expression for AssignmentExpression {
+    fn get_type(&self) -> Result<Type, TypeError> {
+        self.rval.get_type()
+    }
+
+    fn load_address(&self, _reg: Register) -> Result<Vec<jasm::AssemblerToken>, ExpressionError> {
+        Err(ExpressionError::NotAddressable)
+    }
+
+    fn load_to(
+            &self,
+            reg: Register,
+            spare: Register,
+            state: &mut AsmGenstate,
+        ) -> Result<Vec<jasm::AssemblerToken>, ExpressionError> {
+        panic!("assignment not implemented");
     }
 }
 

@@ -1,20 +1,20 @@
 pub mod expression;
+pub mod statement;
 pub mod variable;
 
 use jasm::{AssemblerErrorLoc, LocationInfo, TokenList};
 use jib::cpu::Register;
-use std::collections::HashMap;
+use core::fmt;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use self::{expression::Expression, variable::{GlobalVariable, LocalVariable, Variable}};
+use crate::{parser::ParseError, types::TypeError};
+
+use self::{
+    expression::Expression,
+    variable::{GlobalVariable, LocalVariable, Variable},
+};
 
 use super::types::{Type, TypeDict};
-
-pub struct CompilerState {
-    pub globals: HashMap<String, GlobalVariable>,
-    //pub functions: HashMap<String, Box<dyn Function>>,
-    pub types: TypeDict,
-    pub scopes: Vec<Scope>,
-}
 
 pub struct AsmGenstate {
     pub label_num: u64,
@@ -34,72 +34,119 @@ impl AsmGenstate {
     }
 }
 
-pub struct Scope {
-    pub variables: HashMap<String, LocalVariable>,
-    pub statements: Vec<Box<dyn Statement>>,
+enum ParserScopeType {
+    Root(HashMap<String, GlobalVariable>),
+    Child(Rc<RefCell<ParserScope>>),
 }
 
-impl Scope {
-    pub fn new() -> Self {
+#[derive(Debug, Clone)]
+pub enum ParserScopeError {
+    DuplicateName(String),
+    UnknownVariable(String),
+    TypeError(TypeError),
+}
+
+impl From<TypeError> for ParserScopeError {
+    fn from(value: TypeError) -> Self {
+        Self::TypeError(value)
+    }
+}
+
+impl fmt::Display for ParserScopeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DuplicateName(n) => write!(f, "varible name \"{n}\" already exists in the current scope"),
+            Self::UnknownVariable(n) => write!(f, "unknown variable name \"{n}\" in scope"),
+            Self::TypeError(t) => write!(f, "{t}"),
+        }
+    }
+}
+
+pub struct ParserScope {
+    variables: HashMap<String, LocalVariable>,
+    scope_type: ParserScopeType,
+    base_offset: i32,
+}
+
+impl ParserScope {
+    pub fn new(parent: Rc<RefCell<Self>>) -> Self {
         Self {
             variables: HashMap::new(),
-            statements: Vec::new(),
+            scope_type: ParserScopeType::Child(parent),
+            base_offset: 0,
         }
     }
 
-    pub fn add_statement(&mut self, s: Box<dyn Statement>) {
-        self.statements.push(s);
+    pub fn has_variable(&self, name: &str) -> bool {
+        let exists_local = self.variables.contains_key(name);
+        let exists_global = match &self.scope_type {
+            ParserScopeType::Root(vars) => vars.contains_key(name),
+            _ => false,
+        };
+
+        exists_global || exists_local
+    }
+
+    pub fn add_variable(&mut self, name: &str, t: Type) -> Result<Box<dyn Variable>, ParserScopeError> {
+        if self.has_variable(name) {
+            return Err(ParserScopeError::DuplicateName(name.into()));
+        }
+
+        match &mut self.scope_type {
+            ParserScopeType::Root(global_vars) =>
+            {
+                let var = GlobalVariable::new(name, t);
+                global_vars.insert(name.into(), var.clone());
+                Ok(Box::new(var))
+            }
+            _ =>
+            {
+                let base_offset = self.base_offset;
+                self.base_offset += t.byte_count()? as i32;
+
+                let var = LocalVariable::new(t, base_offset);
+                self.variables.insert(name.into(), var.clone());
+                Ok(Box::new(var))
+            }
+        }
+    }
+
+    pub fn get_variable(&self, s: &str) -> Result<Box<dyn Variable>, ParserScopeError> {
+        let gen_err = || Err(ParserScopeError::UnknownVariable(s.into()));
+
+        if let Some(var) = self.variables.get(s) {
+            Ok(Box::new(var.clone()))
+        } else if let ParserScopeType::Root(globals) = &self.scope_type {
+            globals.get(s).map_or(gen_err(), |v| Ok(Box::new(v.clone()) as Box<dyn Variable>))
+        } else if let ParserScopeType::Child(parent) = &self.scope_type {
+            parent.borrow().get_variable(s)
+        } else {
+            gen_err()
+        }
+    }
+
+    pub fn get_variable_expr(&self, s: &str) -> Result<Box<dyn Expression>, ParserScopeError> {
+        let gen_err = || Err(ParserScopeError::UnknownVariable(s.into()));
+
+        if let Some(var) = self.variables.get(s) {
+            Ok(Box::new(var.clone()))
+        } else if let ParserScopeType::Root(globals) = &self.scope_type {
+            globals.get(s).map_or(gen_err(), |v| Ok(Box::new(v.clone()) as Box<dyn Expression>))
+        } else if let ParserScopeType::Child(parent) = &self.scope_type {
+            parent.borrow().get_variable_expr(s)
+        } else {
+            gen_err()
+        }
     }
 }
 
-impl Default for Scope {
+impl Default for ParserScope {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl CompilerState {
-    pub fn new() -> Self {
         Self {
-            globals: HashMap::new(),
-            //functions: HashMap::new(),
-            scopes: vec![Scope::new()],
-            types: TypeDict::new(),
+            variables: HashMap::new(),
+            scope_type: ParserScopeType::Root(HashMap::new()),
+            base_offset: 0,
         }
-    }
-
-    pub fn get_variable(&self, s: &str) -> Option<Box<dyn Variable>> {
-        for scope in self.scopes.iter().rev() {
-            if let Some(var) = scope.variables.get(s) {
-                return Some(Box::new(var.clone()));
-            }
-        }
-
-        if let Some(var) = self.globals.get(s) {
-            return Some(Box::new(var.clone()));
-        } else {
-            return None;
-        }
-    }
-
-    pub fn get_variable_expr(&self, s: &str) -> Option<Box<dyn Expression>> {
-        for scope in self.scopes.iter().rev() {
-            if let Some(var) = scope.variables.get(s) {
-                return Some(Box::new(var.clone()));
-            }
-        }
-
-        if let Some(var) = self.globals.get(s) {
-            return Some(Box::new(var.clone()));
-        } else {
-            return None;
-        }
-    }
-}
-
-impl Default for CompilerState {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -111,50 +158,6 @@ pub trait BaseStatement {}
 
 pub trait Statement {
     fn stack_size(&self) -> usize;
-}
-
-pub struct DefinitionStatement {
-    var_type: Type,
-    var_name: String,
-    init_expr: Option<Box<dyn expression::Expression>>,
-}
-
-impl DefinitionStatement {
-    pub fn new(name: &str, t: Type) -> Self {
-        Self {
-            var_type: t,
-            var_name: name.into(),
-            init_expr: None,
-        }
-    }
-
-    pub fn set_init(&mut self, expr: Box<dyn expression::Expression>) {
-        self.init_expr = Some(expr);
-    }
-}
-
-impl Statement for DefinitionStatement {
-    fn stack_size(&self) -> usize {
-        panic!("not implemented!")
-    }
-}
-
-impl BaseStatement for DefinitionStatement {}
-
-pub struct ExpressionStatement {
-    expr: Box<dyn expression::Expression>,
-}
-
-impl ExpressionStatement {
-    pub fn new(expr: Box<dyn expression::Expression>) -> Self {
-        Self { expr }
-    }
-}
-
-impl Statement for ExpressionStatement {
-    fn stack_size(&self) -> usize {
-        0
-    }
 }
 
 pub trait Function: BaseStatement {
@@ -170,11 +173,15 @@ pub struct FunctionDefinition {
 }
 
 impl FunctionDefinition {
-    pub fn new(parameters: Vec<(String, Type)>, return_type: Option<Type>, statements: Vec<Box<dyn Statement>>) -> Self {
+    pub fn new(
+        parameters: Vec<(String, Type)>,
+        return_type: Option<Type>,
+        statements: Vec<Box<dyn Statement>>,
+    ) -> Self {
         Self {
             parameters,
             return_type,
-            statements
+            statements,
         }
     }
 }
@@ -202,7 +209,7 @@ impl FunctionPtr {
         Self {
             parameters,
             return_type,
-            addr
+            addr,
         }
     }
 }

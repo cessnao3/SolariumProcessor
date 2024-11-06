@@ -3,7 +3,7 @@ use cbuoy::compile;
 fn main() {
     let code = include_str!("../../examples/test.spc");
 
-    let code = match compile(&code) {
+    let code = match compile(code) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("Parser Error: {e}");
