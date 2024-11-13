@@ -53,7 +53,7 @@ fn func_name(a: u16, b: u32, c: u32) void
         return 5;
     }
 
-    if ((b=4)&&(c==6)) {
+    if ((b = 4) && (c == 6)) {
         return 5;
     }
 

@@ -79,3 +79,13 @@ impl Statement for VariableInitStatement {
             .map_or(0, |t| t.byte_count().unwrap_or(0))
     }
 }
+
+pub struct ReturnStatement {
+    pub expr: Box<dyn Expression>,
+}
+
+impl Statement for ReturnStatement {
+    fn stack_size(&self) -> usize {
+        0
+    }
+}

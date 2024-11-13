@@ -11,7 +11,7 @@ use crate::components::expression::{
     UnaryOperator,
 };
 use crate::components::statement::{
-    DefinitionStatement, ExpressionStatement, IfStatement, VariableInitStatement,
+    DefinitionStatement, ExpressionStatement, IfStatement, ReturnStatement, VariableInitStatement,
 };
 use crate::components::variable::{GlobalVariable, LocalVariable, Variable};
 use crate::components::{
@@ -91,6 +91,11 @@ fn parse_fn_statement(
 
     let mut parameters = Vec::new();
     loop {
+        if tokens.peek_expect(")") {
+            tokens.expect()?;
+            break;
+        }
+
         let name = tokens.expect()?;
         if !is_identifier(name.get_value()) {
             return Err(ParseError::new_tok(
@@ -442,7 +447,7 @@ fn parse_statement(
             } else {
                 let expr = parse_base_expression(tokens, state, scope)?;
                 tokens.expect_value(";")?;
-                panic!("Return with Value");
+                return Ok(Box::new(ReturnStatement { expr }));
             }
         } else if pt_val == "{" {
             tokens.expect()?;
