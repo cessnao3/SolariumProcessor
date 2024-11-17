@@ -49,11 +49,11 @@ fn func_name(a: u16, b: u32, c: u32) void
     if (a = 3) {
     }
 
-    if ((b = 8) && (c == 5)) {
+    if ((b=8) && (c == 5)) {
         return 5;
     }
 
-    if ((b = 4) && (c == 6)) {
+    if ((b=4) && (c==6)) {
         return 5;
     }
 

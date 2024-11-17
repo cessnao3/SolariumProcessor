@@ -246,10 +246,10 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenizeError> {
         })
         .peekable();
 
-    let double_char_separators = ["&&", "||"];
+    let double_char_separators = ["&&", "||", "==", "!="];
 
     let single_char_separators = [
-        '+', '-', '.', ',', '*', '/', '&', '|', '[', ']', '(', ')', '{', '}', ':', ';',
+        '+', '-', '.', ',', '*', '=', '!', '/', '&', '|', '[', ']', '(', ')', '{', '}', ':', ';',
     ];
 
     let all_separator_init_char = single_char_separators
