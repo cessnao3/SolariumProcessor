@@ -5,7 +5,7 @@ mod parser;
 mod tokenizer;
 mod types;
 
-pub fn compile(s: &str) -> Result<Vec<u16>, String> {
+pub fn compile(s: &str) -> Result<Vec<u32>, String> {
     match parser::parse(s) {
         Ok(_) => (),
         Err(e) => return Err(format!("Parse error - {e}")),

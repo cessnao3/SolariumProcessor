@@ -33,7 +33,7 @@ impl Token {
     pub fn tok_str(toks: &[Token]) -> String {
         toks.iter()
             .map(|t| t.get_value().into())
-            .reduce(|a, b| format!("{a} {b}"))
+            .reduce(|a, b| format!("{a}{b}"))
             .unwrap_or(String::new())
     }
 }
