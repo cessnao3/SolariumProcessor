@@ -1,4 +1,4 @@
-use jasm::{
+use jib_asm::{
     argument::ArgumentType,
     instructions::{OpAdd, OpLd, OpLdn},
     AssemblerToken, FromLiteral,

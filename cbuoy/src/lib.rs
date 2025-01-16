@@ -1,16 +1,17 @@
-use jasm::{AssemblerErrorLoc, TokenLoc};
+use jib_asm::{AssemblerErrorLoc, TokenLoc};
 
 mod components;
 mod parser;
 mod tokenizer;
 mod types;
 
-pub fn compile(s: &str) -> Result<Vec<u32>, String> {
-    match parser::parse(s) {
-        Ok(_) => (),
+pub fn compile(s: &str) -> Result<Vec<u8>, String> {
+    let state = match parser::parse(s) {
+        Ok(s) => s,
         Err(e) => return Err(format!("Parse error - {e}")),
-    }
-    Err("compiling not yet fully supported".into())
+    };
+
+    Ok(state.generate_code())
 }
 
 pub fn assemble(_s: &str) -> Result<Vec<TokenLoc>, AssemblerErrorLoc> {

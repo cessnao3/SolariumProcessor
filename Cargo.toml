@@ -2,7 +2,7 @@
 
 members = [
     "cbuoy",
-    "jasm",
+    "jib-asm",
     "jib",
     "visual-jib",
 ]

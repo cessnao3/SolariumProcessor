@@ -21,8 +21,10 @@ use crate::tokenizer::{tokenize, Token, TokenIter, TokenIterError, TokenizeError
 use crate::types::{StructDef, TypeError};
 use crate::types::{Type, TypeDict};
 
-pub fn parse(s: &str) -> Result<(), ParseError> {
-    parse_with_state(s, &mut ParserState::default())
+pub fn parse(s: &str) -> Result<ParserState, ParseError> {
+    let mut state = ParserState::default();
+    parse_with_state(s, &mut state)?;
+    Ok(state)
 }
 
 fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> {
@@ -173,7 +175,7 @@ fn parse_fn_statement(
         tokens.expect_value("}")?;
 
         Ok(Box::new(FunctionDefinition::new(
-            parameters, ret_type, statements,
+            name, parameters, ret_type, statements,
         )))
     }
 }
@@ -670,6 +672,18 @@ pub struct ParserState {
     pub statements: Vec<Box<dyn BaseStatement>>,
     pub types: TypeDict,
     pub root_scope: Rc<RefCell<ParserScope>>,
+}
+
+impl ParserState {
+    pub fn generate_code(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+
+        for s in self.statements.iter() {
+            todo!();
+        }
+
+        data
+    }
 }
 
 #[derive(Debug)]

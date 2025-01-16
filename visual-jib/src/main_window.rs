@@ -46,7 +46,7 @@ pub fn build_ui(app: &Application) {
     });
 
     // Create the
-    let inst = jasm::InstructionList::default();
+    let inst = jib_asm::InstructionList::default();
 
     // Setup the UI receiver
     glib::spawn_future_local(async move {
@@ -136,7 +136,7 @@ fn build_code_column(
 ) -> gtk::Box {
     let code_stack = gtk::Stack::builder().build();
 
-    let default_asm = include_str!("../../examples/jasm/thread_test.jsm");
+    let default_asm = include_str!("../../jib-asm/examples/thread_test.jsm");
 
     let code_options = vec![
         (default_asm, "Assemble", "ASM", true),
@@ -174,7 +174,7 @@ fn build_code_column(
         if is_assembly {
             btn_build.connect_clicked(clone!(#[strong] tx_thread, #[strong] tx_ui, move |_| {
                 let asm = buffer_assembly_code.text(&buffer_assembly_code.start_iter(), &buffer_assembly_code.end_iter(), false);
-                match jasm::assemble_text(asm.as_str()) {
+                match jib_asm::assemble_text(asm.as_str()) {
                     Ok(v) => {
                         tx_ui.send(UiToThread::SetCode(v)).unwrap();
                         tx_thread.send(ThreadToUi::LogMessage(format!("{short_name} Successful"))).unwrap();

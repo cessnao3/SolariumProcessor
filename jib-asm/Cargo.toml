@@ -1,5 +1,5 @@
 [package]
-name = "jasm"
+name = "jib-asm"
 version = "0.1.0"
 edition = "2021"
 

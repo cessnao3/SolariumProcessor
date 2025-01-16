@@ -101,6 +101,16 @@ pub struct LocationInfo {
     pub base_loc: Option<Box<LocationInfo>>,
 }
 
+impl Default for LocationInfo {
+    fn default() -> Self {
+        Self {
+            line: 0,
+            full_line: None,
+            base_loc: None,
+        }
+    }
+}
+
 impl fmt::Display for LocationInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[{}]", self.line)?;
@@ -698,7 +708,7 @@ mod test {
 
     #[test]
     fn test_counter() {
-        let txt = include_str!("../../examples/jasm/counter.jsm");
+        let txt = include_str!("../../jib-asm/examples/counter.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
         assert!(!res.unwrap().is_empty());
@@ -706,7 +716,7 @@ mod test {
 
     #[test]
     fn test_hello_world() {
-        let txt = include_str!("../../examples/jasm/hello_world.jsm");
+        let txt = include_str!("../../jib-asm/examples/hello_world.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
         assert!(!res.unwrap().is_empty());
@@ -714,7 +724,7 @@ mod test {
 
     #[test]
     fn test_infinite_counter() {
-        let txt = include_str!("../../examples/jasm/infinite_counter.jsm");
+        let txt = include_str!("../../jib-asm/examples/infinite_counter.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
         assert!(!res.unwrap().is_empty());
@@ -722,7 +732,7 @@ mod test {
 
     #[test]
     fn test_serial_echo() {
-        let txt = include_str!("../../examples/jasm/serial_echo.jsm");
+        let txt = include_str!("../../jib-asm/examples/serial_echo.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
         assert!(!res.unwrap().is_empty());
@@ -730,7 +740,7 @@ mod test {
 
     #[test]
     fn test_thread_test() {
-        let txt = include_str!("../../examples/jasm/thread_test.jsm");
+        let txt = include_str!("../../jib-asm/examples/thread_test.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
         assert!(!res.unwrap().is_empty());

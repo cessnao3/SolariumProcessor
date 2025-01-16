@@ -8,4 +8,4 @@ edition = "2021"
 [dependencies]
 regex = "1"
 jib = { path = "../jib", version = "*" }
-jasm = { path = "../jasm", version = "*" }
+jib-asm = { path = "../jib-asm", version = "*" }

@@ -2,12 +2,15 @@ pub mod expression;
 pub mod statement;
 pub mod variable;
 
-use jasm::{AssemblerErrorLoc, LocationInfo, TokenList};
-use jib::cpu::Register;
 use core::fmt;
+use jib_asm::{AssemblerErrorLoc, LocationInfo, TokenList, TokenLoc};
+use jib::cpu::Register;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{parser::ParseError, types::TypeError};
+use crate::{
+    parser::{ParseError, ParserState},
+    types::TypeError,
+};
 
 use self::{
     expression::Expression,
@@ -55,7 +58,10 @@ impl From<TypeError> for ParserScopeError {
 impl fmt::Display for ParserScopeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::DuplicateName(n) => write!(f, "varible name \"{n}\" already exists in the current scope"),
+            Self::DuplicateName(n) => write!(
+                f,
+                "varible name \"{n}\" already exists in the current scope"
+            ),
             Self::UnknownVariable(n) => write!(f, "unknown variable name \"{n}\" in scope"),
             Self::TypeError(t) => write!(f, "{t}"),
         }
@@ -87,20 +93,22 @@ impl ParserScope {
         exists_global || exists_local
     }
 
-    pub fn add_variable(&mut self, name: &str, t: Type) -> Result<Box<dyn Variable>, ParserScopeError> {
+    pub fn add_variable(
+        &mut self,
+        name: &str,
+        t: Type,
+    ) -> Result<Box<dyn Variable>, ParserScopeError> {
         if self.has_variable(name) {
             return Err(ParserScopeError::DuplicateName(name.into()));
         }
 
         match &mut self.scope_type {
-            ParserScopeType::Root(global_vars) =>
-            {
+            ParserScopeType::Root(global_vars) => {
                 let var = GlobalVariable::new(name, t);
                 global_vars.insert(name.into(), var.clone());
                 Ok(Box::new(var))
             }
-            _ =>
-            {
+            _ => {
                 let base_offset = self.base_offset;
                 self.base_offset += t.byte_count()? as i32;
 
@@ -117,7 +125,9 @@ impl ParserScope {
         if let Some(var) = self.variables.get(s) {
             Ok(Box::new(var.clone()))
         } else if let ParserScopeType::Root(globals) = &self.scope_type {
-            globals.get(s).map_or(gen_err(), |v| Ok(Box::new(v.clone()) as Box<dyn Variable>))
+            globals
+                .get(s)
+                .map_or(gen_err(), |v| Ok(Box::new(v.clone()) as Box<dyn Variable>))
         } else if let ParserScopeType::Child(parent) = &self.scope_type {
             parent.borrow().get_variable(s)
         } else {
@@ -131,7 +141,10 @@ impl ParserScope {
         if let Some(var) = self.variables.get(s) {
             Ok(Box::new(var.clone()))
         } else if let ParserScopeType::Root(globals) = &self.scope_type {
-            globals.get(s).map_or(gen_err(), |v| Ok(Box::new(v.clone()) as Box<dyn Expression>))
+            globals.get(s).map_or(
+                gen_err(),
+                |v| Ok(Box::new(v.clone()) as Box<dyn Expression>),
+            )
         } else if let ParserScopeType::Child(parent) = &self.scope_type {
             parent.borrow().get_variable_expr(s)
         } else {
@@ -151,10 +164,10 @@ impl Default for ParserScope {
 }
 
 pub trait CodeComponent {
-    fn generate_code(&self, state: &mut TokenList);
+    fn generate_code(&self) -> Vec<TokenLoc>;
 }
 
-pub trait BaseStatement {}
+pub trait BaseStatement: CodeComponent {}
 
 pub trait Statement {
     fn stack_size(&self) -> usize;
@@ -167,6 +180,7 @@ pub trait Function: BaseStatement {
 }
 
 pub struct FunctionDefinition {
+    name: String,
     parameters: Vec<(String, Type)>,
     return_type: Option<Type>,
     statements: Vec<Box<dyn Statement>>,
@@ -174,19 +188,42 @@ pub struct FunctionDefinition {
 
 impl FunctionDefinition {
     pub fn new(
+        name: &str,
         parameters: Vec<(String, Type)>,
         return_type: Option<Type>,
         statements: Vec<Box<dyn Statement>>,
     ) -> Self {
         Self {
+            name: name.to_string(),
             parameters,
             return_type,
             statements,
         }
     }
+
+    fn assembler_label(&self) -> String {
+        format!("func_def_{}", self.name)
+    }
 }
 
 impl BaseStatement for FunctionDefinition {}
+
+impl CodeComponent for FunctionDefinition {
+    fn generate_code(&self) -> Vec<TokenLoc> {
+        let mut tokens = vec![TokenLoc {
+            loc: LocationInfo::default(),
+            tok: jib_asm::AssemblerToken::CreateLabel(self.assembler_label()),
+        }];
+
+        // TODO - Create spots for the input parameters?
+
+        for s in self.statements.iter() {
+            todo!("generate code for statements");
+        }
+
+        tokens
+    }
+}
 
 impl Function for FunctionDefinition {
     fn get_input_parameters(&self) -> Vec<(String, Type)> {
@@ -215,6 +252,12 @@ impl FunctionPtr {
 }
 
 impl BaseStatement for FunctionPtr {}
+
+impl CodeComponent for FunctionPtr {
+    fn generate_code(&self) -> Vec<TokenLoc> {
+        todo!("generate code to jump to the stored function pointer?");
+    }
+}
 
 impl Function for FunctionPtr {
     fn get_input_parameters(&self) -> Vec<(String, Type)> {
@@ -267,3 +310,9 @@ impl AsmFunction {
 }
 
 impl BaseStatement for AsmFunction {}
+
+impl CodeComponent for AsmFunction {
+    fn generate_code(&self) -> Vec<TokenLoc> {
+        panic!("not implemented");
+    }
+}

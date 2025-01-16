@@ -1,6 +1,10 @@
+use std::panic::Location;
+
+use jib_asm::{LocationInfo, TokenLoc};
+
 use crate::types::Type;
 
-use super::{expression::Expression, variable::Variable, BaseStatement, Statement};
+use super::{expression::Expression, variable::Variable, BaseStatement, CodeComponent, Statement};
 
 pub struct DefinitionStatement {
     pub name: String,
@@ -20,15 +24,37 @@ impl DefinitionStatement {
     pub fn set_init(&mut self, expr: Box<dyn Expression>) {
         self.init_expr = Some(expr);
     }
+
+    fn assmebler_label(&self) -> String {
+        format!("static_var_{}", self.name)
+    }
 }
 
 impl Statement for DefinitionStatement {
     fn stack_size(&self) -> usize {
-        0
+        self.var_type.byte_count().unwrap()
     }
 }
 
 impl BaseStatement for DefinitionStatement {}
+
+impl CodeComponent for DefinitionStatement {
+    fn generate_code(&self) -> Vec<jib_asm::TokenLoc> {
+        let mut v = vec![
+            TokenLoc { loc: LocationInfo::default(), tok: jib_asm::AssemblerToken::CreateLabel(self.assmebler_label())},
+        ];
+
+        for _ in 0..self.stack_size() {
+            v.push(TokenLoc { loc: LocationInfo::default(), tok: jib_asm::AssemblerToken::Literal1(0)});
+        }
+
+        if let Some(e) = &self.init_expr {
+            todo!("need to initialize memory with the provided expression");
+        }
+
+        v
+    }
+}
 
 pub struct ExpressionStatement {
     pub expr: Box<dyn Expression>,

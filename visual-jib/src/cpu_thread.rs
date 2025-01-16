@@ -2,7 +2,7 @@ use crate::messages::{ThreadToUi, UiToThread};
 use jib::cpu::{Processor, ProcessorError};
 use jib::device::{InterruptClockDevice, SerialInputOutputDevice};
 use jib::memory::{MemorySegment, ReadOnlySegment, ReadWriteSegment};
-use jasm::InstructionList;
+use jib_asm::InstructionList;
 use std::sync::mpsc::{Receiver, RecvError, Sender, TryRecvError};
 
 use std::cell::RefCell;

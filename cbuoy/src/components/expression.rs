@@ -1,6 +1,6 @@
 use std::fmt::Binary;
 
-use jasm::{
+use jib_asm::{
     argument::ArgumentType,
     instructions::{
         OpAdd, OpBand, OpBnot, OpBor, OpBshl, OpBshr, OpBxor, OpConv, OpDiv, OpJmp, OpJmpri, OpLd,
@@ -385,7 +385,7 @@ impl Expression for AssignmentExpression {
         self.rval.get_type()
     }
 
-    fn load_address(&self, _reg: Register) -> Result<Vec<jasm::AssemblerToken>, ExpressionError> {
+    fn load_address(&self, _reg: Register) -> Result<Vec<jib_asm::AssemblerToken>, ExpressionError> {
         Err(ExpressionError::NotAddressable)
     }
 
@@ -394,7 +394,7 @@ impl Expression for AssignmentExpression {
             reg: Register,
             spare: Register,
             state: &mut AsmGenstate,
-        ) -> Result<Vec<jasm::AssemblerToken>, ExpressionError> {
+        ) -> Result<Vec<jib_asm::AssemblerToken>, ExpressionError> {
         panic!("assignment not implemented");
     }
 }
