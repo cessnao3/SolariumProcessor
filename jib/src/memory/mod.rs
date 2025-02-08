@@ -24,7 +24,9 @@ impl fmt::Display for MemoryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidMemoryAccess(loc) => write!(f, "Invalid Memory Access 0x{loc:08x}"),
-            Self::InvalidMemoryWrite(loc, data) => write!(f, "Invalid Memory Access 0x{loc:08x}[{data}]"),
+            Self::InvalidMemoryWrite(loc, data) => {
+                write!(f, "Invalid Memory Access 0x{loc:08x}[{data}]")
+            }
             Self::ReadOnlyMemory(loc) => write!(f, "Read Only Memory 0x{loc:08x}"),
             Self::OverlappingSegment(loc) => write!(f, "Overlapping Segment at 0x{loc:08x}"),
             Self::EmptySegment(loc) => write!(f, "Empty Segment 0x{loc:08x}"),

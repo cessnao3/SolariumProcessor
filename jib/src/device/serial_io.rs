@@ -1,7 +1,7 @@
 use alloc::collections::VecDeque;
 use core::cell::RefCell;
 
-use super::{ProcessorDevice, DEVICE_MEM_SIZE, DEVICE_ID_SIZE};
+use super::{DEVICE_ID_SIZE, DEVICE_MEM_SIZE, ProcessorDevice};
 
 use crate::memory::{MemorySegment, MemorySegmentError};
 
@@ -64,7 +64,9 @@ impl SerialInputOutputDevice {
         // Use the offset values to determine the action to take
         return match offset {
             n if n < DEVICE_ID_SIZE => Ok(Self::DEVICE_ID.to_be_bytes()[offset as usize]),
-            Self::OFFSET_INPUT_SIZE => Ok((u8::MAX as usize).min(self.input_queue.borrow().len()) as u8),
+            Self::OFFSET_INPUT_SIZE => {
+                Ok((u8::MAX as usize).min(self.input_queue.borrow().len()) as u8)
+            }
             Self::OFFSET_OUTPUT_SIZE => Ok((u8::MAX as usize).min(self.output_queue.len()) as u8),
             Self::OFFSET_OUTPUT_SET => Ok(0),
             _ => Err(MemorySegmentError::InvalidMemoryAccess(offset)),

@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use crate::{
     argument::{ArgumentError, ArgumentRegister, ArgumentType},
-    immediate::{parse_imm_i16, ImmediateError},
+    immediate::{ImmediateError, parse_imm_i16},
 };
 use jib::cpu::{Opcode, Processor};
 
@@ -23,7 +23,9 @@ impl fmt::Display for InstructionError {
             Self::CountMismatch(num, expected) => write!(f, "Found {num}, Expected {expected}"),
             Self::Immediate(i) => write!(f, "Immediate Error => {i}"),
             Self::Argument(a) => write!(f, "Argument Error => {a}"),
-            Self::OpcodeMismatch(op, b) => write!(f, "Opcode Mismatch - {op} does not match provided {b}"),
+            Self::OpcodeMismatch(op, b) => {
+                write!(f, "Opcode Mismatch - {op} does not match provided {b}")
+            }
         }
     }
 }
@@ -46,6 +48,8 @@ pub trait Instruction {
     fn to_u32(&self) -> u32 {
         u32::from_be_bytes(self.to_bytes())
     }
+
+    fn boxed_clone(&self) -> Box<dyn Instruction>;
 }
 
 macro_rules! InstNoArg {
@@ -58,13 +62,21 @@ macro_rules! InstNoArg {
             const NUM_ARGS: usize = 0;
 
             pub fn name() -> String {
-                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+                stringify!($op_name)
+                    .to_lowercase()
+                    .strip_prefix("op")
+                    .unwrap()
+                    .into()
             }
         }
 
         impl Instruction for $op_name {
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), 0, 0, 0]
+            }
+
+            fn boxed_clone(&self) -> Box<dyn Instruction> {
+                Box::new(self.clone())
             }
         }
 
@@ -116,13 +128,21 @@ macro_rules! InstSingleArg {
             }
 
             pub fn name() -> String {
-                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+                stringify!($op_name)
+                    .to_lowercase()
+                    .strip_prefix("op")
+                    .unwrap()
+                    .into()
             }
         }
 
         impl Instruction for $op_name {
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), self.arg.to_byte(), 0, 0]
+            }
+
+            fn boxed_clone(&self) -> Box<dyn Instruction> {
+                Box::new(self.clone())
             }
         }
 
@@ -152,7 +172,7 @@ macro_rules! InstSingleArg {
                     Err(InstructionError::OpcodeMismatch(Self::OP, bytes[0]))
                 } else {
                     Ok(Self {
-                        arg: ArgumentRegister::try_from(bytes[1])?
+                        arg: ArgumentRegister::try_from(bytes[1])?,
                     })
                 }
             }
@@ -176,13 +196,21 @@ macro_rules! InstSingleArgDataType {
             }
 
             pub fn name() -> String {
-                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+                stringify!($op_name)
+                    .to_lowercase()
+                    .strip_prefix("op")
+                    .unwrap()
+                    .into()
             }
         }
 
         impl Instruction for $op_name {
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), self.arg.to_byte(), 0, 0]
+            }
+
+            fn boxed_clone(&self) -> Box<dyn Instruction> {
+                Box::new(self.clone())
             }
         }
 
@@ -212,7 +240,7 @@ macro_rules! InstSingleArgDataType {
                     Err(InstructionError::OpcodeMismatch(Self::OP, bytes[0]))
                 } else {
                     Ok(Self {
-                        arg: ArgumentType::try_from(bytes[1])?
+                        arg: ArgumentType::try_from(bytes[1])?,
                     })
                 }
             }
@@ -236,7 +264,11 @@ macro_rules! InstImmediateArg {
             }
 
             pub fn name() -> String {
-                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+                stringify!($op_name)
+                    .to_lowercase()
+                    .strip_prefix("op")
+                    .unwrap()
+                    .into()
             }
         }
 
@@ -244,6 +276,10 @@ macro_rules! InstImmediateArg {
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 let imm = self.imm.to_be_bytes();
                 [Self::OP.to_byte(), 0, imm[0], imm[1]]
+            }
+
+            fn boxed_clone(&self) -> Box<dyn Instruction> {
+                Box::new(self.clone())
             }
         }
 
@@ -299,7 +335,11 @@ macro_rules! InstSingleArgImm {
             }
 
             pub fn name() -> String {
-                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+                stringify!($op_name)
+                    .to_lowercase()
+                    .strip_prefix("op")
+                    .unwrap()
+                    .into()
             }
         }
 
@@ -307,6 +347,10 @@ macro_rules! InstSingleArgImm {
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 let imm = self.imm.to_be_bytes();
                 [Self::OP.to_byte(), self.arg.to_byte(), imm[0], imm[1]]
+            }
+
+            fn boxed_clone(&self) -> Box<dyn Instruction> {
+                Box::new(self.clone())
             }
         }
 
@@ -364,7 +408,11 @@ macro_rules! InstDoubleArg {
             }
 
             pub fn name() -> String {
-                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+                stringify!($op_name)
+                    .to_lowercase()
+                    .strip_prefix("op")
+                    .unwrap()
+                    .into()
             }
         }
 
@@ -376,6 +424,10 @@ macro_rules! InstDoubleArg {
                     self.arg1.to_byte(),
                     0,
                 ]
+            }
+
+            fn boxed_clone(&self) -> Box<dyn Instruction> {
+                Box::new(self.clone())
             }
         }
 
@@ -433,7 +485,11 @@ macro_rules! InstDoubleArgType {
             }
 
             pub fn name() -> String {
-                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+                stringify!($op_name)
+                    .to_lowercase()
+                    .strip_prefix("op")
+                    .unwrap()
+                    .into()
             }
         }
 
@@ -445,6 +501,10 @@ macro_rules! InstDoubleArgType {
                     self.arg1.to_byte(),
                     0,
                 ]
+            }
+
+            fn boxed_clone(&self) -> Box<dyn Instruction> {
+                Box::new(self.clone())
             }
         }
 
@@ -502,7 +562,11 @@ macro_rules! InstDoubleArgDoubleType {
             }
 
             pub fn name() -> String {
-                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+                stringify!($op_name)
+                    .to_lowercase()
+                    .strip_prefix("op")
+                    .unwrap()
+                    .into()
             }
         }
 
@@ -514,6 +578,10 @@ macro_rules! InstDoubleArgDoubleType {
                     self.arg1.to_byte(),
                     0,
                 ]
+            }
+
+            fn boxed_clone(&self) -> Box<dyn Instruction> {
+                Box::new(self.clone())
             }
         }
 
@@ -572,7 +640,11 @@ macro_rules! InstArith {
             }
 
             pub fn name() -> String {
-                stringify!($op_name).to_lowercase().strip_prefix("op").unwrap().into()
+                stringify!($op_name)
+                    .to_lowercase()
+                    .strip_prefix("op")
+                    .unwrap()
+                    .into()
             }
         }
 
@@ -585,11 +657,22 @@ macro_rules! InstArith {
                     self.arg2.to_byte(),
                 ]
             }
+
+            fn boxed_clone(&self) -> Box<dyn Instruction> {
+                Box::new(self.clone())
+            }
         }
 
         impl fmt::Display for $op_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{} {} {} {}", Self::name(), self.arg0, self.arg1, self.arg2)
+                write!(
+                    f,
+                    "{} {} {} {}",
+                    Self::name(),
+                    self.arg0,
+                    self.arg1,
+                    self.arg2
+                )
             }
         }
 

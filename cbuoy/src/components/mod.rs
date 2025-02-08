@@ -3,12 +3,14 @@ pub mod statement;
 pub mod variable;
 
 use core::fmt;
-use jib_asm::{AssemblerErrorLoc, LocationInfo, TokenList, TokenLoc};
+use expression::ExpressionError;
 use jib::cpu::Register;
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use jib_asm::{AsmToken, AsmTokenLoc, AssemblerErrorLoc, LocationInfo, TokenList};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
     parser::{ParseError, ParserState},
+    tokenizer::Token,
     types::TypeError,
 };
 
@@ -19,17 +21,25 @@ use self::{
 
 use super::types::{Type, TypeDict};
 
-pub struct AsmGenstate {
+pub struct AsmGenState {
     pub label_num: u64,
     pub current_register_count: usize,
 }
 
-impl AsmGenstate {
+impl AsmGenState {
     pub fn new() -> Self {
         Self {
             label_num: 0,
             current_register_count: Register::first_gp_register().get_index(),
         }
+    }
+
+    pub fn reg_a(&self) -> Register {
+        Register::try_from(self.current_register_count).unwrap()
+    }
+
+    pub fn reg_b(&self) -> Register {
+        Register::try_from(self.current_register_count + 1).unwrap()
     }
 
     pub fn temporary_register(&self) -> Register {
@@ -95,6 +105,7 @@ impl ParserScope {
 
     pub fn add_variable(
         &mut self,
+        tok: Token,
         name: &str,
         t: Type,
     ) -> Result<Box<dyn Variable>, ParserScopeError> {
@@ -104,7 +115,7 @@ impl ParserScope {
 
         match &mut self.scope_type {
             ParserScopeType::Root(global_vars) => {
-                let var = GlobalVariable::new(name, t);
+                let var = GlobalVariable::new(tok, name, t);
                 global_vars.insert(name.into(), var.clone());
                 Ok(Box::new(var))
             }
@@ -112,7 +123,7 @@ impl ParserScope {
                 let base_offset = self.base_offset;
                 self.base_offset += t.byte_count()? as i32;
 
-                let var = LocalVariable::new(t, base_offset);
+                let var = LocalVariable::new(tok, t, base_offset);
                 self.variables.insert(name.into(), var.clone());
                 Ok(Box::new(var))
             }
@@ -163,8 +174,72 @@ impl Default for ParserScope {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ErrorToken {
+    tok: Token,
+    msg: Option<String>,
+}
+
+impl ErrorToken {
+    pub fn test<T, E: ToString>(tok: &Token, value: Result<T, E>) -> Result<T, Self> {
+        match value {
+            Ok(v) => Ok(v),
+            Err(e) => Err(Self::new(tok.clone(), &e.to_string())),
+        }
+    }
+
+    pub fn new<T: ToString>(tok: Token, msg: T) -> Self {
+        Self {
+            tok,
+            msg: Some(msg.to_string()),
+        }
+    }
+
+    pub fn get_msg(&self) -> Option<&String> {
+        self.msg.as_ref()
+    }
+
+    pub fn get_msg_text(&self) -> String {
+        self.msg.clone().unwrap_or(String::new())
+    }
+
+    pub fn get_token(&self) -> &Token {
+        &self.tok
+    }
+}
+
+impl Display for ErrorToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let res = write!(f, "Error @ {}", self.tok)?;
+        if let Some(msg) = &self.msg {
+            write!(f, " - {msg}")
+        } else {
+            Ok(res)
+        }
+    }
+}
+
+impl From<Token> for ErrorToken {
+    fn from(value: Token) -> Self {
+        Self {
+            tok: value,
+            msg: None,
+        }
+    }
+}
+
+impl From<AssemblerErrorLoc> for ErrorToken {
+    fn from(value: AssemblerErrorLoc) -> Self {
+        Self::new(value.loc.into(), &value.err.to_string())
+    }
+}
+
 pub trait CodeComponent {
-    fn generate_code(&self) -> Vec<TokenLoc>;
+    fn generate_init_code(&self, _state: &mut AsmGenState) -> Result<Vec<AsmToken>, ErrorToken> {
+        return Ok(Vec::new());
+    }
+
+    fn generate_code(&self, state: &mut AsmGenState) -> Result<Vec<AsmToken>, ErrorToken>;
 }
 
 pub trait BaseStatement: CodeComponent {}
@@ -209,11 +284,8 @@ impl FunctionDefinition {
 impl BaseStatement for FunctionDefinition {}
 
 impl CodeComponent for FunctionDefinition {
-    fn generate_code(&self) -> Vec<TokenLoc> {
-        let mut tokens = vec![TokenLoc {
-            loc: LocationInfo::default(),
-            tok: jib_asm::AssemblerToken::CreateLabel(self.assembler_label()),
-        }];
+    fn generate_code(&self, state: &mut AsmGenState) -> Result<Vec<AsmToken>, ErrorToken> {
+        let tokens = vec![AsmToken::CreateLabel(self.assembler_label())];
 
         // TODO - Create spots for the input parameters?
 
@@ -221,7 +293,7 @@ impl CodeComponent for FunctionDefinition {
             todo!("generate code for statements");
         }
 
-        tokens
+        Ok(tokens)
     }
 }
 
@@ -254,7 +326,7 @@ impl FunctionPtr {
 impl BaseStatement for FunctionPtr {}
 
 impl CodeComponent for FunctionPtr {
-    fn generate_code(&self) -> Vec<TokenLoc> {
+    fn generate_code(&self, state: &mut AsmGenState) -> Result<Vec<AsmToken>, ErrorToken> {
         todo!("generate code to jump to the stored function pointer?");
     }
 }
@@ -312,7 +384,7 @@ impl AsmFunction {
 impl BaseStatement for AsmFunction {}
 
 impl CodeComponent for AsmFunction {
-    fn generate_code(&self) -> Vec<TokenLoc> {
+    fn generate_code(&self, state: &mut AsmGenState) -> Result<Vec<AsmToken>, ErrorToken> {
         panic!("not implemented");
     }
 }

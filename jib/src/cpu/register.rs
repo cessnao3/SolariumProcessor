@@ -54,7 +54,7 @@ impl Register {
         }
     }
 
-    pub const fn get_special_name(&self) -> &str{
+    pub const fn get_special_name(&self) -> &str {
         match self.as_special() {
             Some(Self::ProgramCounter) => "pc",
             Some(Self::Status) => "stat",
@@ -62,7 +62,7 @@ impl Register {
             Some(Self::Overflow) => "ovf",
             Some(Self::Return) => "ret",
             Some(Self::ArgumentBase) => "arg",
-            _ => ""
+            _ => "",
         }
     }
 }
@@ -77,6 +77,23 @@ impl fmt::Display for Register {
     }
 }
 
+impl TryFrom<usize> for Register {
+    type Error = RegisterError;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        Ok(match value {
+            Self::IDX_PROGRAM_COUNTER => Self::ProgramCounter,
+            Self::IDX_STATUS => Self::Status,
+            Self::IDX_STACK_POINTER => Self::StackPointer,
+            Self::IDX_OVERFLOW => Self::Overflow,
+            Self::IDX_RETURN => Self::Return,
+            Self::IDX_ARGUMENT_BASE => Self::ArgumentBase,
+            x if x >= Self::IDX_FIRST_GP && x < Self::NUM_REGISTERS => Self::GeneralPurpose(x),
+            x => return Err(Self::Error::UnknownRegister(x)),
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum RegisterError {
     UnknownRegister(usize),
@@ -85,7 +102,7 @@ pub enum RegisterError {
 impl fmt::Display for RegisterError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnknownRegister(r) => write!(f, "Unknown Register {r}")
+            Self::UnknownRegister(r) => write!(f, "Unknown Register {r}"),
         }
     }
 }

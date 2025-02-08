@@ -94,7 +94,11 @@ pub struct Instruction {
 
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{:02x}, {:02x}, {:02x}, {:02x}]", self.data[0], self.data[1], self.data[2], self.data[3])
+        write!(
+            f,
+            "[{:02x}, {:02x}, {:02x}, {:02x}]",
+            self.data[0], self.data[1], self.data[2], self.data[3]
+        )
     }
 }
 

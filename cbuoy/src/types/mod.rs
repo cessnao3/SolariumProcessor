@@ -318,14 +318,14 @@ impl TypeDict {
                         return Err(TypeError::CannotOverrideType {
                             new_type: t.clone(),
                             old_type: existing_type.clone(),
-                        })
+                        });
                     }
                 },
                 _ => {
                     return Err(TypeError::CannotOverrideType {
                         new_type: t.clone(),
                         old_type: existing_type.clone(),
-                    })
+                    });
                 }
             }
         }

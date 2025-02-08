@@ -12,9 +12,9 @@ use crate::memory::{MemoryError, MemoryMap, MemorySegment};
 
 use self::instruction::Instruction;
 use self::operations::{
-    ArithmeticOperations, BinaryOperations, FloatOperations, IntegerI16Operations,
-    IntegerI32Operations, IntegerI8Operations, IntegerU16Operations, IntegerU32Operations,
-    IntegerU8Operations, OperationError, RelationalOperations,
+    ArithmeticOperations, BinaryOperations, FloatOperations, IntegerI8Operations,
+    IntegerI16Operations, IntegerI32Operations, IntegerU8Operations, IntegerU16Operations,
+    IntegerU32Operations, OperationError, RelationalOperations,
 };
 
 use self::register::RegisterFlag;
@@ -575,7 +575,7 @@ impl Processor {
             _ => {
                 return Err(ProcessorError::Operation(
                     OperationError::UnuspportedOperation,
-                ))
+                ));
             }
         })
     }

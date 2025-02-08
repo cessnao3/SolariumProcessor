@@ -2,8 +2,8 @@ use super::{MemoryError, MemorySegment, MemorySegmentError};
 
 use core::cell::RefCell;
 
-use alloc::vec::Vec;
 use alloc::rc::Rc;
+use alloc::vec::Vec;
 use core::mem::size_of;
 
 struct SegmentData {

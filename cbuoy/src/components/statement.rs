@@ -1,18 +1,19 @@
-use std::panic::Location;
-
-use jib_asm::{LocationInfo, TokenLoc};
+use jib_asm::{AsmToken, AsmTokenLoc, LocationInfo};
 
 use crate::types::Type;
 
-use super::{expression::Expression, variable::Variable, BaseStatement, CodeComponent, Statement};
+use super::{
+    expression::Expression, variable::Variable, AsmGenState, BaseStatement, CodeComponent,
+    ErrorToken, Statement,
+};
 
-pub struct DefinitionStatement {
+pub struct GlobalDefinitionStatement {
     pub name: String,
     pub var_type: Type,
     pub init_expr: Option<Box<dyn Expression>>,
 }
 
-impl DefinitionStatement {
+impl GlobalDefinitionStatement {
     pub fn new(name: &str, var_type: Type) -> Self {
         Self {
             name: name.into(),
@@ -30,29 +31,34 @@ impl DefinitionStatement {
     }
 }
 
-impl Statement for DefinitionStatement {
+impl Statement for GlobalDefinitionStatement {
     fn stack_size(&self) -> usize {
         self.var_type.byte_count().unwrap()
     }
 }
 
-impl BaseStatement for DefinitionStatement {}
+impl BaseStatement for GlobalDefinitionStatement {}
 
-impl CodeComponent for DefinitionStatement {
-    fn generate_code(&self) -> Vec<jib_asm::TokenLoc> {
-        let mut v = vec![
-            TokenLoc { loc: LocationInfo::default(), tok: jib_asm::AssemblerToken::CreateLabel(self.assmebler_label())},
-        ];
+impl CodeComponent for GlobalDefinitionStatement {
+    fn generate_init_code(&self, state: &mut AsmGenState) -> Result<Vec<AsmToken>, ErrorToken> {
+        if let Some(e) = &self.init_expr {
+            Ok(ErrorToken::test(
+                &e.get_token(),
+                e.load_to(state.reg_a(), state.reg_b(), state),
+            )?)
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    fn generate_code(&self, state: &mut AsmGenState) -> Result<Vec<AsmToken>, ErrorToken> {
+        let mut v = vec![jib_asm::AsmToken::CreateLabel(self.assmebler_label())];
 
         for _ in 0..self.stack_size() {
-            v.push(TokenLoc { loc: LocationInfo::default(), tok: jib_asm::AssemblerToken::Literal1(0)});
+            v.push(jib_asm::AsmToken::Literal1(0));
         }
 
-        if let Some(e) = &self.init_expr {
-            todo!("need to initialize memory with the provided expression");
-        }
-
-        v
+        Ok(v)
     }
 }
 

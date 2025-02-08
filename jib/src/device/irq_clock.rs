@@ -3,7 +3,7 @@ use crate::{
     memory::{MemorySegment, MemorySegmentError},
 };
 
-use super::{DeviceAction, ProcessorDevice, DEVICE_MEM_SIZE, DEVICE_ID_SIZE};
+use super::{DEVICE_ID_SIZE, DEVICE_MEM_SIZE, DeviceAction, ProcessorDevice};
 
 pub struct InterruptClockDevice {
     clock_interval: u32,

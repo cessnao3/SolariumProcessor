@@ -4,18 +4,20 @@ use std::fmt::Display;
 use std::rc::Rc;
 use std::sync::{LazyLock, OnceLock};
 
+use jib_asm::{AsmTokenLoc, LocationInfo};
 use regex::Regex;
 
 use crate::components::expression::{
-    AssignmentExpression, BinaryExpression, BinaryOperator, Expression, Literal, UnaryExpression,
-    UnaryOperator,
+    AssignmentExpression, BinaryExpression, BinaryOperator, Expression, Literal, LiteralExpression,
+    UnaryExpression, UnaryOperator,
 };
 use crate::components::statement::{
-    DefinitionStatement, ExpressionStatement, IfStatement, ReturnStatement, VariableInitStatement,
+    ExpressionStatement, GlobalDefinitionStatement, IfStatement, ReturnStatement,
+    VariableInitStatement,
 };
-use crate::components::variable::{GlobalVariable, LocalVariable, Variable};
 use crate::components::{
-    AsmFunction, BaseStatement, Function, FunctionDefinition, FunctionPtr, ParserScope, Statement,
+    AsmFunction, AsmGenState, BaseStatement, ErrorToken, FunctionDefinition, FunctionPtr,
+    ParserScope, Statement,
 };
 use crate::tokenizer::{tokenize, Token, TokenIter, TokenIterError, TokenizeError};
 use crate::types::{StructDef, TypeError};
@@ -52,7 +54,7 @@ fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> 
                 return Err(ParseError::new_tok(
                     tok.clone(),
                     format!("unknown start of base expression {word}"),
-                ))
+                ));
             }
         };
 
@@ -67,7 +69,14 @@ fn parse_with_state(s: &str, state: &mut ParserState) -> Result<(), ParseError> 
 fn check_type_error<T>(r: Result<T, TypeError>, toks: &[Token]) -> Result<T, ParseError> {
     match r {
         Ok(v) => Ok(v),
-        Err(e) => Err(ParseError::new_type(toks, e)),
+        Err(e) => Err(ParseError::new_toks(toks, e.to_string())),
+    }
+}
+
+fn check_parse_error<T>(r: Result<T, ErrorToken>, toks: &[Token]) -> Result<T, ParseError> {
+    match r {
+        Ok(v) => Ok(v),
+        Err(e) => Err(ParseError::new_toks(toks, e.get_msg_text())),
     }
 }
 
@@ -157,7 +166,7 @@ fn parse_fn_statement(
                 return Err(ParseError::new_tok(
                     addr_tok,
                     format!("uanble to parse token as address: {e}"),
-                ))
+                ));
             }
         };
 
@@ -219,7 +228,7 @@ fn parse_struct_statement(
                     return Err(ParseError::new_tok(
                         end_check,
                         format!("unexpected provided type for given type value for {struct_name}"),
-                    ))
+                    ));
                 }
             }
 
@@ -297,7 +306,7 @@ fn parse_struct_statement(
             return Err(ParseError::new_tok(
                 first_tok,
                 format!("cannot create struct `{struct_name}` - type with name already exists!"),
-            ))
+            ));
         }
         _ => (),
     };
@@ -343,12 +352,14 @@ fn parse_base_expression(
         if pt_val == "=" {
             tokens.expect()?;
             let right_expr = parse_base_expression(tokens, state, scope)?;
-            return Ok(Box::new(AssignmentExpression::new(init_expr, right_expr)));
+            return Ok(Box::new(AssignmentExpression::new(
+                pt, init_expr, right_expr,
+            )));
         } else if let Some(op) = BINARY_EXPR_MAP.get(pt_val) {
             tokens.expect()?;
             let right_expr = parse_expression(tokens, state, scope)?;
-            return Ok(Box::new(check_type_error(
-                BinaryExpression::new(*op, init_expr, right_expr),
+            return Ok(Box::new(check_parse_error(
+                BinaryExpression::new(pt, *op, init_expr, right_expr),
                 &[init_tok],
             )?));
         }
@@ -426,10 +437,11 @@ fn parse_statement(
             };
 
             if spacer.get_value() == ";" {
-                match scope
-                    .borrow_mut()
-                    .add_variable(var_name.get_value(), var_type)
-                {
+                match scope.borrow_mut().add_variable(
+                    var_name.clone(),
+                    var_name.get_value(),
+                    var_type,
+                ) {
                     Err(e) => return Err(ParseError::new_tok(spacer, format!("{e}"))),
                     Ok(var) => {
                         return Ok(Box::new(VariableInitStatement::new(var, var_expr)));
@@ -567,7 +579,7 @@ fn parse_expression(
         }
     } else if let Some(op) = UNARY_MAP.get(first.get_value()) {
         Ok(Box::new(check_type_error(
-            UnaryExpression::new(*op, parse_expression(tokens, state, scope)?),
+            UnaryExpression::new(first.clone(), *op, parse_expression(tokens, state, scope)?),
             &[first],
         )?))
     } else if is_identifier(first.get_value()) {
@@ -582,7 +594,7 @@ fn parse_expression(
             Err(e) => Err(ParseError::new_tok(first, format!("{e}"))),
         };
     } else if let Ok(lit) = parse_literal(&first) {
-        Ok(Box::new(lit))
+        Ok(Box::new(LiteralExpression::new(first, lit)))
     } else {
         Err(ParseError::new_tok(
             first,
@@ -595,7 +607,7 @@ fn parse_def_statement(
     tokens: &mut TokenIter,
     state: &mut ParserState,
     scope: &Rc<RefCell<ParserScope>>,
-) -> Result<DefinitionStatement, ParseError> {
+) -> Result<GlobalDefinitionStatement, ParseError> {
     let init_tok = tokens.expect()?;
     let name = init_tok.get_value().to_string();
 
@@ -653,14 +665,17 @@ fn parse_def_statement(
     tokens.expect_value(";")?;
 
     // TODO - This works for base statements, but not anything else :-(
-    let mut def_statement = DefinitionStatement::new(&name, type_val.clone());
+    let mut def_statement = GlobalDefinitionStatement::new(&name, type_val.clone());
 
     if !expr_tokens.is_empty() {
         let mut expr_iter = TokenIter::new(expr_tokens);
         def_statement.set_init(parse_expression(&mut expr_iter, state, scope)?);
     }
 
-    if let Err(e) = scope.borrow_mut().add_variable(&name, type_val) {
+    if let Err(e) = scope
+        .borrow_mut()
+        .add_variable(init_tok.clone(), &name, type_val)
+    {
         Err(ParseError::new_tok(init_tok, format!("{e}")))
     } else {
         Ok(def_statement)
@@ -675,14 +690,22 @@ pub struct ParserState {
 }
 
 impl ParserState {
-    pub fn generate_code(&self) -> Vec<u8> {
-        let mut data = Vec::new();
+    pub fn generate_code(&self) -> Result<Vec<u8>, ErrorToken> {
+        let mut tokens = Vec::new();
+        let mut state = AsmGenState::new();
 
         for s in self.statements.iter() {
-            todo!();
+            for t in s.generate_code(&mut state)? {
+                tokens.push(t);
+            }
         }
 
-        data
+        let tokens_loc = tokens.into_iter().map(|v| AsmTokenLoc {
+            tok: v,
+            loc: LocationInfo::default(),
+        });
+
+        Ok(jib_asm::assemble_tokens(tokens_loc)?)
     }
 }
 
@@ -703,6 +726,13 @@ impl ParseError {
     pub fn new_tok(tok: Token, msg: String) -> Self {
         Self {
             tok: vec![tok],
+            msg,
+        }
+    }
+
+    pub fn new_toks(tok: &[Token], msg: String) -> Self {
+        Self {
+            tok: tok.to_vec(),
             msg,
         }
     }
@@ -729,6 +759,15 @@ impl Display for ParseError {
             )?;
         }
         write!(f, "{}", self.msg)
+    }
+}
+
+impl From<ErrorToken> for ParseError {
+    fn from(value: ErrorToken) -> Self {
+        Self {
+            tok: vec![value.get_token().clone()],
+            msg: value.get_msg_text(),
+        }
     }
 }
 

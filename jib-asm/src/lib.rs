@@ -146,7 +146,8 @@ pub trait FromLiteral<T> {
     fn from_literal(v: T) -> Self;
 }
 
-pub enum AssemblerToken {
+#[derive(Clone)]
+pub enum AsmToken {
     ChangeAddress(u32),
     Operation(FnInst, Vec<String>),
     OperationLiteral(Box<dyn Instruction>),
@@ -159,50 +160,57 @@ pub enum AssemblerToken {
     AlignInstruction,
 }
 
-impl FromLiteral<u8> for AssemblerToken {
+impl Clone for Box<dyn Instruction> {
+    fn clone(&self) -> Self {
+        self.boxed_clone()
+    }
+}
+
+impl FromLiteral<u8> for AsmToken {
     fn from_literal(v: u8) -> Self {
         Self::Literal1(v)
     }
 }
 
-impl FromLiteral<i8> for AssemblerToken {
+impl FromLiteral<i8> for AsmToken {
     fn from_literal(v: i8) -> Self {
         Self::Literal1(v as u8)
     }
 }
 
-impl FromLiteral<u16> for AssemblerToken {
+impl FromLiteral<u16> for AsmToken {
     fn from_literal(v: u16) -> Self {
         Self::Literal2(v)
     }
 }
 
-impl FromLiteral<i16> for AssemblerToken {
+impl FromLiteral<i16> for AsmToken {
     fn from_literal(v: i16) -> Self {
         Self::Literal2(v as u16)
     }
 }
 
-impl FromLiteral<u32> for AssemblerToken {
+impl FromLiteral<u32> for AsmToken {
     fn from_literal(v: u32) -> Self {
         Self::Literal4(v)
     }
 }
 
-impl FromLiteral<i32> for AssemblerToken {
+impl FromLiteral<i32> for AsmToken {
     fn from_literal(v: i32) -> Self {
         Self::Literal4(v as u32)
     }
 }
 
-impl FromLiteral<f32> for AssemblerToken {
+impl FromLiteral<f32> for AsmToken {
     fn from_literal(v: f32) -> Self {
         Self::Literal4(v.to_bits())
     }
 }
 
-pub struct TokenLoc {
-    pub tok: AssemblerToken,
+#[derive(Clone)]
+pub struct AsmTokenLoc {
+    pub tok: AsmToken,
     pub loc: LocationInfo,
 }
 
@@ -290,7 +298,7 @@ impl fmt::Display for ParseError {
 }
 
 pub struct TokenList {
-    tokens: Vec<TokenLoc>,
+    tokens: Vec<AsmTokenLoc>,
     inst: InstructionList,
     label_regex: regex::Regex,
 }
@@ -390,12 +398,12 @@ impl TokenList {
 
             if args.is_empty() {
                 match op {
-                    "align" => AssemblerToken::AlignInstruction,
+                    "align" => AsmToken::AlignInstruction,
                     _ => {
                         return Err(AssemblerError::UnknownInstruction(
                             op.to_string(),
                             Some(args.len()),
-                        ))
+                        ));
                     }
                 }
             } else if args.len() == 1 {
@@ -415,17 +423,17 @@ impl TokenList {
                             parse_imm_u32(arg)?
                         };
 
-                        AssemblerToken::ChangeAddress(addr)
+                        AsmToken::ChangeAddress(addr)
                     }
-                    "loadloc" => AssemblerToken::LoadLoc(arg.into()),
-                    "text" => AssemblerToken::LiteralText(arg.into()),
-                    "u8" => AssemblerToken::Literal1(parse_imm_u8(arg)?),
-                    "u16" => AssemblerToken::Literal2(parse_imm_u16(arg)?),
-                    "u32" => AssemblerToken::Literal4(parse_imm_u32(arg)?),
-                    "i8" => AssemblerToken::Literal1(parse_imm_i8(arg)? as u8),
-                    "i16" => AssemblerToken::Literal2(parse_imm_i16(arg)? as u16),
-                    "i32" => AssemblerToken::Literal4(parse_imm_i32(arg)? as u32),
-                    "f32" => AssemblerToken::Literal4(
+                    "loadloc" => AsmToken::LoadLoc(arg.into()),
+                    "text" => AsmToken::LiteralText(arg.into()),
+                    "u8" => AsmToken::Literal1(parse_imm_u8(arg)?),
+                    "u16" => AsmToken::Literal2(parse_imm_u16(arg)?),
+                    "u32" => AsmToken::Literal4(parse_imm_u32(arg)?),
+                    "i8" => AsmToken::Literal1(parse_imm_i8(arg)? as u8),
+                    "i16" => AsmToken::Literal2(parse_imm_i16(arg)? as u16),
+                    "i32" => AsmToken::Literal4(parse_imm_i32(arg)? as u32),
+                    "f32" => AsmToken::Literal4(
                         match arg.parse::<f32>() {
                             Ok(v) => v,
                             Err(_) => return Err(ImmediateError(arg.to_string()).into()),
@@ -436,7 +444,7 @@ impl TokenList {
                         return Err(AssemblerError::UnknownInstruction(
                             op.to_string(),
                             Some(args.len()),
-                        ))
+                        ));
                     }
                 }
             } else {
@@ -451,20 +459,20 @@ impl TokenList {
                 return Err(AssemblerError::ArgumentCountMismatch(words.len(), 1));
             }
 
-            AssemblerToken::CreateLabel(lbl.to_string())
+            AsmToken::CreateLabel(lbl.to_string())
         } else if let Some(inst_fn) = self.inst.get_instruction(&words[0]) {
             let args = &words[1..];
-            AssemblerToken::Operation(*inst_fn, args.iter().map(|s| s.to_string()).collect())
+            AsmToken::Operation(*inst_fn, args.iter().map(|s| s.to_string()).collect())
         } else {
             return Err(AssemblerError::UnknownInstruction(line.into(), None));
         };
 
-        self.tokens.push(TokenLoc { tok, loc });
+        self.tokens.push(AsmTokenLoc { tok, loc });
 
         Ok(())
     }
 
-    pub fn add_token(&mut self, tok: TokenLoc) {
+    pub fn add_token(&mut self, tok: AsmTokenLoc) {
         self.tokens.push(tok)
     }
 
@@ -475,11 +483,11 @@ impl TokenList {
             let loc = t.loc.clone();
 
             match &t.tok {
-                AssemblerToken::AlignInstruction => state.align_boundary(Processor::BYTES_PER_WORD),
-                AssemblerToken::OperationLiteral(op) => {
+                AsmToken::AlignInstruction => state.align_boundary(Processor::BYTES_PER_WORD),
+                AsmToken::OperationLiteral(op) => {
                     state.add_bytes(&op.to_u32().to_be_bytes(), loc)?;
                 }
-                AssemblerToken::ChangeAddress(new_addr) => {
+                AsmToken::ChangeAddress(new_addr) => {
                     if *new_addr < state.addr {
                         return Err(AssemblerErrorLoc {
                             err: AssemblerError::CannotBackupAddress(*new_addr),
@@ -489,7 +497,7 @@ impl TokenList {
                         state.addr = *new_addr;
                     }
                 }
-                AssemblerToken::LiteralText(s) => {
+                AsmToken::LiteralText(s) => {
                     for c in s.chars() {
                         let bv = match jib::text::character_to_byte(c) {
                             Ok(v) => v,
@@ -497,23 +505,23 @@ impl TokenList {
                                 return Err(AssemblerErrorLoc {
                                     err: AssemblerError::from(e),
                                     loc,
-                                })
+                                });
                             }
                         };
                         state.add_bytes(&[bv], loc.clone())?;
                     }
                     state.add_bytes(&[0], loc.clone())?;
                 }
-                AssemblerToken::Literal1(i) => {
+                AsmToken::Literal1(i) => {
                     state.add_bytes(&[*i], loc)?;
                 }
-                AssemblerToken::Literal2(i) => {
+                AsmToken::Literal2(i) => {
                     state.add_bytes(&i.to_be_bytes(), loc)?;
                 }
-                AssemblerToken::Literal4(i) => {
+                AsmToken::Literal4(i) => {
                     state.add_bytes(&i.to_be_bytes(), loc)?;
                 }
-                AssemblerToken::CreateLabel(lbl) => {
+                AsmToken::CreateLabel(lbl) => {
                     if state.labels.contains_key(lbl) {
                         return Err(AssemblerErrorLoc {
                             err: AssemblerError::DuplicateLabel(lbl.to_string()),
@@ -522,10 +530,10 @@ impl TokenList {
                     }
                     state.labels.insert(lbl.into(), state.addr);
                 }
-                AssemblerToken::LoadLoc(lbl) => {
+                AsmToken::LoadLoc(lbl) => {
                     state.add_delay(DelayToken::LoadLoc { label: lbl.into() }, t.loc.clone())?;
                 }
-                AssemblerToken::Operation(func, args) => {
+                AsmToken::Operation(func, args) => {
                     state.add_delay(
                         DelayToken::Operation {
                             inst: *func,
@@ -650,7 +658,7 @@ impl ParserState {
                             return Err(AssemblerErrorLoc {
                                 err: err.into(),
                                 loc: loc.clone(),
-                            })
+                            });
                         }
                     };
 
@@ -693,7 +701,7 @@ pub fn assemble_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
 
 pub fn assemble_tokens<T>(tokens: T) -> Result<Vec<u8>, AssemblerErrorLoc>
 where
-    T: IntoIterator<Item = TokenLoc>,
+    T: IntoIterator<Item = AsmTokenLoc>,
 {
     let mut state = TokenList::default();
     for t in tokens.into_iter() {

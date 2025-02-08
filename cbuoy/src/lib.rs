@@ -1,4 +1,4 @@
-use jib_asm::{AssemblerErrorLoc, TokenLoc};
+use jib_asm::{AssemblerErrorLoc, AsmTokenLoc};
 
 mod components;
 mod parser;
@@ -11,9 +11,9 @@ pub fn compile(s: &str) -> Result<Vec<u8>, String> {
         Err(e) => return Err(format!("Parse error - {e}")),
     };
 
-    Ok(state.generate_code())
+    Ok(state.generate_code().unwrap())
 }
 
-pub fn assemble(_s: &str) -> Result<Vec<TokenLoc>, AssemblerErrorLoc> {
+pub fn assemble(_s: &str) -> Result<Vec<AsmTokenLoc>, AssemblerErrorLoc> {
     panic!("compiling to assembly not yet fully supported");
 }

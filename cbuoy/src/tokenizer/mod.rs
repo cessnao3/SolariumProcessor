@@ -1,3 +1,5 @@
+use jib_asm::{AsmToken, LocationInfo};
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Token {
     value: String,
@@ -41,6 +43,12 @@ impl Token {
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "[{}:{}] {}", self.line, self.column, self.value)
+    }
+}
+
+impl From<LocationInfo> for Token {
+    fn from(value: LocationInfo) -> Self {
+        Self::new(value.line, 0, value.full_line.unwrap_or(String::new()))
     }
 }
 
