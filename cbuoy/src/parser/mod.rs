@@ -160,7 +160,7 @@ fn parse_fn_statement(
 
         let addr_tok = tokens.expect()?;
 
-        let addr = match addr_tok.get_value().parse() {
+        let addr = match addr_tok.get_value().try_into() {
             Ok(v) => v,
             Err(e) => {
                 return Err(ParseError::new_tok(

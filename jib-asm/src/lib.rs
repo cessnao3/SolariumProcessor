@@ -3,7 +3,7 @@ mod immediate;
 pub mod instructions;
 
 use core::fmt;
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, rc::Rc, sync::LazyLock};
 
 use instructions::{
     Instruction, InstructionError, OpAdd, OpBand, OpBnot, OpBool, OpBor, OpBshl, OpBshr, OpBxor,
@@ -19,6 +19,13 @@ use immediate::{
     parse_imm_i16, parse_imm_i32, parse_imm_i8, parse_imm_u16, parse_imm_u32, parse_imm_u8,
     ImmediateError,
 };
+use regex::Regex;
+
+static LABEL_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new("^[a-z](a-z0-9_)*").unwrap());
+
+pub fn is_valid_label(s: &str) -> bool {
+    LABEL_REGEX.is_match(s)
+}
 
 #[derive(Debug, Clone)]
 pub enum AssemblerError {
@@ -300,7 +307,6 @@ impl fmt::Display for ParseError {
 pub struct TokenList {
     tokens: Vec<AsmTokenLoc>,
     inst: InstructionList,
-    label_regex: regex::Regex,
 }
 
 impl TokenList {
@@ -451,7 +457,7 @@ impl TokenList {
                 return Err(AssemblerError::ArgumentCountMismatch(args.len(), 1));
             }
         } else if let Some(lbl) = first.strip_prefix(':') {
-            if !self.label_regex.is_match(lbl) {
+            if !is_valid_label(lbl) {
                 return Err(AssemblerError::BadLabel(lbl.to_string()));
             }
 
@@ -566,7 +572,6 @@ impl Default for TokenList {
         Self {
             tokens: Vec::new(),
             inst: InstructionList::default(),
-            label_regex: regex::Regex::new("^[a-z](a-z0-9_)*").unwrap(),
         }
     }
 }

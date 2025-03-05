@@ -5,7 +5,11 @@ pub mod variable;
 use core::fmt;
 use expression::ExpressionError;
 use jib::cpu::Register;
-use jib_asm::{AsmToken, AsmTokenLoc, AssemblerErrorLoc, LocationInfo, TokenList};
+use jib_asm::{
+    argument::{ArgumentRegister, ArgumentType},
+    instructions::{OpJmp, OpLdn},
+    is_valid_label, AsmToken, AsmTokenLoc, AssemblerErrorLoc, LocationInfo, TokenList,
+};
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
@@ -250,6 +254,10 @@ pub trait BaseStatement: CodeComponent {}
 
 pub trait Statement: CodeLocation {
     fn stack_size(&self) -> Result<usize, ErrorToken>;
+
+    fn generate_code(&self, state: &mut AsmGenState) -> Result<Vec<AsmToken>, ErrorToken> {
+        todo!("not implemented");
+    }
 }
 
 pub trait Function: BaseStatement {
@@ -289,12 +297,12 @@ impl BaseStatement for FunctionDefinition {}
 
 impl CodeComponent for FunctionDefinition {
     fn generate_code(&self, state: &mut AsmGenState) -> Result<Vec<AsmToken>, ErrorToken> {
-        let tokens = vec![AsmToken::CreateLabel(self.assembler_label())];
+        let mut tokens = vec![AsmToken::CreateLabel(self.assembler_label())];
 
-        // TODO - Create spots for the input parameters?
+        // TODO: create spots for input parameters
 
         for s in self.statements.iter() {
-            todo!("generate code for statements");
+            tokens.extend_from_slice(&s.generate_code(state)?);
         }
 
         Ok(tokens)
@@ -317,14 +325,49 @@ impl Function for FunctionDefinition {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum LocationSpecifier {
+    Literal(u32),
+    Label(String),
+}
+
+impl LocationSpecifier {
+    pub fn get_asm_token(&self) -> AsmToken {
+        match self {
+            Self::Literal(v) => AsmToken::Literal4(*v),
+            Self::Label(s) => AsmToken::LoadLoc(s.clone()),
+        }
+    }
+}
+
+impl TryFrom<&str> for LocationSpecifier {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if is_valid_label(value) {
+            Ok(Self::Label(value.to_owned()))
+        } else if let Ok(v) = value.parse() {
+            Ok(Self::Literal(v))
+        } else {
+            Err(format!(
+                "unable to create a valid location from provided value \"{value}\""
+            ))
+        }
+    }
+}
+
 pub struct FunctionPtr {
     parameters: Vec<(String, Type)>,
     return_type: Option<Type>,
-    addr: u32, // TODO - Update Type Here
+    addr: LocationSpecifier,
 }
 
 impl FunctionPtr {
-    pub fn new(parameters: Vec<(String, Type)>, return_type: Option<Type>, addr: u32) -> Self {
+    pub fn new(
+        parameters: Vec<(String, Type)>,
+        return_type: Option<Type>,
+        addr: LocationSpecifier,
+    ) -> Self {
         Self {
             parameters,
             return_type,
@@ -337,7 +380,14 @@ impl BaseStatement for FunctionPtr {}
 
 impl CodeComponent for FunctionPtr {
     fn generate_code(&self, state: &mut AsmGenState) -> Result<Vec<AsmToken>, ErrorToken> {
-        todo!("generate code to jump to the stored function pointer?");
+        Ok(vec![
+            AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
+                state.reg_a(),
+                jib::cpu::DataType::U32,
+            )))),
+            self.addr.get_asm_token(),
+            AsmToken::OperationLiteral(Box::new(OpJmp::new(ArgumentRegister::new(state.reg_a())))),
+        ])
     }
 }
 

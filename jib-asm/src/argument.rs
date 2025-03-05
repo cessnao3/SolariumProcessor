@@ -48,6 +48,10 @@ pub struct ArgumentRegister {
 impl ArgumentRegister {
     const REGISTER_MASK: u8 = 0x1F;
 
+    pub fn new(reg: Register) -> Self {
+        Self { reg }
+    }
+
     pub fn to_byte(self) -> u8 {
         (self.reg.get_index() as u8) & Self::REGISTER_MASK
     }

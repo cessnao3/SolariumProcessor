@@ -2,8 +2,8 @@
 use crate::cpu_thread::cpu_thread;
 use crate::messages::{ThreadToUi, UiToThread};
 use gtk::glib::clone;
-use gtk::{Application, ApplicationWindow};
 use gtk::{glib, prelude::*};
+use gtk::{Application, ApplicationWindow};
 use jib::cpu::RegisterManager;
 
 pub fn build_ui(app: &Application) {
@@ -144,11 +144,19 @@ fn build_code_column(
 ) -> gtk::Box {
     let code_stack = gtk::Stack::builder().build();
 
-    let default_asm = include_str!("../../jib-asm/examples/thread_test.jsm");
-
-    let code_options = vec![
-        (default_asm, "Assemble", "ASM", true),
-        ("// C/Buoy Code", "Build", "C/B", false),
+    let code_options = [
+        (
+            include_str!("../../jib-asm/examples/thread_test.jsm"),
+            "Assemble",
+            "ASM",
+            true,
+        ),
+        (
+            include_str!("../../cbuoy/examples/test.cb"),
+            "Build",
+            "C/B",
+            false,
+        ),
     ];
 
     for (comment, button_verb, short_name, is_assembly) in code_options.into_iter() {
