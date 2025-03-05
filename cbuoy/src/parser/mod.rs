@@ -410,6 +410,7 @@ fn parse_statement(
             };
 
             return Ok(Box::new(IfStatement {
+                tok: pt,
                 conditional: if_expr,
                 statements,
                 else_clause: else_statement,
@@ -461,7 +462,7 @@ fn parse_statement(
             } else {
                 let expr = parse_base_expression(tokens, state, scope)?;
                 tokens.expect_value(";")?;
-                return Ok(Box::new(ReturnStatement { expr }));
+                return Ok(Box::new(ReturnStatement { tok: pt, expr }));
             }
         } else if pt_val == "{" {
             tokens.expect()?;
@@ -665,7 +666,8 @@ fn parse_def_statement(
     tokens.expect_value(";")?;
 
     // TODO - This works for base statements, but not anything else :-(
-    let mut def_statement = GlobalDefinitionStatement::new(&name, type_val.clone());
+    let mut def_statement =
+        GlobalDefinitionStatement::new(init_tok.clone(), &name, type_val.clone());
 
     if !expr_tokens.is_empty() {
         let mut expr_iter = TokenIter::new(expr_tokens);

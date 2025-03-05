@@ -7,7 +7,7 @@ use jib_asm::{
         OpAdd, OpBand, OpBnot, OpBor, OpBshl, OpBshr, OpBxor, OpConv, OpDiv, OpJmp, OpJmpri, OpLd,
         OpLdi, OpLdn, OpMul, OpNeg, OpNot, OpRem, OpSub, OpTeq, OpTneq, OpTnz, OpTz,
     },
-    AsmToken, AsmTokenLoc, FromLiteral, LocationInfo,
+    AsmToken, FromLiteral,
 };
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
     types::{Type, TypeError},
 };
 
-use super::{AsmGenState, ErrorToken};
+use super::{AsmGenState, CodeLocation, ErrorToken};
 
 #[derive(Debug, Clone)]
 pub enum ExpressionError {
@@ -38,7 +38,7 @@ impl Display for ExpressionError {
     }
 }
 
-pub trait Expression {
+pub trait Expression: CodeLocation {
     fn get_type(&self) -> Result<Type, TypeError>;
 
     fn get_type_tok(&self) -> Result<Type, ErrorToken> {
@@ -58,12 +58,10 @@ pub trait Expression {
 
     fn load_address(&self, _reg: Register) -> Result<Vec<AsmToken>, ErrorToken> {
         Err(ErrorToken::new(
-            self.get_token(),
+            self.get_token().clone(),
             &ExpressionError::NotAddressable.to_string(),
         ))
     }
-
-    fn get_token(&self) -> Token;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -212,9 +210,11 @@ impl Expression for LiteralExpression {
             Ok(vec![lit_token])
         }
     }
+}
 
-    fn get_token(&self) -> Token {
-        self.tok.clone()
+impl CodeLocation for LiteralExpression {
+    fn get_token(&self) -> &Token {
+        &self.tok
     }
 }
 
@@ -429,9 +429,11 @@ impl Expression for BinaryExpression {
 
         Ok(res)
     }
+}
 
-    fn get_token(&self) -> Token {
-        self.tok.clone()
+impl CodeLocation for BinaryExpression {
+    fn get_token(&self) -> &Token {
+        &self.tok
     }
 }
 
@@ -455,7 +457,7 @@ impl Expression for AssignmentExpression {
 
     fn load_address(&self, _reg: Register) -> Result<Vec<AsmToken>, ErrorToken> {
         Err(ErrorToken::new(
-            self.get_token(),
+            self.get_token().clone(),
             &ExpressionError::NotAddressable.to_string(),
         ))
     }
@@ -468,9 +470,11 @@ impl Expression for AssignmentExpression {
     ) -> Result<Vec<AsmToken>, ErrorToken> {
         panic!("assignment not implemented");
     }
+}
 
-    fn get_token(&self) -> Token {
-        self.tok.clone()
+impl CodeLocation for AssignmentExpression {
+    fn get_token(&self) -> &Token {
+        &self.tok
     }
 }
 
@@ -575,9 +579,11 @@ impl Expression for UnaryExpression {
             )),
         }
     }
+}
 
-    fn get_token(&self) -> Token {
-        self.tok.clone()
+impl CodeLocation for UnaryExpression {
+    fn get_token(&self) -> &Token {
+        &self.tok
     }
 }
 
@@ -609,8 +615,10 @@ impl Expression for AsExpression {
 
         Ok(res)
     }
+}
 
-    fn get_token(&self) -> Token {
-        self.tok.clone()
+impl CodeLocation for AsExpression {
+    fn get_token(&self) -> &Token {
+        &self.tok
     }
 }

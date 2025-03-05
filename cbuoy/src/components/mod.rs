@@ -174,6 +174,10 @@ impl Default for ParserScope {
     }
 }
 
+pub trait CodeLocation {
+    fn get_token(&self) -> &Token;
+}
+
 #[derive(Debug, Clone)]
 pub struct ErrorToken {
     tok: Token,
@@ -234,7 +238,7 @@ impl From<AssemblerErrorLoc> for ErrorToken {
     }
 }
 
-pub trait CodeComponent {
+pub trait CodeComponent: CodeLocation {
     fn generate_init_code(&self, _state: &mut AsmGenState) -> Result<Vec<AsmToken>, ErrorToken> {
         return Ok(Vec::new());
     }
@@ -244,8 +248,8 @@ pub trait CodeComponent {
 
 pub trait BaseStatement: CodeComponent {}
 
-pub trait Statement {
-    fn stack_size(&self) -> usize;
+pub trait Statement: CodeLocation {
+    fn stack_size(&self) -> Result<usize, ErrorToken>;
 }
 
 pub trait Function: BaseStatement {
@@ -297,6 +301,12 @@ impl CodeComponent for FunctionDefinition {
     }
 }
 
+impl CodeLocation for FunctionDefinition {
+    fn get_token(&self) -> &Token {
+        todo!()
+    }
+}
+
 impl Function for FunctionDefinition {
     fn get_input_parameters(&self) -> Vec<(String, Type)> {
         self.parameters.clone()
@@ -338,6 +348,12 @@ impl Function for FunctionPtr {
 
     fn get_return_type(&self) -> Option<Type> {
         self.return_type.clone()
+    }
+}
+
+impl CodeLocation for FunctionPtr {
+    fn get_token(&self) -> &Token {
+        todo!()
     }
 }
 
@@ -386,5 +402,11 @@ impl BaseStatement for AsmFunction {}
 impl CodeComponent for AsmFunction {
     fn generate_code(&self, state: &mut AsmGenState) -> Result<Vec<AsmToken>, ErrorToken> {
         panic!("not implemented");
+    }
+}
+
+impl CodeLocation for AsmFunction {
+    fn get_token(&self) -> &Token {
+        todo!()
     }
 }

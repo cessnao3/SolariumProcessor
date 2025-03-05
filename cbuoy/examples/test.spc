@@ -3,7 +3,7 @@ def array_name: [5]i32;
 def int_test: u16 = 3u16;
 def ptr_test: *u16 = 6u32;
 def void_test: *void = 0u32;
-def void_er: void;
+//def void_er: void;
 
 def func_ptr: ^(*u8, *u16, *u32) u32 = 3049;
 

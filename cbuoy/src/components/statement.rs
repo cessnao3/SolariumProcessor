@@ -1,21 +1,23 @@
-use jib_asm::{AsmToken, AsmTokenLoc, LocationInfo};
+use jib_asm::AsmToken;
 
-use crate::types::Type;
+use crate::{tokenizer::Token, types::Type};
 
 use super::{
     expression::Expression, variable::Variable, AsmGenState, BaseStatement, CodeComponent,
-    ErrorToken, Statement,
+    CodeLocation, ErrorToken, Statement,
 };
 
 pub struct GlobalDefinitionStatement {
+    pub tok: Token,
     pub name: String,
     pub var_type: Type,
     pub init_expr: Option<Box<dyn Expression>>,
 }
 
 impl GlobalDefinitionStatement {
-    pub fn new(name: &str, var_type: Type) -> Self {
+    pub fn new(tok: Token, name: &str, var_type: Type) -> Self {
         Self {
+            tok,
             name: name.into(),
             var_type,
             init_expr: None,
@@ -32,8 +34,14 @@ impl GlobalDefinitionStatement {
 }
 
 impl Statement for GlobalDefinitionStatement {
-    fn stack_size(&self) -> usize {
-        self.var_type.byte_count().unwrap()
+    fn stack_size(&self) -> Result<usize, ErrorToken> {
+        ErrorToken::test(self.get_token(), self.var_type.byte_count())
+    }
+}
+
+impl CodeLocation for GlobalDefinitionStatement {
+    fn get_token(&self) -> &Token {
+        &self.tok
     }
 }
 
@@ -54,7 +62,7 @@ impl CodeComponent for GlobalDefinitionStatement {
     fn generate_code(&self, state: &mut AsmGenState) -> Result<Vec<AsmToken>, ErrorToken> {
         let mut v = vec![jib_asm::AsmToken::CreateLabel(self.assmebler_label())];
 
-        for _ in 0..self.stack_size() {
+        for _ in 0..self.stack_size()? {
             v.push(jib_asm::AsmToken::Literal1(0));
         }
 
@@ -73,23 +81,42 @@ impl ExpressionStatement {
 }
 
 impl Statement for ExpressionStatement {
-    fn stack_size(&self) -> usize {
-        0
+    fn stack_size(&self) -> Result<usize, ErrorToken> {
+        Ok(0)
+    }
+}
+
+impl CodeLocation for ExpressionStatement {
+    fn get_token(&self) -> &Token {
+        self.expr.get_token()
     }
 }
 
 pub struct IfStatement {
+    pub tok: Token,
     pub conditional: Box<dyn Expression>,
     pub statements: Vec<Box<dyn Statement>>,
     pub else_clause: Option<Box<dyn Statement>>,
 }
 
 impl Statement for IfStatement {
-    fn stack_size(&self) -> usize {
+    fn stack_size(&self) -> Result<usize, ErrorToken> {
+        type SizeError = Result<usize, ErrorToken>;
+
+        fn sum_size(a: SizeError, b: SizeError) -> SizeError {
+            Ok(a? + b?)
+        }
+
         self.statements
             .iter()
             .map(|s| s.stack_size())
-            .fold(0, |a, b| a + b)
+            .fold(Ok(0), sum_size)
+    }
+}
+
+impl CodeLocation for IfStatement {
+    fn get_token(&self) -> &Token {
+        &self.tok
     }
 }
 
@@ -105,19 +132,31 @@ impl VariableInitStatement {
 }
 
 impl Statement for VariableInitStatement {
-    fn stack_size(&self) -> usize {
-        self.var
-            .get_type()
-            .map_or(0, |t| t.byte_count().unwrap_or(0))
+    fn stack_size(&self) -> Result<usize, ErrorToken> {
+        let t = ErrorToken::test(self.get_token(), self.var.get_type())?;
+        ErrorToken::test(self.get_token(), t.byte_count())
+    }
+}
+
+impl CodeLocation for VariableInitStatement {
+    fn get_token(&self) -> &Token {
+        self.var.get_token()
     }
 }
 
 pub struct ReturnStatement {
+    pub tok: Token,
     pub expr: Box<dyn Expression>,
 }
 
 impl Statement for ReturnStatement {
-    fn stack_size(&self) -> usize {
-        0
+    fn stack_size(&self) -> Result<usize, ErrorToken> {
+        Ok(0)
+    }
+}
+
+impl CodeLocation for ReturnStatement {
+    fn get_token(&self) -> &Token {
+        &self.tok
     }
 }

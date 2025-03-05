@@ -15,7 +15,7 @@ use crate::{
 
 use super::{
     expression::{Expression, Literal},
-    AsmGenState, ErrorToken,
+    AsmGenState, CodeLocation, ErrorToken,
 };
 
 pub enum VariableError {
@@ -154,9 +154,11 @@ impl Expression for LocalVariable {
             ))),
         ])
     }
+}
 
-    fn get_token(&self) -> Token {
-        self.tok.clone()
+impl CodeLocation for LocalVariable {
+    fn get_token(&self) -> &Token {
+        &self.tok
     }
 }
 
@@ -214,9 +216,11 @@ impl Expression for GlobalVariable {
             AsmToken::LoadLoc(self.var_label.clone()),
         ])
     }
+}
 
-    fn get_token(&self) -> Token {
-        self.tok.clone()
+impl CodeLocation for GlobalVariable {
+    fn get_token(&self) -> &Token {
+        &self.tok
     }
 }
 
