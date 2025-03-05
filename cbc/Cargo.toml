@@ -1,0 +1,7 @@
+[package]
+name = "cbc"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cbuoy = { path = "../cbuoy", version = "*" }

@@ -1,7 +1,7 @@
 use alloc::collections::VecDeque;
 use core::cell::RefCell;
 
-use super::{DEVICE_ID_SIZE, DEVICE_MEM_SIZE, ProcessorDevice};
+use super::{ProcessorDevice, DEVICE_ID_SIZE, DEVICE_MEM_SIZE};
 
 use crate::memory::{MemorySegment, MemorySegmentError};
 
@@ -62,7 +62,7 @@ impl SerialInputOutputDevice {
 
     fn common_get(&self, offset: u32) -> Result<u8, MemorySegmentError> {
         // Use the offset values to determine the action to take
-        return match offset {
+        match offset {
             n if n < DEVICE_ID_SIZE => Ok(Self::DEVICE_ID.to_be_bytes()[offset as usize]),
             Self::OFFSET_INPUT_SIZE => {
                 Ok((u8::MAX as usize).min(self.input_queue.borrow().len()) as u8)
@@ -70,7 +70,7 @@ impl SerialInputOutputDevice {
             Self::OFFSET_OUTPUT_SIZE => Ok((u8::MAX as usize).min(self.output_queue.len()) as u8),
             Self::OFFSET_OUTPUT_SET => Ok(0),
             _ => Err(MemorySegmentError::InvalidMemoryAccess(offset)),
-        };
+        }
     }
 }
 
@@ -78,25 +78,25 @@ impl MemorySegment for SerialInputOutputDevice {
     /// Provides the word at the requested memory location
     fn get(&self, offset: u32) -> Result<u8, MemorySegmentError> {
         // Use the offset values to determine the action to take
-        return match offset {
+        match offset {
             Self::OFFSET_INPUT_GET => match self.input_queue.borrow_mut().pop_front() {
                 Some(v) => Ok(v),
                 None => Ok(0),
             },
             _ => self.common_get(offset),
-        };
+        }
     }
 
     /// Provides the word at the requested memory location without affecting the device state
     fn inspect(&self, offset: u32) -> Result<u8, MemorySegmentError> {
         // Use the offset values to determine the action to take
-        return match offset {
+        match offset {
             Self::OFFSET_INPUT_GET => match self.input_queue.borrow().front() {
                 Some(v) => Ok(*v),
                 None => Ok(0),
             },
             _ => self.common_get(offset),
-        };
+        }
     }
 
     /// Sets the word at the requested memory location with the given data
@@ -108,7 +108,7 @@ impl MemorySegment for SerialInputOutputDevice {
         }
 
         // Extract the offset and match based on the result
-        return match offset {
+        match offset {
             Self::OFFSET_OUTPUT_SET => {
                 if self.output_queue.len() < self.buffer_size {
                     self.output_queue.push_back(data);
@@ -130,7 +130,7 @@ impl MemorySegment for SerialInputOutputDevice {
                 Ok(())
             }
             _ => Err(MemorySegmentError::InvalidMemoryWrite(offset, data)),
-        };
+        }
     }
 
     /// Resets the memory segment

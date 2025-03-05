@@ -88,7 +88,7 @@ impl TryFrom<usize> for Register {
             Self::IDX_OVERFLOW => Self::Overflow,
             Self::IDX_RETURN => Self::Return,
             Self::IDX_ARGUMENT_BASE => Self::ArgumentBase,
-            x if x >= Self::IDX_FIRST_GP && x < Self::NUM_REGISTERS => Self::GeneralPurpose(x),
+            x if (Self::IDX_FIRST_GP..Self::NUM_REGISTERS).contains(&x) => Self::GeneralPurpose(x),
             x => return Err(Self::Error::UnknownRegister(x)),
         })
     }

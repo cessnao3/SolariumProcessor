@@ -4,7 +4,7 @@ members = [
     "cbuoy",
     "jib-asm",
     "jib",
-    "visual-jib",
+    "visual-jib", "cbc",
 ]
 default-members = ["visual-jib"]
 resolver = "2"

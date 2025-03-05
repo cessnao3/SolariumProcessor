@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use crate::{
     argument::{ArgumentError, ArgumentRegister, ArgumentType},
-    immediate::{ImmediateError, parse_imm_i16},
+    immediate::{parse_imm_i16, ImmediateError},
 };
 use jib::cpu::{Opcode, Processor};
 
@@ -42,7 +42,11 @@ impl From<ArgumentError> for InstructionError {
     }
 }
 
-pub trait Instruction {
+pub trait Instruction: Debug {
+    fn get_name(&self) -> String;
+
+    fn get_args(&self) -> Vec<String>;
+
     fn to_bytes(&self) -> [u8; INST_SIZE];
 
     fn to_u32(&self) -> u32 {
@@ -71,6 +75,18 @@ macro_rules! InstNoArg {
         }
 
         impl Instruction for $op_name {
+            fn get_name(&self) -> String {
+                stringify!($op_name)
+                    .to_lowercase()
+                    .strip_prefix("op")
+                    .unwrap()
+                    .into()
+            }
+
+            fn get_args(&self) -> Vec<String> {
+                Vec::default()
+            }
+
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), 0, 0, 0]
             }
@@ -137,6 +153,14 @@ macro_rules! InstSingleArg {
         }
 
         impl Instruction for $op_name {
+            fn get_name(&self) -> String {
+                Self::name()
+            }
+
+            fn get_args(&self) -> Vec<String> {
+                vec![format!("{}", self.arg)]
+            }
+
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), self.arg.to_byte(), 0, 0]
             }
@@ -205,6 +229,14 @@ macro_rules! InstSingleArgDataType {
         }
 
         impl Instruction for $op_name {
+            fn get_name(&self) -> String {
+                Self::name()
+            }
+
+            fn get_args(&self) -> Vec<String> {
+                vec![format!("{}", self.arg)]
+            }
+
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [Self::OP.to_byte(), self.arg.to_byte(), 0, 0]
             }
@@ -273,6 +305,14 @@ macro_rules! InstImmediateArg {
         }
 
         impl Instruction for $op_name {
+            fn get_name(&self) -> String {
+                Self::name()
+            }
+
+            fn get_args(&self) -> Vec<String> {
+                vec![format!("{}:u16", self.imm)]
+            }
+
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 let imm = self.imm.to_be_bytes();
                 [Self::OP.to_byte(), 0, imm[0], imm[1]]
@@ -344,6 +384,14 @@ macro_rules! InstSingleArgImm {
         }
 
         impl Instruction for $op_name {
+            fn get_name(&self) -> String {
+                Self::name()
+            }
+
+            fn get_args(&self) -> Vec<String> {
+                vec![format!("{}", self.arg), format!("{}:u16", self.imm)]
+            }
+
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 let imm = self.imm.to_be_bytes();
                 [Self::OP.to_byte(), self.arg.to_byte(), imm[0], imm[1]]
@@ -417,6 +465,14 @@ macro_rules! InstDoubleArg {
         }
 
         impl Instruction for $op_name {
+            fn get_name(&self) -> String {
+                Self::name()
+            }
+
+            fn get_args(&self) -> Vec<String> {
+                vec![format!("{}", self.arg0), format!("{}", self.arg1)]
+            }
+
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [
                     Self::OP.to_byte(),
@@ -494,6 +550,14 @@ macro_rules! InstDoubleArgType {
         }
 
         impl Instruction for $op_name {
+            fn get_name(&self) -> String {
+                Self::name()
+            }
+
+            fn get_args(&self) -> Vec<String> {
+                vec![format!("{}", self.arg0), format!("{}", self.arg1)]
+            }
+
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [
                     Self::OP.to_byte(),
@@ -571,6 +635,14 @@ macro_rules! InstDoubleArgDoubleType {
         }
 
         impl Instruction for $op_name {
+            fn get_name(&self) -> String {
+                Self::name()
+            }
+
+            fn get_args(&self) -> Vec<String> {
+                vec![format!("{}", self.arg0), format!("{}", self.arg1)]
+            }
+
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [
                     Self::OP.to_byte(),
@@ -649,6 +721,18 @@ macro_rules! InstArith {
         }
 
         impl Instruction for $op_name {
+            fn get_name(&self) -> String {
+                Self::name()
+            }
+
+            fn get_args(&self) -> Vec<String> {
+                vec![
+                    format!("{}", self.arg0),
+                    format!("{}", self.arg1),
+                    format!("{}", self.arg2),
+                ]
+            }
+
             fn to_bytes(&self) -> [u8; INST_SIZE] {
                 [
                     Self::OP.to_byte(),

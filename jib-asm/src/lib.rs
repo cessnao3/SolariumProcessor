@@ -3,7 +3,7 @@ mod immediate;
 pub mod instructions;
 
 use core::fmt;
-use std::{collections::HashMap, rc::Rc, sync::LazyLock};
+use std::{collections::HashMap, fmt::Display, rc::Rc, sync::LazyLock};
 
 use instructions::{
     Instruction, InstructionError, OpAdd, OpBand, OpBnot, OpBool, OpBor, OpBshl, OpBshr, OpBxor,
@@ -101,27 +101,17 @@ impl From<ParseError> for AssemblerError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct LocationInfo {
     pub line: usize,
-    pub full_line: Option<String>,
-    pub base_loc: Option<Box<LocationInfo>>,
-}
-
-impl Default for LocationInfo {
-    fn default() -> Self {
-        Self {
-            line: 0,
-            full_line: None,
-            base_loc: None,
-        }
-    }
+    pub column: usize,
+    pub text: Option<Rc<str>>,
 }
 
 impl fmt::Display for LocationInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[{}]", self.line)?;
-        if let Some(txt) = &self.full_line {
+        if let Some(txt) = &self.text {
             write!(f, " {}", txt)
         } else {
             Ok(())
@@ -138,7 +128,7 @@ pub struct AssemblerErrorLoc {
 impl fmt::Display for AssemblerErrorLoc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Line {} - {}", self.loc.line, self.err)?;
-        if let Some(s) = self.loc.full_line.as_ref() {
+        if let Some(s) = self.loc.text.as_ref() {
             write!(f, " - \"{}\"", s)?;
         }
 
@@ -153,10 +143,10 @@ pub trait FromLiteral<T> {
     fn from_literal(v: T) -> Self;
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum AsmToken {
     ChangeAddress(u32),
-    Operation(FnInst, Vec<String>),
+    Operation(FnInst, String, Vec<String>),
     OperationLiteral(Box<dyn Instruction>),
     CreateLabel(String),
     LoadLoc(String),
@@ -165,6 +155,37 @@ pub enum AsmToken {
     Literal4(u32),
     LiteralText(String),
     AlignInstruction,
+    Comment(String),
+}
+
+impl Display for AsmToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Comment(s) => write!(f, "; {s}"),
+            Self::LoadLoc(l) => write!(f, ".loadloc {l}"),
+            Self::AlignInstruction => write!(f, ".align"),
+            Self::ChangeAddress(addr) => write!(f, ".oper 0x{addr:x}"),
+            Self::Literal1(x) => write!(f, ".u8 0x{x:x}"),
+            Self::Literal2(x) => write!(f, ".u16 0x{x:x}"),
+            Self::Literal4(x) => write!(f, ".u32 0x{x:x}"),
+            Self::LiteralText(t) => write!(f, ".text \"{t}\""),
+            Self::CreateLabel(lbl) => write!(f, ":{lbl}"),
+            Self::Operation(_, name, args) => {
+                write!(f, "{name}")?;
+                for a in args {
+                    write!(f, " {a}")?;
+                }
+                Ok(())
+            }
+            Self::OperationLiteral(op) => {
+                write!(f, "{}", op.get_name())?;
+                for a in op.get_args() {
+                    write!(f, " {a}")?;
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 impl Clone for Box<dyn Instruction> {
@@ -215,7 +236,7 @@ impl FromLiteral<f32> for AsmToken {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AsmTokenLoc {
     pub tok: AsmToken,
     pub loc: LocationInfo,
@@ -304,6 +325,7 @@ impl fmt::Display for ParseError {
     }
 }
 
+#[derive(Default)]
 pub struct TokenList {
     tokens: Vec<AsmTokenLoc>,
     inst: InstructionList,
@@ -467,8 +489,13 @@ impl TokenList {
 
             AsmToken::CreateLabel(lbl.to_string())
         } else if let Some(inst_fn) = self.inst.get_instruction(&words[0]) {
+            let name = &words[0];
             let args = &words[1..];
-            AsmToken::Operation(*inst_fn, args.iter().map(|s| s.to_string()).collect())
+            AsmToken::Operation(
+                *inst_fn,
+                name.into(),
+                args.iter().map(|s| s.to_string()).collect(),
+            )
         } else {
             return Err(AssemblerError::UnknownInstruction(line.into(), None));
         };
@@ -489,6 +516,7 @@ impl TokenList {
             let loc = t.loc.clone();
 
             match &t.tok {
+                AsmToken::Comment(_) => (),
                 AsmToken::AlignInstruction => state.align_boundary(Processor::BYTES_PER_WORD),
                 AsmToken::OperationLiteral(op) => {
                     state.add_bytes(&op.to_u32().to_be_bytes(), loc)?;
@@ -539,7 +567,7 @@ impl TokenList {
                 AsmToken::LoadLoc(lbl) => {
                     state.add_delay(DelayToken::LoadLoc { label: lbl.into() }, t.loc.clone())?;
                 }
-                AsmToken::Operation(func, args) => {
+                AsmToken::Operation(func, _, args) => {
                     state.add_delay(
                         DelayToken::Operation {
                             inst: *func,
@@ -564,15 +592,6 @@ impl TokenList {
         }
 
         Ok(bytes)
-    }
-}
-
-impl Default for TokenList {
-    fn default() -> Self {
-        Self {
-            tokens: Vec::new(),
-            inst: InstructionList::default(),
-        }
     }
 }
 
@@ -693,8 +712,8 @@ pub fn assemble_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
     for (i, l) in txt.iter().enumerate() {
         let loc = LocationInfo {
             line: i + 1,
-            full_line: Some(l.to_string()),
-            base_loc: None,
+            column: 0,
+            text: Some(l.to_string().into()),
         };
         if let Err(e) = state.parse_line(&l.to_lowercase(), loc.clone()) {
             return Err(AssemblerErrorLoc { err: e, loc });
