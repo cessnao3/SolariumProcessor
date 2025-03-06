@@ -5,6 +5,8 @@ use std::{
     sync::LazyLock,
 };
 
+use jib_asm::{ArgumentType, AsmToken, Instruction, OpAdd, OpConv, OpPopr, OpPush, OpSub};
+
 use crate::{
     TokenError,
     compiler::CompilingState,
@@ -13,18 +15,76 @@ use crate::{
     typing::Type,
 };
 
+#[derive(Debug, Clone, Copy)]
+pub struct RegisterDef {
+    pub reg: jib::cpu::Register,
+    pub spare: jib::cpu::Register,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum RegisterDefError {
+    RegisterEqualToSpare,
+}
+
+impl Display for RegisterDefError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "register and spare location cannot be the same")
+    }
+}
+
+impl RegisterDef {
+    pub fn new(reg: jib::cpu::Register) -> Result<Self, RegisterDefError> {
+        let spare = jib::cpu::Register::last_register();
+        if reg == spare {
+            Err(RegisterDefError::RegisterEqualToSpare)
+        } else {
+            Ok(Self { reg, spare })
+        }
+    }
+
+    pub fn increment_register(&self) -> Option<Self> {
+        Self::new(jib::cpu::Register::GeneralPurpose(self.reg.get_index() + 1))
+            .map_or(None, |x| Some(x))
+    }
+
+    pub fn push_spare(&self) -> AsmToken {
+        AsmToken::OperationLiteral(Box::new(OpPush::new(self.spare.into())))
+    }
+
+    pub fn pop_spare(&self) -> AsmToken {
+        AsmToken::OperationLiteral(Box::new(OpPopr::new(self.spare.into())))
+    }
+}
+
+impl Default for RegisterDef {
+    fn default() -> Self {
+        Self::new(jib::cpu::Register::first_gp_register()).unwrap()
+    }
+}
+
 pub trait Expression: Debug + Display {
     fn get_token(&self) -> &Token;
 
     fn get_type(&self) -> Result<Type, TokenError>;
 
+    fn load_address_to_register(
+        &self,
+        _reg: RegisterDef,
+    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        Err(self
+            .get_token()
+            .clone()
+            .into_err("expression does not have a mappable address in memory"))
+    }
+
     fn load_value_to_register(
         &self,
-        reg: jib::cpu::Register,
-        spare: jib::cpu::Register,
+        reg: RegisterDef,
     ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError>;
 
-    fn simplify(&self) -> Option<Literal>;
+    fn simplify(&self) -> Option<Literal> {
+        None
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,8 +143,7 @@ impl Expression for UnaryExpression {
 
     fn load_value_to_register(
         &self,
-        _reg: jib::cpu::Register,
-        _spare: jib::cpu::Register,
+        _reg: RegisterDef,
     ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
         todo!()
     }
@@ -228,10 +287,62 @@ impl Expression for BinaryExpression {
 
     fn load_value_to_register(
         &self,
-        _reg: jib::cpu::Register,
-        _spare: jib::cpu::Register,
+        reg: RegisterDef,
     ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
-        todo!()
+        if let Some(dt) = self.get_type()?.primitive_type() {
+            let mut asm = self.lhs.load_value_to_register(reg)?;
+            let reg_a = reg.reg;
+
+            let reg_b;
+            if let Some(reg_next) = reg.increment_register() {
+                asm.extend_from_slice(&self.rhs.load_value_to_register(reg_next)?);
+                reg_b = reg_next.reg;
+            } else {
+                asm.push(self.get_token().to_asm(reg.push_spare()));
+                asm.extend_from_slice(&self.rhs.load_value_to_register(reg)?);
+                asm.push(self.get_token().to_asm(reg.pop_spare()));
+                reg_b = reg.spare;
+            }
+
+            if let Some(p) = self.lhs.get_type()?.primitive_type() {
+                if p != dt {
+                    asm.push(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
+                        OpConv::new(ArgumentType::new(reg_a, dt), ArgumentType::new(reg_a, p)),
+                    ))));
+                }
+            } else {
+                panic!("type error!")
+            }
+
+            if let Some(p) = self.rhs.get_type()?.primitive_type() {
+                if p != dt {
+                    asm.push(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
+                        OpConv::new(ArgumentType::new(reg_b, dt), ArgumentType::new(reg_b, p)),
+                    ))));
+                }
+            } else {
+                panic!("type error")
+            }
+
+            let reg_type = ArgumentType::new(reg.reg, dt);
+
+            let x: Box<dyn Instruction> = match self.operation {
+                BinaryOperation::Plus => Box::new(OpAdd::new(reg_type, reg_a.into(), reg_b.into())),
+                BinaryOperation::Minus => {
+                    Box::new(OpSub::new(reg_type, reg_a.into(), reg_b.into()))
+                }
+                x => todo!("operation {x} not yet supported"),
+            };
+
+            asm.push(self.get_token().to_asm(AsmToken::OperationLiteral(x)));
+
+            Ok(asm)
+        } else {
+            Err(self
+                .get_token()
+                .clone()
+                .into_err("non-primitive types not yet supported"))
+        }
     }
 }
 
@@ -272,7 +383,7 @@ pub fn parse_expression(
             parse_expression(tokens, state)?,
         ))
     } else if let Ok(id) = get_identifier(&first) {
-        todo!()
+        state.get_variable(&first)?.clone().into()
     } else if let Ok(lit) = Literal::try_from(first.clone()) {
         Rc::new(lit)
     } else {

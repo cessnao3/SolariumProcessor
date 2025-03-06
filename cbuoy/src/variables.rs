@@ -1,47 +1,38 @@
-use std::{fmt::Debug, rc::Rc};
+use std::{
+    fmt::{Debug, Display},
+    rc::Rc,
+};
 
-use jib_asm::{AsmToken, AsmTokenLoc, argument::ArgumentType};
+use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc};
 
-use crate::{TokenError, tokenizer::Token, typing::Type};
+use crate::{
+    TokenError,
+    expressions::{Expression, RegisterDef},
+    tokenizer::{Token, get_identifier},
+    typing::Type,
+};
 
-pub trait Variable: Debug {
-    fn get_token(&self) -> &Token;
-    fn load_to_register(
-        &self,
-        reg: jib::cpu::Register,
-        spare: jib::cpu::Register,
-    ) -> Result<Vec<AsmTokenLoc>, TokenError>;
-
-    fn load_address_to_register(
-        &self,
-        reg: jib::cpu::Register,
-        spare: jib::cpu::Register,
-    ) -> Result<Vec<AsmTokenLoc>, TokenError>;
-
+pub trait Variable: Debug + Expression {
     fn get_name(&self) -> &str {
         self.get_token().get_value()
     }
-
-    fn get_type(&self) -> &Type;
 }
 
 #[derive(Debug, Clone)]
 pub struct GlobalVariable {
     name: Token,
     dtype: Type,
-    id: usize,
     label: Rc<str>,
 }
 
 impl GlobalVariable {
-    pub fn new(token: Token, id: usize, dtype: Type) -> Self {
-        let label = format!("global_variable_{}_{}", id, token).into();
-        Self {
+    pub fn new(token: Token, id: usize, dtype: Type) -> Result<Self, TokenError> {
+        let label = format!("global_variable_{}_{}", id, get_identifier(&token)?).into();
+        Ok(Self {
             name: token,
             dtype,
-            id,
             label,
-        }
+        })
     }
 
     pub fn access_label(&self) -> &str {
@@ -60,30 +51,41 @@ impl GlobalVariable {
     }
 }
 
+impl Display for GlobalVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.get_name())
+    }
+}
+
 impl Variable for GlobalVariable {
+    fn get_name(&self) -> &str {
+        self.name.get_value()
+    }
+}
+
+impl Expression for GlobalVariable {
     fn get_token(&self) -> &Token {
         &self.name
     }
 
-    fn get_type(&self) -> &Type {
-        &self.dtype
+    fn get_type(&self) -> Result<Type, TokenError> {
+        Ok(self.dtype.clone())
     }
 
-    fn load_to_register(
+    fn load_value_to_register(
         &self,
-        reg: jib::cpu::Register,
-        _spare: jib::cpu::Register,
-    ) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        reg: RegisterDef,
+    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
         if let Type::Primitive(p) = self.dtype {
             let vals = [
                 AsmToken::OperationLiteral(Box::new(jib_asm::OpLdn::new(ArgumentType::new(
-                    reg,
+                    reg.reg,
                     jib::cpu::DataType::U32,
                 )))),
                 AsmToken::LoadLoc(self.access_label().into()),
                 AsmToken::OperationLiteral(Box::new(jib_asm::OpLd::new(
-                    ArgumentType::new(reg, p.into()),
-                    reg.into(),
+                    ArgumentType::new(reg.reg, p.into()),
+                    reg.reg.into(),
                 ))),
             ];
             Ok(self.to_token_loc(vals.into_iter()).collect())
@@ -95,15 +97,11 @@ impl Variable for GlobalVariable {
         }
     }
 
-    fn load_address_to_register(
-        &self,
-        reg: jib::cpu::Register,
-        _spare: jib::cpu::Register,
-    ) -> Result<Vec<AsmTokenLoc>, TokenError> {
+    fn load_address_to_register(&self, reg: RegisterDef) -> Result<Vec<AsmTokenLoc>, TokenError> {
         Ok(self
             .to_token_loc([
                 AsmToken::OperationLiteral(Box::new(jib_asm::OpLdn::new(ArgumentType::new(
-                    reg,
+                    reg.reg,
                     jib::cpu::DataType::U32,
                 )))),
                 AsmToken::LoadLoc(self.access_label().into()),

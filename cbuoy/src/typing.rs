@@ -35,6 +35,14 @@ impl Type {
         }
     }
 
+    pub fn primitive_type(&self) -> Option<DataType> {
+        if let Some(Self::Primitive(p)) = self.base_type() {
+            Some(p)
+        } else {
+            None
+        }
+    }
+
     pub fn ref_type(&self) -> Type {
         Self::Pointer(Rc::new(self.clone()))
     }

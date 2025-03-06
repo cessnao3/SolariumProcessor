@@ -1,6 +1,6 @@
-pub mod argument;
+mod argument;
 mod immediate;
-pub mod instructions;
+mod instructions;
 
 use core::fmt;
 use std::{collections::HashMap, fmt::Display, rc::Rc, sync::LazyLock};
@@ -12,6 +12,8 @@ pub use instructions::{
     OpRem, OpReset, OpRet, OpRetInt, OpSav, OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq,
     OpTnz, OpTz,
 };
+
+pub use argument::{ArgumentError, ArgumentRegister, ArgumentType};
 
 use jib::cpu::{Opcode, Processor, ProcessorError};
 

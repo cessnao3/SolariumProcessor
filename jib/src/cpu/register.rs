@@ -1,6 +1,6 @@
 use core::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub enum Register {
     ProgramCounter,
     Status,
@@ -91,6 +91,13 @@ impl TryFrom<usize> for Register {
             x if (Self::IDX_FIRST_GP..Self::NUM_REGISTERS).contains(&x) => Self::GeneralPurpose(x),
             x => return Err(Self::Error::UnknownRegister(x)),
         })
+    }
+}
+
+impl Eq for Register {}
+impl PartialEq for Register {
+    fn eq(&self, other: &Self) -> bool {
+        self.get_index() == other.get_index()
     }
 }
 

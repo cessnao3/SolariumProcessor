@@ -1,12 +1,12 @@
 use std::{fmt::Display, sync::LazyLock};
 
 use jib::cpu::{DataType, OperationError, OperatorManager};
-use jib_asm::{AsmToken, argument::ArgumentType};
+use jib_asm::{ArgumentType, AsmToken};
 use regex::Regex;
 
 use crate::{
     TokenError,
-    expressions::{BinaryOperation, Expression, UnaryOperation},
+    expressions::{BinaryOperation, Expression, RegisterDef, UnaryOperation},
     tokenizer::Token,
     typing::Type,
 };
@@ -157,8 +157,7 @@ impl Expression for Literal {
 
     fn load_value_to_register(
         &self,
-        reg: jib::cpu::Register,
-        _spare: jib::cpu::Register,
+        reg: RegisterDef,
     ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
         let op_lit = match self.value {
             LiteralValue::U32(x) => jib_asm::AsmToken::Literal4(x),
@@ -170,7 +169,7 @@ impl Expression for Literal {
             LiteralValue::F32(x) => jib_asm::AsmToken::Literal4(x.to_bits()),
         };
         let op_load = AsmToken::OperationLiteral(Box::new(jib_asm::OpLdn::new(ArgumentType::new(
-            reg,
+            reg.reg,
             self.value.get_dtype().into(),
         ))));
 
