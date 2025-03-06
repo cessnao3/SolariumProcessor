@@ -58,6 +58,8 @@ pub fn parse(s: &str) -> Result<Vec<AsmTokenLoc>, TokenError> {
 trait Expression: Debug + Display {
     fn get_token(&self) -> &Token;
 
+    fn get_type(&self) -> Result<Type, TokenError>;
+
     fn load_value_to_register(
         &self,
         reg: jib::cpu::Register,
@@ -185,6 +187,10 @@ impl Expression for Literal {
         &self.token
     }
 
+    fn get_type(&self) -> Result<Type, TokenError> {
+        Ok(Type::Primitive(self.value.get_dtype()))
+    }
+
     fn load_value_to_register(
         &self,
         reg: jib::cpu::Register,
@@ -232,7 +238,7 @@ impl TryFrom<Token> for Literal {
     type Error = TokenError;
     fn try_from(value: Token) -> Result<Self, Self::Error> {
         static LITERAL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"^(((?<inum>\d+)(?<itype>[ui](8|(16)|(32)))?)|((?<fnum>(\d+(\.\d*))|(\.\d+))f32)|(<f32>\d*\.\d+))$").unwrap()
+            Regex::new(r"^(((?<inum>\d+)(?<itype>[ui](8|(16)|(32)))?)|((?<fnum>(\d+(\.\d*))|(\.\d+))f32)|(?<f32>\d*\.\d+))$").unwrap()
         });
 
         let res = if let Some(m) = LITERAL_REGEX.captures(value.get_value()) {
@@ -400,6 +406,17 @@ impl Expression for UnaryExpression {
         &self.token
     }
 
+    fn get_type(&self) -> Result<Type, TokenError> {
+        if let Some(Type::Primitive(t)) = self.base.get_type()?.base_type() {
+            Ok(Type::Primitive(t))
+        } else {
+            Err(self
+                .token
+                .clone()
+                .into_err("expression is not a primitive data type for unary expression"))
+        }
+    }
+
     fn load_value_to_register(
         &self,
         reg: jib::cpu::Register,
@@ -435,6 +452,26 @@ struct BinaryExpression {
 impl Expression for BinaryExpression {
     fn get_token(&self) -> &Token {
         &self.token
+    }
+
+    fn get_type(&self) -> Result<Type, TokenError> {
+        if let Some(Type::Primitive(a)) = self.lhs.get_type()?.base_type() {
+            if let Some(Type::Primitive(b)) = self.rhs.get_type()?.base_type() {
+                Ok(Type::Primitive(PrimitiveType::coerced(a, b)))
+            } else {
+                Err(self
+                    .rhs
+                    .get_token()
+                    .clone()
+                    .into_err("cannot convert expression to expression primitive type"))
+            }
+        } else {
+            Err(self
+                .lhs
+                .get_token()
+                .clone()
+                .into_err("cannot convert expression to expression primitive type"))
+        }
     }
 
     fn simplify(&self) -> Option<Literal> {
@@ -753,16 +790,16 @@ mod tests {
         let tokens = [
             ("0u32", Some(LiteralValue::U32(0))),
             ("23834i8", None),
-            ("-1i8", Some(LiteralValue::I8(-1))),
-            ("-23834i16", Some(LiteralValue::I16(-23834))),
+            ("1i8", Some(LiteralValue::I8(1))),
+            ("23834i16", Some(LiteralValue::I16(23834))),
             ("394i23", None),
             ("38905u32", Some(LiteralValue::U32(38905))),
             ("389u35", None),
             ("3.234i8", None),
-            ("+3.2f32", Some(LiteralValue::F32(3.2))),
+            ("3.2f32", Some(LiteralValue::F32(3.2))),
             (".3f32", Some(LiteralValue::F32(0.3))),
-            ("-32.34f32", Some(LiteralValue::F32(-32.34))),
-            ("-32.34", Some(LiteralValue::F32(-32.34))),
+            ("32.34f32", Some(LiteralValue::F32(32.34))),
+            ("32.34", Some(LiteralValue::F32(32.34))),
             ("394", Some(LiteralValue::I32(394))),
         ];
 

@@ -159,6 +159,10 @@ impl PrimitiveType {
         // TODO - Move to jib::cpu::DataType
         self.byte_size()
     }
+
+    pub fn coerced(a: Self, b: Self) -> Self {
+        if a > b { a } else { b }
+    }
 }
 
 impl From<PrimitiveType> for jib::cpu::DataType {
