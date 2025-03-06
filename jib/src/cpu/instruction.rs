@@ -2,7 +2,7 @@ use core::fmt;
 
 use super::register::Register;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DataType {
     U8,
     I8,
@@ -13,23 +13,25 @@ pub enum DataType {
     F32,
 }
 
-impl fmt::Display for DataType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            Self::U8 => "u8",
-            Self::I8 => "i8",
-            Self::U16 => "u16",
-            Self::I16 => "i16",
-            Self::U32 => "u32",
-            Self::I32 => "i32",
-            Self::F32 => "f32",
-        };
-
-        write!(f, "{s}")
-    }
-}
-
 impl DataType {
+    pub const ALL: &[Self] = &[
+        Self::U8,
+        Self::I8,
+        Self::U16,
+        Self::I16,
+        Self::U32,
+        Self::I32,
+        Self::F32,
+    ];
+
+    pub fn coerced(a: Self, b: Self) -> Self {
+        if a > b {
+            a
+        } else {
+            b
+        }
+    }
+
     pub fn byte_size(&self) -> usize {
         match self {
             Self::U8 | Self::I8 => 1,
@@ -55,6 +57,21 @@ impl DataType {
     }
 }
 
+impl fmt::Display for DataType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::U8 => "u8",
+            Self::I8 => "i8",
+            Self::U16 => "u16",
+            Self::I16 => "i16",
+            Self::U32 => "u32",
+            Self::I32 => "i32",
+            Self::F32 => "f32",
+        };
+
+        write!(f, "{s}")
+    }
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DataTypeError(u8);
 

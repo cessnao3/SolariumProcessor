@@ -1,9 +1,8 @@
 use std::{collections::HashSet, fmt, iter::Peekable, rc::Rc, slice::Iter, sync::LazyLock};
 
+use jib::cpu::DataType;
 use jib_asm::{AsmToken, AsmTokenLoc};
 use regex::Regex;
-
-use crate::typing::PrimitiveType;
 
 pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
     // Define the splitting regex
@@ -231,7 +230,7 @@ impl TokenIter<'_> {
 
 static RESERVED_KEYWORDS: LazyLock<HashSet<String>> = LazyLock::new(|| {
     let keywords = ["if", "while", "else", "global", "def", "var", "fn"].map(|v| v.to_string());
-    let primitives = PrimitiveType::ALL.iter().map(|v| v.to_string());
+    let primitives = DataType::ALL.iter().map(|v| v.to_string());
     keywords.into_iter().chain(primitives).collect()
 });
 

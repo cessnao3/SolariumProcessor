@@ -4,11 +4,13 @@ use std::rc::Rc;
 use std::sync::LazyLock;
 use std::{collections::HashMap, fmt::Display};
 
+use jib::cpu::DataType;
+
 use crate::tokenizer::{Token, TokenError, TokenIter};
 
 #[derive(Debug, Clone)]
 pub enum Type {
-    Primitive(PrimitiveType),
+    Primitive(DataType),
     Pointer(Rc<Self>),
     Array(usize, Rc<Self>),
     Struct(Rc<String>, HashMap<String, Rc<Self>>),
@@ -18,7 +20,7 @@ impl Type {
     pub fn byte_size(&self) -> usize {
         match self {
             Self::Primitive(p) => p.byte_size(),
-            Self::Pointer(_) => PrimitiveType::U32.byte_size(),
+            Self::Pointer(_) => DataType::U32.byte_size(),
             Self::Array(size, t) => size * t.byte_size(),
             Self::Struct(_, types) => types.values().map(|v| v.byte_size()).sum(),
         }
@@ -27,7 +29,7 @@ impl Type {
     pub fn base_type(&self) -> Option<Type> {
         match self {
             Self::Primitive(p) => Some(Self::Primitive(*p)),
-            Self::Pointer(_) => Some(Self::Primitive(PrimitiveType::U32)),
+            Self::Pointer(_) => Some(Self::Primitive(DataType::U32)),
             Self::Array(_, t) => Some(t.as_ref().clone()),
             Self::Struct(_, _) => None,
         }
@@ -39,11 +41,15 @@ impl Type {
 
     pub fn alignment(&self) -> usize {
         match self {
-            Self::Primitive(p) => p.alignment(),
-            Self::Pointer(_) => PrimitiveType::U32.byte_size(),
+            Self::Primitive(p) => p.byte_size(),
+            Self::Pointer(_) => DataType::U32.byte_size(),
             Self::Array(_, t) => t.alignment(),
-            Self::Struct(_, _) => PrimitiveType::U32.alignment(),
+            Self::Struct(_, _) => DataType::U32.byte_size(),
         }
+    }
+
+    pub fn coerce_type(a: DataType, b: DataType) -> DataType {
+        a.max(b)
     }
 }
 
@@ -99,13 +105,8 @@ impl StructType {
     }
 
     pub fn alignment(&self) -> usize {
-        static MAX_ALIGNMENT: LazyLock<usize> = LazyLock::new(|| {
-            PrimitiveType::ALL
-                .iter()
-                .map(|v| v.alignment())
-                .max()
-                .unwrap()
-        });
+        static MAX_ALIGNMENT: LazyLock<usize> =
+            LazyLock::new(|| DataType::ALL.iter().map(|v| v.byte_size()).max().unwrap());
         *MAX_ALIGNMENT
     }
 }
@@ -115,96 +116,6 @@ struct StructField {
     offset: usize,
     name: Rc<str>,
     dtype: Type,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum PrimitiveType {
-    U8,
-    I8,
-    U16,
-    I16,
-    U32,
-    I32,
-    F32,
-}
-
-impl PrimitiveType {
-    pub const ALL: &[PrimitiveType] = &[
-        Self::U8,
-        Self::I8,
-        Self::U16,
-        Self::I16,
-        Self::U32,
-        Self::I32,
-        Self::F32,
-    ];
-
-    pub fn is_signed(&self) -> bool {
-        matches!(self, Self::U8 | Self::U16 | Self::U32)
-    }
-
-    pub fn coerced_type(&self, other: Self) -> Self {
-        if *self > other { *self } else { other }
-    }
-
-    pub fn byte_size(&self) -> usize {
-        match self {
-            Self::U8 | Self::I8 => 1,
-            Self::U16 | Self::I16 => 2,
-            Self::U32 | Self::I32 | Self::F32 => 4,
-        }
-    }
-
-    pub fn alignment(&self) -> usize {
-        // TODO - Move to jib::cpu::DataType
-        self.byte_size()
-    }
-
-    pub fn coerced(a: Self, b: Self) -> Self {
-        if a > b { a } else { b }
-    }
-}
-
-impl From<PrimitiveType> for jib::cpu::DataType {
-    fn from(value: PrimitiveType) -> Self {
-        match value {
-            PrimitiveType::U8 => Self::U8,
-            PrimitiveType::U16 => Self::U16,
-            PrimitiveType::U32 => Self::U32,
-            PrimitiveType::I8 => Self::I8,
-            PrimitiveType::I16 => Self::I16,
-            PrimitiveType::I32 => Self::I32,
-            PrimitiveType::F32 => Self::F32,
-        }
-    }
-}
-
-impl From<jib::cpu::DataType> for PrimitiveType {
-    fn from(value: jib::cpu::DataType) -> Self {
-        match value {
-            jib::cpu::DataType::U8 => Self::U8,
-            jib::cpu::DataType::U16 => Self::U16,
-            jib::cpu::DataType::U32 => Self::U32,
-            jib::cpu::DataType::I8 => Self::I8,
-            jib::cpu::DataType::I16 => Self::I16,
-            jib::cpu::DataType::I32 => Self::I32,
-            jib::cpu::DataType::F32 => Self::F32,
-        }
-    }
-}
-
-impl Display for PrimitiveType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::U8 => write!(f, "u8"),
-            Self::U16 => write!(f, "u16"),
-            Self::U32 => write!(f, "u32"),
-            Self::I8 => write!(f, "i8"),
-            Self::I16 => write!(f, "i16"),
-            Self::I32 => write!(f, "i32"),
-            Self::F32 => write!(f, "f32"),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -229,7 +140,7 @@ impl From<UnknownPrimitiveError> for TokenError {
     }
 }
 
-impl TryFrom<TokenIter<'_>> for PrimitiveType {
+impl TryFrom<TokenIter<'_>> for DataType {
     type Error = TokenError;
 
     fn try_from(value: TokenIter) -> Result<Self, Self::Error> {
@@ -243,21 +154,17 @@ impl TryFrom<TokenIter<'_>> for PrimitiveType {
                 msg: "UNKNOWN!".to_owned(),
             })
         } else {
-            Ok(PrimitiveType::try_from(first)?)
+            Ok(DataType::try_from(first)?)
         }
     }
 }
 
-impl TryFrom<Token> for PrimitiveType {
+impl TryFrom<Token> for DataType {
     type Error = UnknownPrimitiveError;
 
     fn try_from(value: Token) -> Result<Self, Self::Error> {
-        static PRIMITIVE_MAP: LazyLock<HashMap<String, PrimitiveType>> = LazyLock::new(|| {
-            PrimitiveType::ALL
-                .iter()
-                .map(|v| (v.to_string(), *v))
-                .collect()
-        });
+        static PRIMITIVE_MAP: LazyLock<HashMap<String, DataType>> =
+            LazyLock::new(|| DataType::ALL.iter().map(|v| (v.to_string(), *v)).collect());
 
         if let Some(p) = PRIMITIVE_MAP.get(value.get_value()) {
             Ok(*p)
