@@ -1,4 +1,9 @@
-use core::fmt;
+use core::{
+    default,
+    fmt::{self, Display},
+};
+
+use super::{DataType, ProcessorError};
 
 pub struct OperationValue {
     pub val: u32,
@@ -63,6 +68,75 @@ pub trait BinaryOperations {
     fn bsftr(&self, a: u32, b: u32) -> Result<OperationValue, OperationError>;
     fn bsftl(&self, a: u32, b: u32) -> Result<OperationValue, OperationError>;
     fn bnot(&self, a: u32) -> Result<OperationValue, OperationError>;
+}
+
+#[derive(Default)]
+pub struct OperatorManager {
+    op_f32: FloatOperations,
+    op_u8: IntegerU8Operations,
+    op_u16: IntegerU16Operations,
+    op_u32: IntegerU32Operations,
+    op_i8: IntegerI8Operations,
+    op_i16: IntegerI16Operations,
+    op_i32: IntegerI32Operations,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct OperatorInvalidForType;
+
+impl From<OperatorInvalidForType> for ProcessorError {
+    fn from(_value: OperatorInvalidForType) -> Self {
+        Self::Operation(OperationError::UnuspportedOperation)
+    }
+}
+
+impl From<OperatorInvalidForType> for OperationError {
+    fn from(_value: OperatorInvalidForType) -> Self {
+        Self::UnuspportedOperation
+    }
+}
+
+impl OperatorManager {
+    pub fn get_arith(&self, dt: DataType) -> &dyn ArithmeticOperations {
+        match dt {
+            DataType::U8 => &self.op_u8,
+            DataType::U16 => &self.op_u16,
+            DataType::U32 => &self.op_u32,
+            DataType::I8 => &self.op_i8,
+            DataType::I16 => &self.op_i16,
+            DataType::I32 => &self.op_i32,
+            DataType::F32 => &self.op_f32,
+        }
+    }
+
+    pub fn get_bitwise(
+        &self,
+        dt: DataType,
+    ) -> Result<&dyn BinaryOperations, OperatorInvalidForType> {
+        Ok(match dt {
+            DataType::U8 => &self.op_u8,
+            DataType::U16 => &self.op_u16,
+            DataType::U32 => &self.op_u32,
+            DataType::I8 => &self.op_i8,
+            DataType::I16 => &self.op_i16,
+            DataType::I32 => &self.op_i32,
+            _ => {
+                return Err(OperatorInvalidForType);
+            }
+        })
+    }
+
+    pub fn get_relative(&self, dt: DataType) -> &dyn RelationalOperations {
+        match dt {
+            DataType::U8 => &self.op_u8,
+            DataType::U16 => &self.op_u16,
+            DataType::U32 => &self.op_u32,
+            DataType::I8 => &self.op_i8,
+            DataType::I16 => &self.op_i16,
+            DataType::I32 => &self.op_i32,
+            DataType::F32 => &self.op_f32,
+        }
+    }
 }
 
 macro_rules! define_arith_for_type {
@@ -173,36 +247,43 @@ macro_rules! define_rel_for_type {
     };
 }
 
+#[derive(Default)]
 pub struct IntegerU8Operations;
 define_arith_for_type!(IntegerU8Operations, u8);
 define_bitwise_for_type!(IntegerU8Operations, u8);
 define_rel_for_type!(IntegerU8Operations, u8);
 
+#[derive(Default)]
 pub struct IntegerU16Operations;
 define_arith_for_type!(IntegerU16Operations, u16);
 define_bitwise_for_type!(IntegerU16Operations, u16);
 define_rel_for_type!(IntegerU16Operations, u16);
 
+#[derive(Default)]
 pub struct IntegerU32Operations;
 define_arith_for_type!(IntegerU32Operations, u32);
 define_bitwise_for_type!(IntegerU32Operations, u32);
 define_rel_for_type!(IntegerU32Operations, u32);
 
+#[derive(Default)]
 pub struct IntegerI8Operations;
 define_arith_for_type!(IntegerI8Operations, i8);
 define_bitwise_for_type!(IntegerI8Operations, i8);
 define_rel_for_type!(IntegerI8Operations, i8);
 
+#[derive(Default)]
 pub struct IntegerI16Operations;
 define_arith_for_type!(IntegerI16Operations, i16);
 define_bitwise_for_type!(IntegerI16Operations, i16);
 define_rel_for_type!(IntegerI16Operations, i16);
 
+#[derive(Default)]
 pub struct IntegerI32Operations;
 define_arith_for_type!(IntegerI32Operations, i32);
 define_bitwise_for_type!(IntegerI32Operations, i32);
 define_rel_for_type!(IntegerI32Operations, i32);
 
+#[derive(Default)]
 pub struct FloatOperations;
 impl ArithmeticOperations for FloatOperations {
     fn add(&self, a: u32, b: u32) -> Result<OperationValue, OperationError> {

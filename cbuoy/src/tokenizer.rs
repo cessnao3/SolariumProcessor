@@ -5,17 +5,17 @@ use regex::Regex;
 
 use crate::typing::PrimitiveType;
 
-pub fn tokenize(s: &str) -> Vec<Token> {
+pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
     // Define the splitting regex
     static SPLIT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(\w+)|:|;|\{|\}|\(|\)|\+|\-|\*|/|(==?)|(&&?)|(\|\|?)|(\!=?)|(>=?)|(<=?)\[|\]")
-            .unwrap()
+        Regex::new(r"(\w+)|:|;|\{|\}|\(|\)|\+|\-|\*|/|(&&?)|(\|\|?)|([<>!=]=?)|\[|\]").unwrap()
     });
 
     // Obtain the tokens
     struct TokenMatch<'a> {
         s: &'a str,
-        index: usize,
+        start: usize,
+        end: usize,
         loc: Option<TokenLocation>,
     }
 
@@ -32,10 +32,42 @@ pub fn tokenize(s: &str) -> Vec<Token> {
         .find_iter(s)
         .map(|m| TokenMatch {
             s: m.as_str(),
-            index: m.start(),
+            start: m.start(),
+            end: m.end(),
             loc: None,
         })
         .collect::<Vec<_>>();
+
+    let mut last_end = None;
+    for t in tokens.iter() {
+        let last_index = last_end.unwrap_or(0);
+        let check = s[last_index..t.start].trim();
+
+        let line = s.chars().filter(|c| *c == '\n').count();
+
+        let mut col_val = 0;
+        for (i, c) in s.char_indices().take(t.start) {
+            if c == '\n' {
+                col_val = i;
+            }
+        }
+
+        let column = t.start - col_val;
+
+        if check.len() > 0 {
+            return Err(TokenError {
+                msg: format!("unexpected token \"{}\" found", check),
+                token: Some(Token {
+                    value: check.into(),
+                    loc: TokenLocation { line, column },
+                }),
+            });
+        }
+
+        last_end = Some(t.end);
+    }
+
+    // TODO - Check that the spaces between words are just whitespace
 
     // Determine Locations
     let mut char_iter = s.chars();
@@ -44,7 +76,7 @@ pub fn tokenize(s: &str) -> Vec<Token> {
     let mut current_col = 0;
 
     for t in tokens.iter_mut() {
-        while current_index < t.index && current_index < s.len() {
+        while current_index < t.start && current_index < s.len() {
             if Some('\n') == char_iter.next() {
                 current_line += 1;
                 current_col = 0;
@@ -62,10 +94,10 @@ pub fn tokenize(s: &str) -> Vec<Token> {
     }
 
     // Return the resulting tokens
-    tokens
+    Ok(tokens
         .into_iter()
         .map(|t| Token::new(t.s, t.loc.unwrap()))
-        .collect()
+        .collect())
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -96,10 +128,10 @@ impl Token {
         &self.loc
     }
 
-    pub fn into_err(self, msg: String) -> TokenError {
+    pub fn into_err<T: AsRef<str>>(self, msg: T) -> TokenError {
         TokenError {
             token: Some(self),
-            msg,
+            msg: msg.as_ref().into(),
         }
     }
 
@@ -184,7 +216,7 @@ impl TokenIter<'_> {
         }
     }
 
-    pub fn next_if(&mut self, pred: fn(&str) -> bool) -> Option<Token> {
+    pub fn next_if<F: Fn(&str) -> bool>(&mut self, pred: F) -> Option<Token> {
         if let Some(s) = self.peek() {
             if pred(s.get_value()) {
                 Some(self.next().unwrap())
@@ -271,6 +303,8 @@ mod tests {
             "=", "==", "!=", "+", "-", "/", "&", "&&", "|", "||", ">", "<", ">=", "<=",
         ];
         let tokens = tokenize(&expected_operators.join("\n"));
+        assert!(tokens.is_ok());
+        let tokens = tokens.unwrap();
         assert_eq!(tokens.len(), expected_operators.len());
 
         for (i, (expected, token)) in expected_operators.iter().zip(tokens.iter()).enumerate() {
@@ -298,6 +332,8 @@ mod tests {
         ];
         let tokens = tokenize(&input_text);
 
+        assert!(tokens.is_ok());
+        let tokens = tokens.unwrap();
         assert_eq!(expected_tokens.len(), tokens.len());
 
         for (expected, token) in expected_tokens.iter().zip(tokens.iter()) {

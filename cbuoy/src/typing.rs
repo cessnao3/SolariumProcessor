@@ -156,7 +156,36 @@ impl PrimitiveType {
     }
 
     pub fn alignment(&self) -> usize {
+        // TODO - Move to jib::cpu::DataType
         self.byte_size()
+    }
+}
+
+impl From<PrimitiveType> for jib::cpu::DataType {
+    fn from(value: PrimitiveType) -> Self {
+        match value {
+            PrimitiveType::U8 => Self::U8,
+            PrimitiveType::U16 => Self::U16,
+            PrimitiveType::U32 => Self::U32,
+            PrimitiveType::I8 => Self::I8,
+            PrimitiveType::I16 => Self::I16,
+            PrimitiveType::I32 => Self::I32,
+            PrimitiveType::F32 => Self::F32,
+        }
+    }
+}
+
+impl From<jib::cpu::DataType> for PrimitiveType {
+    fn from(value: jib::cpu::DataType) -> Self {
+        match value {
+            jib::cpu::DataType::U8 => Self::U8,
+            jib::cpu::DataType::U16 => Self::U16,
+            jib::cpu::DataType::U32 => Self::U32,
+            jib::cpu::DataType::I8 => Self::I8,
+            jib::cpu::DataType::I16 => Self::I16,
+            jib::cpu::DataType::I32 => Self::I32,
+            jib::cpu::DataType::F32 => Self::F32,
+        }
     }
 }
 

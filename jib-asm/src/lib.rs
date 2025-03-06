@@ -5,7 +5,7 @@ pub mod instructions;
 use core::fmt;
 use std::{collections::HashMap, fmt::Display, rc::Rc, sync::LazyLock};
 
-use instructions::{
+pub use instructions::{
     Instruction, InstructionError, OpAdd, OpBand, OpBnot, OpBool, OpBor, OpBshl, OpBshr, OpBxor,
     OpCall, OpConv, OpCopy, OpDiv, OpHalt, OpInt, OpIntoff, OpInton, OpIntr, OpJmp, OpJmpr,
     OpJmpri, OpLd, OpLdi, OpLdn, OpLdr, OpLdri, OpMul, OpNeg, OpNoop, OpNot, OpPop, OpPopr, OpPush,

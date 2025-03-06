@@ -11,10 +11,8 @@ use crate::device::{DeviceAction, ProcessorDevice};
 use crate::memory::{MemoryError, MemoryMap, MemorySegment};
 
 use self::instruction::Instruction;
-use self::operations::{
-    ArithmeticOperations, BinaryOperations, FloatOperations, IntegerI8Operations,
-    IntegerI16Operations, IntegerI32Operations, IntegerU8Operations, IntegerU16Operations,
-    IntegerU32Operations, OperationError, RelationalOperations,
+pub use self::operations::{
+    ArithmeticOperations, BinaryOperations, OperationError, OperatorManager, RelationalOperations,
 };
 
 use self::register::RegisterFlag;
@@ -155,13 +153,7 @@ pub struct Processor {
     memory: MemoryMap,
     devices: Vec<Rc<RefCell<dyn ProcessorDevice>>>,
     registers: RegisterManager,
-    op_f32: FloatOperations,
-    op_u8: IntegerU8Operations,
-    op_u16: IntegerU16Operations,
-    op_u32: IntegerU32Operations,
-    op_i8: IntegerI8Operations,
-    op_i16: IntegerI16Operations,
-    op_i32: IntegerI32Operations,
+    operator_manager: OperatorManager,
     interrupt_hold: Option<Interrupt>,
 }
 
@@ -395,13 +387,7 @@ impl Processor {
             memory: MemoryMap::default(),
             devices: Vec::new(),
             registers: RegisterManager::default(),
-            op_f32: FloatOperations,
-            op_u8: IntegerU8Operations,
-            op_u16: IntegerU16Operations,
-            op_u32: IntegerU32Operations,
-            op_i8: IntegerI8Operations,
-            op_i16: IntegerI16Operations,
-            op_i32: IntegerI32Operations,
+            operator_manager: OperatorManager::default(),
             interrupt_hold: None,
         }
     }
@@ -547,52 +533,6 @@ impl Processor {
     ) -> Result<(), ProcessorError> {
         self.devices.push(seg);
         Ok(())
-    }
-
-    fn get_arith_operation(
-        &self,
-        dt: DataType,
-    ) -> Result<&dyn ArithmeticOperations, ProcessorError> {
-        Ok(match dt {
-            DataType::U8 => &self.op_u8,
-            DataType::U16 => &self.op_u16,
-            DataType::U32 => &self.op_u32,
-            DataType::I8 => &self.op_i8,
-            DataType::I16 => &self.op_i16,
-            DataType::I32 => &self.op_i32,
-            DataType::F32 => &self.op_f32,
-        })
-    }
-
-    fn get_bitwise_operation(&self, dt: DataType) -> Result<&dyn BinaryOperations, ProcessorError> {
-        Ok(match dt {
-            DataType::U8 => &self.op_u8,
-            DataType::U16 => &self.op_u16,
-            DataType::U32 => &self.op_u32,
-            DataType::I8 => &self.op_i8,
-            DataType::I16 => &self.op_i16,
-            DataType::I32 => &self.op_i32,
-            _ => {
-                return Err(ProcessorError::Operation(
-                    OperationError::UnuspportedOperation,
-                ));
-            }
-        })
-    }
-
-    fn get_relative_operation(
-        &self,
-        dt: DataType,
-    ) -> Result<&dyn RelationalOperations, ProcessorError> {
-        Ok(match dt {
-            DataType::U8 => &self.op_u8,
-            DataType::U16 => &self.op_u16,
-            DataType::U32 => &self.op_u32,
-            DataType::I8 => &self.op_i8,
-            DataType::I16 => &self.op_i16,
-            DataType::I32 => &self.op_i32,
-            DataType::F32 => &self.op_f32,
-        })
     }
 
     pub fn step(&mut self) -> Result<(), ProcessorError> {
@@ -862,7 +802,7 @@ impl Processor {
                 base: Self::OP_BASE_MATH,
                 ..
             } => {
-                let arith = self.get_arith_operation(inst.arg0_data_type()?)?;
+                let arith = self.operator_manager.get_arith(inst.arg0_data_type()?);
 
                 let val_a = self.registers.get(inst.arg1_register())?;
                 let val_b = self.registers.get(inst.arg2_register())?;
@@ -884,7 +824,7 @@ impl Processor {
                 base: Self::OP_BASE_BITS,
                 ..
             } => {
-                let bitwise = self.get_bitwise_operation(inst.arg0_data_type()?)?;
+                let bitwise = self.operator_manager.get_bitwise(inst.arg0_data_type()?)?;
 
                 let val_a = self.registers.get(inst.arg1_register())?;
                 let val_b = self.registers.get(inst.arg2_register())?;
@@ -906,7 +846,7 @@ impl Processor {
                 base: Self::OP_BASE_TEST,
                 ..
             } => {
-                let relative = self.get_relative_operation(inst.arg0_data_type()?)?;
+                let relative = self.operator_manager.get_relative(inst.arg0_data_type()?);
 
                 let val_a = self.registers.get(inst.arg1_register())?;
                 let val_b = self.registers.get(inst.arg2_register())?;
