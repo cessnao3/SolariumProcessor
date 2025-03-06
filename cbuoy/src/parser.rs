@@ -232,7 +232,7 @@ impl TryFrom<Token> for Literal {
     type Error = TokenError;
     fn try_from(value: Token) -> Result<Self, Self::Error> {
         static LITERAL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"^(((?<inum>[+-]?\d+)(?<itype>[ui](8|(16)|(32)))?)|((?<fnum>[+-]?(\d+(\.\d*))|(\.\d+))f32)|(?<f32>[+-]\d*\.\d+))$").unwrap()
+            Regex::new(r"^(((?<inum>\d+)(?<itype>[ui](8|(16)|(32)))?)|((?<fnum>(\d+(\.\d*))|(\.\d+))f32)|(<f32>\d*\.\d+))$").unwrap()
         });
 
         let res = if let Some(m) = LITERAL_REGEX.captures(value.get_value()) {

@@ -1,3 +1,6 @@
-global a: u16 = 1 + 5;
+global a: u16 = 255 + 5;
 global b: u32;
-global c: i32;
+global c: i32 = -1;
+global d: i16 = 0 - 1;
+global e: i8 = 127;
+global f: i8 = -128;
