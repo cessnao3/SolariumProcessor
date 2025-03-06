@@ -113,6 +113,18 @@ impl LiteralValue {
         }
     }
 
+    pub fn as_asm_literal(&self) -> AsmToken {
+        match *self {
+            Self::U8(x) => AsmToken::Literal1(x),
+            Self::I8(x) => AsmToken::Literal1(x as u8),
+            Self::U16(x) => AsmToken::Literal2(x),
+            Self::I16(x) => AsmToken::Literal2(x as u16),
+            Self::U32(x) => AsmToken::Literal4(x),
+            Self::I32(x) => AsmToken::Literal4(x as u32),
+            Self::F32(x) => AsmToken::Literal4(x.to_bits()),
+        }
+    }
+
     pub fn from_u32(x: u32, dtype: PrimitiveType) -> Self {
         match dtype {
             PrimitiveType::U8 => Self::U8(x as u8),
@@ -725,6 +737,16 @@ impl CompilingState {
         self.asm_static
             .push(name.to_asm(AsmToken::CreateLabel(var.access_label().into())));
 
+        let init_literal = if let Some(expr) = &init_expr {
+            if let Some(simplified) = expr.simplify() {
+                Some(simplified.value.as_asm_literal())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         let literal_value = init_expr
             .clone()
             .map_or(None, |x| x.simplify())
@@ -733,23 +755,27 @@ impl CompilingState {
         let needs_init = literal_value.is_none() && init_expr.is_some();
         let literal_value = literal_value.unwrap_or(0);
 
-        let mut needed_size = var.dtype.byte_size(); // Check if it is a primitive type for literals!
-        while needed_size > 0 {
-            let tok = if needed_size >= 4 {
-                needed_size -= 4;
-                AsmToken::Literal4(literal_value)
-            } else if needed_size >= 2 {
-                needed_size -= 2;
-                AsmToken::Literal2(literal_value as u16)
-            } else {
-                needed_size -= 1;
-                AsmToken::Literal1(literal_value as u8)
-            };
+        if let Some(a) = init_literal.clone() {
+            self.asm_static.push(name.to_asm(a));
+        } else {
+            let mut needed_size = var.dtype.byte_size();
+            while needed_size > 0 {
+                let tok = if needed_size >= 4 {
+                    needed_size -= 4;
+                    AsmToken::Literal4(literal_value)
+                } else if needed_size >= 2 {
+                    needed_size -= 2;
+                    AsmToken::Literal2(literal_value as u16)
+                } else {
+                    needed_size -= 1;
+                    AsmToken::Literal1(literal_value as u8)
+                };
 
-            self.asm_static.push(name.to_asm(tok));
+                self.asm_static.push(name.to_asm(tok));
+            }
         }
 
-        if needs_init {
+        if init_expr.is_some() && init_literal.is_none() {
             todo!();
         }
 
