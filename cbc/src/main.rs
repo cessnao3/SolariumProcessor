@@ -20,7 +20,7 @@ fn print_error(txt: &str, err: &TokenError) {
     if let Some(t) = &err.token {
         let line_num = t.get_loc().line;
         let display_num = line_num + 1;
-        let line = txt.lines().skip(line_num).next().unwrap();
+        let line = txt.lines().nth(line_num).unwrap();
         eprintln!("{display_num} >> {line}");
         eprint!("{display_num}    ");
         for _ in 0..t.get_loc().column {

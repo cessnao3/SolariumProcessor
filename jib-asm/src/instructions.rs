@@ -310,7 +310,7 @@ macro_rules! InstImmediateArg {
             }
 
             fn get_args(&self) -> Vec<String> {
-                vec![format!("{}:u16", self.imm)]
+                vec![format!("{}", self.imm)]
             }
 
             fn to_bytes(&self) -> [u8; INST_SIZE] {

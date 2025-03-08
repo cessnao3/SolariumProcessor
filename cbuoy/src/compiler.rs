@@ -1,44 +1,76 @@
 use std::{
     collections::{HashMap, hash_map::Entry},
+    fmt::Debug,
     rc::Rc,
 };
 
-use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, LocationInfo, OpConv, OpSav};
+use jib_asm::{AsmToken, AsmTokenLoc, LocationInfo, OpJmpri};
 
 use crate::{
     TokenError,
-    expressions::{Expression, RegisterDef},
+    expressions::Expression,
+    parser::FunctionDefinition,
     tokenizer::{Token, get_identifier},
     typing::Type,
-    variables::GlobalVariable,
+    variables::{GlobalVariable, GlobalVariableStatement, LocalVariable},
 };
+
+pub trait Statement: Debug {
+    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError>;
+}
+
+pub trait GlobalStatement: Statement {
+    fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError>;
+    fn get_static_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError>;
+}
+
+#[derive(Debug, Clone)]
+enum GlobalType {
+    Variable(Rc<GlobalVariable>),
+    Function(Rc<FunctionDefinition>),
+}
+
+impl GlobalType {
+    fn get_token(&self) -> &Token {
+        match self {
+            Self::Variable(v) => v.get_token(),
+            Self::Function(v) => v.get_token(),
+        }
+    }
+
+    fn get_statement(&self) -> Rc<dyn GlobalStatement> {
+        match self {
+            Self::Variable(var) => Rc::new(GlobalVariableStatement::new(var.clone())),
+            Self::Function(func) => func.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ScopeBlock {
+    variables: HashMap<String, Rc<LocalVariable>>,
+    current_offset: usize,
+}
 
 #[derive(Debug)]
 pub struct CompilingState {
     init_loc: u32,
-    asm_static: Vec<jib_asm::AsmTokenLoc>,
-    asm_init: Vec<jib_asm::AsmTokenLoc>,
-    asm_func: Vec<jib_asm::AsmTokenLoc>,
-    global_variables: HashMap<String, Rc<dyn Expression>>,
+    statements: Vec<Rc<dyn GlobalStatement>>,
+    global_scope: HashMap<String, GlobalType>,
+    scopes: Vec<ScopeBlock>,
     current_id: usize,
+    full_program: bool,
 }
 
 impl Default for CompilingState {
     fn default() -> Self {
-        fn init_vec(name: &str) -> Vec<AsmTokenLoc> {
-            vec![
-                CompilingState::blank_token_loc(AsmToken::Comment(name.into())),
-                CompilingState::blank_token_loc(AsmToken::AlignInstruction),
-            ]
-        }
-
         Self {
             init_loc: 0x2000,
-            asm_init: init_vec("Initialization"),
-            asm_func: init_vec("Functions"),
-            asm_static: init_vec("Static"),
-            global_variables: HashMap::new(),
+            global_scope: HashMap::new(),
             current_id: 0,
+            statements: Vec::new(),
+            scopes: Vec::new(),
+            full_program: true,
         }
     }
 }
@@ -57,15 +89,55 @@ impl CompilingState {
         current
     }
 
-    pub fn get_assembler(&self) -> Vec<AsmTokenLoc> {
-        let mut asm = vec![Self::blank_token_loc(AsmToken::ChangeAddress(
-            self.init_loc,
-        ))];
-        asm.extend_from_slice(&self.asm_init);
-        asm.extend_from_slice(&self.asm_static);
-        asm.extend_from_slice(&self.asm_func);
+    pub fn get_assembler(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        fn add_name(asm: &mut Vec<AsmTokenLoc>, name: &str) {
+            asm.extend_from_slice(&[
+                CompilingState::blank_token_loc(AsmToken::Comment(name.into())),
+                CompilingState::blank_token_loc(AsmToken::AlignInstruction),
+            ]);
+        }
 
-        asm
+        let init_label = "program_init".to_string();
+
+        let mut asm = if self.full_program {
+            vec![
+                Self::blank_token_loc(AsmToken::LoadLoc(init_label.clone())),
+                Self::blank_token_loc(AsmToken::LoadLoc(init_label.clone())),
+                Self::blank_token_loc(AsmToken::ChangeAddress(self.init_loc)),
+            ]
+        } else {
+            Vec::new()
+        };
+
+        add_name(&mut asm, "Initialization");
+        asm.push(Self::blank_token_loc(AsmToken::CreateLabel(
+            init_label.clone(),
+        )));
+
+        for s in self.statements.iter() {
+            asm.extend_from_slice(&s.get_init_code()?);
+        }
+
+        asm.extend_from_slice(
+            &[
+                AsmToken::Comment("Program Halt".into()),
+                AsmToken::OperationLiteral(Box::new(OpJmpri::new(0))),
+                AsmToken::ChangeAddress(0x3000), // TODO - TEMP!
+            ]
+            .map(Self::blank_token_loc),
+        );
+
+        add_name(&mut asm, "Static");
+        for s in self.statements.iter() {
+            asm.extend_from_slice(&s.get_static_code()?);
+        }
+
+        add_name(&mut asm, "Functions");
+        for s in self.statements.iter() {
+            asm.extend_from_slice(&s.get_exec_code()?);
+        }
+
+        Ok(asm)
     }
 
     pub fn add_global_var(
@@ -74,123 +146,80 @@ impl CompilingState {
         dtype: Type,
         init_expr: Option<Rc<dyn Expression>>,
     ) -> Result<(), TokenError> {
-        let id = self.get_next_id();
-        let name_str: Rc<str> = get_identifier(&name)?.into();
+        let var = Rc::new(GlobalVariable::new(
+            name,
+            self.get_next_id(),
+            dtype,
+            init_expr,
+        )?);
+        self.add_to_global_scope(GlobalType::Variable(var))
+    }
 
-        let var = Rc::new(GlobalVariable::new(name.clone(), id, dtype)?);
+    pub fn add_function(&mut self, func: Rc<FunctionDefinition>) -> Result<(), TokenError> {
+        self.add_to_global_scope(GlobalType::Function(func))
+    }
 
-        self.asm_static
-            .push(name.to_asm(AsmToken::CreateLabel(var.access_label().into())));
-
-        let init_literal = if let Some(expr) = &init_expr {
-            if let Some(simplified) = expr.simplify() {
-                Some(simplified.get_value().as_asm_literal())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let literal_value = init_expr
-            .clone()
-            .map_or(None, |x| x.simplify())
-            .map(|x| x.get_value().as_u32());
-
-        let literal_value = literal_value.unwrap_or(0);
-
-        if let Some(a) = init_literal.clone() {
-            self.asm_static.push(name.to_asm(a));
-        } else {
-            let mut needed_size = var.get_type()?.byte_size();
-            while needed_size > 0 {
-                let tok = if needed_size >= 4 {
-                    needed_size -= 4;
-                    AsmToken::Literal4(literal_value)
-                } else if needed_size >= 2 {
-                    needed_size -= 2;
-                    AsmToken::Literal2(literal_value as u16)
-                } else {
-                    needed_size -= 1;
-                    AsmToken::Literal1(literal_value as u8)
-                };
-
-                self.asm_static.push(name.to_asm(tok));
-            }
-        }
-
-        if init_literal.is_none() {
-            if let Some(init_expr) = init_expr {
-                if let Some(init_p) = init_expr.get_type()?.primitive_type() {
-                    if let Some(p) = var.get_type()?.primitive_type() {
-                        // TODO - Replace with a better expression (operation expression value?)
-                        let reg_state_var = RegisterDef::default();
-                        let reg_state_init = match reg_state_var.increment_register() {
-                            Some(x) => x,
-                            None => {
-                                return Err(name
-                                    .clone()
-                                    .into_err("unable to get valid register definition"));
-                            }
-                        };
-
-                        self.asm_init
-                            .extend_from_slice(&var.load_address_to_register(reg_state_var)?);
-                        self.asm_init
-                            .extend_from_slice(&init_expr.load_value_to_register(reg_state_init)?);
-
-                        let reg_init = reg_state_init.reg;
-                        let reg_var = reg_state_var.reg;
-
-                        if p != init_p {
-                            self.asm_init
-                                .push(name.to_asm(AsmToken::OperationLiteral(Box::new(
-                                    OpConv::new(
-                                        ArgumentType::new(reg_init.into(), p),
-                                        ArgumentType::new(reg_init.into(), init_p),
-                                    ),
-                                ))));
-                        }
-
-                        self.asm_init
-                            .push(name.to_asm(AsmToken::OperationLiteral(Box::new(OpSav::new(
-                                ArgumentType::new(reg_var, p),
-                                reg_init.into(),
-                            )))));
-                    } else {
-                        return Err(name
-                            .clone()
-                            .into_err("type does not have a valid primitive type"));
-                    }
-                } else {
-                    return Err(name
-                        .clone()
-                        .into_err("init expression does not result in a valid primitive type"));
-                }
-            }
-        }
-
-        match self.global_variables.entry(name_str.to_string()) {
+    fn add_to_global_scope(&mut self, t: GlobalType) -> Result<(), TokenError> {
+        let name = get_identifier(t.get_token())?;
+        let statement = t.get_statement();
+        match self.global_scope.entry(name.clone()) {
+            Entry::Vacant(e) => e.insert(t),
             Entry::Occupied(_) => {
-                return Err(name.into_err(format!(
-                    "global variable already exists with name \"{name_str}\""
-                )));
+                return Err(t
+                    .get_token()
+                    .clone()
+                    .into_err(format!("global scope already contains name \"{name}\"")));
             }
-            Entry::Vacant(e) => e.insert(var),
         };
 
-        // TODO - Check if the expression can be converted to the raw byte values and loaded directly
-        // TODO - Add support for initializing expressions
+        self.statements.push(statement);
 
         Ok(())
     }
 
+    pub fn add_local_var(
+        &mut self,
+        name: Token,
+        dtype: Type,
+        init_expr: Option<Rc<dyn Expression>>,
+    ) -> Result<(), TokenError> {
+        let ident = get_identifier(&name)?;
+
+        if let Some(s) = self.scopes.last_mut() {
+            match s.variables.entry(ident) {
+                Entry::Vacant(e) => {
+                    e.insert(Rc::new(LocalVariable::new(name, dtype, init_expr)?));
+                    Ok(())
+                }
+                Entry::Occupied(_) => {
+                    Err(name.into_err("dupliate variable name exists within the same scope"))
+                }
+            }
+        } else {
+            Err(name.into_err("unable to add variable without a scope block"))
+        }
+    }
+
     pub fn get_variable(&self, name: &Token) -> Result<Rc<dyn Expression>, TokenError> {
-        self.global_variables.get(&get_identifier(name)?).map_or(
+        let ident = get_identifier(name)?;
+
+        for s in self.scopes.iter().rev() {
+            if let Some(var) = s.variables.get(&ident) {
+                return Ok(var.clone());
+            }
+        }
+
+        match self.global_scope.get(&ident).map_or(
             Err(name
                 .clone()
                 .into_err("no variable with matching name found")),
             |x| Ok(x.clone()),
-        )
+        )? {
+            GlobalType::Variable(v) => Ok(v),
+            x => Err(x
+                .get_token()
+                .clone()
+                .into_err("global is not a variable type")),
+        }
     }
 }

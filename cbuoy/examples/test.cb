@@ -4,4 +4,8 @@ global c: i32 = -1;
 global d: i16 = 0 - 1;
 global e: i8 = 127;
 global f: i8 = -128;
-global q: i8 = f + 1;
+global q: i8 = f + 1; // TESTING
+
+fn main() {
+    // TODO
+}

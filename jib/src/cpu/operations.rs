@@ -1,7 +1,4 @@
-use core::{
-    default,
-    fmt::{self, Display},
-};
+use core::fmt;
 
 use super::{DataType, ProcessorError};
 
@@ -79,6 +76,77 @@ pub struct OperatorManager {
     op_i8: IntegerI8Operations,
     op_i16: IntegerI16Operations,
     op_i32: IntegerI32Operations,
+}
+
+pub fn convert_types(src_v: u32, src_t: DataType, dst_t: DataType) -> u32 {
+    match dst_t {
+        DataType::U8 => {
+            (match src_t {
+                DataType::U8 | DataType::U16 | DataType::U32 => src_v as u8,
+                DataType::I8 | DataType::I16 | DataType::I32 => (src_v as i32) as u8,
+                DataType::F32 => (f32::from_bits(src_v) as i32) as u8,
+            }) as u32
+        }
+        DataType::U16 => {
+            (match src_t {
+                DataType::U8 | DataType::U16 | DataType::U32 => src_v as u16,
+                DataType::I8 | DataType::I16 | DataType::I32 => (src_v as i32) as u16,
+                DataType::F32 => (f32::from_bits(src_v) as i32) as u16,
+            }) as u32
+        }
+        DataType::U32 => match src_t {
+            DataType::U8
+            | DataType::U16
+            | DataType::U32
+            | DataType::I8
+            | DataType::I16
+            | DataType::I32 => src_v,
+            DataType::F32 => (f32::from_bits(src_v) as i32) as u32,
+        },
+        DataType::I8 => {
+            ((match src_t {
+                DataType::U8 => (src_v as u8) as i8,
+                DataType::U16 => (src_v as u16) as i8,
+                DataType::U32 => src_v as i8,
+                DataType::I8 => src_v as i8,
+                DataType::I16 => (src_v as i16) as i8,
+                DataType::I32 => (src_v as i32) as i8,
+                DataType::F32 => (f32::from_bits(src_v) as i32) as i8,
+            }) as i32) as u32
+        }
+        DataType::I16 => {
+            ((match src_t {
+                DataType::U8 => (src_v as u8) as i16,
+                DataType::U16 => (src_v as u16) as i16,
+                DataType::U32 => src_v as i16,
+                DataType::I8 => (src_v as i8) as i16,
+                DataType::I16 => src_v as i16,
+                DataType::I32 => (src_v as i32) as i16,
+                DataType::F32 => (f32::from_bits(src_v) as i32) as i16,
+            }) as i32) as u32
+        }
+        DataType::I32 => {
+            (match src_t {
+                DataType::U8 => (src_v as u8) as i32,
+                DataType::U16 => (src_v as u16) as i32,
+                DataType::U32 => src_v as i32,
+                DataType::I8 => (src_v as i8) as i32,
+                DataType::I16 => (src_v as i16) as i32,
+                DataType::I32 => src_v as i32,
+                DataType::F32 => f32::from_bits(src_v) as i32,
+            }) as u32
+        }
+        DataType::F32 => (match src_t {
+            DataType::U8 => (src_v as u8) as f32,
+            DataType::U16 => (src_v as u16) as f32,
+            DataType::U32 => src_v as f32,
+            DataType::I8 => (src_v as i8) as f32,
+            DataType::I16 => (src_v as i16) as f32,
+            DataType::I32 => (src_v as i32) as f32,
+            DataType::F32 => f32::from_bits(src_v),
+        })
+        .to_bits(),
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

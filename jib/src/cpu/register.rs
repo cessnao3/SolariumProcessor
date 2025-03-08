@@ -101,6 +101,18 @@ impl PartialEq for Register {
     }
 }
 
+impl Ord for Register {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.get_index().cmp(&other.get_index())
+    }
+}
+
+impl PartialOrd for Register {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum RegisterError {
     UnknownRegister(usize),

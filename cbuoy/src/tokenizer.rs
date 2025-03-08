@@ -4,13 +4,29 @@ use jib::cpu::DataType;
 use jib_asm::{AsmToken, AsmTokenLoc};
 use regex::Regex;
 
+fn strip_comments(s: &str) -> String {
+    let mut lines = Vec::new();
+
+    for l in s.lines() {
+        lines.push(if let Some(i) = l.find("//") {
+            &l[0..i]
+        } else {
+            l
+        });
+    }
+
+    lines.join("\n")
+}
+
 pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
+    // Remove comments
+    let s = strip_comments(s);
+
     // Define the splitting regex
     static SPLIT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(\w+)|:|;|\{|\}|\(|\)|\+|\-|\*|/|(&&?)|(\|\|?)|([<>!=]=?)|\[|\]").unwrap()
     });
 
-    // Obtain the tokens
     struct TokenMatch<'a> {
         s: &'a str,
         start: usize,
@@ -28,7 +44,7 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
     }
 
     let mut tokens: Vec<TokenMatch> = SPLIT_REGEX
-        .find_iter(s)
+        .find_iter(&s)
         .map(|m| TokenMatch {
             s: m.as_str(),
             start: m.start(),
@@ -53,7 +69,7 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
 
         let column = t.start - col_val;
 
-        if check.len() > 0 {
+        if !check.is_empty() {
             return Err(TokenError {
                 msg: format!("unexpected token \"{}\" found", check),
                 token: Some(Token {

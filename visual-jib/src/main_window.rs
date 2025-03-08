@@ -45,7 +45,7 @@ pub fn build_ui(app: &Application) {
         }
     });
 
-    // Create the
+    // Create the instruction list
     let inst = jib_asm::InstructionList::default();
 
     // Setup the UI receiver
@@ -144,40 +144,45 @@ fn build_code_column(
 ) -> gtk::Box {
     let code_stack = gtk::Stack::builder().build();
 
+    let buffer_asm_code = gtk::TextBuffer::builder().enable_undo(true).build();
+    let buffer_cbuoy_code = gtk::TextBuffer::builder().enable_undo(true).build();
+
     let code_options = [
         (
             include_str!("../../jib-asm/examples/thread_test.jsm"),
             "Assemble",
             "ASM",
+            buffer_asm_code.clone(),
             true,
         ),
         (
             include_str!("../../cbuoy/examples/test.cb"),
             "Build",
             "C/B",
+            buffer_cbuoy_code.clone(),
             false,
         ),
     ];
 
-    for (comment, button_verb, short_name, is_assembly) in code_options.into_iter() {
-        let buffer_assembly_code = gtk::TextBuffer::builder()
-            .enable_undo(true)
-            .text(comment)
-            .build();
+    for (initial_code, button_verb, short_name, text_buffer, is_assembly) in
+        code_options.into_iter()
+    {
+        text_buffer.set_text(initial_code);
 
         let text_code = gtk::TextView::builder()
-            .buffer(&buffer_assembly_code)
+            .buffer(&text_buffer)
             .width_request(300)
             .height_request(400)
             .has_tooltip(true)
             .hexpand(true)
             .vexpand(true)
-            .tooltip_text(&format!("Text input for {short_name} code"))
+            .tooltip_text(format!("Text input for {short_name} code"))
             .monospace(true)
             .build();
+
         let text_code_scroll = gtk::ScrolledWindow::builder().child(&text_code).build();
         let text_code_frame = gtk::Frame::builder()
-            .label(&format!("{} Code Editor", short_name))
+            .label(format!("{} Code Editor", short_name))
             .child(&text_code_scroll)
             .build();
 
@@ -193,12 +198,11 @@ fn build_code_column(
                 tx_thread,
                 #[strong]
                 tx_ui,
+                #[strong]
+                text_buffer,
                 move |_| {
-                    let asm = buffer_assembly_code.text(
-                        &buffer_assembly_code.start_iter(),
-                        &buffer_assembly_code.end_iter(),
-                        false,
-                    );
+                    let asm =
+                        text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false);
                     match jib_asm::assemble_text(asm.as_str()) {
                         Ok(v) => {
                             tx_ui.send(UiToThread::SetCode(v)).unwrap();
@@ -216,12 +220,73 @@ fn build_code_column(
             btn_build.connect_clicked(clone!(
                 #[strong]
                 tx_thread,
+                #[strong]
+                text_buffer,
+                #[strong]
+                tx_ui,
+                #[strong]
+                buffer_asm_code,
                 move |_| {
-                    tx_thread
-                        .send(ThreadToUi::LogMessage(format!(
-                            "{short_name} compiling not supported"
-                        )))
-                        .unwrap();
+                    let cb =
+                        text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false);
+
+                    match cbuoy::parse(cb.as_str()) {
+                        Ok(v) => {
+                            let asm = v
+                                .iter()
+                                .map(|x| format!("{}", x.tok))
+                                .collect::<Vec<_>>()
+                                .join("\n");
+
+                            buffer_asm_code.set_text(&asm);
+
+                            match jib_asm::assemble_text(asm.as_str()) {
+                                Ok(v) => {
+                                    tx_ui.send(UiToThread::SetCode(v)).unwrap();
+                                    tx_thread
+                                        .send(ThreadToUi::LogMessage(format!(
+                                            "{short_name} Successful"
+                                        )))
+                                        .unwrap();
+                                }
+                                Err(err) => {
+                                    tx_thread
+                                        .send(ThreadToUi::LogMessage(format!(
+                                            "{short_name}: {err}"
+                                        )))
+                                        .unwrap();
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            tx_thread
+                                .send(ThreadToUi::LogMessage(format!("{short_name}: {err}")))
+                                .unwrap();
+
+                            eprintln!("Error: {}", err.msg);
+
+                            if let Some(t) = &err.token {
+                                let line_num = t.get_loc().line;
+                                let display_num = line_num + 1;
+                                let line = cb.lines().nth(line_num).unwrap();
+                                tx_thread
+                                    .send(ThreadToUi::LogMessage(format!(
+                                        "> {display_num} >> {line}"
+                                    )))
+                                    .unwrap();
+
+                                let mut err_msg = format!("> {display_num}    ");
+                                for _ in 0..t.get_loc().column {
+                                    err_msg += " ";
+                                }
+                                for _ in 0..t.get_value().len() {
+                                    err_msg += "^";
+                                }
+
+                                tx_thread.send(ThreadToUi::LogMessage(err_msg)).unwrap();
+                            }
+                        }
+                    }
                 }
             ));
         }
@@ -354,12 +419,12 @@ fn build_cpu_column(
 
         let label = gtk::Label::builder()
             .use_markup(true)
-            .label(&format!("<tt>R{i:02}</tt>"))
+            .label(format!("<tt>R{i:02}</tt>"))
             .margin_end(6)
             .build();
         let text = gtk::Label::builder()
             .use_markup(true)
-            .label(&format!("<tt>0x{:04x}</tt>", 0))
+            .label(format!("<tt>0x{:04x}</tt>", 0))
             .hexpand(true)
             .build();
 

@@ -1,10 +1,11 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt::{Debug, Display},
     rc::Rc,
     sync::LazyLock,
 };
 
+use jib::cpu::{DataType, Register};
 use jib_asm::{ArgumentType, AsmToken, Instruction, OpAdd, OpConv, OpPopr, OpPush, OpSub};
 
 use crate::{
@@ -17,8 +18,8 @@ use crate::{
 
 #[derive(Debug, Clone, Copy)]
 pub struct RegisterDef {
-    pub reg: jib::cpu::Register,
-    pub spare: jib::cpu::Register,
+    pub reg: Register,
+    pub spare: Register,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -33,18 +34,29 @@ impl Display for RegisterDefError {
 }
 
 impl RegisterDef {
-    pub fn new(reg: jib::cpu::Register) -> Result<Self, RegisterDefError> {
-        let spare = jib::cpu::Register::last_register();
-        if reg == spare {
+    pub const FN_BASE: Register = Register::first_gp_register();
+    pub const SPARE: Register = Self::increment(Self::FN_BASE);
+    pub const FIRST_USEABLE: Register = Self::increment(Self::SPARE);
+
+    const fn increment(reg: Register) -> Register {
+        let next = Register::GeneralPurpose(reg.get_index() + 1);
+        assert!(next.get_index() <= Register::last_register().get_index());
+        next
+    }
+
+    pub fn new(reg: Register) -> Result<Self, RegisterDefError> {
+        if reg < Self::FIRST_USEABLE || reg > Register::last_register() {
             Err(RegisterDefError::RegisterEqualToSpare)
         } else {
-            Ok(Self { reg, spare })
+            Ok(Self {
+                reg,
+                spare: Self::SPARE,
+            })
         }
     }
 
     pub fn increment_register(&self) -> Option<Self> {
-        Self::new(jib::cpu::Register::GeneralPurpose(self.reg.get_index() + 1))
-            .map_or(None, |x| Some(x))
+        Self::new(Register::GeneralPurpose(self.reg.get_index() + 1)).ok()
     }
 
     pub fn push_spare(&self) -> AsmToken {
@@ -58,7 +70,7 @@ impl RegisterDef {
 
 impl Default for RegisterDef {
     fn default() -> Self {
-        Self::new(jib::cpu::Register::first_gp_register()).unwrap()
+        Self::new(Self::FIRST_USEABLE).unwrap()
     }
 }
 
@@ -66,6 +78,17 @@ pub trait Expression: Debug + Display {
     fn get_token(&self) -> &Token;
 
     fn get_type(&self) -> Result<Type, TokenError>;
+
+    fn get_primitive_type(&self) -> Result<DataType, TokenError> {
+        if let Some(t) = self.get_type()?.primitive_type() {
+            Ok(t)
+        } else {
+            Err(self
+                .get_token()
+                .clone()
+                .into_err("unable to obtain primitive type from expression"))
+        }
+    }
 
     fn load_address_to_register(
         &self,
@@ -150,7 +173,7 @@ impl Expression for UnaryExpression {
 
     fn simplify(&self) -> Option<Literal> {
         LiteralValue::unary(*self.base.simplify()?.get_value(), self.op)
-            .map_or(None, |x| Some(Literal::new(self.token.clone().into(), x)))
+            .map_or(None, |x| Some(Literal::new(self.token.clone(), x)))
     }
 }
 
@@ -372,7 +395,7 @@ pub fn parse_expression(
             .map(|x| (x.to_string(), *x))
             .collect()
     });
-    static KEYWORDS: LazyLock<HashSet<String>> = LazyLock::new(|| HashSet::new()); // TODO - Update with actual keywords // TODO - Update tokenizer regex with keywords and expressions
+    //static KEYWORDS: LazyLock<HashSet<String>> = LazyLock::new(|| HashSet::new()); // TODO - Update with actual keywords // TODO - Update tokenizer regex with keywords and expressions
 
     let first = tokens.next()?;
 
@@ -382,8 +405,8 @@ pub fn parse_expression(
             *op,
             parse_expression(tokens, state)?,
         ))
-    } else if let Ok(id) = get_identifier(&first) {
-        state.get_variable(&first)?.clone().into()
+    } else if get_identifier(&first).is_ok() {
+        state.get_variable(&first)?.clone()
     } else if let Ok(lit) = Literal::try_from(first.clone()) {
         Rc::new(lit)
     } else {

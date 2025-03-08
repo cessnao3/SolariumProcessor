@@ -1,6 +1,6 @@
 use std::{fmt::Display, sync::LazyLock};
 
-use jib::cpu::{DataType, OperationError, OperatorManager};
+use jib::cpu::{DataType, OperationError, OperatorManager, convert_types};
 use jib_asm::{ArgumentType, AsmToken};
 use regex::Regex;
 
@@ -11,7 +11,7 @@ use crate::{
     typing::Type,
 };
 
-static OPERATIONS: LazyLock<OperatorManager> = LazyLock::new(|| OperatorManager::default());
+static OPERATIONS: LazyLock<OperatorManager> = LazyLock::new(OperatorManager::default);
 
 #[derive(Debug, Clone)]
 pub struct Literal {
@@ -81,7 +81,7 @@ impl LiteralValue {
         match dtype {
             DataType::U8 => Self::U8(x as u8),
             DataType::U16 => Self::U16(x as u16),
-            DataType::U32 => Self::U32(x as u32),
+            DataType::U32 => Self::U32(x),
             DataType::I8 => Self::I8((x as i32) as i8),
             DataType::I16 => Self::I16((x as i32) as i16),
             DataType::I32 => Self::I32(x as i32),
@@ -91,7 +91,7 @@ impl LiteralValue {
 
     pub fn unary(a: Self, op: UnaryOperation) -> Result<Self, OperationError> {
         let x = a.as_u32();
-        let dt = a.get_dtype().into();
+        let dt = a.get_dtype();
 
         let res = match op {
             UnaryOperation::BitNot => OPERATIONS.get_bitwise(dt)?.bnot(x)?.val,
@@ -106,16 +106,15 @@ impl LiteralValue {
             }
         };
 
-        Ok(Self::from_u32(res, dt.into()))
+        Ok(Self::from_u32(res, dt))
     }
 
     pub fn operation(lhs: Self, rhs: Self, op: BinaryOperation) -> Result<Self, OperationError> {
-        let dt: DataType = (if lhs.get_dtype() > rhs.get_dtype() {
+        let dt: DataType = if lhs.get_dtype() > rhs.get_dtype() {
             lhs.get_dtype()
         } else {
             rhs.get_dtype()
-        })
-        .into();
+        };
 
         let a = lhs.as_u32();
         let b = rhs.as_u32();
@@ -142,7 +141,21 @@ impl LiteralValue {
             BinaryOperation::BitXor => OPERATIONS.get_bitwise(dt)?.bxor(a, b)?.val,
         };
 
-        Ok(Self::from_u32(res, dt.into()))
+        Ok(Self::from_u32(res, dt))
+    }
+
+    pub fn convert(&self, dt: DataType) -> Self {
+        let val = convert_types(self.as_u32(), self.get_dtype(), dt);
+
+        match dt {
+            DataType::U8 => Self::U8(val as u8),
+            DataType::I8 => Self::I8((val as i32) as i8),
+            DataType::U16 => Self::U16(val as u16),
+            DataType::I16 => Self::I16((val as i32) as i16),
+            DataType::U32 => Self::U32(val),
+            DataType::I32 => Self::I32(val as i32),
+            DataType::F32 => Self::F32(f32::from_bits(val)),
+        }
     }
 }
 
@@ -170,7 +183,7 @@ impl Expression for Literal {
         };
         let op_load = AsmToken::OperationLiteral(Box::new(jib_asm::OpLdn::new(ArgumentType::new(
             reg.reg,
-            self.value.get_dtype().into(),
+            self.value.get_dtype(),
         ))));
 
         Ok([op_load, op_lit]
@@ -263,7 +276,7 @@ impl TryFrom<Token> for Literal {
         }?;
 
         Ok(Literal {
-            token: value.into(),
+            token: value,
             value: res,
         })
     }

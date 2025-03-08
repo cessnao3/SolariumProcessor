@@ -12,7 +12,8 @@ use crate::memory::{MemoryError, MemoryMap, MemorySegment};
 
 use self::instruction::Instruction;
 pub use self::operations::{
-    ArithmeticOperations, BinaryOperations, OperationError, OperatorManager, RelationalOperations,
+    convert_types, ArithmeticOperations, BinaryOperations, OperationError, OperatorManager,
+    RelationalOperations,
 };
 
 use self::register::RegisterFlag;
@@ -722,81 +723,14 @@ impl Processor {
                 self.registers.get(inst.arg1_register())?,
             )?,
             Self::OP_CONV => {
-                let t_src = inst.arg1_data_type()?;
-                let v_src = self.registers.get(inst.arg1_register())?;
-
-                let t_dest = inst.arg0_data_type()?;
-
-                let v_dest = match t_dest {
-                    DataType::U8 => {
-                        (match t_src {
-                            DataType::U8 | DataType::U16 | DataType::U32 => v_src as u8,
-                            DataType::I8 | DataType::I16 | DataType::I32 => (v_src as i32) as u8,
-                            DataType::F32 => (f32::from_bits(v_src) as i32) as u8,
-                        }) as u32
-                    }
-                    DataType::U16 => {
-                        (match t_src {
-                            DataType::U8 | DataType::U16 | DataType::U32 => v_src as u16,
-                            DataType::I8 | DataType::I16 | DataType::I32 => (v_src as i32) as u16,
-                            DataType::F32 => (f32::from_bits(v_src) as i32) as u16,
-                        }) as u32
-                    }
-                    DataType::U32 => match t_src {
-                        DataType::U8
-                        | DataType::U16
-                        | DataType::U32
-                        | DataType::I8
-                        | DataType::I16
-                        | DataType::I32 => v_src,
-                        DataType::F32 => (f32::from_bits(v_src) as i32) as u32,
-                    },
-                    DataType::I8 => {
-                        ((match t_src {
-                            DataType::U8 => (v_src as u8) as i8,
-                            DataType::U16 => (v_src as u16) as i8,
-                            DataType::U32 => v_src as i8,
-                            DataType::I8 => v_src as i8,
-                            DataType::I16 => (v_src as i16) as i8,
-                            DataType::I32 => (v_src as i32) as i8,
-                            DataType::F32 => (f32::from_bits(v_src) as i32) as i8,
-                        }) as i32) as u32
-                    }
-                    DataType::I16 => {
-                        ((match t_src {
-                            DataType::U8 => (v_src as u8) as i16,
-                            DataType::U16 => (v_src as u16) as i16,
-                            DataType::U32 => v_src as i16,
-                            DataType::I8 => (v_src as i8) as i16,
-                            DataType::I16 => v_src as i16,
-                            DataType::I32 => (v_src as i32) as i16,
-                            DataType::F32 => (f32::from_bits(v_src) as i32) as i16,
-                        }) as i32) as u32
-                    }
-                    DataType::I32 => {
-                        (match t_src {
-                            DataType::U8 => (v_src as u8) as i32,
-                            DataType::U16 => (v_src as u16) as i32,
-                            DataType::U32 => v_src as i32,
-                            DataType::I8 => (v_src as i8) as i32,
-                            DataType::I16 => (v_src as i16) as i32,
-                            DataType::I32 => v_src as i32,
-                            DataType::F32 => f32::from_bits(v_src) as i32,
-                        }) as u32
-                    }
-                    DataType::F32 => (match t_src {
-                        DataType::U8 => (v_src as u8) as f32,
-                        DataType::U16 => (v_src as u16) as f32,
-                        DataType::U32 => v_src as f32,
-                        DataType::I8 => (v_src as i8) as f32,
-                        DataType::I16 => (v_src as i16) as f32,
-                        DataType::I32 => (v_src as i32) as f32,
-                        DataType::F32 => f32::from_bits(v_src),
-                    })
-                    .to_bits(),
-                };
-
-                self.registers.set(inst.arg0_register(), v_dest)?;
+                self.registers.set(
+                    inst.arg0_register(),
+                    convert_types(
+                        self.registers.get(inst.arg1_register())?,
+                        inst.arg1_data_type()?,
+                        inst.arg0_data_type()?,
+                    ),
+                )?;
             }
             Opcode {
                 base: Self::OP_BASE_MATH,
