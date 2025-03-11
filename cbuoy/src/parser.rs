@@ -1,12 +1,13 @@
 use std::rc::Rc;
 
 use jib::cpu::DataType;
-use jib_asm::{AsmToken, AsmTokenLoc};
+use jib_asm::AsmTokenLoc;
 
 use crate::{
-    compiler::{CompilingState, GlobalStatement, Statement},
+    compiler::{CompilingState, ScopeManager},
     expressions::{Expression, parse_expression},
-    tokenizer::{Token, TokenError, TokenIter, get_identifier, tokenize},
+    functions::parse_fn_statement,
+    tokenizer::{Token, TokenError, TokenIter, tokenize},
     typing::Type,
 };
 
@@ -29,111 +30,6 @@ pub fn parse(s: &str) -> Result<Vec<AsmTokenLoc>, TokenError> {
     }
 
     state.get_assembler()
-}
-
-fn parse_fn_statement(
-    tokens: &mut TokenIter,
-    state: &mut CompilingState,
-) -> Result<(), TokenError> {
-    tokens.expect("fn")?;
-    let name_token = tokens.next()?;
-    let name = get_identifier(&name_token)?;
-
-    tokens.expect("(")?;
-    let mut params_iter = Vec::new();
-    while let Some(t) = tokens.next_if(|t| t != ")") {
-        params_iter.push(t);
-    }
-    tokens.expect(")")?;
-
-    if !params_iter.is_empty() {
-        todo!("params not yet supported!");
-    }
-
-    let mut return_iter = Vec::new();
-    while let Some(t) = tokens.next_if(|t| t != "{") {
-        return_iter.push(t);
-    }
-    tokens.expect("{")?;
-
-    while let Some(s) = parse_statement(tokens, state)? {
-        todo!();
-    }
-
-    tokens.expect("}")?;
-
-    let def = Rc::new(FunctionDefinition::new(
-        state.get_next_id(),
-        name_token.clone(),
-    )?);
-    state.add_function(def)
-}
-
-#[derive(Debug)]
-pub struct FunctionDefinition {
-    name: Token,
-    entry_label: String,
-    statements: Vec<Rc<dyn Statement>>,
-    parameters: Vec<(String, Type)>,
-}
-
-impl FunctionDefinition {
-    pub fn new(id: usize, name: Token) -> Result<Self, TokenError> {
-        let ident = get_identifier(&name)?;
-        Ok(Self {
-            name,
-            entry_label: format!("func_{id}_{ident}"),
-            statements: Vec::new(),
-            parameters: Vec::new(),
-        })
-    }
-
-    pub fn get_token(&self) -> &Token {
-        &self.name
-    }
-}
-
-impl Statement for FunctionDefinition {
-    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        if !self.parameters.is_empty() {
-            Err(self
-                .name
-                .clone()
-                .into_err("parameters currently unsupported"))
-        } else if self.statements.is_empty() {
-            Err(self
-                .name
-                .clone()
-                .into_err("statements within functions currently unsupported"))
-        } else {
-            // THIS IS THE FUNCTION CODE!
-            // Push the current base location onto the stack
-            Ok(vec![
-                self.name
-                    .to_asm(AsmToken::CreateLabel(self.entry_label.clone())),
-                self.name.to_asm(AsmToken::Comment(
-                    "TODO VARIABLE STATEMENTS HERE!".to_string(),
-                )),
-            ])
-        }
-    }
-}
-
-impl GlobalStatement for FunctionDefinition {
-    fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        Ok(Vec::new())
-    }
-
-    fn get_static_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        Ok(Vec::new())
-    }
-}
-
-fn parse_statement(
-    tokens: &mut TokenIter,
-    state: &mut CompilingState,
-) -> Result<Option<Rc<dyn Statement>>, TokenError> {
-    Ok(None)
 }
 
 struct VariableDefinition {
@@ -197,10 +93,11 @@ fn parse_global_statement(
 fn parse_def_statement(
     tokens: &mut TokenIter,
     state: &mut CompilingState,
+    scope_manager: &mut ScopeManager,
 ) -> Result<(), TokenError> {
     tokens.expect("def")?;
     let def = parse_generic_var(tokens, state)?;
-    state.add_local_var(def.token, def.dtype, def.init_expr)
+    scope_manager.add_var(def.token, def.dtype, def.init_expr)
 }
 
 #[cfg(test)]

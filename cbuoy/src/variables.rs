@@ -3,7 +3,8 @@ use std::{
     rc::Rc,
 };
 
-use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, OpConv, OpSav};
+use jib::cpu::{DataType, Register};
+use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpConv, OpLd, OpSav};
 
 use crate::{
     TokenError,
@@ -12,6 +13,7 @@ use crate::{
     literals::Literal,
     tokenizer::{Token, get_identifier},
     typing::Type,
+    utilities::load_to_register,
 };
 
 #[derive(Debug, Clone)]
@@ -234,6 +236,8 @@ impl GlobalStatement for GlobalVariableStatement {
 pub struct LocalVariable {
     token: Token,
     dtype: Type,
+    base: Register,
+    offset: usize,
     init_expr: Option<Rc<dyn Expression>>,
 }
 
@@ -241,12 +245,16 @@ impl LocalVariable {
     pub fn new(
         name: Token,
         dtype: Type,
+        base: Register,
+        offset: usize,
         init_expr: Option<Rc<dyn Expression>>,
     ) -> Result<Self, TokenError> {
         get_identifier(&name)?;
         Ok(Self {
             token: name,
             dtype,
+            base,
+            offset,
             init_expr,
         })
     }
@@ -269,15 +277,38 @@ impl Expression for LocalVariable {
 
     fn load_address_to_register(
         &self,
-        _reg: RegisterDef,
+        reg: RegisterDef,
     ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
-        panic!()
+        let mut asm = Vec::new();
+        asm.extend_from_slice(&load_to_register(reg.reg, self.offset as u32));
+        asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+            ArgumentType::new(reg.reg, DataType::U32),
+            reg.reg.into(),
+            self.base.into(),
+        ))));
+
+        Ok(self.token.to_asm_iter(asm).into_iter().collect())
     }
 
     fn load_value_to_register(
         &self,
         reg: RegisterDef,
     ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
-        panic!()
+        if let Some(dt) = self.dtype.primitive_type() {
+            let mut asm = self.load_address_to_register(reg)?;
+            asm.push(
+                self.token
+                    .to_asm(AsmToken::OperationLiteral(Box::new(OpLd::new(
+                        ArgumentType::new(reg.reg, dt),
+                        reg.reg.into(),
+                    )))),
+            );
+            Ok(asm)
+        } else {
+            Err(self
+                .token
+                .clone()
+                .into_err("unable to move non-primitive type into register"))
+        }
     }
 }

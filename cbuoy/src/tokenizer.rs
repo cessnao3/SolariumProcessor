@@ -160,6 +160,13 @@ impl Token {
             },
         }
     }
+
+    pub fn to_asm_iter<T: IntoIterator<Item = AsmToken>>(
+        &self,
+        iter: T,
+    ) -> impl IntoIterator<Item = AsmTokenLoc> {
+        iter.into_iter().map(|t| self.to_asm(t))
+    }
 }
 
 impl fmt::Display for Token {

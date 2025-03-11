@@ -186,9 +186,11 @@ impl Expression for Literal {
             self.value.get_dtype(),
         ))));
 
-        Ok([op_load, op_lit]
-            .map(|x| self.get_token().to_asm(x))
-            .to_vec())
+        Ok(self
+            .get_token()
+            .to_asm_iter([op_load, op_lit])
+            .into_iter()
+            .collect())
     }
 
     fn simplify(&self) -> Option<Literal> {

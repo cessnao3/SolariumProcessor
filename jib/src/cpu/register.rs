@@ -70,7 +70,7 @@ impl Register {
 impl fmt::Display for Register {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(spr) = self.as_special() {
-            write!(f, "{} ({})", spr.get_special_name(), self.get_index())
+            write!(f, "${}", spr.get_special_name())
         } else {
             write!(f, "{}", self.get_index())
         }

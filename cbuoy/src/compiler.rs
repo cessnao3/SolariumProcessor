@@ -4,14 +4,16 @@ use std::{
     rc::Rc,
 };
 
-use jib_asm::{AsmToken, AsmTokenLoc, LocationInfo, OpJmpri};
+use jib::cpu::{DataType, Register};
+use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, LocationInfo, OpJmpri, OpLdi, OpLdn, OpSub};
 
 use crate::{
     TokenError,
-    expressions::Expression,
-    parser::FunctionDefinition,
+    expressions::{Expression, RegisterDef},
+    functions::FunctionDefinition,
     tokenizer::{Token, get_identifier},
     typing::Type,
+    utilities::load_to_register,
     variables::{GlobalVariable, GlobalVariableStatement, LocalVariable},
 };
 
@@ -46,10 +48,136 @@ impl GlobalType {
     }
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct ScopeManager {
+    scopes: Vec<ScopeBlock>,
+    all_variables: Vec<Rc<LocalVariable>>,
+}
+
+impl ScopeManager {
+    pub fn add_scope(&mut self, token: Token) {
+        self.scopes.push(ScopeBlock::new(token));
+    }
+
+    pub fn remove_scope(&mut self) -> Result<Box<ScopeRemoveStatement>, TokenError> {
+        if let Some(s) = self.scopes.pop() {
+            let size = s.size()?;
+            Ok(Box::new(ScopeRemoveStatement {
+                token: s.token,
+                size,
+            }))
+        } else {
+            Err(TokenError {
+                token: None,
+                msg: "already removed all scopes".to_string(),
+            })
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.scopes.clear();
+    }
+
+    pub fn scope_full_size(&self) -> Result<usize, TokenError> {
+        self.scopes.iter().map(|x| x.size()).sum()
+    }
+
+    pub fn add_var(
+        &mut self,
+        name: Token,
+        dtype: Type,
+        init_expr: Option<Rc<dyn Expression>>,
+    ) -> Result<(), TokenError> {
+        let ident = get_identifier(&name)?;
+        let offset = self.scope_full_size()?;
+
+        if let Some(s) = self.scopes.last_mut() {
+            match s.variables.entry(ident) {
+                Entry::Vacant(e) => {
+                    e.insert(Rc::new(LocalVariable::new(
+                        name,
+                        dtype,
+                        RegisterDef::FN_BASE,
+                        offset,
+                        init_expr,
+                    )?));
+                    Ok(())
+                }
+                Entry::Occupied(_) => {
+                    Err(name.into_err("dupliate variable name exists within the same scope"))
+                }
+            }
+        } else {
+            Err(name.into_err("unable to add variable without a scope block"))
+        }
+    }
+
+    pub fn get_variable(&self, name: &Token) -> Result<Rc<dyn Expression>, TokenError> {
+        let ident: String = get_identifier(name)?;
+
+        for s in self.scopes.iter().rev() {
+            if let Some(var) = s.variables.get(&ident) {
+                return Ok(var.clone());
+            }
+        }
+
+        Err(name
+            .clone()
+            .into_err("no variable with provided name found"))
+    }
+
+    pub fn len(&self) -> usize {
+        self.scopes.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.scopes.is_empty()
+    }
+}
+
 #[derive(Debug, Clone)]
 struct ScopeBlock {
+    token: Token,
     variables: HashMap<String, Rc<LocalVariable>>,
     current_offset: usize,
+}
+
+impl ScopeBlock {
+    pub fn new(token: Token) -> Self {
+        Self {
+            token,
+            variables: HashMap::new(),
+            current_offset: 0,
+        }
+    }
+
+    pub fn size(&self) -> Result<usize, TokenError> {
+        self.variables
+            .values()
+            .map(|v| v.get_type().map(|x| x.byte_size()))
+            .sum()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ScopeRemoveStatement {
+    token: Token,
+    size: usize,
+}
+
+impl Statement for ScopeRemoveStatement {
+    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        let mut asm = Vec::new();
+        asm.extend_from_slice(&load_to_register(RegisterDef::SPARE, self.size as u32));
+
+        asm.push(AsmToken::OperationLiteral(Box::new(OpSub::new(
+            ArgumentType::new(Register::StackPointer, DataType::U32),
+            Register::StackPointer.into(),
+            RegisterDef::SPARE.into(),
+        ))));
+
+        Ok(self.token.to_asm_iter(asm).into_iter().collect())
+    }
 }
 
 #[derive(Debug)]
@@ -57,9 +185,9 @@ pub struct CompilingState {
     init_loc: u32,
     statements: Vec<Rc<dyn GlobalStatement>>,
     global_scope: HashMap<String, GlobalType>,
-    scopes: Vec<ScopeBlock>,
     current_id: usize,
     full_program: bool,
+    scope_manager: ScopeManager,
 }
 
 impl Default for CompilingState {
@@ -69,8 +197,8 @@ impl Default for CompilingState {
             global_scope: HashMap::new(),
             current_id: 0,
             statements: Vec::new(),
-            scopes: Vec::new(),
             full_program: true,
+            scope_manager: ScopeManager::default(),
         }
     }
 }
@@ -122,7 +250,7 @@ impl CompilingState {
             &[
                 AsmToken::Comment("Program Halt".into()),
                 AsmToken::OperationLiteral(Box::new(OpJmpri::new(0))),
-                AsmToken::ChangeAddress(0x3000), // TODO - TEMP!
+                AsmToken::ChangeAddress(0x10000), // TODO - TEMP!
             ]
             .map(Self::blank_token_loc),
         );
@@ -138,6 +266,20 @@ impl CompilingState {
         }
 
         Ok(asm)
+    }
+
+    pub fn get_scopes(&self) -> &ScopeManager {
+        &self.scope_manager
+    }
+
+    pub fn get_scopes_mut(&mut self) -> &mut ScopeManager {
+        &mut self.scope_manager
+    }
+
+    pub fn extract_scope(&mut self) -> ScopeManager {
+        let sm = self.scope_manager.clone();
+        self.scope_manager.clear();
+        sm
     }
 
     pub fn add_global_var(
@@ -177,36 +319,11 @@ impl CompilingState {
         Ok(())
     }
 
-    pub fn add_local_var(
-        &mut self,
-        name: Token,
-        dtype: Type,
-        init_expr: Option<Rc<dyn Expression>>,
-    ) -> Result<(), TokenError> {
-        let ident = get_identifier(&name)?;
-
-        if let Some(s) = self.scopes.last_mut() {
-            match s.variables.entry(ident) {
-                Entry::Vacant(e) => {
-                    e.insert(Rc::new(LocalVariable::new(name, dtype, init_expr)?));
-                    Ok(())
-                }
-                Entry::Occupied(_) => {
-                    Err(name.into_err("dupliate variable name exists within the same scope"))
-                }
-            }
-        } else {
-            Err(name.into_err("unable to add variable without a scope block"))
-        }
-    }
-
     pub fn get_variable(&self, name: &Token) -> Result<Rc<dyn Expression>, TokenError> {
-        let ident = get_identifier(name)?;
+        let ident: String = get_identifier(name)?;
 
-        for s in self.scopes.iter().rev() {
-            if let Some(var) = s.variables.get(&ident) {
-                return Ok(var.clone());
-            }
+        if let Ok(v) = self.scope_manager.get_variable(name) {
+            return Ok(v);
         }
 
         match self.global_scope.get(&ident).map_or(

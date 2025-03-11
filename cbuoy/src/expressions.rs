@@ -10,7 +10,7 @@ use jib_asm::{ArgumentType, AsmToken, Instruction, OpAdd, OpConv, OpPopr, OpPush
 
 use crate::{
     TokenError,
-    compiler::CompilingState,
+    compiler::{CompilingState, ScopeManager},
     literals::{Literal, LiteralValue},
     tokenizer::{Token, TokenIter, get_identifier},
     typing::Type,

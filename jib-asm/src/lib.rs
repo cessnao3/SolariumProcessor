@@ -158,6 +158,188 @@ pub enum AsmToken {
     LiteralText(String),
     AlignInstruction,
     Comment(String),
+    Empty,
+}
+
+impl AsmToken {
+    fn trim_line(line: &str) -> &str {
+        let s = line.trim();
+        if let Some(ind) = s.find(';') {
+            &s[..ind]
+        } else {
+            s
+        }
+    }
+
+    fn split_asm_delim(s: &str) -> Result<Vec<String>, ParseError> {
+        let mut within_quote = false;
+        let mut is_escape = false;
+        let mut last_was_quote = false;
+
+        let mut so_far = Vec::<char>::new();
+        let mut words = Vec::new();
+
+        for c in s.chars() {
+            if last_was_quote {
+                if c.is_whitespace() {
+                    last_was_quote = false;
+                } else {
+                    return Err(ParseError::ExpectedSpaceBetweenQuote);
+                }
+            } else if within_quote {
+                if is_escape {
+                    if c == '\\' {
+                        so_far.push('\\');
+                    } else if c == 'n' {
+                        so_far.push('\n');
+                    } else if c == '"' {
+                        so_far.push('"')
+                    } else {
+                        return Err(ParseError::UnknownEscapeCode(c));
+                    }
+
+                    is_escape = false;
+                } else if c == '\\' {
+                    is_escape = true;
+                } else if c == '"' {
+                    within_quote = false;
+                    last_was_quote = true;
+                    if !so_far.is_empty() {
+                        words.push(so_far.iter().collect());
+                        so_far.clear();
+                    }
+                } else {
+                    so_far.push(c);
+                }
+            } else if c == '"' {
+                if !so_far.is_empty() {
+                    return Err(ParseError::ExpectedSpaceBetweenQuote);
+                }
+                within_quote = true;
+            } else if c.is_whitespace() {
+                if !so_far.is_empty() {
+                    words.push(so_far.iter().collect());
+                    so_far.clear();
+                }
+            } else {
+                so_far.push(c);
+            }
+        }
+
+        if within_quote {
+            return Err(ParseError::WithinQuote);
+        } else if is_escape {
+            return Err(ParseError::WithinEscape);
+        }
+
+        if !so_far.is_empty() {
+            words.push(so_far.into_iter().collect());
+        }
+
+        Ok(words)
+    }
+}
+
+impl TryFrom<&str> for AsmToken {
+    type Error = AssemblerError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        // Create the instruction list
+        static INSTRUCTION_LIST: LazyLock<InstructionList> =
+            LazyLock::new(|| InstructionList::default());
+
+        // Trim Comments
+        let s = Self::trim_line(value);
+
+        let words = Self::split_asm_delim(s)?;
+
+        let first: &str = if let Some(w) = words.first() {
+            w
+        } else {
+            return Ok(Self::Empty); // Empty Instruction
+        };
+
+        let tok = if let Some(op) = first.strip_prefix('.') {
+            let args = &words[1..];
+
+            if args.is_empty() {
+                match op {
+                    "align" => Self::AlignInstruction,
+                    _ => {
+                        return Err(Self::Error::UnknownInstruction(
+                            op.to_string(),
+                            Some(args.len()),
+                        ));
+                    }
+                }
+            } else if args.len() == 1 {
+                let arg = &args[0];
+
+                match op {
+                    "oper" => {
+                        let addr = if let Some(r) = arg.strip_prefix('#') {
+                            Processor::interrupt_address(jib::cpu::Interrupt::Hardware(
+                                parse_imm_u32(r)?,
+                            ))?
+                        } else if let Some(r) = arg.strip_prefix('@') {
+                            Processor::interrupt_address(jib::cpu::Interrupt::Software(
+                                parse_imm_u32(r)?,
+                            ))?
+                        } else {
+                            parse_imm_u32(arg)?
+                        };
+
+                        Self::ChangeAddress(addr)
+                    }
+                    "loadloc" => Self::LoadLoc(arg.into()),
+                    "text" => Self::LiteralText(arg.into()),
+                    "u8" => Self::Literal1(parse_imm_u8(arg)?),
+                    "u16" => Self::Literal2(parse_imm_u16(arg)?),
+                    "u32" => Self::Literal4(parse_imm_u32(arg)?),
+                    "i8" => Self::Literal1(parse_imm_i8(arg)? as u8),
+                    "i16" => Self::Literal2(parse_imm_i16(arg)? as u16),
+                    "i32" => Self::Literal4(parse_imm_i32(arg)? as u32),
+                    "f32" => Self::Literal4(
+                        match arg.parse::<f32>() {
+                            Ok(v) => v,
+                            Err(_) => return Err(ImmediateError(arg.to_string()).into()),
+                        }
+                        .to_bits(),
+                    ),
+                    _ => {
+                        return Err(Self::Error::UnknownInstruction(
+                            op.to_string(),
+                            Some(args.len()),
+                        ));
+                    }
+                }
+            } else {
+                return Err(Self::Error::ArgumentCountMismatch(args.len(), 1));
+            }
+        } else if let Some(lbl) = first.strip_prefix(':') {
+            if !is_valid_label(lbl) {
+                return Err(Self::Error::BadLabel(lbl.to_string()));
+            }
+
+            if words.len() != 1 {
+                return Err(Self::Error::ArgumentCountMismatch(words.len(), 1));
+            }
+
+            Self::CreateLabel(lbl.to_string())
+        } else if let Some(inst_fn) = INSTRUCTION_LIST.get_instruction(&words[0]) {
+            let name = &words[0];
+            let args = &words[1..];
+            Self::Operation(
+                *inst_fn,
+                name.into(),
+                args.iter().map(|s| s.to_string()).collect(),
+            )
+        } else {
+            return Err(Self::Error::UnknownInstruction(value.into(), None));
+        };
+
+        Ok(tok)
+    }
 }
 
 impl Display for AsmToken {
@@ -186,6 +368,7 @@ impl Display for AsmToken {
                 }
                 Ok(())
             }
+            Self::Empty => Ok(()),
         }
     }
 }
@@ -330,7 +513,6 @@ impl fmt::Display for ParseError {
 #[derive(Default)]
 pub struct TokenList {
     tokens: Vec<AsmTokenLoc>,
-    inst: InstructionList,
 }
 
 impl TokenList {
@@ -412,98 +594,10 @@ impl TokenList {
     }
 
     pub fn parse_line(&mut self, line: &str, loc: LocationInfo) -> Result<(), AssemblerError> {
-        // Trim Comments
-        let s = Self::trim_line(line);
-
-        let words = Self::split_asm_delim(s)?;
-
-        let first: &str = if let Some(w) = words.first() {
-            w
-        } else {
-            return Ok(()); // Empty Instruction
-        };
-
-        let tok = if let Some(op) = first.strip_prefix('.') {
-            let args = &words[1..];
-
-            if args.is_empty() {
-                match op {
-                    "align" => AsmToken::AlignInstruction,
-                    _ => {
-                        return Err(AssemblerError::UnknownInstruction(
-                            op.to_string(),
-                            Some(args.len()),
-                        ));
-                    }
-                }
-            } else if args.len() == 1 {
-                let arg = &args[0];
-
-                match op {
-                    "oper" => {
-                        let addr = if let Some(r) = arg.strip_prefix('#') {
-                            Processor::interrupt_address(jib::cpu::Interrupt::Hardware(
-                                parse_imm_u32(r)?,
-                            ))?
-                        } else if let Some(r) = arg.strip_prefix('@') {
-                            Processor::interrupt_address(jib::cpu::Interrupt::Software(
-                                parse_imm_u32(r)?,
-                            ))?
-                        } else {
-                            parse_imm_u32(arg)?
-                        };
-
-                        AsmToken::ChangeAddress(addr)
-                    }
-                    "loadloc" => AsmToken::LoadLoc(arg.into()),
-                    "text" => AsmToken::LiteralText(arg.into()),
-                    "u8" => AsmToken::Literal1(parse_imm_u8(arg)?),
-                    "u16" => AsmToken::Literal2(parse_imm_u16(arg)?),
-                    "u32" => AsmToken::Literal4(parse_imm_u32(arg)?),
-                    "i8" => AsmToken::Literal1(parse_imm_i8(arg)? as u8),
-                    "i16" => AsmToken::Literal2(parse_imm_i16(arg)? as u16),
-                    "i32" => AsmToken::Literal4(parse_imm_i32(arg)? as u32),
-                    "f32" => AsmToken::Literal4(
-                        match arg.parse::<f32>() {
-                            Ok(v) => v,
-                            Err(_) => return Err(ImmediateError(arg.to_string()).into()),
-                        }
-                        .to_bits(),
-                    ),
-                    _ => {
-                        return Err(AssemblerError::UnknownInstruction(
-                            op.to_string(),
-                            Some(args.len()),
-                        ));
-                    }
-                }
-            } else {
-                return Err(AssemblerError::ArgumentCountMismatch(args.len(), 1));
-            }
-        } else if let Some(lbl) = first.strip_prefix(':') {
-            if !is_valid_label(lbl) {
-                return Err(AssemblerError::BadLabel(lbl.to_string()));
-            }
-
-            if words.len() != 1 {
-                return Err(AssemblerError::ArgumentCountMismatch(words.len(), 1));
-            }
-
-            AsmToken::CreateLabel(lbl.to_string())
-        } else if let Some(inst_fn) = self.inst.get_instruction(&words[0]) {
-            let name = &words[0];
-            let args = &words[1..];
-            AsmToken::Operation(
-                *inst_fn,
-                name.into(),
-                args.iter().map(|s| s.to_string()).collect(),
-            )
-        } else {
-            return Err(AssemblerError::UnknownInstruction(line.into(), None));
-        };
-
-        self.tokens.push(AsmTokenLoc { tok, loc });
-
+        self.tokens.push(AsmTokenLoc {
+            tok: AsmToken::try_from(line)?,
+            loc,
+        });
         Ok(())
     }
 
@@ -519,6 +613,7 @@ impl TokenList {
 
             match &t.tok {
                 AsmToken::Comment(_) => (),
+                AsmToken::Empty => (),
                 AsmToken::AlignInstruction => state.align_boundary(Processor::BYTES_PER_WORD),
                 AsmToken::OperationLiteral(op) => {
                     state.add_bytes(&op.to_u32().to_be_bytes(), loc)?;
