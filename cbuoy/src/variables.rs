@@ -190,14 +190,7 @@ impl GlobalStatement for GlobalVariableStatement {
 
                     // TODO - Replace with a better expression (operation expression value?)
                     let reg_state_var = RegisterDef::default();
-                    let reg_state_init = match reg_state_var.increment_register() {
-                        Some(x) => x,
-                        None => {
-                            return Err(name
-                                .clone()
-                                .into_err("unable to get valid register definition"));
-                        }
-                    };
+                    let reg_state_init = reg_state_var.increment_token(name)?;
 
                     asm_init.extend_from_slice(&var.load_address_to_register(reg_state_var)?);
                     asm_init.extend_from_slice(&init_expr.load_value_to_register(reg_state_init)?);
@@ -257,6 +250,71 @@ impl LocalVariable {
             offset,
             init_expr,
         })
+    }
+}
+
+impl Statement for LocalVariable {
+    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        if let Some(var_type) = self.dtype.primitive_type() {
+            let mut asm = Vec::new();
+
+            if let Some(e) = &self.init_expr {
+                let expr_type = e.get_primitive_type()?;
+
+                let def = RegisterDef::default();
+                let load_val = def.increment_token(&self.token)?;
+
+                asm.push(self.token.to_asm(AsmToken::Comment(format!(
+                    "initializing local variable \"{}\" with offset {} from {}",
+                    self.token.get_value(),
+                    self.offset,
+                    self.base
+                ))));
+
+                let addr_reg =
+                    if self.offset > 0 {
+                        asm.extend(self.token.to_asm_iter(
+                            load_to_register(def.reg, self.offset as u32).into_iter(),
+                        ));
+                        asm.push(self.token.to_asm(AsmToken::OperationLiteral(Box::new(
+                            OpAdd::new(
+                                ArgumentType::new(def.reg, DataType::U32),
+                                def.reg.into(),
+                                self.base.into(),
+                            ),
+                        ))));
+                        def.reg
+                    } else {
+                        self.base
+                    };
+                asm.extend_from_slice(&e.load_value_to_register(load_val)?);
+
+                if var_type != expr_type {
+                    asm.push(
+                        self.token
+                            .to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
+                                ArgumentType::new(load_val.reg, var_type),
+                                ArgumentType::new(load_val.reg, expr_type),
+                            )))),
+                    );
+                }
+
+                asm.push(
+                    self.token
+                        .to_asm(AsmToken::OperationLiteral(Box::new(OpSav::new(
+                            ArgumentType::new(addr_reg, var_type),
+                            load_val.reg.into(),
+                        )))),
+                );
+            }
+
+            Ok(asm)
+        } else {
+            Err(self
+                .token
+                .clone()
+                .into_err("variable without a primitive type cannot be initialized directly"))
+        }
     }
 }
 

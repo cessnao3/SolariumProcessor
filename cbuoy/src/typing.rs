@@ -13,7 +13,7 @@ pub enum Type {
     Primitive(DataType),
     Pointer(Rc<Self>),
     Array(usize, Rc<Self>),
-    Struct(Rc<String>, HashMap<String, Rc<Self>>),
+    Struct(Rc<str>, HashMap<Rc<str>, StructField>),
 }
 
 impl Type {
@@ -22,7 +22,7 @@ impl Type {
             Self::Primitive(p) => p.byte_size(),
             Self::Pointer(_) => DataType::U32.byte_size(),
             Self::Array(size, t) => size * t.byte_size(),
-            Self::Struct(_, types) => types.values().map(|v| v.byte_size()).sum(),
+            Self::Struct(_, fields) => fields.values().map(|v| v.dtype.byte_size()).sum(),
         }
     }
 
@@ -73,57 +73,9 @@ impl Display for Type {
 }
 
 #[derive(Debug, Clone)]
-struct StructType {
-    fields: Vec<Rc<StructField>>,
-    field_map: HashMap<Rc<str>, Rc<StructField>>,
-}
-
-impl StructType {
-    pub fn new<T: IntoIterator<Item = (Token, Type)>>(entries: T) -> Result<Self, TokenError> {
-        let mut current_offset = 0;
-        let mut fields = Vec::new();
-        let mut field_map = HashMap::new();
-
-        for (name, dtype) in entries {
-            let alignment = dtype.alignment();
-            current_offset += alignment - current_offset % alignment;
-
-            let fname: Rc<str> = name.get_value().into();
-            let f = Rc::new(StructField {
-                offset: current_offset,
-                name: fname.clone(),
-                dtype,
-            });
-
-            match field_map.entry(fname.clone()) {
-                Entry::Occupied(_) => {
-                    return Err(
-                        name.into_err(format!("duplicate field name provided for \"{fname}\""))
-                    );
-                }
-                Entry::Vacant(e) => {
-                    e.insert(f.clone());
-                }
-            }
-
-            fields.push(f.clone());
-        }
-
-        Ok(Self { fields, field_map })
-    }
-
-    pub fn alignment(&self) -> usize {
-        static MAX_ALIGNMENT: LazyLock<usize> =
-            LazyLock::new(|| DataType::ALL.iter().map(|v| v.byte_size()).max().unwrap());
-        *MAX_ALIGNMENT
-    }
-}
-
-#[derive(Debug, Clone)]
-struct StructField {
-    offset: usize,
-    name: Rc<str>,
-    dtype: Type,
+pub struct StructField {
+    pub offset: usize,
+    pub dtype: Type,
 }
 
 #[derive(Debug, Clone)]

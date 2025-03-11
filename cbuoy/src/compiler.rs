@@ -5,14 +5,14 @@ use std::{
 };
 
 use jib::cpu::{DataType, Register};
-use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, LocationInfo, OpJmpri, OpLdi, OpLdn, OpSub};
+use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, LocationInfo, OpJmpri, OpSub};
 
 use crate::{
     TokenError,
     expressions::{Expression, RegisterDef},
     functions::FunctionDefinition,
+    parser::VariableDefinition,
     tokenizer::{Token, get_identifier},
-    typing::Type,
     utilities::load_to_register,
     variables::{GlobalVariable, GlobalVariableStatement, LocalVariable},
 };
@@ -82,33 +82,29 @@ impl ScopeManager {
         self.scopes.iter().map(|x| x.size()).sum()
     }
 
-    pub fn add_var(
-        &mut self,
-        name: Token,
-        dtype: Type,
-        init_expr: Option<Rc<dyn Expression>>,
-    ) -> Result<(), TokenError> {
-        let ident = get_identifier(&name)?;
+    pub fn add_var(&mut self, def: VariableDefinition) -> Result<Rc<LocalVariable>, TokenError> {
+        let ident = get_identifier(&def.token)?;
         let offset = self.scope_full_size()?;
 
         if let Some(s) = self.scopes.last_mut() {
             match s.variables.entry(ident) {
-                Entry::Vacant(e) => {
-                    e.insert(Rc::new(LocalVariable::new(
-                        name,
-                        dtype,
+                Entry::Vacant(e) => Ok(e
+                    .insert(Rc::new(LocalVariable::new(
+                        def.token,
+                        def.dtype,
                         RegisterDef::FN_BASE,
                         offset,
-                        init_expr,
-                    )?));
-                    Ok(())
-                }
-                Entry::Occupied(_) => {
-                    Err(name.into_err("dupliate variable name exists within the same scope"))
-                }
+                        def.init_expr,
+                    )?))
+                    .clone()),
+                Entry::Occupied(_) => Err(def
+                    .token
+                    .into_err("dupliate variable name exists within the same scope")),
             }
         } else {
-            Err(name.into_err("unable to add variable without a scope block"))
+            Err(def
+                .token
+                .into_err("unable to add variable without a scope block"))
         }
     }
 
@@ -282,17 +278,12 @@ impl CompilingState {
         sm
     }
 
-    pub fn add_global_var(
-        &mut self,
-        name: Token,
-        dtype: Type,
-        init_expr: Option<Rc<dyn Expression>>,
-    ) -> Result<(), TokenError> {
+    pub fn add_global_var(&mut self, def: VariableDefinition) -> Result<(), TokenError> {
         let var = Rc::new(GlobalVariable::new(
-            name,
+            def.token,
             self.get_next_id(),
-            dtype,
-            init_expr,
+            def.dtype,
+            def.init_expr,
         )?);
         self.add_to_global_scope(GlobalType::Variable(var))
     }

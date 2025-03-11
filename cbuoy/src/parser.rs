@@ -32,10 +32,10 @@ pub fn parse(s: &str) -> Result<Vec<AsmTokenLoc>, TokenError> {
     state.get_assembler()
 }
 
-struct VariableDefinition {
-    token: Token,
-    dtype: Type,
-    init_expr: Option<Rc<dyn Expression>>,
+pub struct VariableDefinition {
+    pub token: Token,
+    pub dtype: Type,
+    pub init_expr: Option<Rc<dyn Expression>>,
 }
 
 pub fn parse_generic_var(
@@ -86,18 +86,7 @@ fn parse_global_statement(
     state: &mut CompilingState,
 ) -> Result<(), TokenError> {
     tokens.expect("global")?;
-    let def = parse_generic_var(tokens, state)?;
-    state.add_global_var(def.token, def.dtype, def.init_expr)
-}
-
-fn parse_def_statement(
-    tokens: &mut TokenIter,
-    state: &mut CompilingState,
-    scope_manager: &mut ScopeManager,
-) -> Result<(), TokenError> {
-    tokens.expect("def")?;
-    let def = parse_generic_var(tokens, state)?;
-    scope_manager.add_var(def.token, def.dtype, def.init_expr)
+    state.add_global_var(parse_generic_var(tokens, state)?)
 }
 
 #[cfg(test)]

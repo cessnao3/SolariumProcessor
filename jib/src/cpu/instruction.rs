@@ -72,6 +72,27 @@ impl fmt::Display for DataType {
         write!(f, "{s}")
     }
 }
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct UnknownDataType;
+
+impl TryFrom<&str> for DataType {
+    type Error = UnknownDataType;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(match value.as_ref() {
+            "u8" => Self::U8,
+            "i8" => Self::I8,
+            "u16" => Self::U16,
+            "i16" => Self::I16,
+            "u32" => Self::U32,
+            "i32" => Self::I32,
+            "f32" => Self::F32,
+            _ => return Err(UnknownDataType),
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DataTypeError(u8);
 
@@ -103,7 +124,6 @@ impl TryFrom<u8> for DataType {
 // | Opcode                  | Arg 0                     | Arg 1                     | Arg 2                     |
 // | Opcode                  | DType 0  | Arg 0 (Reg)    | DType 1  | Arg 1 (Reg)    | DType 2  | Arg 2 (Reg)    |
 // | Opcode                  | ImmTodo  | Immediate Value                                                        |
-//   ^ TODO - Split load into 2 instructions to get full immediate value (signed, unsigned)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Instruction {
     data: [u8; 4],

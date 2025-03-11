@@ -6,7 +6,9 @@ use std::{
 };
 
 use jib::cpu::{DataType, Register};
-use jib_asm::{ArgumentType, AsmToken, Instruction, OpAdd, OpConv, OpPopr, OpPush, OpSub};
+use jib_asm::{
+    ArgumentType, AsmToken, Instruction, OpAdd, OpConv, OpPopr, OpPush, OpSub, OpTeq, OpTneq,
+};
 
 use crate::{
     TokenError,
@@ -35,10 +37,10 @@ impl Display for RegisterDefError {
 
 impl RegisterDef {
     pub const FN_BASE: Register = Register::first_gp_register();
-    pub const SPARE: Register = Self::increment(Self::FN_BASE);
-    pub const FIRST_USEABLE: Register = Self::increment(Self::SPARE);
+    pub const SPARE: Register = Self::increment_const(Self::FN_BASE);
+    pub const FIRST_USEABLE: Register = Self::increment_const(Self::SPARE);
 
-    const fn increment(reg: Register) -> Register {
+    const fn increment_const(reg: Register) -> Register {
         let next = Register::GeneralPurpose(reg.get_index() + 1);
         assert!(next.get_index() <= Register::last_register().get_index());
         next
@@ -55,8 +57,15 @@ impl RegisterDef {
         }
     }
 
-    pub fn increment_register(&self) -> Option<Self> {
+    fn increment(&self) -> Option<Self> {
         Self::new(Register::GeneralPurpose(self.reg.get_index() + 1)).ok()
+    }
+
+    pub fn increment_token(&self, token: &Token) -> Result<Self, TokenError> {
+        match self.increment() {
+            Some(x) => Ok(x),
+            None => Err(token.clone().into_err("cannot find valid register vlaue")),
+        }
     }
 
     pub fn push_spare(&self) -> AsmToken {
@@ -317,7 +326,7 @@ impl Expression for BinaryExpression {
             let reg_a = reg.reg;
 
             let reg_b;
-            if let Some(reg_next) = reg.increment_register() {
+            if let Some(reg_next) = reg.increment() {
                 asm.extend_from_slice(&self.rhs.load_value_to_register(reg_next)?);
                 reg_b = reg_next.reg;
             } else {
@@ -349,15 +358,29 @@ impl Expression for BinaryExpression {
 
             let reg_type = ArgumentType::new(reg.reg, dt);
 
-            let x: Box<dyn Instruction> = match self.operation {
-                BinaryOperation::Plus => Box::new(OpAdd::new(reg_type, reg_a.into(), reg_b.into())),
+            let op_instructions: Vec<Box<dyn Instruction>> = match self.operation {
+                BinaryOperation::Plus => {
+                    vec![Box::new(OpAdd::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
                 BinaryOperation::Minus => {
-                    Box::new(OpSub::new(reg_type, reg_a.into(), reg_b.into()))
+                    vec![Box::new(OpSub::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryOperation::NotEquals => {
+                    vec![Box::new(OpTeq::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryOperation::Equals => {
+                    vec![Box::new(OpTneq::new(reg_type, reg_a.into(), reg_b.into()))]
                 }
                 x => todo!("operation {x} not yet supported"),
             };
 
-            asm.push(self.get_token().to_asm(AsmToken::OperationLiteral(x)));
+            asm.extend(
+                self.get_token().to_asm_iter(
+                    op_instructions
+                        .into_iter()
+                        .map(|x| AsmToken::OperationLiteral(x)),
+                ),
+            );
 
             Ok(asm)
         } else {
@@ -375,6 +398,44 @@ impl Display for BinaryExpression {
     }
 }
 
+#[derive(Debug, Clone)]
+struct AsExpression {
+    token: Token,
+    data_type: DataType,
+    expr: Rc<dyn Expression>,
+}
+
+impl Expression for AsExpression {
+    fn get_token(&self) -> &Token {
+        &self.token
+    }
+
+    fn get_type(&self) -> Result<Type, TokenError> {
+        Ok(Type::Primitive(self.data_type))
+    }
+
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        let mut asm = self.expr.load_address_to_register(reg)?;
+        asm.push(
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
+                    ArgumentType::new(reg.reg, self.data_type),
+                    ArgumentType::new(reg.reg, self.expr.get_primitive_type()?),
+                )))),
+        );
+        Ok(asm)
+    }
+}
+
+impl Display for AsExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}):{}", self.expr, self.data_type)
+    }
+}
+
 pub fn parse_expression(
     tokens: &mut TokenIter,
     state: &CompilingState,
@@ -382,6 +443,7 @@ pub fn parse_expression(
     // if keyword
     // if literal?
     // if paren
+    // function
 
     static UNARY_STR: LazyLock<HashMap<String, UnaryOperation>> = LazyLock::new(|| {
         UnaryOperation::ALL
@@ -393,9 +455,8 @@ pub fn parse_expression(
         BinaryOperation::ALL
             .iter()
             .map(|x| (x.to_string(), *x))
-            .collect()
+            .collect() // TODO - work for values
     });
-    //static KEYWORDS: LazyLock<HashSet<String>> = LazyLock::new(|| HashSet::new()); // TODO - Update with actual keywords // TODO - Update tokenizer regex with keywords and expressions
 
     let first = tokens.next()?;
 
@@ -405,6 +466,10 @@ pub fn parse_expression(
             *op,
             parse_expression(tokens, state)?,
         ))
+    } else if first.get_value() == "(" {
+        let inner = parse_expression(tokens, state)?;
+        tokens.expect(")")?;
+        inner
     } else if get_identifier(&first).is_ok() {
         state.get_variable(&first)?.clone()
     } else if let Ok(lit) = Literal::try_from(first.clone()) {
@@ -422,6 +487,19 @@ pub fn parse_expression(
                 expr,
                 parse_expression(tokens, state)?,
             ))
+        } else if next.get_value() == ":" {
+            let token = tokens.next()?;
+            let type_token = tokens.next()?;
+            let dt = DataType::try_from(type_token.get_value().as_ref())
+                .map_or(Err(token.clone().into_err("unknown data type")), |x| Ok(x))?;
+
+            Rc::new(AsExpression {
+                data_type: dt,
+                token,
+                expr,
+            })
+        } else if next.get_value() == "(" {
+            panic!("function calls not yet supported");
         } else {
             expr
         }

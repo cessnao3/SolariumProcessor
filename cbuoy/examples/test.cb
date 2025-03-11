@@ -7,5 +7,19 @@ global f: i8 = -128;
 global q: i8 = f + 1; // TESTING
 
 fn main() {
-    // TODO
+    def a: u16 = 32;
+    {
+        def bloc: u32 = a;
+    }
+    a = b;
+
+    while (a != 0) {
+        a = a - 1;
+    }
+
+    if (a == 0) {
+        c = 7;
+    } else {
+        c = 9;
+    }
 }
