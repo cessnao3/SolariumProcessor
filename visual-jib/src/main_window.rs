@@ -2,8 +2,8 @@
 use crate::cpu_thread::cpu_thread;
 use crate::messages::{ThreadToUi, UiToThread};
 use gtk::glib::clone;
-use gtk::{glib, prelude::*};
 use gtk::{Application, ApplicationWindow};
+use gtk::{glib, prelude::*};
 use jib::cpu::RegisterManager;
 
 pub fn build_ui(app: &Application) {

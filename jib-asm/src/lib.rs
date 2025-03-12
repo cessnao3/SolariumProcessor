@@ -18,8 +18,8 @@ pub use argument::{ArgumentError, ArgumentRegister, ArgumentType};
 use jib::cpu::{Opcode, Processor, ProcessorError};
 
 use immediate::{
-    parse_imm_i16, parse_imm_i32, parse_imm_i8, parse_imm_u16, parse_imm_u32, parse_imm_u8,
-    ImmediateError,
+    ImmediateError, parse_imm_i8, parse_imm_i16, parse_imm_i32, parse_imm_u8, parse_imm_u16,
+    parse_imm_u32,
 };
 use regex::Regex;
 

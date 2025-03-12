@@ -12,8 +12,8 @@ use crate::memory::{MemoryError, MemoryMap, MemorySegment};
 
 use self::instruction::Instruction;
 pub use self::operations::{
-    convert_types, ArithmeticOperations, BinaryOperations, OperationError, OperatorManager,
-    RelationalOperations,
+    ArithmeticOperations, BinaryOperations, OperationError, OperatorManager, RelationalOperations,
+    convert_types,
 };
 
 use self::register::RegisterFlag;

@@ -1,7 +1,7 @@
 use alloc::collections::VecDeque;
 use core::cell::RefCell;
 
-use super::{ProcessorDevice, DEVICE_ID_SIZE, DEVICE_MEM_SIZE};
+use super::{DEVICE_ID_SIZE, DEVICE_MEM_SIZE, ProcessorDevice};
 
 use crate::memory::{MemorySegment, MemorySegmentError};
 
