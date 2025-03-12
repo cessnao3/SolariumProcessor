@@ -496,10 +496,11 @@ pub fn parse_expression(
         inner
     } else if get_identifier(&first).is_ok() {
         state.get_variable(&first)?.clone()
-    } else if let Ok(lit) = Literal::try_from(first.clone()) {
-        Rc::new(lit)
     } else {
-        panic!("unknown value {}", first.get_value());
+        match Literal::try_from(first.clone()) {
+            Ok(lit) => Rc::new(lit),
+            Err(e) => return Err(e),
+        }
     };
 
     let return_expr = if let Some(next) = tokens.peek() {

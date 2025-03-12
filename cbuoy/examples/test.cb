@@ -7,6 +7,8 @@ global f: i8 = -128;
 const Z: i8 = 10;
 global q: i8 = Z; // TESTING
 
+global ex_ptr: *u32 = 0x3000;
+
 struct TEST {
     a: u16;
     b: u32;

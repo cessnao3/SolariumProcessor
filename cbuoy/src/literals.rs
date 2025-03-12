@@ -228,20 +228,34 @@ impl TryFrom<Token> for Literal {
     type Error = TokenError;
     fn try_from(value: Token) -> Result<Self, Self::Error> {
         static LITERAL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"^(((?<inum>\d+)(?<itype>[ui](8|(16)|(32)))?)|((?<fnum>(\d+(\.\d*))|(\.\d+))f32)|(?<f32>\d*\.\d+))$").unwrap()
+            Regex::new(r"^(((?<inum>(0x)?\d+)(?<itype>[ui](8|(16)|(32)))?)|((?<fnum>(\d+(\.\d*))|(\.\d+))f32)|(?<f32>\d*\.\d+))$").unwrap()
         });
 
         let res = if let Some(m) = LITERAL_REGEX.captures(value.get_value()) {
             if let Some(inum) = m.name("inum") {
+                let mut num = inum.as_str();
+
+                let radix = if let Some(n) = num.strip_prefix("0x") {
+                    num = n;
+                    16
+                } else {
+                    10
+                };
+
                 if let Some(itype) = m.name("itype") {
-                    let num = inum.as_str();
                     let val = match itype.as_str() {
-                        "u8" => num.parse().map_or(None, |x| Some(LiteralValue::U8(x))),
-                        "u16" => num.parse().map_or(None, |x| Some(LiteralValue::U16(x))),
-                        "u32" => num.parse().map_or(None, |x| Some(LiteralValue::U32(x))),
-                        "i8" => num.parse().map_or(None, |x| Some(LiteralValue::I8(x))),
-                        "i16" => num.parse().map_or(None, |x| Some(LiteralValue::I16(x))),
-                        "i32" => num.parse().map_or(None, |x| Some(LiteralValue::I32(x))),
+                        "u8" => u8::from_str_radix(num, radix)
+                            .map_or(None, |x| Some(LiteralValue::U8(x))),
+                        "u16" => u16::from_str_radix(num, radix)
+                            .map_or(None, |x| Some(LiteralValue::U16(x))),
+                        "u32" => u32::from_str_radix(num, radix)
+                            .map_or(None, |x| Some(LiteralValue::U32(x))),
+                        "i8" => i8::from_str_radix(num, radix)
+                            .map_or(None, |x| Some(LiteralValue::I8(x))),
+                        "i16" => i16::from_str_radix(num, radix)
+                            .map_or(None, |x| Some(LiteralValue::I16(x))),
+                        "i32" => i32::from_str_radix(num, radix)
+                            .map_or(None, |x| Some(LiteralValue::I32(x))),
                         x => {
                             return Err(value
                                 .clone()
@@ -260,11 +274,11 @@ impl TryFrom<Token> for Literal {
                         }
                     }
                 } else {
-                    match inum.as_str().parse() {
+                    match i32::from_str_radix(num, radix) {
                         Ok(x) => Ok(LiteralValue::I32(x)),
                         Err(_) => Err(value
                             .clone()
-                            .into_err(format!("unmable to get i32 value from {}", inum.as_str()))),
+                            .into_err(format!("unable to get i32 value from {}", inum.as_str()))),
                     }
                 }
             } else if let Some(fnum) = m.name("fnum") {
