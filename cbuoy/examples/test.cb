@@ -24,6 +24,8 @@ fn main() {
     }
     a = b;
 
+    ex_ptr = ex_ptr + 1;
+
     while (a != 0) {
         a = a - 1;
     }

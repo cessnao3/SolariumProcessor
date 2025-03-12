@@ -75,7 +75,7 @@ impl Expression for GlobalVariable {
         &self,
         reg: RegisterDef,
     ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
-        if let Type::Primitive(p) = self.dtype {
+        if let Some(p) = self.dtype.primitive_type() {
             let vals = [
                 AsmToken::OperationLiteral(Box::new(jib_asm::OpLdn::new(ArgumentType::new(
                     reg.reg,
@@ -119,14 +119,6 @@ impl GlobalVariableStatement {
         Self {
             global_var: var.clone(),
         }
-    }
-
-    pub fn get_name(&self) -> &str {
-        self.global_var.get_name()
-    }
-
-    pub fn get_expr(&self) -> Rc<dyn Expression> {
-        self.global_var.clone()
     }
 
     fn simplified_literal(&self) -> Option<Literal> {
