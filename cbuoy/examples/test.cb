@@ -4,9 +4,11 @@ global c: i32 = -1;
 global d: i16 = 0 - 1;
 global e: i8 = 127;
 global f: i8 = -128;
-global q: i8 = f + 1; // TESTING
+const Z: i8 = 10;
+global q: i8 = Z; // TESTING
 
 fn main() {
+    const X: i16 = 3;
     def a: u16 = 32;
     {
         def bloc: u32 = a;

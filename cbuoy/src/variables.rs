@@ -110,6 +110,33 @@ impl Expression for GlobalVariable {
 }
 
 #[derive(Debug, Clone)]
+pub struct ConstantStatement {
+    literal: Rc<Literal>,
+}
+
+impl ConstantStatement {
+    pub fn new(lit: Rc<Literal>) -> Self {
+        Self { literal: lit }
+    }
+}
+
+impl GlobalStatement for ConstantStatement {
+    fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        Ok(Vec::new())
+    }
+
+    fn get_static_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        Ok(Vec::new())
+    }
+}
+
+impl Statement for ConstantStatement {
+    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        Ok(Vec::new())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct GlobalVariableStatement {
     global_var: Rc<GlobalVariable>,
 }

@@ -4,9 +4,10 @@ use jib::cpu::DataType;
 use jib_asm::AsmTokenLoc;
 
 use crate::{
-    compiler::{CompilingState, ScopeManager},
+    compiler::CompilingState,
     expressions::{Expression, parse_expression},
     functions::parse_fn_statement,
+    literals::Literal,
     tokenizer::{Token, TokenError, TokenIter, tokenize},
     typing::Type,
 };
@@ -18,7 +19,9 @@ pub fn parse(s: &str) -> Result<Vec<AsmTokenLoc>, TokenError> {
 
     while let Some(next) = token_iter.peek().map(|v| v.get_value().to_string()) {
         if next == "global" {
-            parse_global_statement(&mut token_iter, &mut state)?;
+            state.add_global_var(parse_generic_var("global", &mut token_iter, &state)?)?;
+        } else if next == "const" {
+            state.add_const_var(parse_generic_var("const", &mut token_iter, &state)?)?;
         } else if next == "fn" {
             parse_fn_statement(&mut token_iter, &mut state)?;
         } else {
@@ -38,12 +41,40 @@ pub struct VariableDefinition {
     pub init_expr: Option<Rc<dyn Expression>>,
 }
 
+impl VariableDefinition {
+    pub fn into_literal(self) -> Result<Literal, TokenError> {
+        if let Some(expr) = self.init_expr {
+            if let Some(lit) = expr.simplify() {
+                let dt = match self.dtype.primitive_type() {
+                    Some(x) => x,
+                    None => {
+                        return Err(self
+                            .token
+                            .into_err("constant must have a primitive data type"));
+                    }
+                };
+
+                Ok(Literal::new(self.token, lit.get_value().convert(dt)))
+            } else {
+                Err(self
+                    .token
+                    .into_err("constant must have a constant expression value"))
+            }
+        } else {
+            Err(self
+                .token
+                .into_err("constant must have initialization statement"))
+        }
+    }
+}
+
 pub fn parse_generic_var(
+    def_name: &str,
     tokens: &mut TokenIter,
     state: &CompilingState,
 ) -> Result<VariableDefinition, TokenError> {
+    tokens.expect(def_name)?;
     let name_token = tokens.next()?;
-
     tokens.expect(":")?;
 
     let mut type_tokens = Vec::new();
@@ -85,8 +116,14 @@ fn parse_global_statement(
     tokens: &mut TokenIter,
     state: &mut CompilingState,
 ) -> Result<(), TokenError> {
-    tokens.expect("global")?;
-    state.add_global_var(parse_generic_var(tokens, state)?)
+    state.add_global_var(parse_generic_var("global", tokens, state)?)
+}
+
+fn parse_const_statement(
+    tokens: &mut TokenIter,
+    state: &mut CompilingState,
+) -> Result<(), TokenError> {
+    state.add_const_var(parse_generic_var("const", tokens, state)?)
 }
 
 #[cfg(test)]

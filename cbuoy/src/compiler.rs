@@ -11,10 +11,11 @@ use crate::{
     TokenError,
     expressions::{Expression, RegisterDef},
     functions::FunctionDefinition,
+    literals::Literal,
     parser::VariableDefinition,
     tokenizer::{Token, get_identifier},
     utilities::load_to_register,
-    variables::{GlobalVariable, GlobalVariableStatement, LocalVariable},
+    variables::{ConstantStatement, GlobalVariable, GlobalVariableStatement, LocalVariable},
 };
 
 pub trait Statement: Debug {
@@ -30,6 +31,7 @@ pub trait GlobalStatement: Statement {
 enum GlobalType {
     Variable(Rc<GlobalVariable>),
     Function(Rc<FunctionDefinition>),
+    Constant(Rc<Literal>),
 }
 
 impl GlobalType {
@@ -37,6 +39,7 @@ impl GlobalType {
         match self {
             Self::Variable(v) => v.get_token(),
             Self::Function(v) => v.get_token(),
+            Self::Constant(v) => v.get_token(),
         }
     }
 
@@ -44,6 +47,7 @@ impl GlobalType {
         match self {
             Self::Variable(var) => Rc::new(GlobalVariableStatement::new(var.clone())),
             Self::Function(func) => func.clone(),
+            Self::Constant(v) => Rc::new(ConstantStatement::new(v.clone())),
         }
     }
 }
@@ -51,7 +55,6 @@ impl GlobalType {
 #[derive(Debug, Default, Clone)]
 pub struct ScopeManager {
     scopes: Vec<ScopeBlock>,
-    all_variables: Vec<Rc<LocalVariable>>,
 }
 
 impl ScopeManager {
@@ -88,15 +91,40 @@ impl ScopeManager {
 
         if let Some(s) = self.scopes.last_mut() {
             match s.variables.entry(ident) {
-                Entry::Vacant(e) => Ok(e
-                    .insert(Rc::new(LocalVariable::new(
+                Entry::Vacant(e) => {
+                    let var = Rc::new(LocalVariable::new(
                         def.token,
                         def.dtype,
                         RegisterDef::FN_BASE,
                         offset,
                         def.init_expr,
-                    )?))
-                    .clone()),
+                    )?);
+                    e.insert(ScopeVariables::Local(var.clone()));
+                    Ok(var)
+                }
+                Entry::Occupied(_) => Err(def
+                    .token
+                    .into_err("dupliate variable name exists within the same scope")),
+            }
+        } else {
+            Err(def
+                .token
+                .into_err("unable to add variable without a scope block"))
+        }
+    }
+
+    pub fn add_const(
+        &mut self,
+        def: VariableDefinition,
+    ) -> Result<Rc<ConstantStatement>, TokenError> {
+        let ident = get_identifier(&def.token)?;
+        if let Some(s) = self.scopes.last_mut() {
+            match s.variables.entry(ident) {
+                Entry::Vacant(e) => {
+                    let literal_expr = Rc::new(def.into_literal()?);
+                    e.insert(ScopeVariables::Const(literal_expr.clone()));
+                    Ok(Rc::new(ConstantStatement::new(literal_expr)))
+                }
                 Entry::Occupied(_) => Err(def
                     .token
                     .into_err("dupliate variable name exists within the same scope")),
@@ -113,7 +141,7 @@ impl ScopeManager {
 
         for s in self.scopes.iter().rev() {
             if let Some(var) = s.variables.get(&ident) {
-                return Ok(var.clone());
+                return Ok(var.get_expr());
             }
         }
 
@@ -132,10 +160,31 @@ impl ScopeManager {
 }
 
 #[derive(Debug, Clone)]
+enum ScopeVariables {
+    Local(Rc<LocalVariable>),
+    Const(Rc<Literal>),
+}
+
+impl ScopeVariables {
+    fn stack_size(&self) -> Result<usize, TokenError> {
+        match self {
+            Self::Local(var) => var.get_type().map(|x| x.byte_size()),
+            Self::Const(_) => Ok(0),
+        }
+    }
+
+    fn get_expr(&self) -> Rc<dyn Expression> {
+        match self {
+            Self::Local(var) => var.clone(),
+            Self::Const(lit) => lit.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 struct ScopeBlock {
     token: Token,
-    variables: HashMap<String, Rc<LocalVariable>>,
-    current_offset: usize,
+    variables: HashMap<String, ScopeVariables>,
 }
 
 impl ScopeBlock {
@@ -143,15 +192,11 @@ impl ScopeBlock {
         Self {
             token,
             variables: HashMap::new(),
-            current_offset: 0,
         }
     }
 
     pub fn size(&self) -> Result<usize, TokenError> {
-        self.variables
-            .values()
-            .map(|v| v.get_type().map(|x| x.byte_size()))
-            .sum()
+        self.variables.values().map(|v| v.stack_size()).sum()
     }
 }
 
@@ -288,6 +333,10 @@ impl CompilingState {
         self.add_to_global_scope(GlobalType::Variable(var))
     }
 
+    pub fn add_const_var(&mut self, def: VariableDefinition) -> Result<(), TokenError> {
+        self.add_to_global_scope(GlobalType::Constant(Rc::new(def.into_literal()?)))
+    }
+
     pub fn add_function(&mut self, func: Rc<FunctionDefinition>) -> Result<(), TokenError> {
         self.add_to_global_scope(GlobalType::Function(func))
     }
@@ -324,6 +373,7 @@ impl CompilingState {
             |x| Ok(x.clone()),
         )? {
             GlobalType::Variable(v) => Ok(v),
+            GlobalType::Constant(v) => Ok(v),
             x => Err(x
                 .get_token()
                 .clone()

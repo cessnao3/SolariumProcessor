@@ -298,7 +298,11 @@ fn parse_statement(
 ) -> Result<Option<Rc<dyn Statement>>, TokenError> {
     if let Some(next) = tokens.peek() {
         if next.get_value() == "def" {
-            Ok(Some(parse_def_statement(tokens, state)?))
+            let def = parse_generic_var("def", tokens, state)?;
+            Ok(Some(state.get_scopes_mut().add_var(def)?))
+        } else if next.get_value() == "const" {
+            let def = parse_generic_var("const", tokens, state)?;
+            Ok(Some(state.get_scopes_mut().add_const(def)?))
         } else if next.get_value() == "{" {
             state.get_scopes_mut().add_scope(tokens.expect("{")?);
             let mut statements = Vec::new();
@@ -371,15 +375,6 @@ fn parse_statement(
     } else {
         Err(EndOfTokenStream.into())
     }
-}
-
-fn parse_def_statement(
-    tokens: &mut TokenIter,
-    state: &mut CompilingState,
-) -> Result<Rc<LocalVariable>, TokenError> {
-    tokens.expect("def")?;
-    let def = parse_generic_var(tokens, state)?;
-    state.get_scopes_mut().add_var(def)
 }
 
 #[derive(Debug, Clone)]
