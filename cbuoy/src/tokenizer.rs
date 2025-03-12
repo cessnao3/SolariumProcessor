@@ -135,10 +135,6 @@ impl Token {
         }
     }
 
-    pub fn clone_value(&self) -> Rc<str> {
-        self.value.clone()
-    }
-
     pub fn get_value(&self) -> &str {
         self.value.as_ref()
     }
@@ -274,9 +270,9 @@ pub fn is_identifier<T: AsRef<str>>(s: T) -> bool {
     IDENT_REGEX.is_match(s.as_ref()) && !RESERVED_KEYWORDS.contains(s.as_ref())
 }
 
-pub fn get_identifier(t: &Token) -> Result<Rc<str>, IdentifierError> {
+pub fn get_identifier(t: &Token) -> Result<&str, IdentifierError> {
     if is_identifier(t.get_value()) {
-        Ok(t.clone_value())
+        Ok(t.get_value())
     } else {
         Err(IdentifierError {
             token: t.to_owned(),

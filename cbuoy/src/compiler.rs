@@ -140,7 +140,7 @@ impl ScopeManager {
         let ident = get_identifier(name)?;
 
         for s in self.scopes.iter().rev() {
-            if let Some(var) = s.variables.get(ident.as_ref()) {
+            if let Some(var) = s.variables.get(ident) {
                 return Ok(var.get_expr());
             }
         }

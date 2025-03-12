@@ -24,6 +24,9 @@ fn main() {
     }
     a = b;
 
+    def ex_ptr2: **u32 = &ex_ptr;
+    def ex_val: u32 = **ex_ptr2;
+
     ex_ptr = ex_ptr + 1;
 
     while (a != 0) {

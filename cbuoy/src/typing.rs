@@ -13,8 +13,8 @@ use crate::tokenizer::{Token, TokenError, TokenIter, get_identifier, is_identifi
 #[derive(Debug, Clone)]
 pub enum Type {
     Primitive(DataType),
-    Pointer(Rc<Self>),
-    Array(usize, Rc<Self>),
+    Pointer(Box<Self>),
+    Array(usize, Box<Self>),
     Struct(Rc<StructDefinition>),
 }
 
@@ -22,7 +22,7 @@ impl Type {
     pub fn read_type(tokens: &mut TokenIter, state: &CompilingState) -> Result<Self, TokenError> {
         let t = tokens.next()?;
         if t.get_value() == "*" {
-            Ok(Self::Pointer(Rc::new(Self::read_type(tokens, state)?)))
+            Ok(Self::Pointer(Box::new(Self::read_type(tokens, state)?)))
         } else if t.get_value() == "[" {
             let expr = parse_expression(tokens, state)?;
             if let Some(lit) = expr.simplify() {
@@ -30,7 +30,7 @@ impl Type {
                 if s > 0 {
                     Ok(Self::Array(
                         s as usize,
-                        Rc::new(Self::read_type(tokens, state)?),
+                        Box::new(Self::read_type(tokens, state)?),
                     ))
                 } else {
                     Err(t.into_err("computed size is {s} and is not > 0"))
@@ -74,7 +74,7 @@ impl Type {
     }
 
     pub fn ref_type(&self) -> Type {
-        Self::Pointer(Rc::new(self.clone()))
+        Self::Pointer(Box::new(self.clone()))
     }
 
     pub fn alignment(&self) -> usize {
@@ -105,7 +105,7 @@ impl Display for Type {
 #[derive(Debug, Clone)]
 pub struct StructDefinition {
     name: Token,
-    fields: HashMap<Rc<str>, StructField>,
+    fields: HashMap<String, StructField>,
 }
 
 impl StructDefinition {
@@ -127,7 +127,7 @@ impl StructDefinition {
 
         while !tokens.expect_peek("}") {
             let field_token = tokens.next()?;
-            let field_name = get_identifier(&field_token)?;
+            let field_name = get_identifier(&field_token)?.to_string();
             tokens.expect(":")?;
 
             let dtype = Type::read_type(tokens, state)?;

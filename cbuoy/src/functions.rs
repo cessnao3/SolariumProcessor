@@ -32,7 +32,7 @@ impl FunctionDefinition {
         statements: Vec<Rc<dyn Statement>>,
         scope_manager: ScopeManager,
     ) -> Result<Self, TokenError> {
-        let ident = get_identifier(&name)?;
+        let ident = get_identifier(&name)?.to_string();
         Ok(Self {
             name,
             entry_label: format!("func_{id}_{ident}_start"),
@@ -120,7 +120,7 @@ pub fn parse_fn_statement(
 ) -> Result<(), TokenError> {
     tokens.expect("fn")?;
     let name_token = tokens.next()?;
-    let name = get_identifier(&name_token)?;
+    let name = get_identifier(&name_token)?.to_string();
 
     if !state.get_scopes().is_empty() {
         return Err(name_token.into_err(format!(

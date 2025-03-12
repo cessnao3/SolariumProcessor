@@ -7,7 +7,7 @@ use std::{
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
-    ArgumentType, AsmToken, Instruction, OpAdd, OpConv, OpPopr, OpPush, OpSub, OpTeq, OpTneq,
+    ArgumentType, AsmToken, Instruction, OpAdd, OpConv, OpLd, OpPopr, OpPush, OpSub, OpTeq, OpTneq,
 };
 
 use crate::{
@@ -192,21 +192,82 @@ impl Display for UnaryExpression {
     }
 }
 
-/*
 #[derive(Debug, Clone)]
 struct DereferenceExpression {
+    token: Token,
     base: Rc<dyn Expression>,
 }
 
 impl Expression for DereferenceExpression {
-    fn get_type(&self) -> Result<Type, TokenError> {}
+    fn get_type(&self) -> Result<Type, TokenError> {
+        if let Type::Pointer(dt) = self.base.get_type()? {
+            Ok(dt.as_ref().clone())
+        } else {
+            Err(self
+                .base
+                .get_token()
+                .clone()
+                .into_err("cannot dereference a non-pointer type"))
+        }
+    }
+
+    fn get_token(&self) -> &Token {
+        &self.token
+    }
+
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        let mut asm = self.base.load_value_to_register(reg)?;
+        let dt = self.get_primitive_type()?;
+
+        asm.push(
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpLd::new(
+                    ArgumentType::new(reg.reg, dt),
+                    reg.reg.into(),
+                )))),
+        );
+
+        Ok(asm)
+    }
+}
+
+impl Display for DereferenceExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "*{}", self.base)
+    }
 }
 
 #[derive(Debug, Clone)]
 struct AddressOfExpression {
+    token: Token,
     base: Rc<dyn Expression>,
 }
-    */
+
+impl Expression for AddressOfExpression {
+    fn get_token(&self) -> &Token {
+        &self.token
+    }
+
+    fn get_type(&self) -> Result<Type, TokenError> {
+        Ok(Type::Pointer(Box::new(self.base.get_type()?)))
+    }
+
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        self.base.load_address_to_register(reg)
+    }
+}
+
+impl Display for AddressOfExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "*{}", self.base)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperation {
@@ -490,6 +551,16 @@ pub fn parse_expression(
             *op,
             parse_expression(tokens, state)?,
         ))
+    } else if first.get_value() == "*" {
+        Rc::new(DereferenceExpression {
+            token: first,
+            base: parse_expression(tokens, state)?,
+        })
+    } else if first.get_value() == "&" {
+        Rc::new(AddressOfExpression {
+            token: first,
+            base: parse_expression(tokens, state)?,
+        })
     } else if first.get_value() == "(" {
         let inner = parse_expression(tokens, state)?;
         tokens.expect(")")?;
