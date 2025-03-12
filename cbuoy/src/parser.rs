@@ -9,7 +9,8 @@ use crate::{
     functions::parse_fn_statement,
     literals::Literal,
     tokenizer::{Token, TokenError, TokenIter, tokenize},
-    typing::Type,
+    typing::{StructDefinition, Type},
+    variables::VariableDefinition,
 };
 
 pub fn parse(s: &str) -> Result<Vec<AsmTokenLoc>, TokenError> {
@@ -19,11 +20,18 @@ pub fn parse(s: &str) -> Result<Vec<AsmTokenLoc>, TokenError> {
 
     while let Some(next) = token_iter.peek().map(|v| v.get_value().to_string()) {
         if next == "global" {
-            state.add_global_var(parse_generic_var("global", &mut token_iter, &state)?)?;
+            state.add_global_var(VariableDefinition::parse(
+                "global",
+                &mut token_iter,
+                &state,
+            )?)?;
         } else if next == "const" {
-            state.add_const_var(parse_generic_var("const", &mut token_iter, &state)?)?;
+            state.add_const_var(VariableDefinition::parse("const", &mut token_iter, &state)?)?;
         } else if next == "fn" {
             parse_fn_statement(&mut token_iter, &mut state)?;
+        } else if next == "struct" {
+            let s = StructDefinition::read_definition(&mut token_iter, &state)?;
+            state.add_struct(s)?;
         } else {
             return Err(token_iter
                 .next()?
@@ -33,97 +41,6 @@ pub fn parse(s: &str) -> Result<Vec<AsmTokenLoc>, TokenError> {
     }
 
     state.get_assembler()
-}
-
-pub struct VariableDefinition {
-    pub token: Token,
-    pub dtype: Type,
-    pub init_expr: Option<Rc<dyn Expression>>,
-}
-
-impl VariableDefinition {
-    pub fn into_literal(self) -> Result<Literal, TokenError> {
-        if let Some(expr) = self.init_expr {
-            if let Some(lit) = expr.simplify() {
-                let dt = match self.dtype.primitive_type() {
-                    Some(x) => x,
-                    None => {
-                        return Err(self
-                            .token
-                            .into_err("constant must have a primitive data type"));
-                    }
-                };
-
-                Ok(Literal::new(self.token, lit.get_value().convert(dt)))
-            } else {
-                Err(self
-                    .token
-                    .into_err("constant must have a constant expression value"))
-            }
-        } else {
-            Err(self
-                .token
-                .into_err("constant must have initialization statement"))
-        }
-    }
-}
-
-pub fn parse_generic_var(
-    def_name: &str,
-    tokens: &mut TokenIter,
-    state: &CompilingState,
-) -> Result<VariableDefinition, TokenError> {
-    tokens.expect(def_name)?;
-    let name_token = tokens.next()?;
-    tokens.expect(":")?;
-
-    let mut type_tokens = Vec::new();
-    while let Some(t) = tokens.next_if(|s| s != ";" && s != "=") {
-        type_tokens.push(t.to_owned());
-    }
-
-    let init_expr = if tokens.expect_peek("=") {
-        tokens.next()?;
-        let mut expr_tokens = Vec::new();
-        while let Some(t) = tokens.next_if(|s| s != ";") {
-            expr_tokens.push(t);
-        }
-        Some(parse_expression(&mut TokenIter::from(&expr_tokens), state)?)
-    } else {
-        None
-    };
-
-    tokens.expect(";")?;
-
-    let dtype = match DataType::try_from(type_tokens.first().unwrap().to_owned()) {
-        Ok(t) => Type::Primitive(t),
-        Err(e) => {
-            return Err(TokenError {
-                token: Some(type_tokens.first().unwrap().to_owned()),
-                msg: e.to_string(),
-            });
-        }
-    };
-
-    Ok(VariableDefinition {
-        token: name_token,
-        dtype,
-        init_expr,
-    })
-}
-
-fn parse_global_statement(
-    tokens: &mut TokenIter,
-    state: &mut CompilingState,
-) -> Result<(), TokenError> {
-    state.add_global_var(parse_generic_var("global", tokens, state)?)
-}
-
-fn parse_const_statement(
-    tokens: &mut TokenIter,
-    state: &mut CompilingState,
-) -> Result<(), TokenError> {
-    state.add_const_var(parse_generic_var("const", tokens, state)?)
 }
 
 #[cfg(test)]

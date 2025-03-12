@@ -6,23 +6,53 @@ use std::{collections::HashMap, fmt::Display};
 
 use jib::cpu::DataType;
 
-use crate::tokenizer::{Token, TokenError, TokenIter};
+use crate::compiler::CompilingState;
+use crate::expressions::parse_expression;
+use crate::tokenizer::{Token, TokenError, TokenIter, get_identifier, is_identifier};
 
 #[derive(Debug, Clone)]
 pub enum Type {
     Primitive(DataType),
     Pointer(Rc<Self>),
     Array(usize, Rc<Self>),
-    Struct(Rc<str>, HashMap<Rc<str>, StructField>),
+    Struct(Rc<StructDefinition>),
 }
 
 impl Type {
+    pub fn read_type(tokens: &mut TokenIter, state: &CompilingState) -> Result<Self, TokenError> {
+        let t = tokens.next()?;
+        if t.get_value() == "*" {
+            Ok(Self::Pointer(Rc::new(Self::read_type(tokens, state)?)))
+        } else if t.get_value() == "[" {
+            let expr = parse_expression(tokens, state)?;
+            if let Some(lit) = expr.simplify() {
+                let s = lit.get_value().as_size().unwrap_or_default();
+                if s > 0 {
+                    Ok(Self::Array(
+                        s as usize,
+                        Rc::new(Self::read_type(tokens, state)?),
+                    ))
+                } else {
+                    Err(t.into_err("computed size is {s} and is not > 0"))
+                }
+            } else {
+                Err(t.into_err("array must have a constant value"))
+            }
+        } else if is_identifier(t.get_value()) {
+            Ok(Self::Struct(state.get_struct(&t)?))
+        } else if let Ok(p) = DataType::try_from(t.get_value().as_ref()) {
+            Ok(Self::Primitive(p))
+        } else {
+            Err(t.into_err("unknown type token found"))
+        }
+    }
+
     pub fn byte_size(&self) -> usize {
         match self {
             Self::Primitive(p) => p.byte_size(),
             Self::Pointer(_) => DataType::U32.byte_size(),
             Self::Array(size, t) => size * t.byte_size(),
-            Self::Struct(_, fields) => fields.values().map(|v| v.dtype.byte_size()).sum(),
+            Self::Struct(s) => s.fields.values().map(|v| v.dtype.byte_size()).sum(),
         }
     }
 
@@ -31,7 +61,7 @@ impl Type {
             Self::Primitive(p) => Some(Self::Primitive(*p)),
             Self::Pointer(_) => Some(Self::Primitive(DataType::U32)),
             Self::Array(_, t) => Some(t.as_ref().clone()),
-            Self::Struct(_, _) => None,
+            Self::Struct(_) => None,
         }
     }
 
@@ -52,7 +82,7 @@ impl Type {
             Self::Primitive(p) => p.byte_size(),
             Self::Pointer(_) => DataType::U32.byte_size(),
             Self::Array(_, t) => t.alignment(),
-            Self::Struct(_, _) => DataType::U32.byte_size(),
+            Self::Struct(_) => DataType::U32.byte_size(),
         }
     }
 
@@ -67,8 +97,60 @@ impl Display for Type {
             Self::Primitive(p) => write!(f, "{p}"),
             Self::Array(size, t) => write!(f, "[{size}]{t}"),
             Self::Pointer(t) => write!(f, "*{t}"),
-            Self::Struct(name, _) => write!(f, "{name}"),
+            Self::Struct(s) => write!(f, "{}", s.name),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StructDefinition {
+    name: Token,
+    fields: HashMap<Rc<str>, StructField>,
+}
+
+impl StructDefinition {
+    pub fn read_definition(
+        tokens: &mut TokenIter,
+        state: &CompilingState,
+    ) -> Result<Self, TokenError> {
+        tokens.expect("struct")?;
+        let name = tokens.next()?;
+        get_identifier(&name)?;
+
+        let mut s = Self {
+            name,
+            fields: HashMap::new(),
+        };
+
+        tokens.expect("{")?;
+        let mut offset = 0;
+
+        while !tokens.expect_peek("}") {
+            let field_token = tokens.next()?;
+            let field_name = get_identifier(&field_token)?;
+            tokens.expect(":")?;
+
+            let dtype = Type::read_type(tokens, state)?;
+            let dtype_size = dtype.byte_size();
+            tokens.expect(";")?;
+
+            match s.fields.entry(field_name) {
+                Entry::Vacant(e) => e.insert(StructField { offset, dtype }),
+                Entry::Occupied(_) => {
+                    return Err(field_token.into_err("field with name already exists"));
+                }
+            };
+
+            offset += dtype_size;
+        }
+
+        tokens.expect("}")?;
+
+        Ok(s)
+    }
+
+    pub fn get_token(&self) -> &Token {
+        &self.name
     }
 }
 

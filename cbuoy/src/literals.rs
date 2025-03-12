@@ -65,6 +65,18 @@ impl LiteralValue {
         }
     }
 
+    pub fn as_size(&self) -> Option<i32> {
+        match *self {
+            Self::U8(x) => Some(x as i32),
+            Self::U16(x) => Some(x as i32),
+            Self::U32(x) => Some(x as i32),
+            Self::I8(x) => Some(x as i32),
+            Self::I16(x) => Some(x as i32),
+            Self::I32(x) => Some(x),
+            _ => None,
+        }
+    }
+
     pub fn as_asm_literal(&self) -> AsmToken {
         match *self {
             Self::U8(x) => AsmToken::Literal1(x),

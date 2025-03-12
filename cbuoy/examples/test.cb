@@ -7,6 +7,13 @@ global f: i8 = -128;
 const Z: i8 = 10;
 global q: i8 = Z; // TESTING
 
+struct TEST {
+    a: u16;
+    b: u32;
+}
+
+global Q: TEST;
+
 fn main() {
     const X: i16 = 3;
     def a: u16 = 32;
@@ -20,7 +27,7 @@ fn main() {
     }
 
     if (a == 0) {
-        c = 7;
+        c = 7i16 : i16;
     } else {
         c = 9;
     }

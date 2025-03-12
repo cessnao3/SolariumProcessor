@@ -192,6 +192,22 @@ impl Display for UnaryExpression {
     }
 }
 
+/*
+#[derive(Debug, Clone)]
+struct DereferenceExpression {
+    base: Rc<dyn Expression>,
+}
+
+impl Expression for DereferenceExpression {
+    fn get_type(&self) -> Result<Type, TokenError> {}
+}
+
+#[derive(Debug, Clone)]
+struct AddressOfExpression {
+    base: Rc<dyn Expression>,
+}
+    */
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperation {
     Plus,
@@ -401,7 +417,7 @@ impl Display for BinaryExpression {
 #[derive(Debug, Clone)]
 struct AsExpression {
     token: Token,
-    data_type: DataType,
+    data_type: Type,
     expr: Rc<dyn Expression>,
 }
 
@@ -411,22 +427,30 @@ impl Expression for AsExpression {
     }
 
     fn get_type(&self) -> Result<Type, TokenError> {
-        Ok(Type::Primitive(self.data_type))
+        Ok(self.data_type.clone())
     }
 
     fn load_value_to_register(
         &self,
         reg: RegisterDef,
     ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
-        let mut asm = self.expr.load_address_to_register(reg)?;
-        asm.push(
-            self.token
-                .to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
-                    ArgumentType::new(reg.reg, self.data_type),
-                    ArgumentType::new(reg.reg, self.expr.get_primitive_type()?),
-                )))),
-        );
-        Ok(asm)
+        let mut asm = self.expr.load_value_to_register(reg)?;
+        if let Some(dt) = self.data_type.primitive_type() {
+            let src_type = self.expr.get_primitive_type()?;
+
+            if dt != src_type {
+                asm.push(
+                    self.token
+                        .to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
+                            ArgumentType::new(reg.reg, dt),
+                            ArgumentType::new(reg.reg, src_type),
+                        )))),
+                );
+            }
+            Ok(asm)
+        } else {
+            Err(self.token.clone().into_err("unable to perform conversion"))
+        }
     }
 }
 
@@ -488,13 +512,9 @@ pub fn parse_expression(
                 parse_expression(tokens, state)?,
             ))
         } else if next.get_value() == ":" {
-            let token = tokens.next()?;
-            let type_token = tokens.next()?;
-            let dt = DataType::try_from(type_token.get_value().as_ref())
-                .map_or(Err(token.clone().into_err("unknown data type")), |x| Ok(x))?;
-
+            let token = tokens.expect(":")?;
             Rc::new(AsExpression {
-                data_type: dt,
+                data_type: Type::read_type(tokens, state)?,
                 token,
                 expr,
             })

@@ -8,10 +8,10 @@ use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpConv, OpLd, OpSav};
 
 use crate::{
     TokenError,
-    compiler::{GlobalStatement, Statement},
-    expressions::{Expression, RegisterDef},
+    compiler::{CompilingState, GlobalStatement, Statement},
+    expressions::{Expression, RegisterDef, parse_expression},
     literals::Literal,
-    tokenizer::{Token, get_identifier},
+    tokenizer::{Token, TokenIter, get_identifier},
     typing::Type,
     utilities::load_to_register,
 };
@@ -106,33 +106,6 @@ impl Expression for GlobalVariable {
                 AsmToken::LoadLoc(self.access_label().into()),
             ])
             .collect())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ConstantStatement {
-    literal: Rc<Literal>,
-}
-
-impl ConstantStatement {
-    pub fn new(lit: Rc<Literal>) -> Self {
-        Self { literal: lit }
-    }
-}
-
-impl GlobalStatement for ConstantStatement {
-    fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        Ok(Vec::new())
-    }
-
-    fn get_static_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        Ok(Vec::new())
-    }
-}
-
-impl Statement for ConstantStatement {
-    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        Ok(Vec::new())
     }
 }
 
@@ -394,6 +367,69 @@ impl Expression for LocalVariable {
                 .token
                 .clone()
                 .into_err("unable to move non-primitive type into register"))
+        }
+    }
+}
+
+pub struct VariableDefinition {
+    pub token: Token,
+    pub dtype: Type,
+    pub init_expr: Option<Rc<dyn Expression>>,
+}
+
+impl VariableDefinition {
+    pub fn parse(
+        def_name: &str,
+        tokens: &mut TokenIter,
+        state: &CompilingState,
+    ) -> Result<Self, TokenError> {
+        tokens.expect(def_name)?;
+        let name_token = tokens.next()?;
+        tokens.expect(":")?;
+
+        let dtype = Type::read_type(tokens, state)?;
+        let init_expr = if tokens.expect_peek("=") {
+            tokens.next()?;
+            let mut expr_tokens = Vec::new();
+            while let Some(t) = tokens.next_if(|s| s != ";") {
+                expr_tokens.push(t);
+            }
+            Some(parse_expression(&mut TokenIter::from(&expr_tokens), state)?)
+        } else {
+            None
+        };
+
+        tokens.expect(";")?;
+
+        Ok(Self {
+            token: name_token,
+            dtype,
+            init_expr,
+        })
+    }
+
+    pub fn into_literal(self) -> Result<Literal, TokenError> {
+        if let Some(expr) = self.init_expr {
+            if let Some(lit) = expr.simplify() {
+                let dt = match self.dtype.primitive_type() {
+                    Some(x) => x,
+                    None => {
+                        return Err(self
+                            .token
+                            .into_err("constant must have a primitive data type"));
+                    }
+                };
+
+                Ok(Literal::new(self.token, lit.get_value().convert(dt)))
+            } else {
+                Err(self
+                    .token
+                    .into_err("constant must have a constant expression value"))
+            }
+        } else {
+            Err(self
+                .token
+                .into_err("constant must have initialization statement"))
         }
     }
 }

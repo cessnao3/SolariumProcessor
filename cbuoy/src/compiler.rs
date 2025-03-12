@@ -12,10 +12,10 @@ use crate::{
     expressions::{Expression, RegisterDef},
     functions::FunctionDefinition,
     literals::Literal,
-    parser::VariableDefinition,
     tokenizer::{Token, get_identifier},
+    typing::StructDefinition,
     utilities::load_to_register,
-    variables::{ConstantStatement, GlobalVariable, GlobalVariableStatement, LocalVariable},
+    variables::{GlobalVariable, GlobalVariableStatement, LocalVariable, VariableDefinition},
 };
 
 pub trait Statement: Debug {
@@ -32,6 +32,7 @@ enum GlobalType {
     Variable(Rc<GlobalVariable>),
     Function(Rc<FunctionDefinition>),
     Constant(Rc<Literal>),
+    Structure(Rc<StructDefinition>),
 }
 
 impl GlobalType {
@@ -40,14 +41,16 @@ impl GlobalType {
             Self::Variable(v) => v.get_token(),
             Self::Function(v) => v.get_token(),
             Self::Constant(v) => v.get_token(),
+            Self::Structure(s) => s.get_token(),
         }
     }
 
-    fn get_statement(&self) -> Rc<dyn GlobalStatement> {
+    fn get_statement(&self) -> Option<Rc<dyn GlobalStatement>> {
         match self {
-            Self::Variable(var) => Rc::new(GlobalVariableStatement::new(var.clone())),
-            Self::Function(func) => func.clone(),
-            Self::Constant(v) => Rc::new(ConstantStatement::new(v.clone())),
+            Self::Variable(var) => Some(Rc::new(GlobalVariableStatement::new(var.clone()))),
+            Self::Function(func) => Some(func.clone()),
+            Self::Constant(_) => None,
+            Self::Structure(_) => None,
         }
     }
 }
@@ -86,7 +89,7 @@ impl ScopeManager {
     }
 
     pub fn add_var(&mut self, def: VariableDefinition) -> Result<Rc<LocalVariable>, TokenError> {
-        let ident = get_identifier(&def.token)?;
+        let ident = get_identifier(&def.token)?.to_string();
         let offset = self.scope_full_size()?;
 
         if let Some(s) = self.scopes.last_mut() {
@@ -113,17 +116,14 @@ impl ScopeManager {
         }
     }
 
-    pub fn add_const(
-        &mut self,
-        def: VariableDefinition,
-    ) -> Result<Rc<ConstantStatement>, TokenError> {
-        let ident = get_identifier(&def.token)?;
+    pub fn add_const(&mut self, def: VariableDefinition) -> Result<(), TokenError> {
+        let ident = get_identifier(&def.token)?.to_string();
         if let Some(s) = self.scopes.last_mut() {
             match s.variables.entry(ident) {
                 Entry::Vacant(e) => {
                     let literal_expr = Rc::new(def.into_literal()?);
                     e.insert(ScopeVariables::Const(literal_expr.clone()));
-                    Ok(Rc::new(ConstantStatement::new(literal_expr)))
+                    Ok(())
                 }
                 Entry::Occupied(_) => Err(def
                     .token
@@ -137,10 +137,10 @@ impl ScopeManager {
     }
 
     pub fn get_variable(&self, name: &Token) -> Result<Rc<dyn Expression>, TokenError> {
-        let ident: String = get_identifier(name)?;
+        let ident = get_identifier(name)?;
 
         for s in self.scopes.iter().rev() {
-            if let Some(var) = s.variables.get(&ident) {
+            if let Some(var) = s.variables.get(ident.as_ref()) {
                 return Ok(var.get_expr());
             }
         }
@@ -323,6 +323,16 @@ impl CompilingState {
         sm
     }
 
+    pub fn get_struct(&self, name: &Token) -> Result<Rc<StructDefinition>, TokenError> {
+        if let Some(GlobalType::Structure(s)) = self.global_scope.get(name.get_value()) {
+            Ok(s.clone())
+        } else {
+            Err(name
+                .clone()
+                .into_err("no structure with provided name found"))
+        }
+    }
+
     pub fn add_global_var(&mut self, def: VariableDefinition) -> Result<(), TokenError> {
         let var = Rc::new(GlobalVariable::new(
             def.token,
@@ -341,10 +351,15 @@ impl CompilingState {
         self.add_to_global_scope(GlobalType::Function(func))
     }
 
+    pub fn add_struct(&mut self, s: StructDefinition) -> Result<(), TokenError> {
+        self.add_to_global_scope(GlobalType::Structure(Rc::new(s)))
+    }
+
     fn add_to_global_scope(&mut self, t: GlobalType) -> Result<(), TokenError> {
         let name = get_identifier(t.get_token())?;
+
         let statement = t.get_statement();
-        match self.global_scope.entry(name.clone()) {
+        match self.global_scope.entry(name.to_string()) {
             Entry::Vacant(e) => e.insert(t),
             Entry::Occupied(_) => {
                 return Err(t
@@ -354,13 +369,15 @@ impl CompilingState {
             }
         };
 
-        self.statements.push(statement);
+        if let Some(s) = statement {
+            self.statements.push(s);
+        }
 
         Ok(())
     }
 
     pub fn get_variable(&self, name: &Token) -> Result<Rc<dyn Expression>, TokenError> {
-        let ident: String = get_identifier(name)?;
+        let ident = get_identifier(name)?.to_string();
 
         if let Ok(v) = self.scope_manager.get_variable(name) {
             return Ok(v);

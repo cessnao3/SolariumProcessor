@@ -135,8 +135,12 @@ impl Token {
         }
     }
 
+    pub fn clone_value(&self) -> Rc<str> {
+        self.value.clone()
+    }
+
     pub fn get_value(&self) -> &str {
-        &self.value
+        self.value.as_ref()
     }
 
     pub fn get_loc(&self) -> &TokenLocation {
@@ -252,7 +256,10 @@ impl TokenIter<'_> {
 }
 
 static RESERVED_KEYWORDS: LazyLock<HashSet<String>> = LazyLock::new(|| {
-    let keywords = ["if", "while", "else", "global", "def", "var", "fn"].map(|v| v.to_string());
+    let keywords = [
+        "if", "while", "else", "global", "def", "fn", "const", "struct",
+    ]
+    .map(|v| v.to_string());
     let primitives = DataType::ALL.iter().map(|v| v.to_string());
     keywords.into_iter().chain(primitives).collect()
 });
@@ -262,14 +269,14 @@ pub struct IdentifierError {
     pub(crate) token: Token,
 }
 
-pub fn is_identifier(s: &str) -> bool {
+pub fn is_identifier<T: AsRef<str>>(s: T) -> bool {
     static IDENT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-zA-Z_]\w*$").unwrap());
-    IDENT_REGEX.is_match(s) && !RESERVED_KEYWORDS.contains(s)
+    IDENT_REGEX.is_match(s.as_ref()) && !RESERVED_KEYWORDS.contains(s.as_ref())
 }
 
-pub fn get_identifier(t: &Token) -> Result<String, IdentifierError> {
+pub fn get_identifier(t: &Token) -> Result<Rc<str>, IdentifierError> {
     if is_identifier(t.get_value()) {
-        Ok(t.get_value().to_owned())
+        Ok(t.clone_value())
     } else {
         Err(IdentifierError {
             token: t.to_owned(),

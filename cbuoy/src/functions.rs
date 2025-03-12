@@ -2,19 +2,17 @@ use std::rc::Rc;
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
-    ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpConv, OpCopy, OpJmp, OpLdn, OpRet, OpSav, OpTnz,
-    OpTz,
+    ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpConv, OpCopy, OpJmp, OpLdn, OpRet, OpSav, OpTz,
 };
 
 use crate::{
     TokenError,
     compiler::{CompilingState, GlobalStatement, ScopeManager, Statement},
     expressions::{Expression, RegisterDef, parse_expression},
-    parser::parse_generic_var,
     tokenizer::{EndOfTokenStream, Token, TokenIter, get_identifier},
     typing::Type,
     utilities::load_to_register,
-    variables::LocalVariable,
+    variables::VariableDefinition,
 };
 
 #[derive(Debug)]
@@ -298,11 +296,12 @@ fn parse_statement(
 ) -> Result<Option<Rc<dyn Statement>>, TokenError> {
     if let Some(next) = tokens.peek() {
         if next.get_value() == "def" {
-            let def = parse_generic_var("def", tokens, state)?;
+            let def = VariableDefinition::parse("def", tokens, state)?;
             Ok(Some(state.get_scopes_mut().add_var(def)?))
         } else if next.get_value() == "const" {
-            let def = parse_generic_var("const", tokens, state)?;
-            Ok(Some(state.get_scopes_mut().add_const(def)?))
+            let def = VariableDefinition::parse("const", tokens, state)?;
+            state.get_scopes_mut().add_const(def)?;
+            Ok(Some(Rc::new(EmptyStatement)))
         } else if next.get_value() == "{" {
             state.get_scopes_mut().add_scope(tokens.expect("{")?);
             let mut statements = Vec::new();
