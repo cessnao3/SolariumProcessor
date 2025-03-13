@@ -291,7 +291,6 @@ impl CompilingState {
             &[
                 AsmToken::Comment("Program Halt".into()),
                 AsmToken::OperationLiteral(Box::new(OpJmpri::new(0))),
-                AsmToken::ChangeAddress(0x10000), // TODO - TEMP!
             ]
             .map(Self::blank_token_loc),
         );

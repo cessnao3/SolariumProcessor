@@ -215,6 +215,13 @@ impl Expression for DereferenceExpression {
         &self.token
     }
 
+    fn load_address_to_register(
+        &self,
+        reg: RegisterDef,
+    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        self.base.load_value_to_register(reg)
+    }
+
     fn load_value_to_register(
         &self,
         reg: RegisterDef,

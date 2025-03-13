@@ -38,4 +38,6 @@ fn main() {
     } else {
         c = 9;
     }
+
+    *ex_ptr = 0x4387 : u8;
 }
