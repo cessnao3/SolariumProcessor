@@ -42,6 +42,10 @@ fn main() {
 
     *ex_ptr = 0x4387 : u8;
 
+    def q: *TEST;
+    q = &Q;
+
     Q.a = 3;
-    Q.b = 65535
+    Q.b = 65535;
+    (*q).a = 5;
 }

@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 cbuoy = { path = "../cbuoy", version = "*" }
+jib-asm = { path = "../jib-asm", version = "*" }

@@ -1,17 +1,38 @@
 use cbuoy::{TokenError, parse};
+use jib_asm::assemble_tokens;
 
 static INPUT_TEXT: &str = include_str!("../../cbuoy/examples/test.cb");
 
-fn main() {
-    match parse(INPUT_TEXT) {
+fn main() -> std::process::ExitCode {
+    let asm = match parse(INPUT_TEXT) {
         Ok(asm) => {
-            println!("Success!");
-            for t in asm {
-                println!("{}", t.tok);
+            println!("Assembly:");
+            for t in asm.iter() {
+                println!("  {}", t.tok);
+            }
+            asm
+        }
+        Err(e) => {
+            print_error(INPUT_TEXT, &e);
+            return 1.into();
+        }
+    };
+
+    match assemble_tokens(asm) {
+        Ok(r) => {
+            println!("Program Start: {:04x}", r.start_address);
+            println!("Labels:");
+            for (k, v) in r.labels {
+                println!("  {v:04x} => {k}");
             }
         }
-        Err(e) => print_error(INPUT_TEXT, &e),
+        Err(e) => {
+            eprintln!("{e}");
+            return 2.into();
+        }
     }
+
+    std::process::ExitCode::SUCCESS
 }
 
 fn print_error(txt: &str, err: &TokenError) {
