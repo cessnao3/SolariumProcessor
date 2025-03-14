@@ -40,7 +40,7 @@ impl Type {
             }
         } else if is_identifier(t.get_value()) {
             Ok(Self::Struct(state.get_struct(&t)?))
-        } else if let Ok(p) = DataType::try_from(t.get_value().as_ref()) {
+        } else if let Ok(p) = DataType::try_from(t.get_value()) {
             Ok(Self::Primitive(p))
         } else {
             Err(t.into_err("unknown type token found"))
@@ -73,19 +73,6 @@ impl Type {
         }
     }
 
-    pub fn ref_type(&self) -> Type {
-        Self::Pointer(Box::new(self.clone()))
-    }
-
-    pub fn alignment(&self) -> usize {
-        match self {
-            Self::Primitive(p) => p.byte_size(),
-            Self::Pointer(_) => DataType::U32.byte_size(),
-            Self::Array(_, t) => t.alignment(),
-            Self::Struct(_) => DataType::U32.byte_size(),
-        }
-    }
-
     pub fn coerce_type(a: DataType, b: DataType) -> DataType {
         a.max(b)
     }
@@ -105,7 +92,7 @@ impl Display for Type {
 #[derive(Debug, Clone)]
 pub struct StructDefinition {
     name: Token,
-    fields: HashMap<String, StructField>,
+    fields: HashMap<String, Rc<StructField>>,
 }
 
 impl StructDefinition {
@@ -135,7 +122,7 @@ impl StructDefinition {
             tokens.expect(";")?;
 
             match s.fields.entry(field_name) {
-                Entry::Vacant(e) => e.insert(StructField { offset, dtype }),
+                Entry::Vacant(e) => e.insert(Rc::new(StructField { offset, dtype })),
                 Entry::Occupied(_) => {
                     return Err(field_token.into_err("field with name already exists"));
                 }
@@ -151,6 +138,14 @@ impl StructDefinition {
 
     pub fn get_token(&self) -> &Token {
         &self.name
+    }
+
+    pub fn get_name(&self) -> &str {
+        self.name.get_value()
+    }
+
+    pub fn get_field(&self, field_name: &str) -> Option<Rc<StructField>> {
+        self.fields.get(field_name).map(|x| x.clone())
     }
 }
 

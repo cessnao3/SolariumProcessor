@@ -24,7 +24,7 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
 
     // Define the splitting regex
     static SPLIT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r##"(\w+)|:|;|\{|\}|\(|\)|\+|\-|\*|/|(&&?)|(\|\|?)|([<>!=]=?)|\[|\]|('(([\w])|(\\[\w]))')|("(([^\\"])|(\\"))*")"##).unwrap()
+        Regex::new(r##"(\w+)|\.|:|;|\{|\}|\(|\)|\+|\-|\*|/|(&&?)|(\|\|?)|([<>!=]=?)|\[|\]|('(([\w])|(\\[\w]))')|("(([^\\"])|(\\"))*")"##).unwrap()
     });
 
     struct TokenMatch<'a> {

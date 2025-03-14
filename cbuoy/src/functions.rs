@@ -72,8 +72,7 @@ impl Statement for FunctionDefinition {
             let scope_size = self.scope_manager.get_max_size();
 
             if scope_size > 0 {
-                init_asm
-                    .extend(load_to_register(RegisterDef::SPARE, scope_size as u32).into_iter());
+                init_asm.extend(load_to_register(RegisterDef::SPARE, scope_size as u32));
                 init_asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
                     ArgumentType::new(Register::StackPointer, DataType::U32),
                     Register::StackPointer.into(),
@@ -95,7 +94,7 @@ impl Statement for FunctionDefinition {
 
             asm_end.push(AsmToken::CreateLabel(self.end_label.clone()));
             if scope_size > 0 {
-                asm_end.extend(load_to_register(RegisterDef::SPARE, scope_size as u32).into_iter());
+                asm_end.extend(load_to_register(RegisterDef::SPARE, scope_size as u32));
                 asm_end.push(AsmToken::OperationLiteral(Box::new(OpSub::new(
                     ArgumentType::new(Register::StackPointer, DataType::U32),
                     Register::StackPointer.into(),
@@ -206,7 +205,7 @@ impl Statement for IfStatement {
             self.id, self.token,
         )))];
 
-        asm.extend(self.test_expr.load_value_to_register(def)?.into_iter());
+        asm.extend(self.test_expr.load_value_to_register(def)?);
 
         asm.extend(self.token.to_asm_iter([
             AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
@@ -256,7 +255,7 @@ impl Statement for WhileStatement {
                 .to_asm(AsmToken::CreateLabel(format!("{label_base}_test"))),
         ];
 
-        asm.extend(self.test_expr.load_value_to_register(def)?.into_iter());
+        asm.extend(self.test_expr.load_value_to_register(def)?);
 
         asm.extend(self.token.to_asm_iter([
             AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
@@ -366,7 +365,7 @@ fn parse_statement(
                 token: while_token,
                 id,
                 test_expr,
-                statement: statement,
+                statement,
             })))
         } else if next.get_value() == "}" {
             Ok(None)
@@ -405,12 +404,8 @@ impl Statement for AssignmentStatement {
             let addr_def = RegisterDef::default();
             let val_def = addr_def.increment_token(tok)?;
 
-            asm.extend(
-                self.addr_expr
-                    .load_address_to_register(addr_def)?
-                    .into_iter(),
-            );
-            asm.extend(self.val_expr.load_value_to_register(val_def)?.into_iter());
+            asm.extend(self.addr_expr.load_address_to_register(addr_def)?);
+            asm.extend(self.val_expr.load_value_to_register(val_def)?);
 
             if val_dtype != dest_dtype {
                 asm.push(tok.to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(

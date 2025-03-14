@@ -162,10 +162,6 @@ impl ScopeManager {
             .into_err("no variable with provided name found"))
     }
 
-    pub fn len(&self) -> usize {
-        self.scopes.len()
-    }
-
     pub fn is_empty(&self) -> bool {
         self.scopes.is_empty()
     }

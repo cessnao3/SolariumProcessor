@@ -268,22 +268,23 @@ impl Statement for LocalVariable {
                     self.base
                 ))));
 
-                let addr_reg =
-                    if self.offset > 0 {
-                        asm.extend(self.token.to_asm_iter(
-                            load_to_register(def.reg, self.offset as u32).into_iter(),
-                        ));
-                        asm.push(self.token.to_asm(AsmToken::OperationLiteral(Box::new(
-                            OpAdd::new(
+                let addr_reg = if self.offset > 0 {
+                    asm.extend(
+                        self.token
+                            .to_asm_iter(load_to_register(def.reg, self.offset as u32)),
+                    );
+                    asm.push(
+                        self.token
+                            .to_asm(AsmToken::OperationLiteral(Box::new(OpAdd::new(
                                 ArgumentType::new(def.reg, DataType::U32),
                                 def.reg.into(),
                                 self.base.into(),
-                            ),
-                        ))));
-                        def.reg
-                    } else {
-                        self.base
-                    };
+                            )))),
+                    );
+                    def.reg
+                } else {
+                    self.base
+                };
                 asm.extend_from_slice(&e.load_value_to_register(load_val)?);
 
                 if var_type != expr_type {

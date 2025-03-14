@@ -15,7 +15,8 @@ use crate::{
     compiler::CompilingState,
     literals::{Literal, LiteralValue},
     tokenizer::{Token, TokenIter, get_identifier},
-    typing::Type,
+    typing::{StructDefinition, StructField, Type},
+    utilities::load_to_register,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -459,11 +460,8 @@ impl Expression for BinaryExpression {
             };
 
             asm.extend(
-                self.get_token().to_asm_iter(
-                    op_instructions
-                        .into_iter()
-                        .map(|x| AsmToken::OperationLiteral(x)),
-                ),
+                self.get_token()
+                    .to_asm_iter(op_instructions.into_iter().map(AsmToken::OperationLiteral)),
             );
 
             Ok(asm)
@@ -528,6 +526,92 @@ impl Display for AsExpression {
     }
 }
 
+#[derive(Debug, Clone)]
+struct DotExpression {
+    token: Token,
+    field: Token,
+    s_expression: Rc<dyn Expression>,
+}
+
+impl DotExpression {
+    fn get_struct(&self) -> Result<Rc<StructDefinition>, TokenError> {
+        if let Type::Struct(s) = self.s_expression.get_type()? {
+            Ok(s)
+        } else {
+            Err(self
+                .token
+                .clone()
+                .into_err("left-hand expression to dot is not a structure"))
+        }
+    }
+
+    fn get_field(&self) -> Result<Rc<StructField>, TokenError> {
+        let st = self.get_struct()?;
+        if let Some(f) = st.get_field(self.field.get_value()) {
+            Ok(f)
+        } else {
+            Err(self.field.clone().into_err(format!(
+                "no field with name found for structure type {}",
+                st.get_name()
+            )))
+        }
+    }
+}
+
+impl Expression for DotExpression {
+    fn get_token(&self) -> &Token {
+        &self.token
+    }
+
+    fn get_type(&self) -> Result<Type, TokenError> {
+        Ok(self.get_field()?.dtype.clone())
+    }
+
+    fn load_address_to_register(
+        &self,
+        reg: RegisterDef,
+    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        let mut asm = self.s_expression.load_address_to_register(reg)?;
+        asm.extend(
+            self.token
+                .to_asm_iter(load_to_register(reg.spare, self.get_field()?.offset as u32)),
+        );
+        asm.push(
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                    ArgumentType::new(reg.reg, DataType::U32),
+                    reg.reg.into(),
+                    reg.spare.into(),
+                )))),
+        );
+        Ok(asm)
+    }
+
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        let mut asm = self.load_address_to_register(reg)?;
+        let dt = self.get_primitive_type()?;
+
+        asm.push(
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpLd::new(
+                    ArgumentType::new(reg.reg, dt),
+                    reg.reg.into(),
+                )))),
+        );
+
+        Ok(asm)
+    }
+}
+
+impl Display for DotExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}", self.s_expression, self.field.get_value())
+    }
+}
+
 pub fn parse_expression(
     tokens: &mut TokenIter,
     state: &CompilingState,
@@ -547,7 +631,7 @@ pub fn parse_expression(
         BinaryOperation::ALL
             .iter()
             .map(|x| (x.to_string(), *x))
-            .collect() // TODO - work for values
+            .collect()
     });
 
     let first = tokens.next()?;
@@ -590,6 +674,19 @@ pub fn parse_expression(
                 expr,
                 parse_expression(tokens, state)?,
             ))
+        } else if next.get_value() == "." {
+            let mut s_expr = expr;
+            while tokens.expect_peek(".") {
+                let dot_token = tokens.expect(".")?;
+                let ident_token = tokens.next()?;
+
+                s_expr = Rc::new(DotExpression {
+                    field: ident_token,
+                    token: dot_token,
+                    s_expression: s_expr,
+                })
+            }
+            s_expr
         } else if next.get_value() == ":" {
             let token = tokens.expect(":")?;
             Rc::new(AsExpression {
