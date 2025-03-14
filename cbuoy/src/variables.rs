@@ -184,6 +184,11 @@ impl GlobalStatement for GlobalVariableStatement {
                     let reg_state_var = RegisterDef::default();
                     let reg_state_init = reg_state_var.increment_token(name)?;
 
+                    asm_init.push(name.to_asm(AsmToken::Comment(format!(
+                        "Initializing Global Variable {}",
+                        self.global_var.get_name()
+                    ))));
+
                     asm_init.extend_from_slice(&var.load_address_to_register(reg_state_var)?);
                     asm_init.extend_from_slice(&init_expr.load_value_to_register(reg_state_init)?);
 

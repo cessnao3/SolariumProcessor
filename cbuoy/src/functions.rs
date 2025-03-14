@@ -2,7 +2,8 @@ use std::rc::Rc;
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
-    ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpConv, OpCopy, OpJmp, OpLdn, OpRet, OpSav, OpTz,
+    ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpConv, OpCopy, OpJmp, OpLdn, OpRet, OpSav, OpSub,
+    OpTz,
 };
 
 use crate::{
@@ -43,6 +44,10 @@ impl FunctionDefinition {
         })
     }
 
+    pub fn get_entry_label(&self) -> &str {
+        &self.entry_label
+    }
+
     pub fn get_token(&self) -> &Token {
         &self.name
     }
@@ -56,48 +61,50 @@ impl Statement for FunctionDefinition {
                 .clone()
                 .into_err("parameters currently unsupported"))
         } else {
-            let mut asm = Vec::new();
+            let mut init_asm = vec![
+                AsmToken::CreateLabel(self.entry_label.clone()),
+                AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                    RegisterDef::FN_BASE.into(),
+                    Register::StackPointer.into(),
+                ))),
+            ];
 
-            asm.push(
-                self.name
-                    .to_asm(AsmToken::CreateLabel(self.entry_label.clone())),
-            );
-            asm.push(
-                self.name
-                    .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                        RegisterDef::FN_BASE.into(),
-                        Register::StackPointer.into(),
-                    )))),
-            );
-
-            let scope_size = self.scope_manager.scope_full_size()?;
+            let scope_size = self.scope_manager.get_max_size();
 
             if scope_size > 0 {
-                asm.extend(self.name.to_asm_iter(
-                    load_to_register(RegisterDef::SPARE, scope_size as u32).into_iter(),
-                ));
-                asm.push(
-                    self.name
-                        .to_asm(AsmToken::OperationLiteral(Box::new(OpAdd::new(
-                            ArgumentType::new(Register::StackPointer, DataType::U32),
-                            Register::StackPointer.into(),
-                            RegisterDef::SPARE.into(),
-                        )))),
-                );
+                init_asm
+                    .extend(load_to_register(RegisterDef::SPARE, scope_size as u32).into_iter());
+                init_asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                    ArgumentType::new(Register::StackPointer, DataType::U32),
+                    Register::StackPointer.into(),
+                    RegisterDef::SPARE.into(),
+                ))));
             }
+
+            let mut asm = self
+                .name
+                .to_asm_iter(init_asm)
+                .into_iter()
+                .collect::<Vec<_>>();
 
             for s in self.statements.iter() {
                 asm.extend_from_slice(&s.get_exec_code()?);
             }
 
-            asm.push(
-                self.name
-                    .to_asm(AsmToken::CreateLabel(self.end_label.clone())),
-            );
-            asm.push(
-                self.name
-                    .to_asm(AsmToken::OperationLiteral(Box::new(OpRet))),
-            );
+            let mut asm_end = Vec::new();
+
+            asm_end.push(AsmToken::CreateLabel(self.end_label.clone()));
+            if scope_size > 0 {
+                asm_end.extend(load_to_register(RegisterDef::SPARE, scope_size as u32).into_iter());
+                asm_end.push(AsmToken::OperationLiteral(Box::new(OpSub::new(
+                    ArgumentType::new(Register::StackPointer, DataType::U32),
+                    Register::StackPointer.into(),
+                    RegisterDef::SPARE.into(),
+                ))));
+            }
+            asm_end.push(AsmToken::OperationLiteral(Box::new(OpRet)));
+
+            asm.extend(self.name.to_asm_iter(asm_end));
 
             Ok(asm)
         }

@@ -12,7 +12,7 @@ use jib_asm::{
 
 use crate::{
     TokenError,
-    compiler::{CompilingState, ScopeManager},
+    compiler::CompilingState,
     literals::{Literal, LiteralValue},
     tokenizer::{Token, TokenIter, get_identifier},
     typing::Type,

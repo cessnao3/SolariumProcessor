@@ -1,15 +1,10 @@
-use std::rc::Rc;
-
-use jib::cpu::DataType;
 use jib_asm::AsmTokenLoc;
 
 use crate::{
     compiler::CompilingState,
-    expressions::{Expression, parse_expression},
     functions::parse_fn_statement,
-    literals::Literal,
-    tokenizer::{Token, TokenError, TokenIter, tokenize},
-    typing::{StructDefinition, Type},
+    tokenizer::{TokenError, TokenIter, tokenize},
+    typing::StructDefinition,
     variables::VariableDefinition,
 };
 

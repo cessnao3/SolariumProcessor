@@ -25,7 +25,11 @@ impl DataType {
     ];
 
     pub fn coerced(a: Self, b: Self) -> Self {
-        if a > b { a } else { b }
+        if a > b {
+            a
+        } else {
+            b
+        }
     }
 
     pub fn byte_size(&self) -> usize {
@@ -76,7 +80,7 @@ impl TryFrom<&str> for DataType {
     type Error = UnknownDataType;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(match value.as_ref() {
+        Ok(match value {
             "u8" => Self::U8,
             "i8" => Self::I8,
             "u16" => Self::U16,

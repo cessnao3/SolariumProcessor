@@ -227,8 +227,16 @@ impl ThreadState {
                     state.multiplier = m;
                 }
                 UiToThread::SetCode(data) => {
+                    let code = if data.start_address != 0 {
+                        let mut asm_vals = vec![0; data.start_address as usize];
+                        asm_vals.extend(data.bytes);
+                        asm_vals
+                    } else {
+                        data.bytes
+                    };
+
                     state.running = false;
-                    state.last_code = data;
+                    state.last_code = code;
                     state.reset()?;
                     return Ok(Some(ThreadToUi::ProcessorReset));
                 }

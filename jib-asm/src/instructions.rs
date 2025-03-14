@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use crate::{
     argument::{ArgumentError, ArgumentRegister, ArgumentType},
-    immediate::{ImmediateError, parse_imm_i16},
+    immediate::{parse_imm_i16, ImmediateError},
 };
 use jib::cpu::{Opcode, Processor};
 
@@ -389,7 +389,7 @@ macro_rules! InstSingleArgImm {
             }
 
             fn get_args(&self) -> Vec<String> {
-                vec![format!("{}", self.arg), format!("{}:u16", self.imm)]
+                vec![format!("{}", self.arg), format!("{}", self.imm)]
             }
 
             fn to_bytes(&self) -> [u8; INST_SIZE] {

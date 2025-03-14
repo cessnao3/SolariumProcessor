@@ -200,7 +200,7 @@ impl Expression for Literal {
 
         Ok(self
             .get_token()
-            .to_asm_iter([op_load, op_lit])
+            .to_asm_iter([op_load, op_lit, AsmToken::AlignInstruction])
             .into_iter()
             .collect())
     }

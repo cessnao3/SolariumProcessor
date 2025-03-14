@@ -1,4 +1,5 @@
 use jib::cpu::RegisterManager;
+use jib_asm::AssemblerOutput;
 
 #[derive(Clone)]
 pub enum UiToThread {
@@ -7,7 +8,7 @@ pub enum UiToThread {
     CpuStop,
     CpuReset,
     CpuIrq(u8),
-    SetCode(Vec<u8>),
+    SetCode(AssemblerOutput),
     SerialInput(String),
     RequestMemory(u32, u32),
     SetBreakpoint(u32),

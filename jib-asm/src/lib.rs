@@ -18,8 +18,8 @@ pub use argument::{ArgumentError, ArgumentRegister, ArgumentType};
 use jib::cpu::{Opcode, Processor, ProcessorError};
 
 use immediate::{
-    ImmediateError, parse_imm_i8, parse_imm_i16, parse_imm_i32, parse_imm_u8, parse_imm_u16,
-    parse_imm_u32,
+    parse_imm_i16, parse_imm_i32, parse_imm_i8, parse_imm_u16, parse_imm_u32, parse_imm_u8,
+    ImmediateError,
 };
 use regex::Regex;
 
@@ -246,7 +246,7 @@ impl TryFrom<&str> for AsmToken {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         // Create the instruction list
         static INSTRUCTION_LIST: LazyLock<InstructionList> =
-            LazyLock::new(|| InstructionList::default());
+            LazyLock::new(InstructionList::default);
 
         // Trim Comments
         let s = Self::trim_line(value);
@@ -516,83 +516,6 @@ pub struct TokenList {
 }
 
 impl TokenList {
-    fn trim_line(line: &str) -> &str {
-        let s = line.trim();
-        if let Some(ind) = s.find(';') {
-            &s[..ind]
-        } else {
-            s
-        }
-    }
-
-    fn split_asm_delim(s: &str) -> Result<Vec<String>, ParseError> {
-        let mut within_quote = false;
-        let mut is_escape = false;
-        let mut last_was_quote = false;
-
-        let mut so_far = Vec::<char>::new();
-        let mut words = Vec::new();
-
-        for c in s.chars() {
-            if last_was_quote {
-                if c.is_whitespace() {
-                    last_was_quote = false;
-                } else {
-                    return Err(ParseError::ExpectedSpaceBetweenQuote);
-                }
-            } else if within_quote {
-                if is_escape {
-                    if c == '\\' {
-                        so_far.push('\\');
-                    } else if c == 'n' {
-                        so_far.push('\n');
-                    } else if c == '"' {
-                        so_far.push('"')
-                    } else {
-                        return Err(ParseError::UnknownEscapeCode(c));
-                    }
-
-                    is_escape = false;
-                } else if c == '\\' {
-                    is_escape = true;
-                } else if c == '"' {
-                    within_quote = false;
-                    last_was_quote = true;
-                    if !so_far.is_empty() {
-                        words.push(so_far.iter().collect());
-                        so_far.clear();
-                    }
-                } else {
-                    so_far.push(c);
-                }
-            } else if c == '"' {
-                if !so_far.is_empty() {
-                    return Err(ParseError::ExpectedSpaceBetweenQuote);
-                }
-                within_quote = true;
-            } else if c.is_whitespace() {
-                if !so_far.is_empty() {
-                    words.push(so_far.iter().collect());
-                    so_far.clear();
-                }
-            } else {
-                so_far.push(c);
-            }
-        }
-
-        if within_quote {
-            return Err(ParseError::WithinQuote);
-        } else if is_escape {
-            return Err(ParseError::WithinEscape);
-        }
-
-        if !so_far.is_empty() {
-            words.push(so_far.into_iter().collect());
-        }
-
-        Ok(words)
-    }
-
     pub fn parse_line(&mut self, line: &str, loc: LocationInfo) -> Result<(), AssemblerError> {
         self.tokens.push(AsmTokenLoc {
             tok: AsmToken::try_from(line)?,
@@ -605,7 +528,7 @@ impl TokenList {
         self.tokens.push(tok)
     }
 
-    pub fn to_bytes(&self) -> Result<Vec<u8>, AssemblerErrorLoc> {
+    pub fn to_bytes(&self) -> Result<AssemblerOutput, AssemblerErrorLoc> {
         let mut state = ParserState::new();
 
         for t in self.tokens.iter() {
@@ -678,18 +601,31 @@ impl TokenList {
 
         state.process_delays()?;
 
-        let mut bytes = Vec::new();
+        if let Some(min_addr) = state.values.keys().min().copied() {
+            if let Some(max_addr) = state.values.keys().max().copied() {
+                let mut bytes = vec![0; (max_addr - min_addr) as usize + 1];
 
-        if let Some(max_addr) = state.values.keys().max() {
-            bytes.resize(*max_addr as usize + 1, 0);
+                for (a, v) in state.values {
+                    bytes[(a - min_addr) as usize] = v;
+                }
 
-            for (a, v) in state.values {
-                bytes[a as usize] = v;
+                return Ok(AssemblerOutput {
+                    start_address: min_addr,
+                    bytes,
+                    labels: state.labels,
+                });
             }
         }
 
-        Ok(bytes)
+        Ok(AssemblerOutput::default())
     }
+}
+
+#[derive(Default, Clone)]
+pub struct AssemblerOutput {
+    pub start_address: u32,
+    pub bytes: Vec<u8>,
+    pub labels: HashMap<String, u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -725,7 +661,6 @@ impl ParserState {
     }
 
     fn add_bytes(&mut self, vals: &[u8], loc: LocationInfo) -> Result<u32, AssemblerErrorLoc> {
-        self.align_boundary(vals.len() as u32);
         let base = self.addr;
         for v in vals {
             if self.values.insert(self.addr, *v).is_some() {
@@ -799,11 +734,11 @@ impl ParserState {
     }
 }
 
-pub fn assemble_text(txt: &str) -> Result<Vec<u8>, AssemblerErrorLoc> {
+pub fn assemble_text(txt: &str) -> Result<AssemblerOutput, AssemblerErrorLoc> {
     assemble_lines(&txt.lines().collect::<Vec<_>>())
 }
 
-pub fn assemble_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
+pub fn assemble_lines(txt: &[&str]) -> Result<AssemblerOutput, AssemblerErrorLoc> {
     let mut state = TokenList::default();
 
     for (i, l) in txt.iter().enumerate() {
@@ -820,7 +755,7 @@ pub fn assemble_lines(txt: &[&str]) -> Result<Vec<u8>, AssemblerErrorLoc> {
     state.to_bytes()
 }
 
-pub fn assemble_tokens<T>(tokens: T) -> Result<Vec<u8>, AssemblerErrorLoc>
+pub fn assemble_tokens<T>(tokens: T) -> Result<AssemblerOutput, AssemblerErrorLoc>
 where
     T: IntoIterator<Item = AsmTokenLoc>,
 {
@@ -840,7 +775,7 @@ mod test {
         let txt = include_str!("../../jib-asm/examples/counter.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
-        assert!(!res.unwrap().is_empty());
+        assert!(!res.unwrap().bytes.is_empty());
     }
 
     #[test]
@@ -848,7 +783,7 @@ mod test {
         let txt = include_str!("../../jib-asm/examples/hello_world.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
-        assert!(!res.unwrap().is_empty());
+        assert!(!res.unwrap().bytes.is_empty());
     }
 
     #[test]
@@ -856,7 +791,7 @@ mod test {
         let txt = include_str!("../../jib-asm/examples/infinite_counter.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
-        assert!(!res.unwrap().is_empty());
+        assert!(!res.unwrap().bytes.is_empty());
     }
 
     #[test]
@@ -864,7 +799,7 @@ mod test {
         let txt = include_str!("../../jib-asm/examples/serial_echo.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
-        assert!(!res.unwrap().is_empty());
+        assert!(!res.unwrap().bytes.is_empty());
     }
 
     #[test]
@@ -872,6 +807,6 @@ mod test {
         let txt = include_str!("../../jib-asm/examples/thread_test.jsm");
         let res = assemble_text(txt);
         assert!(res.is_ok());
-        assert!(!res.unwrap().is_empty());
+        assert!(!res.unwrap().bytes.is_empty());
     }
 }

@@ -5,7 +5,9 @@ use std::{
 };
 
 use jib::cpu::{DataType, Register};
-use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, LocationInfo, OpJmpri, OpSub};
+use jib_asm::{
+    ArgumentType, AsmToken, AsmTokenLoc, LocationInfo, OpCall, OpJmpri, OpLdi, OpLdn, OpSub,
+};
 
 use crate::{
     TokenError,
@@ -58,6 +60,7 @@ impl GlobalType {
 #[derive(Debug, Default, Clone)]
 pub struct ScopeManager {
     scopes: Vec<ScopeBlock>,
+    max_size: usize,
 }
 
 impl ScopeManager {
@@ -80,8 +83,13 @@ impl ScopeManager {
         }
     }
 
+    pub fn get_max_size(&self) -> usize {
+        self.max_size
+    }
+
     pub fn clear(&mut self) {
         self.scopes.clear();
+        self.max_size = 0;
     }
 
     pub fn scope_full_size(&self) -> Result<usize, TokenError> {
@@ -95,6 +103,7 @@ impl ScopeManager {
         if let Some(s) = self.scopes.last_mut() {
             match s.variables.entry(ident) {
                 Entry::Vacant(e) => {
+                    let var_size = def.dtype.byte_size();
                     let var = Rc::new(LocalVariable::new(
                         def.token,
                         def.dtype,
@@ -102,7 +111,10 @@ impl ScopeManager {
                         offset,
                         def.init_expr,
                     )?);
+
+                    // Update the scope values and maximum size of the stack
                     e.insert(ScopeVariables::Local(var.clone()));
+                    self.max_size = self.max_size.max(offset + var_size);
                     Ok(var)
                 }
                 Entry::Occupied(_) => Err(def
@@ -282,9 +294,30 @@ impl CompilingState {
         asm.push(Self::blank_token_loc(AsmToken::CreateLabel(
             init_label.clone(),
         )));
+        asm.push(Self::blank_token_loc(AsmToken::OperationLiteral(Box::new(
+            OpLdi::new(
+                ArgumentType::new(Register::StackPointer, DataType::U16),
+                0x1000,
+            ),
+        ))));
 
         for s in self.statements.iter() {
             asm.extend_from_slice(&s.get_init_code()?);
+        }
+
+        if let Some(GlobalType::Function(f)) = self.global_scope.get("main") {
+            asm.push(Self::blank_token_loc(AsmToken::OperationLiteral(Box::new(
+                OpLdn::new(ArgumentType::new(
+                    Register::first_gp_register(),
+                    DataType::U32,
+                )),
+            ))));
+            asm.push(Self::blank_token_loc(AsmToken::LoadLoc(
+                f.get_entry_label().to_string(),
+            )));
+            asm.push(Self::blank_token_loc(AsmToken::OperationLiteral(Box::new(
+                OpCall::new(Register::first_gp_register().into()),
+            ))));
         }
 
         asm.extend_from_slice(
