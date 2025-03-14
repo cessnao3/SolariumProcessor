@@ -24,7 +24,7 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
 
     // Define the splitting regex
     static SPLIT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(\w+)|:|;|\{|\}|\(|\)|\+|\-|\*|/|(&&?)|(\|\|?)|([<>!=]=?)|\[|\]").unwrap()
+        Regex::new(r##"(\w+)|:|;|\{|\}|\(|\)|\+|\-|\*|/|(&&?)|(\|\|?)|([<>!=]=?)|\[|\]|('(([\w])|(\\[\w]))')|("(([^\\"])|(\\"))*")"##).unwrap()
     });
 
     struct TokenMatch<'a> {
@@ -81,8 +81,6 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
 
         last_end = Some(t.end);
     }
-
-    // TODO - Check that the spaces between words are just whitespace
 
     // Determine Locations
     let mut char_iter = s.chars();
