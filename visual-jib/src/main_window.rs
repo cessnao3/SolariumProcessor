@@ -2,8 +2,8 @@
 use crate::cpu_thread::cpu_thread;
 use crate::messages::{ThreadToUi, UiToThread};
 use gtk::glib::clone;
-use gtk::{Application, ApplicationWindow};
 use gtk::{glib, prelude::*};
+use gtk::{Application, ApplicationWindow};
 use jib::cpu::RegisterManager;
 
 pub fn build_ui(app: &Application) {
@@ -232,16 +232,24 @@ fn build_code_column(
 
                     match cbuoy::parse(cb.as_str()) {
                         Ok(v) => {
-                            let asm = v
+                            let mut asm = v
                                 .iter()
                                 .map(|x| format!("{}", x.tok))
                                 .collect::<Vec<_>>()
                                 .join("\n");
 
-                            buffer_asm_code.set_text(&asm);
-
                             match jib_asm::assemble_text(asm.as_str()) {
                                 Ok(v) => {
+                                    let mut locs =
+                                        v.labels.iter().map(|(k, v)| (*v, k)).collect::<Vec<_>>();
+                                    locs.sort_by(|a, b| a.0.cmp(&b.0));
+                                    let label_vals = locs
+                                        .into_iter()
+                                        .map(|(v, k)| format!("; {v:04x} = {k}"))
+                                        .collect::<Vec<_>>()
+                                        .join("\n");
+                                    asm = format!("{asm}\n\n{label_vals}");
+
                                     tx_ui.send(UiToThread::SetCode(v)).unwrap();
                                     tx_thread
                                         .send(ThreadToUi::LogMessage(format!(
@@ -257,6 +265,8 @@ fn build_code_column(
                                         .unwrap();
                                 }
                             }
+
+                            buffer_asm_code.set_text(&asm);
                         }
                         Err(err) => {
                             tx_thread

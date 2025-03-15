@@ -663,8 +663,13 @@ impl Expression for AssignmentExpression {
         let tok = self.addr_expr.get_token();
 
         let mut asm = Vec::new();
-        asm.push(self.addr_expr.get_token().to_asm(AsmToken::Comment(format!(
-            "assignment of {} to {}",
+        asm.push(self.token.to_asm(AsmToken::CreateLabel(format!(
+            "assignment_at_{}_{}",
+            self.token.get_loc().line,
+            self.token.get_loc().column
+        ))));
+        asm.push(self.token.to_asm(AsmToken::Comment(format!(
+            "assignment) of {} to {}",
             self.addr_expr, self.val_expr
         ))));
 
@@ -674,8 +679,8 @@ impl Expression for AssignmentExpression {
             let val_def = reg;
             let addr_def = val_def.increment_token(tok)?;
 
-            asm.extend(self.addr_expr.load_address_to_register(addr_def)?);
             asm.extend(self.val_expr.load_value_to_register(val_def)?);
+            asm.extend(self.addr_expr.load_address_to_register(addr_def)?);
 
             if val_dtype != dest_dtype {
                 asm.push(tok.to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
