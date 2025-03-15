@@ -11,7 +11,7 @@ use crate::{
     compiler::{CompilingState, GlobalStatement, ScopeManager, Statement},
     expressions::{Expression, RegisterDef, parse_expression},
     tokenizer::{EndOfTokenStream, Token, TokenIter, get_identifier},
-    typing::Type,
+    typing::{Function, Type},
     utilities::load_to_register,
     variables::VariableDefinition,
 };
@@ -22,7 +22,7 @@ pub struct FunctionDefinition {
     entry_label: String,
     end_label: String,
     statements: Vec<Rc<dyn Statement>>,
-    parameters: Vec<(String, Type)>,
+    dtype: Function,
     scope_manager: ScopeManager,
 }
 
@@ -30,6 +30,7 @@ impl FunctionDefinition {
     pub fn new(
         id: usize,
         name: Token,
+        func: Function,
         statements: Vec<Rc<dyn Statement>>,
         scope_manager: ScopeManager,
     ) -> Result<Self, TokenError> {
@@ -39,7 +40,7 @@ impl FunctionDefinition {
             entry_label: format!("func_{id}_{ident}_start"),
             end_label: format!("func_{id}_{ident}_end"),
             statements,
-            parameters: Vec::new(),
+            dtype: func,
             scope_manager,
         })
     }
@@ -55,7 +56,7 @@ impl FunctionDefinition {
 
 impl Statement for FunctionDefinition {
     fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        if !self.parameters.is_empty() {
+        if !self.dtype.parameters.is_empty() {
             Err(self
                 .name
                 .clone()
@@ -136,21 +137,8 @@ pub fn parse_fn_statement(
 
     state.get_scopes_mut().add_scope(name_token.clone());
 
-    tokens.expect("(")?;
-    let mut params_iter = Vec::new();
-    while let Some(t) = tokens.next_if(|t| t != ")") {
-        params_iter.push(t);
-    }
-    tokens.expect(")")?;
+    let func_type = Function::read_tokens(tokens, state, true)?;
 
-    if !params_iter.is_empty() {
-        todo!("params not yet supported!");
-    }
-
-    let mut return_iter = Vec::new();
-    while let Some(t) = tokens.next_if(|t| t != "{") {
-        return_iter.push(t);
-    }
     tokens.expect("{")?;
 
     let mut statements = Vec::new();
@@ -164,6 +152,7 @@ pub fn parse_fn_statement(
     let def = Rc::new(FunctionDefinition::new(
         state.get_next_id(),
         name_token.clone(),
+        func_type,
         statements,
         state.extract_scope(),
     )?);

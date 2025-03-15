@@ -10,7 +10,7 @@ use crate::compiler::CompilingState;
 use crate::expressions::parse_expression;
 use crate::tokenizer::{Token, TokenError, TokenIter, get_identifier, is_identifier};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Type {
     Primitive(DataType),
     Pointer(Box<Self>),
@@ -25,6 +25,7 @@ impl Type {
             Ok(Self::Pointer(Box::new(Self::read_type(tokens, state)?)))
         } else if t.get_value() == "[" {
             let expr = parse_expression(tokens, state)?;
+            tokens.expect("]")?;
             if let Some(lit) = expr.simplify() {
                 let s = lit.get_value().as_size().unwrap_or_default();
                 if s > 0 {
@@ -89,9 +90,9 @@ impl Display for Type {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructDefinition {
-    name: Token,
+    name: String,
     fields: HashMap<String, Rc<StructField>>,
 }
 
@@ -99,13 +100,13 @@ impl StructDefinition {
     pub fn read_definition(
         tokens: &mut TokenIter,
         state: &CompilingState,
-    ) -> Result<Self, TokenError> {
+    ) -> Result<(Self, Token), TokenError> {
         tokens.expect("struct")?;
         let name = tokens.next()?;
         get_identifier(&name)?;
 
         let mut s = Self {
-            name,
+            name: name.get_value().to_string(),
             fields: HashMap::new(),
         };
 
@@ -133,15 +134,11 @@ impl StructDefinition {
 
         tokens.expect("}")?;
 
-        Ok(s)
-    }
-
-    pub fn get_token(&self) -> &Token {
-        &self.name
+        Ok((s, name))
     }
 
     pub fn get_name(&self) -> &str {
-        self.name.get_value()
+        &self.name
     }
 
     pub fn get_field(&self, field_name: &str) -> Option<Rc<StructField>> {
@@ -149,10 +146,80 @@ impl StructDefinition {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructField {
     pub offset: usize,
     pub dtype: Type,
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctionParameter {
+    pub dtype: Type,
+    pub name: Option<String>,
+}
+
+impl Eq for FunctionParameter {}
+impl PartialEq for FunctionParameter {
+    fn eq(&self, other: &Self) -> bool {
+        self.dtype == other.dtype
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Function {
+    pub parameters: Vec<FunctionParameter>,
+    pub return_type: Option<Type>,
+}
+
+impl Function {
+    pub fn read_tokens(
+        tokens: &mut TokenIter,
+        state: &CompilingState,
+        include_names: bool,
+    ) -> Result<Self, TokenError> {
+        tokens.expect("(")?;
+
+        let mut params = Vec::new();
+
+        if !tokens.expect_peek(")") {
+            loop {
+                let param_name = if include_names {
+                    let pname = get_identifier(&tokens.next()?)?.to_string();
+                    tokens.expect(":")?;
+                    Some(pname)
+                } else {
+                    None
+                };
+
+                let param_type = Type::read_type(tokens, state)?;
+
+                params.push(FunctionParameter {
+                    dtype: param_type,
+                    name: param_name,
+                });
+
+                if !tokens.expect_peek(")") {
+                    tokens.expect(",")?;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        tokens.expect(")")?;
+
+        let ret = if tokens.expect_peek("void") {
+            tokens.expect("void")?;
+            None
+        } else {
+            Some(Type::read_type(tokens, state)?)
+        };
+
+        Ok(Self {
+            parameters: params,
+            return_type: ret,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]

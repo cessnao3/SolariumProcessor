@@ -7,6 +7,7 @@ global f: i8 = -128;
 const Z: i8 = 10;
 global q: i8 = Z;
 global z: u8 = Z;
+global zz: [100]u8;
 
 global ex_ptr: *u32 = 0x3000;
 
@@ -17,7 +18,7 @@ struct TEST {
 
 global Q: TEST;
 
-fn main() {
+fn main() void {
     const X: i16 = 3;
     def a: u16 = 32;
     {

@@ -34,7 +34,7 @@ enum GlobalType {
     Variable(Rc<GlobalVariable>),
     Function(Rc<FunctionDefinition>),
     Constant(Rc<Literal>),
-    Structure(Rc<StructDefinition>),
+    Structure(Token, Rc<StructDefinition>),
 }
 
 impl GlobalType {
@@ -43,7 +43,7 @@ impl GlobalType {
             Self::Variable(v) => v.get_token(),
             Self::Function(v) => v.get_token(),
             Self::Constant(v) => v.get_token(),
-            Self::Structure(s) => s.get_token(),
+            Self::Structure(t, _) => t,
         }
     }
 
@@ -52,7 +52,7 @@ impl GlobalType {
             Self::Variable(var) => Some(Rc::new(GlobalVariableStatement::new(var.clone()))),
             Self::Function(func) => Some(func.clone()),
             Self::Constant(_) => None,
-            Self::Structure(_) => None,
+            Self::Structure(_, _) => None,
         }
     }
 }
@@ -352,7 +352,7 @@ impl CompilingState {
     }
 
     pub fn get_struct(&self, name: &Token) -> Result<Rc<StructDefinition>, TokenError> {
-        if let Some(GlobalType::Structure(s)) = self.global_scope.get(name.get_value()) {
+        if let Some(GlobalType::Structure(_, s)) = self.global_scope.get(name.get_value()) {
             Ok(s.clone())
         } else {
             Err(name
@@ -379,8 +379,8 @@ impl CompilingState {
         self.add_to_global_scope(GlobalType::Function(func))
     }
 
-    pub fn add_struct(&mut self, s: StructDefinition) -> Result<(), TokenError> {
-        self.add_to_global_scope(GlobalType::Structure(Rc::new(s)))
+    pub fn add_struct(&mut self, name: Token, s: StructDefinition) -> Result<(), TokenError> {
+        self.add_to_global_scope(GlobalType::Structure(name, Rc::new(s)))
     }
 
     fn add_to_global_scope(&mut self, t: GlobalType) -> Result<(), TokenError> {
