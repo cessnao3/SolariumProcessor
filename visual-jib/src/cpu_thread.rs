@@ -11,9 +11,10 @@ use std::rc::Rc;
 struct CircularBuffer<T> {
     history: Vec<Option<T>>,
     index: usize,
+    last: Option<T>,
 }
 
-impl<T: Clone> CircularBuffer<T> {
+impl<T: Clone + PartialEq + Eq> CircularBuffer<T> {
     pub fn new(len: usize) -> Self {
         if len == 0 {
             panic!("size may not be 0");
@@ -22,17 +23,23 @@ impl<T: Clone> CircularBuffer<T> {
         Self {
             history: (0..len).map(|_| None).collect(),
             index: 0,
+            last: None,
         }
     }
 
     pub fn reset(&mut self) {
         self.history.fill(None);
         self.index = 0;
+        self.last = None;
     }
 
     pub fn push(&mut self, val: T) {
-        self.history[self.index] = Some(val);
-        self.index = (self.index + 1) % self.history.len();
+        let new_last = Some(val);
+        if new_last != self.last {
+            self.history[self.index] = new_last.clone();
+            self.index = (self.index + 1) % self.history.len();
+            self.last = new_last;
+        }
     }
 
     pub fn list(&self) -> Vec<T> {
