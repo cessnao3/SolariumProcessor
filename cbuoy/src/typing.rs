@@ -16,6 +16,7 @@ pub enum Type {
     Pointer(Box<Self>),
     Array(usize, Box<Self>),
     Struct(Rc<StructDefinition>),
+    Function(Rc<Function>),
 }
 
 impl Type {
@@ -39,6 +40,10 @@ impl Type {
             } else {
                 Err(t.into_err("array must have a constant value"))
             }
+        } else if t.get_value() == "fn" {
+            Ok(Self::Function(Rc::new(Function::read_tokens(
+                tokens, state, false,
+            )?)))
         } else if is_identifier(t.get_value()) {
             Ok(Self::Struct(state.get_struct(&t)?))
         } else if let Ok(p) = DataType::try_from(t.get_value()) {
@@ -54,6 +59,7 @@ impl Type {
             Self::Pointer(_) => DataType::U32.byte_size(),
             Self::Array(size, t) => size * t.byte_size(),
             Self::Struct(s) => s.fields.values().map(|v| v.dtype.byte_size()).sum(),
+            Self::Function(_) => DataType::U32.byte_size(),
         }
     }
 
@@ -63,6 +69,7 @@ impl Type {
             Self::Pointer(_) => Some(Self::Primitive(DataType::U32)),
             Self::Array(_, t) => Some(t.as_ref().clone()),
             Self::Struct(_) => None,
+            Self::Function(_) => None,
         }
     }
 
@@ -71,6 +78,14 @@ impl Type {
             Some(p)
         } else {
             None
+        }
+    }
+
+    pub fn is_pointer(&self) -> bool {
+        match self {
+            Self::Pointer(_) => true,
+            Self::Function(_) => true,
+            _ => false,
         }
     }
 
@@ -86,6 +101,18 @@ impl Display for Type {
             Self::Array(size, t) => write!(f, "[{size}]{t}"),
             Self::Pointer(t) => write!(f, "*{t}"),
             Self::Struct(s) => write!(f, "{}", s.name),
+            Self::Function(d) => write!(
+                f,
+                "fn({}){}",
+                d.parameters
+                    .iter()
+                    .map(|p| format!("{p}"))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                d.return_type
+                    .as_ref()
+                    .map_or("void".to_string(), |r| r.to_string())
+            ),
         }
     }
 }
@@ -165,7 +192,16 @@ impl PartialEq for FunctionParameter {
     }
 }
 
-#[derive(Debug, Clone)]
+impl Display for FunctionParameter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(n) = &self.name {
+            write!(f, "{n}:")?;
+        }
+        write!(f, "{}", self.dtype)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Function {
     pub parameters: Vec<FunctionParameter>,
     pub return_type: Option<Type>,

@@ -8,6 +8,7 @@ const Z: i8 = 10;
 global q: i8 = Z;
 global z: u8 = Z;
 global zz: [100]u8;
+global func_test: fn()void;
 
 global ex_ptr: *u32 = 0x3000;
 
@@ -17,6 +18,10 @@ struct TEST {
 }
 
 global Q: TEST;
+
+fn test_fn() void {
+    b = 7;
+}
 
 fn main() void {
     const X: i16 = 3;
@@ -49,4 +54,6 @@ fn main() void {
     Q.a = 3;
     Q.b = 65535;
     (*q).a = 5;
+
+    //test_fn();
 }

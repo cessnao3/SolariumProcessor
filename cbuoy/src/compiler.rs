@@ -419,6 +419,7 @@ impl CompilingState {
         )? {
             GlobalType::Variable(v) => Ok(v),
             GlobalType::Constant(v) => Ok(v),
+            GlobalType::Function(f) => Ok(f.as_expr()),
             x => Err(x
                 .get_token()
                 .clone()

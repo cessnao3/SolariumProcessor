@@ -7,7 +7,8 @@ use std::{
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
-    ArgumentType, AsmToken, Instruction, OpAdd, OpConv, OpLd, OpPopr, OpPush, OpSub, OpTeq, OpTneq,
+    ArgumentType, AsmToken, Instruction, OpAdd, OpConv, OpCopy, OpLd, OpPopr, OpPush, OpSav, OpSub,
+    OpTeq, OpTneq,
 };
 
 use crate::{
@@ -415,9 +416,16 @@ impl Expression for BinaryExpression {
                 asm.extend_from_slice(&self.rhs.load_value_to_register(reg_next)?);
                 reg_b = reg_next.reg;
             } else {
-                asm.push(self.get_token().to_asm(reg.push_spare()));
+                asm.push(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
+                    OpPush::new(reg.reg.into()),
+                ))));
                 asm.extend_from_slice(&self.rhs.load_value_to_register(reg)?);
-                asm.push(self.get_token().to_asm(reg.pop_spare()));
+                asm.push(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
+                    OpCopy::new(reg.spare.into(), reg.reg.into()),
+                ))));
+                asm.push(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
+                    OpPopr::new(reg.reg.into()),
+                ))));
                 reg_b = reg.spare;
             }
 
@@ -439,6 +447,20 @@ impl Expression for BinaryExpression {
                 }
             } else {
                 panic!("type error")
+            }
+
+            let rhs_type = self.rhs.get_type()?;
+            let lhs_type = self.lhs.get_type()?;
+
+            if rhs_type.is_pointer() && lhs_type.is_pointer() {
+                return Err(self
+                    .get_token()
+                    .clone()
+                    .into_err("cannot add one pointer to another pointer directly"));
+            } else if rhs_type.is_pointer() {
+                // pointer arithmetic?
+            } else if lhs_type.is_pointer() {
+                // pointer arithmetic?
             }
 
             let reg_type = ArgumentType::new(reg.reg, dt);
@@ -612,15 +634,74 @@ impl Display for DotExpression {
     }
 }
 
+#[derive(Debug, Clone)]
+struct AssignmentExpression {
+    token: Token,
+    addr_expr: Rc<dyn Expression>,
+    val_expr: Rc<dyn Expression>,
+}
+
+impl Display for AssignmentExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} = {}", self.addr_expr, self.val_expr)
+    }
+}
+
+impl Expression for AssignmentExpression {
+    fn get_token(&self) -> &Token {
+        &self.token
+    }
+
+    fn get_type(&self) -> Result<Type, TokenError> {
+        self.addr_expr.get_type()
+    }
+
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        let tok = self.addr_expr.get_token();
+
+        let mut asm = Vec::new();
+        asm.push(self.addr_expr.get_token().to_asm(AsmToken::Comment(format!(
+            "assignment of {} to {}",
+            self.addr_expr, self.val_expr
+        ))));
+
+        if let Some(dest_dtype) = self.addr_expr.get_type()?.primitive_type() {
+            let val_dtype = self.val_expr.get_primitive_type()?;
+
+            let val_def = reg;
+            let addr_def = val_def.increment_token(tok)?;
+
+            asm.extend(self.addr_expr.load_address_to_register(addr_def)?);
+            asm.extend(self.val_expr.load_value_to_register(val_def)?);
+
+            if val_dtype != dest_dtype {
+                asm.push(tok.to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
+                    ArgumentType::new(val_def.reg, dest_dtype),
+                    ArgumentType::new(val_def.reg, val_dtype),
+                )))));
+            }
+
+            asm.push(tok.to_asm(AsmToken::OperationLiteral(Box::new(OpSav::new(
+                ArgumentType::new(addr_def.reg, dest_dtype),
+                val_def.reg.into(),
+            )))));
+
+            Ok(asm)
+        } else {
+            Err(tok
+                .clone()
+                .into_err("currently struct assignment is unsupported"))
+        }
+    }
+}
+
 pub fn parse_expression(
     tokens: &mut TokenIter,
     state: &CompilingState,
 ) -> Result<Rc<dyn Expression>, TokenError> {
-    // if keyword
-    // if literal?
-    // if paren
-    // function
-
     static UNARY_STR: LazyLock<HashMap<String, UnaryOperation>> = LazyLock::new(|| {
         UnaryOperation::ALL
             .iter()
@@ -636,7 +717,11 @@ pub fn parse_expression(
 
     let first = tokens.next()?;
 
-    let expr: Rc<dyn Expression> = if let Some(op) = UNARY_STR.get(first.get_value()) {
+    if first.get_value() == "test_fn" {
+        println!("HERE!");
+    }
+
+    let mut expr: Rc<dyn Expression> = if let Some(op) = UNARY_STR.get(first.get_value()) {
         Rc::new(UnaryExpression::new(
             first,
             *op,
@@ -665,47 +750,54 @@ pub fn parse_expression(
         }
     };
 
-    let return_expr = if let Some(next) = tokens.peek() {
-        if let Some(op) = BINARY_STR.get(next.get_value()) {
-            let op_token = tokens.next()?;
-            Rc::new(BinaryExpression::new(
-                op_token,
-                *op,
-                expr,
-                parse_expression(tokens, state)?,
-            ))
-        } else if next.get_value() == "." {
-            let mut s_expr = expr;
-            while tokens.expect_peek(".") {
+    loop {
+        if let Some(next) = tokens.peek() {
+            if let Some(op) = BINARY_STR.get(next.get_value()) {
+                let op_token = tokens.next()?;
+                expr = Rc::new(BinaryExpression::new(
+                    op_token,
+                    *op,
+                    expr,
+                    parse_expression(tokens, state)?,
+                ));
+            } else if next.get_value() == "." {
                 let dot_token = tokens.expect(".")?;
                 let ident_token = tokens.next()?;
 
-                s_expr = Rc::new(DotExpression {
+                expr = Rc::new(DotExpression {
                     field: ident_token,
                     token: dot_token,
-                    s_expression: s_expr,
+                    s_expression: expr,
                 })
+            } else if next.get_value() == ":" {
+                let token = tokens.expect(":")?;
+                expr = Rc::new(AsExpression {
+                    data_type: Type::read_type(tokens, state)?,
+                    token,
+                    expr,
+                })
+            } else if next.get_value() == "=" {
+                let token = tokens.expect("=")?;
+                expr = Rc::new(AssignmentExpression {
+                    token,
+                    addr_expr: expr,
+                    val_expr: parse_expression(tokens, state)?,
+                })
+            } else if next.get_value() == "(" {
+                tokens.expect("(")?;
+                tokens.expect(")")?;
+                panic!("function calls not yet supported");
+            } else {
+                break;
             }
-            s_expr
-        } else if next.get_value() == ":" {
-            let token = tokens.expect(":")?;
-            Rc::new(AsExpression {
-                data_type: Type::read_type(tokens, state)?,
-                token,
-                expr,
-            })
-        } else if next.get_value() == "(" {
-            panic!("function calls not yet supported");
         } else {
-            expr
+            break;
         }
-    } else {
-        expr
-    };
+    }
 
-    if let Some(lit) = return_expr.simplify() {
+    if let Some(lit) = expr.simplify() {
         Ok(Rc::new(lit))
     } else {
-        Ok(return_expr)
+        Ok(expr)
     }
 }

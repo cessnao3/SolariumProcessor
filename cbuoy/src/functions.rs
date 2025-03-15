@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{fmt::Display, rc::Rc};
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
@@ -51,6 +51,51 @@ impl FunctionDefinition {
 
     pub fn get_token(&self) -> &Token {
         &self.name
+    }
+
+    pub fn as_expr(&self) -> Rc<dyn Expression> {
+        Rc::new(FunctionLabelExpr {
+            name: self.name.clone(),
+            dtype: self.dtype.clone(),
+            entry_label: self.entry_label.clone(),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+struct FunctionLabelExpr {
+    name: Token,
+    dtype: Function,
+    entry_label: String,
+}
+
+impl Expression for FunctionLabelExpr {
+    fn get_token(&self) -> &Token {
+        &self.name
+    }
+
+    fn get_type(&self) -> Result<Type, TokenError> {
+        Ok(Type::Function(Rc::new(self.dtype.clone())))
+    }
+
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        let asm = vec![
+            AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
+                reg.reg,
+                DataType::U32,
+            )))),
+            AsmToken::LoadLoc(self.entry_label.clone()),
+        ];
+        Ok(self.name.to_asm_iter(asm).into_iter().collect())
+    }
+}
+
+impl Display for FunctionLabelExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name.get_value())
     }
 }
 
@@ -138,6 +183,10 @@ pub fn parse_fn_statement(
     state.get_scopes_mut().add_scope(name_token.clone());
 
     let func_type = Function::read_tokens(tokens, state, true)?;
+
+    if !func_type.parameters.is_empty() {
+        panic!("empty_values")
+    }
 
     tokens.expect("{")?;
 
@@ -285,6 +334,17 @@ impl Statement for EmptyStatement {
     }
 }
 
+#[derive(Debug, Clone)]
+struct ExpressionStatement {
+    expr: Rc<dyn Expression>,
+}
+
+impl Statement for ExpressionStatement {
+    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        self.expr.load_value_to_register(RegisterDef::default())
+    }
+}
+
 fn parse_statement(
     tokens: &mut TokenIter,
     state: &mut CompilingState,
@@ -361,86 +421,11 @@ fn parse_statement(
         } else if next.get_value() == ";" {
             Ok(Some(Rc::new(EmptyStatement)))
         } else {
-            match parse_assignment_statement(tokens, state) {
-                Ok(s) => Ok(Some(s)),
-                Err(e) => Err(e),
-            }
+            let expr = parse_expression(tokens, state)?;
+            tokens.expect(";")?;
+            Ok(Some(Rc::new(ExpressionStatement { expr })))
         }
     } else {
         Err(EndOfTokenStream.into())
     }
-}
-
-#[derive(Debug, Clone)]
-struct AssignmentStatement {
-    addr_expr: Rc<dyn Expression>,
-    val_expr: Rc<dyn Expression>,
-}
-
-impl Statement for AssignmentStatement {
-    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        let tok = self.addr_expr.get_token();
-
-        let mut asm = Vec::new();
-        asm.push(self.addr_expr.get_token().to_asm(AsmToken::Comment(format!(
-            "assignment of {} to {}",
-            self.addr_expr, self.val_expr
-        ))));
-
-        if let Some(dest_dtype) = self.addr_expr.get_type()?.primitive_type() {
-            let val_dtype = self.val_expr.get_primitive_type()?;
-
-            let addr_def = RegisterDef::default();
-            let val_def = addr_def.increment_token(tok)?;
-
-            asm.extend(self.addr_expr.load_address_to_register(addr_def)?);
-            asm.extend(self.val_expr.load_value_to_register(val_def)?);
-
-            if val_dtype != dest_dtype {
-                asm.push(tok.to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
-                    ArgumentType::new(val_def.reg, dest_dtype),
-                    ArgumentType::new(val_def.reg, val_dtype),
-                )))));
-            }
-
-            asm.push(tok.to_asm(AsmToken::OperationLiteral(Box::new(OpSav::new(
-                ArgumentType::new(addr_def.reg, dest_dtype),
-                val_def.reg.into(),
-            )))));
-
-            Ok(asm)
-        } else {
-            Err(tok
-                .clone()
-                .into_err("currently struct assignment is unsupported"))
-        }
-    }
-}
-
-fn parse_assignment_statement(
-    tokens: &mut TokenIter,
-    state: &mut CompilingState,
-) -> Result<Rc<dyn Statement>, TokenError> {
-    let mut init_tokens = Vec::new();
-    while !tokens.expect_peek("=") {
-        init_tokens.push(tokens.next()?);
-    }
-
-    tokens.expect("=")?;
-
-    let mut end_tokens = Vec::new();
-
-    while !tokens.expect_peek(";") {
-        end_tokens.push(tokens.next()?);
-    }
-
-    tokens.expect(";")?;
-
-    let addr_expr = parse_expression(&mut TokenIter::from(&init_tokens), state)?;
-    let val_expr = parse_expression(&mut TokenIter::from(&end_tokens), state)?;
-
-    Ok(Rc::new(AssignmentStatement {
-        addr_expr,
-        val_expr,
-    }))
 }
