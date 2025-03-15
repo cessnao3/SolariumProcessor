@@ -22,7 +22,9 @@ fn main() -> std::process::ExitCode {
         Ok(r) => {
             println!("Program Start: {:04x}", r.start_address);
             println!("Labels:");
-            for (k, v) in r.labels {
+            let mut locs = r.labels.iter().map(|(k, v)| (*v, k)).collect::<Vec<_>>();
+            locs.sort_by(|a, b| a.0.cmp(&b.0));
+            for (v, k) in locs {
                 println!("  {v:04x} => {k}");
             }
         }
