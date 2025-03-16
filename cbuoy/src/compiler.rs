@@ -14,7 +14,7 @@ use crate::{
     expressions::{Expression, RegisterDef},
     functions::FunctionDefinition,
     literals::Literal,
-    tokenizer::{Token, get_identifier},
+    tokenizer::{Token, TokenLocation, get_identifier},
     typing::StructDefinition,
     utilities::load_to_register,
     variables::{GlobalVariable, GlobalVariableStatement, LocalVariable, VariableDefinition},
@@ -57,13 +57,24 @@ impl GlobalType {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct ScopeManager {
+    token: Token,
     scopes: Vec<ScopeBlock>,
     max_size: usize,
+    parameters: ScopeBlock,
 }
 
 impl ScopeManager {
+    pub fn new(t: Token) -> Self {
+        Self {
+            token: t,
+            scopes: Vec::new(),
+            max_size: 0,
+            parameters: ScopeBlock::default(),
+        }
+    }
+
     pub fn add_scope(&mut self, token: Token) {
         self.scopes.push(ScopeBlock::new(token));
     }
@@ -72,7 +83,7 @@ impl ScopeManager {
         if let Some(s) = self.scopes.pop() {
             let size = s.size()?;
             Ok(Box::new(ScopeRemoveStatement {
-                token: s.token,
+                token: s.token.clone().unwrap_or(self.token.clone()),
                 size,
             }))
         } else {
@@ -85,11 +96,6 @@ impl ScopeManager {
 
     pub fn get_max_size(&self) -> usize {
         self.max_size
-    }
-
-    pub fn clear(&mut self) {
-        self.scopes.clear();
-        self.max_size = 0;
     }
 
     pub fn scope_full_size(&self) -> Result<usize, TokenError> {
@@ -157,9 +163,13 @@ impl ScopeManager {
             }
         }
 
-        Err(name
-            .clone()
-            .into_err("no variable with provided name found"))
+        if let Some(p) = self.parameters.variables.get(ident) {
+            Ok(p.get_expr())
+        } else {
+            Err(name
+                .clone()
+                .into_err("no variable with provided name found"))
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -189,16 +199,16 @@ impl ScopeVariables {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 struct ScopeBlock {
-    token: Token,
+    token: Option<Token>,
     variables: HashMap<String, ScopeVariables>,
 }
 
 impl ScopeBlock {
     pub fn new(token: Token) -> Self {
         Self {
-            token,
+            token: Some(token),
             variables: HashMap::new(),
         }
     }
@@ -236,7 +246,7 @@ pub struct CompilingState {
     global_scope: HashMap<String, GlobalType>,
     current_id: usize,
     full_program: bool,
-    scope_manager: ScopeManager,
+    scope_manager: Option<ScopeManager>,
 }
 
 impl Default for CompilingState {
@@ -247,7 +257,7 @@ impl Default for CompilingState {
             current_id: 0,
             statements: Vec::new(),
             full_program: true,
-            scope_manager: ScopeManager::default(),
+            scope_manager: None,
         }
     }
 }
@@ -337,18 +347,46 @@ impl CompilingState {
         Ok(asm)
     }
 
-    pub fn get_scopes(&self) -> &ScopeManager {
-        &self.scope_manager
+    pub fn get_scopes(&self) -> Result<&ScopeManager, TokenError> {
+        if let Some(s) = &self.scope_manager {
+            Ok(s)
+        } else {
+            Err(TokenError {
+                msg: format!("no scope initialized"),
+                token: None,
+            })
+        }
     }
 
-    pub fn get_scopes_mut(&mut self) -> &mut ScopeManager {
-        &mut self.scope_manager
+    pub fn get_scopes_mut(&mut self) -> Result<&mut ScopeManager, TokenError> {
+        if let Some(s) = &mut self.scope_manager {
+            Ok(s)
+        } else {
+            Err(TokenError {
+                msg: format!("no scope initialized"),
+                token: None,
+            })
+        }
     }
 
-    pub fn extract_scope(&mut self) -> ScopeManager {
-        let sm = self.scope_manager.clone();
-        self.scope_manager.clear();
-        sm
+    pub fn init_scope(&mut self, token: Token) -> Result<(), TokenError> {
+        if let Some(s) = &self.scope_manager {
+            Err(s.token.clone().into_err("scope has not been cleared"))
+        } else {
+            self.scope_manager = Some(ScopeManager::new(token));
+            Ok(())
+        }
+    }
+
+    pub fn extract_scope(&mut self) -> Result<ScopeManager, TokenError> {
+        if let Some(manager) = self.scope_manager.take() {
+            Ok(manager)
+        } else {
+            Err(TokenError {
+                msg: format!("unable to extract scope from uninitialized vlaues"),
+                token: None,
+            })
+        }
     }
 
     pub fn get_struct(&self, name: &Token) -> Result<Rc<StructDefinition>, TokenError> {
@@ -407,7 +445,7 @@ impl CompilingState {
     pub fn get_variable(&self, name: &Token) -> Result<Rc<dyn Expression>, TokenError> {
         let ident = get_identifier(name)?.to_string();
 
-        if let Ok(v) = self.scope_manager.get_variable(name) {
+        if let Ok(v) = self.get_scopes().and_then(|x| x.get_variable(name)) {
             return Ok(v);
         }
 

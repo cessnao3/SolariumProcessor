@@ -172,15 +172,10 @@ pub fn parse_fn_statement(
 ) -> Result<(), TokenError> {
     tokens.expect("fn")?;
     let name_token = tokens.next()?;
-    let name = get_identifier(&name_token)?.to_string();
+    get_identifier(&name_token)?;
 
-    if !state.get_scopes().is_empty() {
-        return Err(name_token.into_err(format!(
-            "unable to start function {name} with non-empty scope"
-        )));
-    }
-
-    state.get_scopes_mut().add_scope(name_token.clone());
+    state.init_scope(name_token.clone())?;
+    state.get_scopes_mut()?.add_scope(name_token.clone());
 
     let func_type = Function::read_tokens(tokens, state, true)?;
 
@@ -203,7 +198,7 @@ pub fn parse_fn_statement(
         name_token.clone(),
         func_type,
         statements,
-        state.extract_scope(),
+        state.extract_scope()?,
     )?);
     state.add_function(def)
 }
@@ -352,19 +347,19 @@ fn parse_statement(
     if let Some(next) = tokens.peek() {
         if next.get_value() == "def" {
             let def = VariableDefinition::parse("def", tokens, state)?;
-            Ok(Some(state.get_scopes_mut().add_var(def)?))
+            Ok(Some(state.get_scopes_mut()?.add_var(def)?))
         } else if next.get_value() == "const" {
             let def = VariableDefinition::parse("const", tokens, state)?;
-            state.get_scopes_mut().add_const(def)?;
+            state.get_scopes_mut()?.add_const(def)?;
             Ok(Some(Rc::new(EmptyStatement)))
         } else if next.get_value() == "{" {
-            state.get_scopes_mut().add_scope(tokens.expect("{")?);
+            state.get_scopes_mut()?.add_scope(tokens.expect("{")?);
             let mut statements = Vec::new();
             while let Some(s) = parse_statement(tokens, state)? {
                 statements.push(s);
             }
             tokens.expect("}")?;
-            state.get_scopes_mut().remove_scope()?;
+            state.get_scopes_mut()?.remove_scope()?;
             Ok(Some(Rc::new(StatementGroup { statements })))
         } else if next.get_value() == "if" {
             let if_token = tokens.expect("if")?;
