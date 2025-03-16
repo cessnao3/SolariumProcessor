@@ -14,7 +14,7 @@ use crate::{
     expressions::{Expression, RegisterDef},
     functions::FunctionDefinition,
     literals::Literal,
-    tokenizer::{Token, TokenLocation, get_identifier},
+    tokenizer::{Token, get_identifier},
     typing::StructDefinition,
     utilities::load_to_register,
     variables::{GlobalVariable, GlobalVariableStatement, LocalVariable, VariableDefinition},
@@ -170,10 +170,6 @@ impl ScopeManager {
                 .clone()
                 .into_err("no variable with provided name found"))
         }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.scopes.is_empty()
     }
 }
 
@@ -352,7 +348,7 @@ impl CompilingState {
             Ok(s)
         } else {
             Err(TokenError {
-                msg: format!("no scope initialized"),
+                msg: "no scope initialized".to_string(),
                 token: None,
             })
         }
@@ -363,7 +359,7 @@ impl CompilingState {
             Ok(s)
         } else {
             Err(TokenError {
-                msg: format!("no scope initialized"),
+                msg: "no scope initialized".to_string(),
                 token: None,
             })
         }
@@ -383,7 +379,7 @@ impl CompilingState {
             Ok(manager)
         } else {
             Err(TokenError {
-                msg: format!("unable to extract scope from uninitialized vlaues"),
+                msg: "unable to extract scope from uninitialized vlaues".to_string(),
                 token: None,
             })
         }

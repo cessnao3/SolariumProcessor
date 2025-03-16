@@ -82,11 +82,7 @@ impl Type {
     }
 
     pub fn is_pointer(&self) -> bool {
-        match self {
-            Self::Pointer(_) => true,
-            Self::Function(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Pointer(_) | Self::Function(_))
     }
 
     pub fn coerce_type(a: DataType, b: DataType) -> DataType {
@@ -169,7 +165,7 @@ impl StructDefinition {
     }
 
     pub fn get_field(&self, field_name: &str) -> Option<Rc<StructField>> {
-        self.fields.get(field_name).map(|x| x.clone())
+        self.fields.get(field_name).cloned()
     }
 }
 
