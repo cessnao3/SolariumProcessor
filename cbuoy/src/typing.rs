@@ -213,28 +213,26 @@ impl Function {
 
         let mut params = Vec::new();
 
-        if !tokens.expect_peek(")") {
-            loop {
-                let param_name = if include_names {
-                    let pname = get_identifier(&tokens.next()?)?.to_string();
-                    tokens.expect(":")?;
-                    Some(pname)
-                } else {
-                    None
-                };
+        while !tokens.expect_peek(")") {
+            let param_name = if include_names {
+                let pname = get_identifier(&tokens.next()?)?.to_string();
+                tokens.expect(":")?;
+                Some(pname)
+            } else {
+                None
+            };
 
-                let param_type = Type::read_type(tokens, state)?;
+            let param_type = Type::read_type(tokens, state)?;
 
-                params.push(FunctionParameter {
-                    dtype: param_type,
-                    name: param_name,
-                });
+            params.push(FunctionParameter {
+                dtype: param_type,
+                name: param_name,
+            });
 
-                if !tokens.expect_peek(")") {
-                    tokens.expect(",")?;
-                } else {
-                    break;
-                }
+            if !tokens.expect_peek(")") {
+                tokens.expect(",")?;
+            } else {
+                break;
             }
         }
 

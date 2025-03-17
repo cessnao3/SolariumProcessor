@@ -19,7 +19,7 @@ struct TEST {
 
 global Q: TEST;
 
-fn test_fn() void {
+fn test_fn(a: u16, b: u32) void {
     b = 7;
 }
 
