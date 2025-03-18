@@ -251,6 +251,10 @@ impl Function {
             return_type: ret,
         })
     }
+
+    pub fn param_size(&self) -> usize {
+        self.parameters.iter().map(|x| x.dtype.byte_size()).sum()
+    }
 }
 
 #[derive(Debug, Clone)]

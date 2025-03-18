@@ -7,17 +7,19 @@ use std::{
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
-    ArgumentType, AsmToken, Instruction, OpAdd, OpConv, OpCopy, OpLd, OpPopr, OpPush, OpSav, OpSub,
-    OpTeq, OpTneq,
+    ArgumentType, AsmToken, Instruction, OpAdd, OpCall, OpConv, OpCopy, OpLd, OpPopr, OpPush,
+    OpSav, OpSub, OpTeq, OpTneq,
 };
 
 use crate::{
     TokenError,
-    compiler::CompilingState,
+    compiler::{CompilingState, Statement},
+    functions::FunctionDefinition,
     literals::{Literal, LiteralValue},
     tokenizer::{Token, TokenIter, get_identifier},
-    typing::{StructDefinition, StructField, Type},
+    typing::{Function, StructDefinition, StructField, Type},
     utilities::load_to_register,
+    variables::LocalVariable,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -68,14 +70,6 @@ impl RegisterDef {
             Some(x) => Ok(x),
             None => Err(token.clone().into_err("cannot find valid register vlaue")),
         }
-    }
-
-    pub fn push_spare(&self) -> AsmToken {
-        AsmToken::OperationLiteral(Box::new(OpPush::new(self.spare.into())))
-    }
-
-    pub fn pop_spare(&self) -> AsmToken {
-        AsmToken::OperationLiteral(Box::new(OpPopr::new(self.spare.into())))
     }
 }
 
@@ -700,6 +694,145 @@ impl Expression for AssignmentExpression {
                 .clone()
                 .into_err("currently struct assignment is unsupported"))
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct FunctionCallExpression {
+    token: Token,
+    args: Vec<Rc<dyn Expression>>,
+    func: Rc<dyn Expression>,
+}
+
+impl Display for FunctionCallExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}(", self.func)?;
+        for p in self.args.iter() {
+            write!(f, "{p},")?;
+        }
+        write!(f, ")")
+    }
+}
+
+impl Expression for FunctionCallExpression {
+    fn get_token(&self) -> &Token {
+        &self.token
+    }
+
+    fn get_type(&self) -> Result<Type, TokenError> {
+        if let Type::Function(f) = self.func.get_type()? {
+            Ok(f.return_type
+                .clone()
+                .unwrap_or(Type::Primitive(DataType::U32)))
+        } else {
+            Err(self
+                .token
+                .clone()
+                .into_err("cannot call a non-function type"))
+        }
+    }
+
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        let func = if let Type::Function(f) = self.func.get_type()? {
+            f.clone()
+        } else {
+            return Err(self
+                .token
+                .clone()
+                .into_err("caller value is not a function type"));
+        };
+
+        let func_loc = reg.increment_token(&self.token)?;
+
+        let mut asm = vec![
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpPush::new(
+                    Register::ArgumentBase.into(),
+                )))),
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                    reg.reg.into(),
+                    Register::StackPointer.into(),
+                )))),
+        ];
+
+        let func_loc = reg.increment_token(&self.token)?;
+        asm.extend(self.func.load_address_to_register(func_loc)?);
+
+        let next_load = func_loc.increment_token(&self.token)?;
+        let mut current_offset = 0;
+
+        for (p, e) in func.parameters.iter().zip(self.args.iter()) {
+            let var = Rc::new(LocalVariable::new(
+                self.token.clone(),
+                p.dtype.clone(),
+                reg.reg.into(),
+                current_offset,
+                None,
+            )?);
+
+            let assign = Rc::new(AssignmentExpression {
+                addr_expr: var,
+                token: self.token.clone(),
+                val_expr: e.clone(),
+            });
+
+            asm.extend(assign.load_value_to_register(next_load)?);
+            current_offset += p.dtype.byte_size();
+        }
+
+        asm.push(
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                    Register::ArgumentBase.into(),
+                    reg.reg.into(),
+                )))),
+        );
+
+        asm.extend(
+            self.token
+                .to_asm_iter(load_to_register(reg.reg, func.param_size() as u32)),
+        );
+        asm.push(
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                    ArgumentType::new(Register::StackPointer, DataType::U32),
+                    Register::StackPointer.into(),
+                    reg.reg.into(),
+                )))),
+        );
+
+        // TODO - Call Function
+        asm.push(
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpCall::new(
+                    func_loc.reg.into(),
+                )))),
+        );
+
+        asm.extend(
+            self.token
+                .to_asm_iter(load_to_register(reg.reg, func.param_size() as u32)),
+        );
+        asm.push(
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpSub::new(
+                    ArgumentType::new(Register::StackPointer, DataType::U32),
+                    Register::StackPointer.into(),
+                    reg.reg.into(),
+                )))),
+        );
+        asm.push(
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpPopr::new(
+                    Register::ArgumentBase.into(),
+                )))),
+        );
+
+        Ok(asm)
     }
 }
 
