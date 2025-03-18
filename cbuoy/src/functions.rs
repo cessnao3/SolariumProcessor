@@ -101,58 +101,51 @@ impl Display for FunctionLabelExpr {
 
 impl Statement for FunctionDefinition {
     fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        if !self.dtype.parameters.is_empty() {
-            Err(self
-                .name
-                .clone()
-                .into_err("parameters currently unsupported"))
-        } else {
-            let mut init_asm = vec![
-                AsmToken::CreateLabel(self.entry_label.clone()),
-                AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                    RegisterDef::FN_BASE.into(),
-                    Register::StackPointer.into(),
-                ))),
-            ];
+        let mut init_asm = vec![
+            AsmToken::CreateLabel(self.entry_label.clone()),
+            AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                RegisterDef::FN_BASE.into(),
+                Register::StackPointer.into(),
+            ))),
+        ];
 
-            let scope_size = self.scope_manager.get_max_size();
+        let scope_size = self.scope_manager.get_max_size();
 
-            if scope_size > 0 {
-                init_asm.extend(load_to_register(RegisterDef::SPARE, scope_size as u32));
-                init_asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
-                    ArgumentType::new(Register::StackPointer, DataType::U32),
-                    Register::StackPointer.into(),
-                    RegisterDef::SPARE.into(),
-                ))));
-            }
-
-            let mut asm = self
-                .name
-                .to_asm_iter(init_asm)
-                .into_iter()
-                .collect::<Vec<_>>();
-
-            for s in self.statements.iter() {
-                asm.extend_from_slice(&s.get_exec_code()?);
-            }
-
-            let mut asm_end = Vec::new();
-
-            asm_end.push(AsmToken::CreateLabel(self.end_label.clone()));
-            if scope_size > 0 {
-                asm_end.extend(load_to_register(RegisterDef::SPARE, scope_size as u32));
-                asm_end.push(AsmToken::OperationLiteral(Box::new(OpSub::new(
-                    ArgumentType::new(Register::StackPointer, DataType::U32),
-                    Register::StackPointer.into(),
-                    RegisterDef::SPARE.into(),
-                ))));
-            }
-            asm_end.push(AsmToken::OperationLiteral(Box::new(OpRet)));
-
-            asm.extend(self.name.to_asm_iter(asm_end));
-
-            Ok(asm)
+        if scope_size > 0 {
+            init_asm.extend(load_to_register(RegisterDef::SPARE, scope_size as u32));
+            init_asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                ArgumentType::new(Register::StackPointer, DataType::U32),
+                Register::StackPointer.into(),
+                RegisterDef::SPARE.into(),
+            ))));
         }
+
+        let mut asm = self
+            .name
+            .to_asm_iter(init_asm)
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        for s in self.statements.iter() {
+            asm.extend_from_slice(&s.get_exec_code()?);
+        }
+
+        let mut asm_end = Vec::new();
+
+        asm_end.push(AsmToken::CreateLabel(self.end_label.clone()));
+        if scope_size > 0 {
+            asm_end.extend(load_to_register(RegisterDef::SPARE, scope_size as u32));
+            asm_end.push(AsmToken::OperationLiteral(Box::new(OpSub::new(
+                ArgumentType::new(Register::StackPointer, DataType::U32),
+                Register::StackPointer.into(),
+                RegisterDef::SPARE.into(),
+            ))));
+        }
+        asm_end.push(AsmToken::OperationLiteral(Box::new(OpRet)));
+
+        asm.extend(self.name.to_asm_iter(asm_end));
+
+        Ok(asm)
     }
 }
 
@@ -179,8 +172,8 @@ pub fn parse_fn_statement(
 
     let func_type = Function::read_tokens(tokens, state, true)?;
 
-    if !func_type.parameters.is_empty() {
-        panic!("empty_values")
+    for p in func_type.parameters.iter() {
+        state.get_scopes_mut()?.add_parameter(p.clone())?;
     }
 
     tokens.expect("{")?;

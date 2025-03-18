@@ -178,7 +178,7 @@ pub struct StructField {
 #[derive(Debug, Clone)]
 pub struct FunctionParameter {
     pub dtype: Type,
-    pub name: Option<String>,
+    pub name: Option<Token>,
 }
 
 impl Eq for FunctionParameter {}
@@ -215,9 +215,10 @@ impl Function {
 
         while !tokens.expect_peek(")") {
             let param_name = if include_names {
-                let pname = get_identifier(&tokens.next()?)?.to_string();
+                let p_token = tokens.next()?;
+                get_identifier(&p_token)?;
                 tokens.expect(":")?;
-                Some(pname)
+                Some(p_token)
             } else {
                 None
             };

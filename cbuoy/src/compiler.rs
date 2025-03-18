@@ -15,7 +15,7 @@ use crate::{
     functions::FunctionDefinition,
     literals::Literal,
     tokenizer::{Token, get_identifier},
-    typing::StructDefinition,
+    typing::{FunctionParameter, StructDefinition},
     utilities::load_to_register,
     variables::{GlobalVariable, GlobalVariableStatement, LocalVariable, VariableDefinition},
 };
@@ -151,6 +151,42 @@ impl ScopeManager {
             Err(def
                 .token
                 .into_err("unable to add variable without a scope block"))
+        }
+    }
+
+    pub fn add_parameter(&mut self, def: FunctionParameter) -> Result<(), TokenError> {
+        let token = match &def.name {
+            Some(name) => name,
+            None => {
+                return Err(self
+                    .token
+                    .clone()
+                    .into_err("no token associated with function parameter"));
+            }
+        };
+        let ident = get_identifier(token)?.to_string();
+
+        let offset = self.scope_full_size()?;
+
+        match self.parameters.variables.entry(ident) {
+            Entry::Vacant(e) => {
+                let var_size = def.dtype.byte_size();
+                let var = Rc::new(LocalVariable::new(
+                    token.clone(),
+                    def.dtype,
+                    Register::ArgumentBase,
+                    offset,
+                    None,
+                )?);
+
+                // Update the scope values and maximum size of the stack
+                e.insert(ScopeVariables::Local(var.clone()));
+                self.max_size = self.max_size.max(offset + var_size);
+                Ok(())
+            }
+            Entry::Occupied(_) => Err(token
+                .clone()
+                .into_err("dupliate variable name exists within the same scope")),
         }
     }
 
