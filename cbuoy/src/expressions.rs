@@ -79,6 +79,12 @@ impl Default for RegisterDef {
     }
 }
 
+impl Display for RegisterDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.reg)
+    }
+}
+
 pub trait Expression: Debug + Display {
     fn get_token(&self) -> &Token;
 
@@ -97,12 +103,11 @@ pub trait Expression: Debug + Display {
 
     fn load_address_to_register(
         &self,
-        _reg: RegisterDef,
+        reg: RegisterDef,
     ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
-        Err(self
-            .get_token()
-            .clone()
-            .into_err("expression does not have a mappable address in memory"))
+        Err(self.get_token().clone().into_err(format!(
+            "expression does not have a mappable address in memory - cannot load to {reg}"
+        )))
     }
 
     fn load_value_to_register(
@@ -745,12 +750,14 @@ impl Expression for FunctionCallExpression {
                 .into_err("caller value is not a function type"));
         };
 
-        let func_loc = reg.increment_token(&self.token)?;
-
         let mut asm = vec![
             self.token
                 .to_asm(AsmToken::OperationLiteral(Box::new(OpPush::new(
                     Register::ArgumentBase.into(),
+                )))),
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpPush::new(
+                    RegisterDef::FN_BASE.into(),
                 )))),
             self.token
                 .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
@@ -794,43 +801,36 @@ impl Expression for FunctionCallExpression {
 
         asm.extend(
             self.token
-                .to_asm_iter(load_to_register(reg.reg, func.param_size() as u32)),
-        );
-        asm.push(
-            self.token
-                .to_asm(AsmToken::OperationLiteral(Box::new(OpAdd::new(
-                    ArgumentType::new(Register::StackPointer, DataType::U32),
-                    Register::StackPointer.into(),
-                    reg.reg.into(),
-                )))),
+                .to_asm_iter(load_to_register(next_load.reg, func.param_size() as u32)),
         );
 
-        // TODO - Call Function
-        asm.push(
-            self.token
-                .to_asm(AsmToken::OperationLiteral(Box::new(OpCall::new(
-                    func_loc.reg.into(),
-                )))),
-        );
+        asm.extend(self.token.to_asm_iter([
+            AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                ArgumentType::new(Register::StackPointer, DataType::U32),
+                Register::StackPointer.into(),
+                next_load.reg.into(),
+            ))),
+            AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                RegisterDef::FN_BASE.into(),
+                reg.reg.into(),
+            ))),
+            AsmToken::OperationLiteral(Box::new(OpCall::new(func_loc.reg.into()))),
+        ]));
 
         asm.extend(
             self.token
                 .to_asm_iter(load_to_register(reg.reg, func.param_size() as u32)),
         );
-        asm.push(
-            self.token
-                .to_asm(AsmToken::OperationLiteral(Box::new(OpSub::new(
-                    ArgumentType::new(Register::StackPointer, DataType::U32),
-                    Register::StackPointer.into(),
-                    reg.reg.into(),
-                )))),
-        );
-        asm.push(
-            self.token
-                .to_asm(AsmToken::OperationLiteral(Box::new(OpPopr::new(
-                    Register::ArgumentBase.into(),
-                )))),
-        );
+
+        asm.extend(self.token.to_asm_iter([
+            AsmToken::OperationLiteral(Box::new(OpSub::new(
+                ArgumentType::new(Register::StackPointer, DataType::U32),
+                Register::StackPointer.into(),
+                reg.reg.into(),
+            ))),
+            AsmToken::OperationLiteral(Box::new(OpPopr::new(RegisterDef::FN_BASE.into()))),
+            AsmToken::OperationLiteral(Box::new(OpPopr::new(Register::ArgumentBase.into()))),
+        ]));
 
         Ok(asm)
     }
