@@ -55,5 +55,5 @@ fn main() void {
     Q.b = 65535;
     (*q).a = 5;
 
-    //test_fn();
+    test_fn();
 }

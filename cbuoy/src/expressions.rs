@@ -767,7 +767,7 @@ impl Expression for FunctionCallExpression {
         ];
 
         let func_loc = reg.increment_token(&self.token)?;
-        asm.extend(self.func.load_address_to_register(func_loc)?);
+        asm.extend(self.func.load_value_to_register(func_loc)?);
 
         let next_load = func_loc.increment_token(&self.token)?;
         let mut current_offset = 0;
@@ -855,10 +855,6 @@ pub fn parse_expression(
 
     let first = tokens.next()?;
 
-    if first.get_value() == "test_fn" {
-        println!("HERE!");
-    }
-
     let mut expr: Rc<dyn Expression> = if let Some(op) = UNARY_STR.get(first.get_value()) {
         Rc::new(UnaryExpression::new(
             first,
@@ -922,9 +918,14 @@ pub fn parse_expression(
                     val_expr: parse_expression(tokens, state)?,
                 })
             } else if next.get_value() == "(" {
-                tokens.expect("(")?;
+                let call_val = tokens.expect("(")?;
                 tokens.expect(")")?;
-                panic!("function calls not yet supported");
+
+                expr = Rc::new(FunctionCallExpression {
+                    token: call_val,
+                    func: expr,
+                    args: Vec::new(),
+                });
             } else {
                 break;
             }
