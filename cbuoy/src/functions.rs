@@ -2,8 +2,7 @@ use std::{fmt::Display, rc::Rc};
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
-    ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpConv, OpCopy, OpJmp, OpLdn, OpRet, OpSav, OpSub,
-    OpTz,
+    ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpCopy, OpJmp, OpLdn, OpRet, OpSub, OpTz,
 };
 
 use crate::{

@@ -13,11 +13,10 @@ use jib_asm::{
 
 use crate::{
     TokenError,
-    compiler::{CompilingState, Statement},
-    functions::FunctionDefinition,
+    compiler::CompilingState,
     literals::{Literal, LiteralValue},
     tokenizer::{Token, TokenIter, get_identifier},
-    typing::{Function, StructDefinition, StructField, Type},
+    typing::{StructDefinition, StructField, Type},
     utilities::load_to_register,
     variables::LocalVariable,
 };
@@ -456,9 +455,7 @@ impl Expression for BinaryExpression {
                     .get_token()
                     .clone()
                     .into_err("cannot add one pointer to another pointer directly"));
-            } else if rhs_type.is_pointer() {
-                // pointer arithmetic?
-            } else if lhs_type.is_pointer() {
+            } else if rhs_type.is_pointer() || lhs_type.is_pointer() {
                 // pointer arithmetic?
             }
 
@@ -776,7 +773,7 @@ impl Expression for FunctionCallExpression {
             let var = Rc::new(LocalVariable::new(
                 self.token.clone(),
                 p.dtype.clone(),
-                reg.reg.into(),
+                reg.reg,
                 current_offset,
                 None,
             )?);
@@ -884,51 +881,47 @@ pub fn parse_expression(
         }
     };
 
-    loop {
-        if let Some(next) = tokens.peek() {
-            if let Some(op) = BINARY_STR.get(next.get_value()) {
-                let op_token = tokens.next()?;
-                expr = Rc::new(BinaryExpression::new(
-                    op_token,
-                    *op,
-                    expr,
-                    parse_expression(tokens, state)?,
-                ));
-            } else if next.get_value() == "." {
-                let dot_token = tokens.expect(".")?;
-                let ident_token = tokens.next()?;
+    while let Some(next) = tokens.peek() {
+        if let Some(op) = BINARY_STR.get(next.get_value()) {
+            let op_token = tokens.next()?;
+            expr = Rc::new(BinaryExpression::new(
+                op_token,
+                *op,
+                expr,
+                parse_expression(tokens, state)?,
+            ));
+        } else if next.get_value() == "." {
+            let dot_token = tokens.expect(".")?;
+            let ident_token = tokens.next()?;
 
-                expr = Rc::new(DotExpression {
-                    field: ident_token,
-                    token: dot_token,
-                    s_expression: expr,
-                })
-            } else if next.get_value() == ":" {
-                let token = tokens.expect(":")?;
-                expr = Rc::new(AsExpression {
-                    data_type: Type::read_type(tokens, state)?,
-                    token,
-                    expr,
-                })
-            } else if next.get_value() == "=" {
-                let token = tokens.expect("=")?;
-                expr = Rc::new(AssignmentExpression {
-                    token,
-                    addr_expr: expr,
-                    val_expr: parse_expression(tokens, state)?,
-                })
-            } else if next.get_value() == "(" {
-                let call_val = tokens.expect("(")?;
-                tokens.expect(")")?;
+            expr = Rc::new(DotExpression {
+                field: ident_token,
+                token: dot_token,
+                s_expression: expr,
+            })
+        } else if next.get_value() == ":" {
+            let token = tokens.expect(":")?;
+            expr = Rc::new(AsExpression {
+                data_type: Type::read_type(tokens, state)?,
+                token,
+                expr,
+            })
+        } else if next.get_value() == "=" {
+            let token = tokens.expect("=")?;
+            expr = Rc::new(AssignmentExpression {
+                token,
+                addr_expr: expr,
+                val_expr: parse_expression(tokens, state)?,
+            })
+        } else if next.get_value() == "(" {
+            let call_val = tokens.expect("(")?;
+            tokens.expect(")")?;
 
-                expr = Rc::new(FunctionCallExpression {
-                    token: call_val,
-                    func: expr,
-                    args: Vec::new(),
-                });
-            } else {
-                break;
-            }
+            expr = Rc::new(FunctionCallExpression {
+                token: call_val,
+                func: expr,
+                args: Vec::new(),
+            });
         } else {
             break;
         }
