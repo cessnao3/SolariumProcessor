@@ -306,7 +306,7 @@ impl From<EndOfTokenStream> for TokenError {
 
 impl From<IdentifierError> for TokenError {
     fn from(value: IdentifierError) -> Self {
-        let msg = format!("\"{}\" is not a valid token", value.token.get_value());
+        let msg = format!("\"{}\" is not a valid identifier", value.token.get_value());
         Self {
             token: Some(value.token),
             msg,

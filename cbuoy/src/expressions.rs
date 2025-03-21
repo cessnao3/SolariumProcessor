@@ -659,13 +659,8 @@ impl Expression for AssignmentExpression {
         let tok = self.addr_expr.get_token();
 
         let mut asm = Vec::new();
-        asm.push(self.token.to_asm(AsmToken::CreateLabel(format!(
-            "assignment_at_{}_{}",
-            self.token.get_loc().line,
-            self.token.get_loc().column
-        ))));
         asm.push(self.token.to_asm(AsmToken::Comment(format!(
-            "assignment) of {} to {}",
+            "assignment of {} with {}",
             self.addr_expr, self.val_expr
         ))));
 
@@ -770,22 +765,29 @@ impl Expression for FunctionCallExpression {
         let mut current_offset = 0;
 
         for (p, e) in func.parameters.iter().zip(self.args.iter()) {
-            let var = Rc::new(LocalVariable::new(
-                self.token.clone(),
-                p.dtype.clone(),
-                reg.reg,
-                current_offset,
-                None,
-            )?);
+            if let Some(p_name) = p.name.clone() {
+                let var = Rc::new(LocalVariable::new(
+                    p_name,
+                    p.dtype.clone(),
+                    reg.reg,
+                    current_offset,
+                    None,
+                )?);
 
-            let assign = Rc::new(AssignmentExpression {
-                addr_expr: var,
-                token: self.token.clone(),
-                val_expr: e.clone(),
-            });
+                let assign = Rc::new(AssignmentExpression {
+                    addr_expr: var,
+                    token: self.token.clone(),
+                    val_expr: e.clone(),
+                });
 
-            asm.extend(assign.load_value_to_register(next_load)?);
-            current_offset += p.dtype.byte_size();
+                asm.extend(assign.load_value_to_register(next_load)?);
+                current_offset += p.dtype.byte_size();
+            } else {
+                return Err(self
+                    .token
+                    .clone()
+                    .into_err("unable to find name for parameter at"));
+            }
         }
 
         asm.push(
@@ -915,12 +917,23 @@ pub fn parse_expression(
             })
         } else if next.get_value() == "(" {
             let call_val = tokens.expect("(")?;
+
+            let mut args = Vec::new();
+
+            while !tokens.expect_peek(")") {
+                args.push(parse_expression(tokens, state)?);
+
+                if tokens.expect_peek(",") {
+                    tokens.expect(",")?;
+                }
+            }
+
             tokens.expect(")")?;
 
             expr = Rc::new(FunctionCallExpression {
                 token: call_val,
                 func: expr,
-                args: Vec::new(),
+                args,
             });
         } else {
             break;
