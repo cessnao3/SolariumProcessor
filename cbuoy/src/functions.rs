@@ -2,7 +2,7 @@ use std::{fmt::Display, rc::Rc};
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
-    ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpCopy, OpJmp, OpLdn, OpRet, OpSub, OpTz,
+    ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpBrk, OpCopy, OpJmp, OpLdn, OpRet, OpSub, OpTz,
 };
 
 use crate::{
@@ -332,6 +332,20 @@ impl Statement for ExpressionStatement {
     }
 }
 
+#[derive(Debug, Clone)]
+struct DebugBreakpointStatement {
+    token: Token,
+}
+
+impl Statement for DebugBreakpointStatement {
+    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        Ok(vec![
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpBrk))),
+        ])
+    }
+}
+
 fn parse_statement(
     tokens: &mut TokenIter,
     state: &mut CompilingState,
@@ -403,6 +417,10 @@ fn parse_statement(
                 test_expr,
                 statement,
             })))
+        } else if next.get_value() == "brkpt" {
+            let tok = tokens.expect("brkpt")?;
+            tokens.expect(";")?;
+            Ok(Some(Rc::new(DebugBreakpointStatement { token: tok })))
         } else if next.get_value() == "}" {
             Ok(None)
         } else if next.get_value() == ";" {

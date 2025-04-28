@@ -95,8 +95,8 @@ impl ThreadState {
         let mut inst_details = "??".to_string();
 
         let pc = self.cpu.get_current_pc().unwrap_or(0);
-        if let Ok(mem) = self.cpu.get_current_inst() {
-            if let Some(disp_val) = self.inst_map.get_display_inst(mem) {
+        if let Ok(inst) = self.cpu.get_current_inst() {
+            if let Some(disp_val) = self.inst_map.get_display_inst(inst.into()) {
                 inst_details = disp_val;
             }
         }
@@ -121,6 +121,12 @@ impl ThreadState {
             }
         }
 
+        let debug_stop = if let Ok(Processor::OP_DEBUG_BREAK) = self.cpu.get_current_op() {
+            true
+        } else {
+            false
+        };
+
         if let Err(e) = self.cpu.step() {
             let msg = format!(
                 "{}\n{}",
@@ -135,6 +141,10 @@ impl ThreadState {
 
             Err(ThreadToUi::LogMessage(msg))
         } else {
+            if debug_stop {
+                self.running = false;
+            }
+
             Ok(())
         }
     }

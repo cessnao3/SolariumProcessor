@@ -61,7 +61,7 @@ pub fn build_ui(app: &Application) {
                     }
                 }
                 ThreadToUi::ProgramCounterValue(pc, val) => {
-                    if let Some(disp_val) = inst.get_display_inst(val) {
+                    if let Some(disp_val) = inst.get_display_inst(val.into()) {
                         serial_details
                             .label_instruction_details
                             .set_markup(&format!("<tt>{disp_val}</tt>"));

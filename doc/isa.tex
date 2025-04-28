@@ -218,6 +218,8 @@ All available instructions are listed in Table \ref{table:instruction-table}. No
 			A & 4 & 0 & \texttt{inton} & Turn Interrupts On \\
 			A & 4 & 1 & \texttt{intoff} & Turn Interrupts Off \\
 
+            A & 5 & 0 & \texttt{brk} & Debug Breakpoint (capturable by hardware; otherwise, acts as a \texttt{noop}) \\
+
 			I & 10 & 0 & \texttt{add [dst] [a] [b]} & \texttt{R[dst] = R[a] + R[b]} \\
 			I & 10 & 1 & \texttt{sub [dst] [a] [b]} & \texttt{R[dst] = R[a] - R[b]} \\
 			I & 10 & 2 & \texttt{mul [dst] [a] [b]} & \texttt{R[dst] = R[a] * R[b]} \\

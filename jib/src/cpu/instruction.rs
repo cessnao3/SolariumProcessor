@@ -126,7 +126,7 @@ impl TryFrom<u8> for DataType {
 // | Opcode                  | ImmTodo  | Immediate Value                                                        |
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Instruction {
-    data: [u8; 4],
+    data: [u8; Self::NUM_BYTES],
 }
 
 impl fmt::Display for Instruction {
@@ -140,8 +140,9 @@ impl fmt::Display for Instruction {
 }
 
 impl Instruction {
-    const NUM_IMM_BITS: u32 = { u16::BITS };
+    pub const NUM_BYTES: usize = 4;
 
+    const NUM_IMM_BITS: u32 = { u16::BITS };
     const IMM_SIGN_BIT: u32 = { 1 << (Self::NUM_IMM_BITS - 1) };
 
     const IMM_NEG_MASK: u32 = {
@@ -154,7 +155,7 @@ impl Instruction {
         val
     };
 
-    pub fn new(data: [u8; 4]) -> Self {
+    pub fn new(data: [u8; Self::NUM_BYTES]) -> Self {
         Self { data }
     }
 
@@ -218,10 +219,20 @@ impl Instruction {
         }
         val as i32
     }
+
+    pub fn get_data(&self) -> [u8; Self::NUM_BYTES] {
+        self.data
+    }
 }
 
 impl From<u32> for Instruction {
     fn from(value: u32) -> Self {
         Self::new(value.to_be_bytes())
+    }
+}
+
+impl From<Instruction> for u32 {
+    fn from(value: Instruction) -> Self {
+        u32::from_be_bytes(value.data)
     }
 }

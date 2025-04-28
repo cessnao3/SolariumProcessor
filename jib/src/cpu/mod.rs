@@ -6,14 +6,13 @@ use alloc::{fmt, rc::Rc, vec::Vec};
 use core::cell::RefCell;
 use core::hash::{Hash, Hasher};
 
-pub use crate::cpu::instruction::{DataType, DataTypeError};
+pub use crate::cpu::instruction::{DataType, DataTypeError, Instruction};
 use crate::device::{DeviceAction, ProcessorDevice};
 use crate::memory::{MemoryError, MemoryMap, MemorySegment};
 
-use self::instruction::Instruction;
 pub use self::operations::{
-    ArithmeticOperations, BinaryOperations, OperationError, OperatorManager, RelationalOperations,
-    convert_types,
+    convert_types, ArithmeticOperations, BinaryOperations, OperationError, OperatorManager,
+    RelationalOperations,
 };
 
 use self::register::RegisterFlag;
@@ -330,6 +329,12 @@ impl Processor {
         code: 1,
     };
 
+    const OP_BASE_DEBUG: u8 = 5;
+    pub const OP_DEBUG_BREAK: Opcode = Opcode {
+        base: Self::OP_BASE_DEBUG,
+        code: 0,
+    };
+
     const OP_BASE_MATH: u8 = 10;
     pub const OP_ADD: Opcode = Opcode {
         base: Self::OP_BASE_MATH,
@@ -545,13 +550,12 @@ impl Processor {
         }
 
         let inst = Instruction::from(self.memory.get_u32(pc)?);
-
         let opcode = Opcode::from(inst.opcode());
 
         // TODO - Jump Condition
 
         match opcode {
-            Self::OP_NOOP => (),
+            Self::OP_NOOP | Self::OP_DEBUG_BREAK => (),
             Self::OP_RESET => self.reset(ResetType::Soft)?,
             Self::OP_INTERRUPT_ENABLE => self
                 .registers
@@ -854,8 +858,15 @@ impl Processor {
         Ok(self.registers.get(Register::ProgramCounter)?)
     }
 
-    pub fn get_current_inst(&self) -> Result<u32, ProcessorError> {
-        self.memory_inspect_u32(self.get_current_pc()?)
+    pub fn get_current_inst(&self) -> Result<Instruction, ProcessorError> {
+        Ok(Instruction::from(
+            self.memory_inspect_u32(self.get_current_pc()?)?,
+        ))
+    }
+
+    pub fn get_current_op(&self) -> Result<Opcode, ProcessorError> {
+        let inst = self.get_current_inst()?;
+        Ok(Opcode::from(inst.opcode()))
     }
 }
 

@@ -59,6 +59,7 @@ fn main() void {
     Q.b = 65535;
     (*q).a = 5;
 
+    brkpt;
     test_fn();
     add_numbers(&b, 10, 33);
 }

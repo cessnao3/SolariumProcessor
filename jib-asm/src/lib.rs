@@ -6,8 +6,8 @@ use core::fmt;
 use std::{collections::HashMap, fmt::Display, rc::Rc, sync::LazyLock};
 
 pub use instructions::{
-    Instruction, InstructionError, OpAdd, OpBand, OpBnot, OpBool, OpBor, OpBshl, OpBshr, OpBxor,
-    OpCall, OpConv, OpCopy, OpDiv, OpHalt, OpInt, OpIntoff, OpInton, OpIntr, OpJmp, OpJmpr,
+    Instruction, InstructionError, OpAdd, OpBand, OpBnot, OpBool, OpBor, OpBrk, OpBshl, OpBshr,
+    OpBxor, OpCall, OpConv, OpCopy, OpDiv, OpHalt, OpInt, OpIntoff, OpInton, OpIntr, OpJmp, OpJmpr,
     OpJmpri, OpLd, OpLdi, OpLdn, OpLdr, OpLdri, OpMul, OpNeg, OpNoop, OpNot, OpPop, OpPopr, OpPush,
     OpRem, OpReset, OpRet, OpRetInt, OpSav, OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq,
     OpTnz, OpTz,
@@ -455,7 +455,7 @@ impl InstructionList {
         self.inst_map.get(s)
     }
 
-    pub fn get_display(&self, inst: [u8; 4]) -> Option<String> {
+    pub fn get_display(&self, inst: [u8; jib::cpu::Instruction::NUM_BYTES]) -> Option<String> {
         let op = Opcode::from(inst[0]);
         if let Some(f) = self.disp_map.get(&op) {
             f(inst)
@@ -464,8 +464,8 @@ impl InstructionList {
         }
     }
 
-    pub fn get_display_inst(&self, inst: u32) -> Option<String> {
-        self.get_display(inst.to_be_bytes())
+    pub fn get_display_inst(&self, inst: jib::cpu::Instruction) -> Option<String> {
+        self.get_display(inst.get_data())
     }
 }
 
@@ -473,8 +473,8 @@ impl Default for InstructionList {
     fn default() -> Self {
         let inst = create_instruction_map!(
             OpAdd, OpBand, OpBnot, OpBool, OpBor, OpBshl, OpBshr, OpBxor, OpCall, OpConv, OpCopy,
-            OpDiv, OpHalt, OpInt, OpIntoff, OpInton, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLd, OpLdi,
-            OpLdn, OpLdr, OpLdri, OpMul, OpNeg, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem,
+            OpDiv, OpHalt, OpInt, OpIntoff, OpBrk, OpInton, OpIntr, OpJmp, OpJmpr, OpJmpri, OpLd,
+            OpLdi, OpLdn, OpLdr, OpLdri, OpMul, OpNeg, OpNoop, OpNot, OpPop, OpPopr, OpPush, OpRem,
             OpReset, OpRet, OpRetInt, OpSav, OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle,
             OpTneq, OpTnz, OpTz
         );
