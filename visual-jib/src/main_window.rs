@@ -308,6 +308,8 @@ fn build_code_column(
         page.set_title(short_name);
     }
 
+    code_stack.set_visible_child(&code_stack.last_child().unwrap());
+
     let column_code = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)

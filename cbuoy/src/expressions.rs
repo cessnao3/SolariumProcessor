@@ -744,6 +744,8 @@ impl Expression for FunctionCallExpression {
 
         let mut asm = vec![
             self.token
+                .to_asm(AsmToken::Comment(format!("calling {}", self.func))),
+            self.token
                 .to_asm(AsmToken::OperationLiteral(Box::new(OpPush::new(
                     Register::ArgumentBase.into(),
                 )))),
@@ -753,7 +755,7 @@ impl Expression for FunctionCallExpression {
                 )))),
             self.token
                 .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                    reg.reg.into(),
+                    RegisterDef::FN_BASE.into(),
                     Register::StackPointer.into(),
                 )))),
         ];
@@ -764,12 +766,21 @@ impl Expression for FunctionCallExpression {
         let next_load = func_loc.increment_token(&self.token)?;
         let mut current_offset = 0;
 
+        if self.args.len() != func.parameters.len() {
+            return Err(self.token.clone().into_err(format!(
+                "expected {} arguments for {}, found {}",
+                func.parameters.len(),
+                self.func,
+                self.args.len()
+            )));
+        }
+
         for (p, e) in func.parameters.iter().zip(self.args.iter()) {
             if let Some(p_name) = p.name.clone() {
                 let var = Rc::new(LocalVariable::new(
                     p_name,
                     p.dtype.clone(),
-                    reg.reg,
+                    RegisterDef::FN_BASE.into(),
                     current_offset,
                     None,
                 )?);
@@ -794,13 +805,13 @@ impl Expression for FunctionCallExpression {
             self.token
                 .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
                     Register::ArgumentBase.into(),
-                    reg.reg.into(),
+                    RegisterDef::FN_BASE.into(),
                 )))),
         );
 
         asm.extend(
             self.token
-                .to_asm_iter(load_to_register(next_load.reg, func.param_size() as u32)),
+                .to_asm_iter(load_to_register(next_load.reg, func.param_size() as u32)), // TODO - Add return value here?
         );
 
         asm.extend(self.token.to_asm_iter([
