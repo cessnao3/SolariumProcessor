@@ -750,12 +750,8 @@ impl Expression for FunctionCallExpression {
                     Register::ArgumentBase.into(),
                 )))),
             self.token
-                .to_asm(AsmToken::OperationLiteral(Box::new(OpPush::new(
-                    RegisterDef::FN_BASE.into(),
-                )))),
-            self.token
                 .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                    RegisterDef::FN_BASE.into(),
+                    reg.reg.into(),
                     Register::StackPointer.into(),
                 )))),
         ];
@@ -780,7 +776,7 @@ impl Expression for FunctionCallExpression {
                 let var = Rc::new(LocalVariable::new(
                     p_name,
                     p.dtype.clone(),
-                    RegisterDef::FN_BASE.into(),
+                    reg.reg.into(),
                     current_offset,
                     None,
                 )?);
@@ -801,14 +797,6 @@ impl Expression for FunctionCallExpression {
             }
         }
 
-        asm.push(
-            self.token
-                .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                    Register::ArgumentBase.into(),
-                    RegisterDef::FN_BASE.into(),
-                )))),
-        );
-
         asm.extend(
             self.token
                 .to_asm_iter(load_to_register(next_load.reg, func.param_size() as u32)), // TODO - Add return value here?
@@ -821,7 +809,7 @@ impl Expression for FunctionCallExpression {
                 next_load.reg.into(),
             ))),
             AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                RegisterDef::FN_BASE.into(),
+                Register::ArgumentBase.into(),
                 reg.reg.into(),
             ))),
             AsmToken::OperationLiteral(Box::new(OpCall::new(func_loc.reg.into()))),
@@ -838,7 +826,6 @@ impl Expression for FunctionCallExpression {
                 Register::StackPointer.into(),
                 reg.reg.into(),
             ))),
-            AsmToken::OperationLiteral(Box::new(OpPopr::new(RegisterDef::FN_BASE.into()))),
             AsmToken::OperationLiteral(Box::new(OpPopr::new(Register::ArgumentBase.into()))),
         ]));
 

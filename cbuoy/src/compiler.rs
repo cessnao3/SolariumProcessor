@@ -6,7 +6,7 @@ use std::{
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
-    ArgumentType, AsmToken, AsmTokenLoc, LocationInfo, OpCall, OpJmpri, OpLdi, OpLdn, OpSub,
+    ArgumentType, AsmToken, AsmTokenLoc, LocationInfo, OpCall, OpCopy, OpJmpri, OpLdi, OpLdn, OpSub,
 };
 
 use crate::{
@@ -98,7 +98,7 @@ impl ScopeManager {
         self.max_size
     }
 
-    pub fn scope_full_size(&self) -> Result<usize, TokenError> {
+    fn scope_full_size(&self) -> Result<usize, TokenError> {
         self.scopes.iter().map(|x| x.size()).sum()
     }
 
@@ -164,13 +164,20 @@ impl ScopeManager {
                     .into_err("no token associated with function parameter"));
             }
         };
-        let ident = get_identifier(token)?.to_string();
 
-        let offset = self.scope_full_size()?;
+        if !self.scopes.is_empty() {
+            return Err(self
+                .token
+                .clone()
+                .into_err("cannot add a parameter when a scope has already been added!"));
+        }
+
+        let ident = get_identifier(token)?.to_string();
+        let offset = self.parameters.size()?;
 
         match self.parameters.variables.entry(ident) {
             Entry::Vacant(e) => {
-                let var_size = def.dtype.byte_size();
+                //let var_size = def.dtype.byte_size();
                 let var = Rc::new(LocalVariable::new(
                     token.clone(),
                     def.dtype,
@@ -181,7 +188,7 @@ impl ScopeManager {
 
                 // Update the scope values and maximum size of the stack
                 e.insert(ScopeVariables::Local(var.clone()));
-                self.max_size = self.max_size.max(offset + var_size);
+                //self.max_size = self.max_size.max(offset + var_size);
                 Ok(())
             }
             Entry::Occupied(_) => Err(token
@@ -345,16 +352,17 @@ impl CompilingState {
 
         if let Some(GlobalType::Function(f)) = self.global_scope.get("main") {
             asm.push(Self::blank_token_loc(AsmToken::OperationLiteral(Box::new(
-                OpLdn::new(ArgumentType::new(
-                    Register::first_gp_register(),
-                    DataType::U32,
-                )),
+                OpCopy::new(Register::ArgumentBase.into(), Register::StackPointer.into()),
+            ))));
+
+            asm.push(Self::blank_token_loc(AsmToken::OperationLiteral(Box::new(
+                OpLdn::new(ArgumentType::new(RegisterDef::SPARE, DataType::U32)),
             ))));
             asm.push(Self::blank_token_loc(AsmToken::LoadLoc(
                 f.get_entry_label().to_string(),
             )));
             asm.push(Self::blank_token_loc(AsmToken::OperationLiteral(Box::new(
-                OpCall::new(Register::first_gp_register().into()),
+                OpCall::new(RegisterDef::SPARE.into()),
             ))));
         }
 

@@ -167,7 +167,6 @@ pub fn parse_fn_statement(
     get_identifier(&name_token)?;
 
     state.init_scope(name_token.clone())?;
-    state.get_scopes_mut()?.add_scope(name_token.clone());
 
     let func_type = Function::read_tokens(tokens, state, true)?;
 
@@ -175,6 +174,7 @@ pub fn parse_fn_statement(
         state.get_scopes_mut()?.add_parameter(p.clone())?;
     }
 
+    state.get_scopes_mut()?.add_scope(name_token.clone());
     tokens.expect("{")?;
 
     let mut statements = Vec::new();

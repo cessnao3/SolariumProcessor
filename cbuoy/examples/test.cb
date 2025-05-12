@@ -20,7 +20,7 @@ struct TEST {
 global Q: TEST;
 
 fn add_numbers(dest: *u16, a: u16, b: u16) u16 {
-    *dest = a + b;
+    (*dest) = a + b;
 }
 
 fn test_fn(a: u16, b: u32) void {
@@ -60,6 +60,5 @@ fn main() void {
     (*q).a = 5;
 
     test_fn(1, 2);
-    brkpt;
     add_numbers(&b, 10, 33);
 }
