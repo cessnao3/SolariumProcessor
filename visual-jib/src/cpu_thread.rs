@@ -121,8 +121,8 @@ impl ThreadState {
             }
         }
 
-        let debug_stop = if let Ok(Processor::OP_DEBUG_BREAK) = self.cpu.get_current_op() {
-            true
+        let debug_stop = if let Ok(op) = self.cpu.get_current_op() {
+            op == Processor::OP_DEBUG_BREAK || op == Processor::OP_HALT
         } else {
             false
         };

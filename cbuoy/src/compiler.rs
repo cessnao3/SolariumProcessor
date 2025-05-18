@@ -6,7 +6,7 @@ use std::{
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
-    ArgumentType, AsmToken, AsmTokenLoc, LocationInfo, OpCall, OpCopy, OpJmpri, OpLdi, OpLdn, OpSub,
+    ArgumentType, AsmToken, AsmTokenLoc, LocationInfo, OpCall, OpCopy, OpHalt, OpLdi, OpLdn, OpSub,
 };
 
 use crate::{
@@ -369,7 +369,7 @@ impl CompilingState {
         asm.extend_from_slice(
             &[
                 AsmToken::Comment("Program Halt".into()),
-                AsmToken::OperationLiteral(Box::new(OpJmpri::new(0))),
+                AsmToken::OperationLiteral(Box::new(OpHalt)),
             ]
             .map(Self::blank_token_loc),
         );
