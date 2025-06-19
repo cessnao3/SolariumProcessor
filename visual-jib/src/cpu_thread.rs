@@ -8,25 +8,13 @@ use std::sync::mpsc::{Receiver, RecvError, Sender, TryRecvError};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-struct CircularBuffer<T> {
-    history: Vec<Option<T>>,
+struct CircularBuffer<T, const S: usize> {
+    history: [Option<T>; S],
     index: usize,
     last: Option<T>,
 }
 
-impl<T: Clone + PartialEq + Eq> CircularBuffer<T> {
-    pub fn new(len: usize) -> Self {
-        if len == 0 {
-            panic!("size may not be 0");
-        }
-
-        Self {
-            history: (0..len).map(|_| None).collect(),
-            index: 0,
-            last: None,
-        }
-    }
-
+impl<T: Clone + PartialEq + Eq, const S: usize> CircularBuffer<T, S> {
     pub fn reset(&mut self) {
         self.history.fill(None);
         self.index = 0;
@@ -57,6 +45,20 @@ impl<T: Clone + PartialEq + Eq> CircularBuffer<T> {
     }
 }
 
+impl<T: Clone + PartialEq + Eq, const S: usize> Default for CircularBuffer<T, S> {
+    fn default() -> Self {
+        const {
+            assert!(S > 0);
+        }
+
+        Self {
+            history: [const { None }; S],
+            index: 0,
+            last: None,
+        }
+    }
+}
+
 struct ThreadState {
     running: bool,
     multiplier: f64,
@@ -65,7 +67,7 @@ struct ThreadState {
     cpu: Processor,
     serial_io_dev: Rc<RefCell<SerialInputOutputDevice>>,
     last_code: Vec<u8>,
-    inst_history: CircularBuffer<String>,
+    inst_history: CircularBuffer<String, 10>,
     inst_map: InstructionList,
     breakpoint: Option<u32>,
 }
@@ -82,7 +84,7 @@ impl ThreadState {
             serial_io_dev: Rc::new(RefCell::new(SerialInputOutputDevice::new(2048))),
             last_code: Vec::new(),
             memory_request: (0, 0),
-            inst_history: CircularBuffer::<String>::new(10),
+            inst_history: Default::default(),
             inst_map: InstructionList::default(),
             breakpoint: None,
         };
