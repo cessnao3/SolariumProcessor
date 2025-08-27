@@ -6,7 +6,7 @@ use regex::Regex;
 
 use crate::{
     TokenError,
-    expressions::{BinaryOperation, Expression, RegisterDef, UnaryOperation},
+    expressions::{BinaryArithmeticOperation, Expression, RegisterDef, UnaryOperation},
     tokenizer::Token,
     typing::Type,
 };
@@ -121,7 +121,11 @@ impl LiteralValue {
         Ok(Self::from_u32(res, dt))
     }
 
-    pub fn operation(lhs: Self, rhs: Self, op: BinaryOperation) -> Result<Self, OperationError> {
+    pub fn operation(
+        lhs: Self,
+        rhs: Self,
+        op: BinaryArithmeticOperation,
+    ) -> Result<Self, OperationError> {
         let dt: DataType = if lhs.get_dtype() > rhs.get_dtype() {
             lhs.get_dtype()
         } else {
@@ -136,21 +140,27 @@ impl LiteralValue {
         }
 
         let res = match op {
-            BinaryOperation::Plus => OPERATIONS.get_arith(dt).add(a, b)?.val,
-            BinaryOperation::Minus => OPERATIONS.get_arith(dt).sub(a, b)?.val,
-            BinaryOperation::Product => OPERATIONS.get_arith(dt).mul(a, b)?.val,
-            BinaryOperation::Divide => OPERATIONS.get_arith(dt).div(a, b)?.val,
-            BinaryOperation::Greater => OPERATIONS.get_relative(dt).gt(a, b)? as u32,
-            BinaryOperation::GreaterEqual => OPERATIONS.get_relative(dt).geq(a, b)? as u32,
-            BinaryOperation::Less => OPERATIONS.get_relative(dt).lt(a, b)? as u32,
-            BinaryOperation::LessEqual => OPERATIONS.get_relative(dt).leq(a, b)? as u32,
-            BinaryOperation::Equals => OPERATIONS.get_relative(dt).eq(a, b)? as u32,
-            BinaryOperation::NotEquals => OPERATIONS.get_relative(dt).neq(a, b)? as u32,
-            BinaryOperation::And => u32_to_bool(OPERATIONS.get_bitwise(dt)?.band(a, b)?.val),
-            BinaryOperation::Or => u32_to_bool(OPERATIONS.get_bitwise(dt)?.bor(a, b)?.val),
-            BinaryOperation::BitAnd => OPERATIONS.get_bitwise(dt)?.band(a, b)?.val,
-            BinaryOperation::BitOr => OPERATIONS.get_bitwise(dt)?.bor(a, b)?.val,
-            BinaryOperation::BitXor => OPERATIONS.get_bitwise(dt)?.bxor(a, b)?.val,
+            BinaryArithmeticOperation::Plus => OPERATIONS.get_arith(dt).add(a, b)?.val,
+            BinaryArithmeticOperation::Minus => OPERATIONS.get_arith(dt).sub(a, b)?.val,
+            BinaryArithmeticOperation::Product => OPERATIONS.get_arith(dt).mul(a, b)?.val,
+            BinaryArithmeticOperation::Divide => OPERATIONS.get_arith(dt).div(a, b)?.val,
+            BinaryArithmeticOperation::Greater => OPERATIONS.get_relative(dt).gt(a, b)? as u32,
+            BinaryArithmeticOperation::GreaterEqual => {
+                OPERATIONS.get_relative(dt).geq(a, b)? as u32
+            }
+            BinaryArithmeticOperation::Less => OPERATIONS.get_relative(dt).lt(a, b)? as u32,
+            BinaryArithmeticOperation::LessEqual => OPERATIONS.get_relative(dt).leq(a, b)? as u32,
+            BinaryArithmeticOperation::Equals => OPERATIONS.get_relative(dt).eq(a, b)? as u32,
+            BinaryArithmeticOperation::NotEquals => OPERATIONS.get_relative(dt).neq(a, b)? as u32,
+            BinaryArithmeticOperation::And => {
+                u32_to_bool(OPERATIONS.get_bitwise(dt)?.band(a, b)?.val)
+            }
+            BinaryArithmeticOperation::Or => {
+                u32_to_bool(OPERATIONS.get_bitwise(dt)?.bor(a, b)?.val)
+            }
+            BinaryArithmeticOperation::BitAnd => OPERATIONS.get_bitwise(dt)?.band(a, b)?.val,
+            BinaryArithmeticOperation::BitOr => OPERATIONS.get_bitwise(dt)?.bor(a, b)?.val,
+            BinaryArithmeticOperation::BitXor => OPERATIONS.get_bitwise(dt)?.bxor(a, b)?.val,
         };
 
         Ok(Self::from_u32(res, dt))

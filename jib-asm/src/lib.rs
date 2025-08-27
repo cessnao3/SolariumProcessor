@@ -10,7 +10,7 @@ pub use instructions::{
     OpBxor, OpCall, OpConv, OpCopy, OpDiv, OpHalt, OpInt, OpIntoff, OpInton, OpIntr, OpJmp, OpJmpr,
     OpJmpri, OpLd, OpLdi, OpLdn, OpLdr, OpLdri, OpMul, OpNeg, OpNoop, OpNot, OpPop, OpPopr, OpPush,
     OpRem, OpReset, OpRet, OpRetInt, OpSav, OpSavr, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq,
-    OpTnz, OpTz,
+    OpTnz, OpTz, INST_SIZE,
 };
 
 pub use argument::{ArgumentError, ArgumentRegister, ArgumentType};

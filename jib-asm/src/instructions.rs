@@ -7,7 +7,7 @@ use crate::{
 };
 use jib::cpu::{Opcode, Processor};
 
-const INST_SIZE: usize = 4;
+pub const INST_SIZE: usize = 4;
 
 #[derive(Debug, Clone)]
 pub enum InstructionError {
@@ -351,6 +351,84 @@ macro_rules! InstImmediateArg {
                 } else {
                     Ok(Self {
                         imm: u16::from_be_bytes([bytes[2], bytes[3]]),
+                    })
+                }
+            }
+        }
+    };
+}
+
+macro_rules! InstImmediateArgSigned {
+    ($op_name:ident, $opcode:expr) => {
+        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+        pub struct $op_name {
+            imm: i16,
+        }
+
+        impl $op_name {
+            pub const OP: Opcode = $opcode;
+            const NUM_ARGS: usize = 1;
+
+            pub fn new(imm: i16) -> Self {
+                Self { imm }
+            }
+
+            pub fn name() -> String {
+                stringify!($op_name)
+                    .to_lowercase()
+                    .strip_prefix("op")
+                    .unwrap()
+                    .into()
+            }
+        }
+
+        impl Instruction for $op_name {
+            fn get_name(&self) -> String {
+                Self::name()
+            }
+
+            fn get_args(&self) -> Vec<String> {
+                vec![format!("{}", self.imm)]
+            }
+
+            fn to_bytes(&self) -> [u8; INST_SIZE] {
+                let imm = self.imm.to_be_bytes();
+                [Self::OP.to_byte(), 0, imm[0], imm[1]]
+            }
+
+            fn boxed_clone(&self) -> Box<dyn Instruction> {
+                Box::new(self.clone())
+            }
+        }
+
+        impl fmt::Display for $op_name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{} {}", Self::name(), self.imm as i16)
+            }
+        }
+
+        impl TryFrom<Vec<String>> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(args: Vec<String>) -> Result<Self, Self::Error> {
+                if args.len() != Self::NUM_ARGS {
+                    Err(InstructionError::CountMismatch(args.len(), Self::NUM_ARGS))
+                } else {
+                    let imm = parse_imm_i16(&args[0])?;
+                    Ok(Self::new(imm))
+                }
+            }
+        }
+
+        impl TryFrom<[u8; 4]> for $op_name {
+            type Error = InstructionError;
+
+            fn try_from(bytes: [u8; 4]) -> Result<Self, Self::Error> {
+                if bytes[0] != Self::OP.to_byte() {
+                    Err(InstructionError::OpcodeMismatch(Self::OP, bytes[0]))
+                } else {
+                    Ok(Self {
+                        imm: i16::from_be_bytes([bytes[2], bytes[3]]),
                     })
                 }
             }
@@ -815,7 +893,7 @@ InstSingleArgDataType!(OpLdn, Processor::OP_LOAD_NEXT);
 InstSingleArg!(OpTz, Processor::OP_TEST_ZERO);
 InstSingleArg!(OpTnz, Processor::OP_TEST_NOT_ZERO);
 
-InstImmediateArg!(OpJmpri, Processor::OP_JUMP_REL_IMM);
+InstImmediateArgSigned!(OpJmpri, Processor::OP_JUMP_REL_IMM);
 InstSingleArgImm!(OpLdi, Processor::OP_LOAD_IMM);
 InstSingleArgImm!(OpLdri, Processor::OP_LOAD_IMM_REL);
 

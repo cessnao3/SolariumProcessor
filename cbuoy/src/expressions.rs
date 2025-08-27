@@ -5,19 +5,20 @@ use std::{
     sync::LazyLock,
 };
 
-use jib::cpu::{DataType, Register};
+use jib::cpu::{DataType, Register, convert_types};
 use jib_asm::{
-    ArgumentType, AsmToken, Instruction, OpAdd, OpCall, OpConv, OpCopy, OpLd, OpPopr, OpPush,
-    OpSav, OpSub, OpTeq, OpTneq,
+    ArgumentType, AsmToken, Instruction, OpAdd, OpBand, OpBool, OpBor, OpBxor, OpCall, OpConv,
+    OpCopy, OpDiv, OpLd, OpMul, OpPopr, OpPush, OpSav, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle,
+    OpTneq,
 };
 
 use crate::{
     TokenError,
-    compiler::CompilingState,
+    compiler::{CompilingState, Statement},
     literals::{Literal, LiteralValue},
     tokenizer::{Token, TokenIter, get_identifier},
     typing::{StructDefinition, StructField, Type},
-    utilities::load_to_register,
+    utilities::{MemcpyStatement, load_to_register},
     variables::LocalVariable,
 };
 
@@ -119,7 +120,7 @@ pub trait Expression: Debug + Display {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UnaryOperation {
     BitNot,
     Not,
@@ -177,6 +178,8 @@ impl Expression for UnaryExpression {
         &self,
         _reg: RegisterDef,
     ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        //let
+
         todo!()
     }
 
@@ -276,8 +279,55 @@ impl Display for AddressOfExpression {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BinaryOperation {
+    Arithmetic(BinaryArithmeticOperation),
+    Assignment,
+}
+
+impl Display for BinaryOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Arithmetic(op) => write!(f, "{op}"),
+            Self::Assignment => write!(f, "="),
+        }
+    }
+}
+
+impl BinaryOperation {
+    pub const ALL: &[BinaryOperation] = &Self::get_all();
+    const DISTINCT_VALS: &[BinaryOperation] = &[BinaryOperation::Assignment];
+
+    const LEN_VAL: usize =
+        BinaryArithmeticOperation::ALL.len() + BinaryOperation::DISTINCT_VALS.len();
+    const fn get_all() -> [Self; Self::LEN_VAL] {
+        let mut vals = [Self::Assignment; Self::LEN_VAL];
+
+        let mut i = 0;
+        while i < BinaryArithmeticOperation::ALL.len() {
+            vals[i] = Self::Arithmetic(BinaryArithmeticOperation::ALL[i]);
+            i += 1;
+        }
+
+        i = 0;
+        while i < Self::DISTINCT_VALS.len() {
+            vals[BinaryArithmeticOperation::ALL.len() + i] = Self::DISTINCT_VALS[i];
+            i += 1;
+        }
+
+        vals
+    }
+
+    pub const fn get_priority(&self) -> i32 {
+        match self {
+            Self::Arithmetic(op) => op.get_priority(),
+            Self::Assignment => 100,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BinaryArithmeticOperation {
     Plus,
     Minus,
     Product,
@@ -295,7 +345,7 @@ pub enum BinaryOperation {
     BitXor,
 }
 
-impl BinaryOperation {
+impl BinaryArithmeticOperation {
     pub const ALL: &[Self] = &[
         Self::Plus,
         Self::Minus,
@@ -313,9 +363,29 @@ impl BinaryOperation {
         Self::BitOr,
         Self::BitXor,
     ];
+
+    pub const fn get_priority(&self) -> i32 {
+        match self {
+            Self::Plus => -5,
+            Self::Minus => -5,
+            Self::Product => -10,
+            Self::Divide => -10,
+            Self::And => 0,
+            Self::Or => 0,
+            Self::Equals => 0,
+            Self::NotEquals => 0,
+            Self::Greater => 0,
+            Self::GreaterEqual => 0,
+            Self::Less => 0,
+            Self::LessEqual => 0,
+            Self::BitAnd => 0,
+            Self::BitOr => 0,
+            Self::BitXor => 0,
+        }
+    }
 }
 
-impl Display for BinaryOperation {
+impl Display for BinaryArithmeticOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             Self::Plus => "+",
@@ -340,17 +410,17 @@ impl Display for BinaryOperation {
 }
 
 #[derive(Debug, Clone)]
-pub struct BinaryExpression {
+pub struct BinaryArithmeticExpression {
     token: Token,
-    operation: BinaryOperation,
+    operation: BinaryArithmeticOperation,
     lhs: Rc<dyn Expression>,
     rhs: Rc<dyn Expression>,
 }
 
-impl BinaryExpression {
+impl BinaryArithmeticExpression {
     pub fn new(
         token: Token,
-        op: BinaryOperation,
+        op: BinaryArithmeticOperation,
         lhs: Rc<dyn Expression>,
         rhs: Rc<dyn Expression>,
     ) -> Self {
@@ -363,7 +433,7 @@ impl BinaryExpression {
     }
 }
 
-impl Expression for BinaryExpression {
+impl Expression for BinaryArithmeticExpression {
     fn get_token(&self) -> &Token {
         &self.token
     }
@@ -455,26 +525,67 @@ impl Expression for BinaryExpression {
                     .get_token()
                     .clone()
                     .into_err("cannot add one pointer to another pointer directly"));
-            } else if rhs_type.is_pointer() || lhs_type.is_pointer() {
-                // pointer arithmetic?
+            } else if rhs_type.is_pointer() {
+                //panic!("pointer arithmetic?");
+            } else if lhs_type.is_pointer() {
+                //panic!("pointer arithmetic?");
             }
 
             let reg_type = ArgumentType::new(reg.reg, dt);
 
             let op_instructions: Vec<Box<dyn Instruction>> = match self.operation {
-                BinaryOperation::Plus => {
-                    vec![Box::new(OpAdd::new(reg_type, reg_a.into(), reg_b.into()))]
-                }
-                BinaryOperation::Minus => {
-                    vec![Box::new(OpSub::new(reg_type, reg_a.into(), reg_b.into()))]
-                }
-                BinaryOperation::NotEquals => {
-                    vec![Box::new(OpTeq::new(reg_type, reg_a.into(), reg_b.into()))]
-                }
-                BinaryOperation::Equals => {
+                BinaryArithmeticOperation::NotEquals => {
                     vec![Box::new(OpTneq::new(reg_type, reg_a.into(), reg_b.into()))]
                 }
-                x => todo!("operation {x} not yet supported"),
+                BinaryArithmeticOperation::Equals => {
+                    vec![Box::new(OpTeq::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryArithmeticOperation::Greater => {
+                    vec![Box::new(OpTg::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryArithmeticOperation::GreaterEqual => {
+                    vec![Box::new(OpTge::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryArithmeticOperation::Less => {
+                    vec![Box::new(OpTl::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryArithmeticOperation::LessEqual => {
+                    vec![Box::new(OpTle::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryArithmeticOperation::Plus => {
+                    vec![Box::new(OpAdd::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryArithmeticOperation::Minus => {
+                    vec![Box::new(OpSub::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryArithmeticOperation::Product => {
+                    vec![Box::new(OpMul::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryArithmeticOperation::Divide => {
+                    vec![Box::new(OpDiv::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryArithmeticOperation::And => {
+                    vec![
+                        Box::new(OpBool::new(reg_a.into(), reg_a.into())),
+                        Box::new(OpBool::new(reg_b.into(), reg_b.into())),
+                        Box::new(OpBand::new(reg_type, reg_a.into(), reg_b.into())),
+                    ]
+                }
+                BinaryArithmeticOperation::Or => {
+                    vec![
+                        Box::new(OpBor::new(reg_type, reg_a.into(), reg_b.into())),
+                        Box::new(OpBool::new(reg_b.into(), reg_b.into())),
+                    ]
+                }
+                BinaryArithmeticOperation::BitAnd => {
+                    vec![Box::new(OpBand::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryArithmeticOperation::BitOr => {
+                    vec![Box::new(OpBor::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryArithmeticOperation::BitXor => {
+                    vec![Box::new(OpBxor::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
             };
 
             asm.extend(
@@ -492,7 +603,7 @@ impl Expression for BinaryExpression {
     }
 }
 
-impl Display for BinaryExpression {
+impl Display for BinaryArithmeticExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({} {} {})", self.lhs, self.operation, self.rhs)
     }
@@ -534,6 +645,18 @@ impl Expression for AsExpression {
             Ok(asm)
         } else {
             Err(self.token.clone().into_err("unable to perform conversion"))
+        }
+    }
+
+    fn simplify(&self) -> Option<Literal> {
+        if let Some(dt) = self.data_type.primitive_type() {
+            let lit = self.expr.simplify()?;
+            let val = lit.get_value();
+            let res = LiteralValue::from_u32(convert_types(val.as_u32(), val.get_dtype(), dt), dt);
+
+            Some(Literal::new(lit.get_token().clone(), res))
+        } else {
+            None
         }
     }
 }
@@ -664,11 +787,11 @@ impl Expression for AssignmentExpression {
             self.addr_expr, self.val_expr
         ))));
 
+        let val_def = reg;
+        let addr_def = val_def.increment_token(tok)?;
+
         if let Some(dest_dtype) = self.addr_expr.get_type()?.primitive_type() {
             let val_dtype = self.val_expr.get_primitive_type()?;
-
-            let val_def = reg;
-            let addr_def = val_def.increment_token(tok)?;
 
             asm.extend(self.val_expr.load_value_to_register(val_def)?);
             asm.extend(self.addr_expr.load_address_to_register(addr_def)?);
@@ -686,10 +809,32 @@ impl Expression for AssignmentExpression {
             )))));
 
             Ok(asm)
+        } else if let Ok(val_type) = self.val_expr.get_type()
+            && let Ok(target_type) = self.addr_expr.get_type()
+        {
+            if val_type == target_type {
+                asm.extend(self.addr_expr.load_address_to_register(addr_def)?);
+                asm.extend(self.val_expr.load_address_to_register(val_def)?);
+
+                let mem = MemcpyStatement::new(
+                    self.token.clone(),
+                    val_def.reg,
+                    addr_def.reg,
+                    val_type.byte_size(),
+                );
+
+                asm.extend(mem.get_exec_code()?);
+
+                Ok(asm)
+            } else {
+                Err(tok.clone().into_err(format!(
+                    "mismatch of types assigning {val_type} to {target_type}"
+                )))
+            }
         } else {
             Err(tok
                 .clone()
-                .into_err("currently struct assignment is unsupported"))
+                .into_err("unable to determine valid types for input values"))
         }
     }
 }
@@ -833,40 +978,40 @@ impl Expression for FunctionCallExpression {
     }
 }
 
-pub fn parse_expression(
+static UNARY_STR: LazyLock<HashMap<String, UnaryOperation>> = LazyLock::new(|| {
+    UnaryOperation::ALL
+        .iter()
+        .map(|x| (x.to_string(), *x))
+        .collect()
+});
+static BINARY_STR: LazyLock<HashMap<String, BinaryOperation>> = LazyLock::new(|| {
+    BinaryOperation::ALL
+        .iter()
+        .map(|x| (x.to_string(), *x))
+        .collect()
+});
+
+fn parse_expression_without_binary_expressions(
     tokens: &mut TokenIter,
     state: &CompilingState,
 ) -> Result<Rc<dyn Expression>, TokenError> {
-    static UNARY_STR: LazyLock<HashMap<String, UnaryOperation>> = LazyLock::new(|| {
-        UnaryOperation::ALL
-            .iter()
-            .map(|x| (x.to_string(), *x))
-            .collect()
-    });
-    static BINARY_STR: LazyLock<HashMap<String, BinaryOperation>> = LazyLock::new(|| {
-        BinaryOperation::ALL
-            .iter()
-            .map(|x| (x.to_string(), *x))
-            .collect()
-    });
-
     let first = tokens.next()?;
 
     let mut expr: Rc<dyn Expression> = if let Some(op) = UNARY_STR.get(first.get_value()) {
         Rc::new(UnaryExpression::new(
             first,
             *op,
-            parse_expression(tokens, state)?,
+            parse_expression_without_binary_expressions(tokens, state)?,
         ))
     } else if first.get_value() == "*" {
         Rc::new(DereferenceExpression {
             token: first,
-            base: parse_expression(tokens, state)?,
+            base: parse_expression_without_binary_expressions(tokens, state)?,
         })
     } else if first.get_value() == "&" {
         Rc::new(AddressOfExpression {
             token: first,
-            base: parse_expression(tokens, state)?,
+            base: parse_expression_without_binary_expressions(tokens, state)?,
         })
     } else if first.get_value() == "(" {
         let inner = parse_expression(tokens, state)?;
@@ -882,14 +1027,8 @@ pub fn parse_expression(
     };
 
     while let Some(next) = tokens.peek() {
-        if let Some(op) = BINARY_STR.get(next.get_value()) {
-            let op_token = tokens.next()?;
-            expr = Rc::new(BinaryExpression::new(
-                op_token,
-                *op,
-                expr,
-                parse_expression(tokens, state)?,
-            ));
+        if BINARY_STR.contains_key(next.get_value()) {
+            break;
         } else if next.get_value() == "." {
             let dot_token = tokens.expect(".")?;
             let ident_token = tokens.next()?;
@@ -905,13 +1044,6 @@ pub fn parse_expression(
                 data_type: Type::read_type(tokens, state)?,
                 token,
                 expr,
-            })
-        } else if next.get_value() == "=" {
-            let token = tokens.expect("=")?;
-            expr = Rc::new(AssignmentExpression {
-                token,
-                addr_expr: expr,
-                val_expr: parse_expression(tokens, state)?,
             })
         } else if next.get_value() == "(" {
             let call_val = tokens.expect("(")?;
@@ -937,6 +1069,97 @@ pub fn parse_expression(
             break;
         }
     }
+
+    Ok(expr)
+}
+
+enum BinaryExpressionMatching {
+    Expression(Rc<dyn Expression>),
+    BinaryOperation(BinaryOperation, Token),
+}
+
+fn process_binary_expressions(
+    exprs: &[BinaryExpressionMatching],
+) -> Result<Rc<dyn Expression>, TokenError> {
+    if exprs.len() == 1
+        && let Some(BinaryExpressionMatching::Expression(e)) = exprs.first()
+    {
+        Ok(e.clone())
+    } else if exprs.len() > 0 && exprs.len() % 2 == 1 {
+        let priorities: HashMap<BinaryOperation, i32> =
+            HashMap::from_iter(BinaryOperation::ALL.iter().map(|x| (*x, x.get_priority())));
+
+        let mut highest_priority = None;
+
+        for (i, val) in exprs.iter().enumerate() {
+            if let BinaryExpressionMatching::BinaryOperation(op, _) = val {
+                let priority = priorities.get(&op).copied().unwrap_or(0);
+
+                if let Some((highest, _)) = highest_priority
+                    && priority > highest
+                {
+                    highest_priority = Some((priority, i));
+                } else if highest_priority.is_none() {
+                    highest_priority = Some((priority, i));
+                }
+            }
+        }
+
+        if let Some((_, index)) = highest_priority
+            && let BinaryExpressionMatching::BinaryOperation(op, token) = &exprs[index]
+        {
+            let a = process_binary_expressions(&exprs[..index])?;
+            let b = process_binary_expressions(&exprs[(index + 1)..])?;
+
+            match *op {
+                BinaryOperation::Arithmetic(opa) => Ok(Rc::new(BinaryArithmeticExpression::new(
+                    token.clone(),
+                    opa,
+                    a,
+                    b,
+                ))),
+                BinaryOperation::Assignment => Ok(Rc::new(AssignmentExpression {
+                    token: token.clone(),
+                    addr_expr: a,
+                    val_expr: b,
+                })),
+            }
+        } else {
+            Err(TokenError {
+                token: None,
+                msg: "unable to determine proper location for expressions".to_string(),
+            })
+        }
+    } else {
+        Err(TokenError {
+            token: None,
+            msg: "no binary expressions provided to process".to_string(),
+        })
+    }
+}
+
+pub fn parse_expression(
+    tokens: &mut TokenIter,
+    state: &CompilingState,
+) -> Result<Rc<dyn Expression>, TokenError> {
+    let mut main_expressions: Vec<BinaryExpressionMatching> =
+        vec![BinaryExpressionMatching::Expression(
+            parse_expression_without_binary_expressions(tokens, state)?,
+        )];
+
+    while let Some(next) = tokens.peek()
+        && let Some(op) = BINARY_STR.get(next.get_value())
+    {
+        main_expressions.push(BinaryExpressionMatching::BinaryOperation(
+            *op,
+            tokens.next()?,
+        ));
+        main_expressions.push(BinaryExpressionMatching::Expression(
+            parse_expression_without_binary_expressions(tokens, state)?,
+        ));
+    }
+
+    let expr = process_binary_expressions(&main_expressions)?;
 
     if let Some(lit) = expr.simplify() {
         Ok(Rc::new(lit))

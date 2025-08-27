@@ -1,6 +1,6 @@
 global a: u16 = 255 + 5;
 global b: u32;
-global c: i32 = -1;
+global c: u32 = (-1) : u32;
 global d: i16 = 0 - 1 + a;
 global e: i8 = 127;
 global f: i8 = -128;
@@ -8,6 +8,7 @@ const Z: i8 = 10;
 global q: i8 = Z;
 global z: u8 = Z;
 global zz: [100]u8;
+global zzz: [10][50]u8;
 global func_test: fn()void;
 
 global ex_ptr: *u32 = 0x3000;
@@ -20,7 +21,7 @@ struct TEST {
 global Q: TEST;
 
 fn add_numbers(dest: *u16, a: u16, b: u16) u16 {
-    (*dest) = a + b;
+    *dest = 4 * a + b * 2;
 }
 
 fn test_fn(a: u16, b: u32) void {
@@ -33,7 +34,6 @@ fn main() void {
     {
         def bloc: u32 = a;
     }
-    a = b;
 
     def ex_ptr2: **u32 = &ex_ptr;
     def ex_val: u32 = **ex_ptr2;
@@ -60,5 +60,12 @@ fn main() void {
     (*q).a = 5;
 
     test_fn(1, 2);
-    add_numbers(&b, 10, 33);
+
+    def q2: TEST = Q;
+    Q.a = 4;
+
+    add_numbers(&b, 10, q2.a);
+
+    q2 = Q;
+    add_numbers(&c, 10, q2.a);
 }

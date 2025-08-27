@@ -4,7 +4,7 @@ use std::{
 };
 
 use jib::cpu::{DataType, Register};
-use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpConv, OpLd, OpSav};
+use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpConv, OpCopy, OpLd, OpSav};
 
 use crate::{
     TokenError,
@@ -13,7 +13,7 @@ use crate::{
     literals::Literal,
     tokenizer::{Token, TokenIter, get_identifier},
     typing::Type,
-    utilities::load_to_register,
+    utilities::{MemcpyStatement, load_to_register},
 };
 
 #[derive(Debug, Clone)]
@@ -252,9 +252,9 @@ impl LocalVariable {
 
 impl Statement for LocalVariable {
     fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        if let Some(var_type) = self.dtype.primitive_type() {
-            let mut asm = Vec::new();
+        let mut asm = Vec::new();
 
+        if let Some(var_type) = self.dtype.primitive_type() {
             if let Some(e) = &self.init_expr {
                 let expr_type = e.get_primitive_type()?;
 
@@ -269,18 +269,7 @@ impl Statement for LocalVariable {
                 ))));
 
                 let addr_reg = if self.offset > 0 {
-                    asm.extend(
-                        self.token
-                            .to_asm_iter(load_to_register(def.reg, self.offset as u32)),
-                    );
-                    asm.push(
-                        self.token
-                            .to_asm(AsmToken::OperationLiteral(Box::new(OpAdd::new(
-                                ArgumentType::new(def.reg, DataType::U32),
-                                def.reg.into(),
-                                self.base.into(),
-                            )))),
-                    );
+                    asm.extend_from_slice(&self.load_address_to_register(def)?);
                     def.reg
                 } else {
                     self.base
@@ -305,14 +294,42 @@ impl Statement for LocalVariable {
                         )))),
                 );
             }
-
-            Ok(asm)
         } else {
-            Err(self
-                .token
-                .clone()
-                .into_err("variable without a primitive type cannot be initialized directly"))
+            if let Some(e) = &self.init_expr {
+                if let Ok(t) = e.get_type() {
+                    if t == self.dtype {
+                        let def = RegisterDef::default();
+                        let load_val = def.increment_token(&self.token)?;
+
+                        let local_reg = if self.offset > 0 {
+                            asm.extend_from_slice(&self.load_address_to_register(def)?);
+                            def.reg
+                        } else {
+                            self.base
+                        };
+
+                        asm.extend_from_slice(&e.load_address_to_register(load_val)?);
+
+                        let mem = MemcpyStatement::new(
+                            self.token.clone(),
+                            load_val.reg,
+                            local_reg,
+                            self.dtype.byte_size(),
+                        );
+
+                        asm.extend_from_slice(&mem.get_exec_code()?);
+                    } else {
+                        return Err(self.token.clone().into_err("mismatch in data type"));
+                    }
+                } else {
+                    return Err(self.token.clone().into_err(
+                        "unable to obtain a valid type for the provided variable init expression",
+                    ));
+                }
+            }
         }
+
+        Ok(asm)
     }
 }
 
@@ -336,12 +353,20 @@ impl Expression for LocalVariable {
         reg: RegisterDef,
     ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
         let mut asm = Vec::new();
-        asm.extend_from_slice(&load_to_register(reg.reg, self.offset as u32));
-        asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
-            ArgumentType::new(reg.reg, DataType::U32),
-            reg.reg.into(),
-            self.base.into(),
-        ))));
+
+        if self.offset > 0 {
+            asm.extend_from_slice(&load_to_register(reg.reg, self.offset as u32));
+            asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                ArgumentType::new(reg.reg, DataType::U32),
+                reg.reg.into(),
+                self.base.into(),
+            ))));
+        } else {
+            asm.push(AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                reg.reg.into(),
+                self.base.into(),
+            ))))
+        }
 
         Ok(self.token.to_asm_iter(asm).into_iter().collect())
     }
