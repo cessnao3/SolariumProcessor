@@ -238,8 +238,10 @@ impl TryFrom<Token> for Literal {
     type Error = TokenError;
     fn try_from(value: Token) -> Result<Self, Self::Error> {
         static LITERAL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"^(((?<inum>(0x)?\d+)(?<itype>[ui](8|(16)|(32)))?)|((?<fnum>(\d+(\.\d*))|(\.\d+))f32)|(?<f32>\d*\.\d+))$").unwrap()
+            Regex::new(r"^(((?<inum>(0x)?[a-fA-F\d]+)(?<itype>[ui](8|(16)|(32)))?)|((?<fnum>(\d+(\.\d*))|(\.\d+))f32)|(?<f32>\d*\.\d+))$").unwrap()
         });
+        static CHAR_REGEX: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"^'(?<num>\\?[\w])'$").unwrap());
 
         let res = if let Some(m) = LITERAL_REGEX.captures(value.get_value()) {
             if let Some(inum) = m.name("inum") {
@@ -308,6 +310,36 @@ impl TryFrom<Token> for Literal {
                 }
             } else {
                 Err(value.clone().into_err("cannot parse as a literal"))
+            }
+        } else if let Some(m) = CHAR_REGEX.captures(value.get_value())
+            && let Some(c) = m.name("num")
+        {
+            let cs = c.as_str();
+
+            let jib_char = if let Some(escape) = cs.strip_prefix("\\") {
+                match escape {
+                    "n" => '\n',
+                    "t" => '\t',
+                    _ => {
+                        return Err(value
+                            .clone()
+                            .into_err(format!("escape sequence for '\\{escape}' unknown")));
+                    }
+                }
+            } else if cs.len() == 1 {
+                cs.chars().next().unwrap()
+            } else {
+                return Err(value
+                    .clone()
+                    .into_err("somehow got an unexpected character count"));
+            };
+
+            if let Ok(val) = jib::text::character_to_byte(jib_char) {
+                Ok(LiteralValue::U8(val as u8))
+            } else {
+                Err(value
+                    .clone()
+                    .into_err("unable to convert '{jib_char}' into byte"))
             }
         } else {
             Err(value.clone().into_err("cannot parse as a literal"))
