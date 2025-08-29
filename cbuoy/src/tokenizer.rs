@@ -1,6 +1,4 @@
-use std::{
-    collections::HashSet, fmt, iter::Peekable, rc::Rc, slice::Iter, sync::LazyLock, thread::current,
-};
+use std::{collections::HashSet, fmt, iter::Peekable, rc::Rc, slice::Iter, sync::LazyLock};
 
 use jib::cpu::DataType;
 use jib_asm::{AsmToken, AsmTokenLoc};
@@ -134,7 +132,7 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
             } else if let Some(TokenStart {
                 i: start_index,
                 string_char: None,
-                last_was_escape,
+                ..
             }) = current_state
             {
                 let prev = &l[start_index..col_num];
@@ -153,14 +151,9 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
                         loc: get_loc(start_index),
                     });
                     current_state = Some(TokenStart::new_str(col_num, c));
-                } else if OPERATORS.contains(prev) && !OPERATORS.contains(current) {
-                    tokens.push(TokenMatch {
-                        s: prev,
-                        loc: get_loc(start_index),
-                    });
-
-                    current_state = Some(TokenStart::new(col_num));
-                } else if !OPERATORS.contains(current) && OPERATOR_STARTS.contains(&c) {
+                } else if (OPERATORS.contains(prev) && !OPERATORS.contains(current))
+                    || (!OPERATORS.contains(current) && OPERATOR_STARTS.contains(&c))
+                {
                     tokens.push(TokenMatch {
                         s: prev,
                         loc: get_loc(start_index),

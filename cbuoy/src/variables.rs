@@ -173,48 +173,46 @@ impl GlobalStatement for GlobalVariableStatement {
     fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let mut asm_init = Vec::new();
 
-        if self.simplified_literal().is_none() {
-            if let Some(init_expr) = &self.global_var.init_expr {
-                let name = self.global_var.get_token();
+        if self.simplified_literal().is_none()
+            && let Some(init_expr) = &self.global_var.init_expr
+        {
+            let name = self.global_var.get_token();
 
-                if let Ok(init_type) = init_expr.get_primitive_type() {
-                    let var = &self.global_var;
+            if let Ok(init_type) = init_expr.get_primitive_type() {
+                let var = &self.global_var;
 
-                    // TODO - Replace with a better expression (operation expression value?)
-                    let reg_state_var = RegisterDef::default();
-                    let reg_state_init = reg_state_var.increment_token(name)?;
+                // TODO - Replace with a better expression (operation expression value?)
+                let reg_state_var = RegisterDef::default();
+                let reg_state_init = reg_state_var.increment_token(name)?;
 
-                    asm_init.push(name.to_asm(AsmToken::Comment(format!(
-                        "Initializing Global Variable {}",
-                        self.global_var.get_name()
-                    ))));
+                asm_init.push(name.to_asm(AsmToken::Comment(format!(
+                    "Initializing Global Variable {}",
+                    self.global_var.get_name()
+                ))));
 
-                    asm_init.extend_from_slice(&var.load_address_to_register(reg_state_var)?);
-                    asm_init.extend_from_slice(&init_expr.load_value_to_register(reg_state_init)?);
+                asm_init.extend_from_slice(&var.load_address_to_register(reg_state_var)?);
+                asm_init.extend_from_slice(&init_expr.load_value_to_register(reg_state_init)?);
 
-                    let reg_init = reg_state_init.reg;
-                    let reg_var = reg_state_var.reg;
+                let reg_init = reg_state_init.reg;
+                let reg_var = reg_state_var.reg;
 
-                    let var_type = var.get_primitive_type()?;
+                let var_type = var.get_primitive_type()?;
 
-                    if init_type != var_type {
-                        asm_init.push(name.to_asm(AsmToken::OperationLiteral(Box::new(
-                            OpConv::new(
-                                ArgumentType::new(reg_init, init_type),
-                                ArgumentType::new(reg_init, var_type),
-                            ),
-                        ))));
-                    }
-
-                    asm_init.push(name.to_asm(AsmToken::OperationLiteral(Box::new(OpSav::new(
-                        ArgumentType::new(reg_var, var_type),
-                        reg_init.into(),
+                if init_type != var_type {
+                    asm_init.push(name.to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
+                        ArgumentType::new(reg_init, init_type),
+                        ArgumentType::new(reg_init, var_type),
                     )))));
-                } else {
-                    return Err(name
-                        .clone()
-                        .into_err("type does not have a valid primitive type"));
                 }
+
+                asm_init.push(name.to_asm(AsmToken::OperationLiteral(Box::new(OpSav::new(
+                    ArgumentType::new(reg_var, var_type),
+                    reg_init.into(),
+                )))));
+            } else {
+                return Err(name
+                    .clone()
+                    .into_err("type does not have a valid primitive type"));
             }
         }
 
@@ -294,39 +292,37 @@ impl Statement for LocalVariable {
                         )))),
                 );
             }
-        } else {
-            if let Some(e) = &self.init_expr {
-                if let Ok(t) = e.get_type() {
-                    if t == self.dtype {
-                        let def = RegisterDef::default();
-                        let load_val = def.increment_token(&self.token)?;
+        } else if let Some(e) = &self.init_expr
+            && let Ok(t) = e.get_type()
+        {
+            if t == self.dtype {
+                let def = RegisterDef::default();
+                let load_val = def.increment_token(&self.token)?;
 
-                        let local_reg = if self.offset > 0 {
-                            asm.extend_from_slice(&self.load_address_to_register(def)?);
-                            def.reg
-                        } else {
-                            self.base
-                        };
-
-                        asm.extend_from_slice(&e.load_address_to_register(load_val)?);
-
-                        let mem = MemcpyStatement::new(
-                            self.token.clone(),
-                            load_val.reg,
-                            local_reg,
-                            self.dtype.byte_size(),
-                        );
-
-                        asm.extend_from_slice(&mem.get_exec_code()?);
-                    } else {
-                        return Err(self.token.clone().into_err("mismatch in data type"));
-                    }
+                let local_reg = if self.offset > 0 {
+                    asm.extend_from_slice(&self.load_address_to_register(def)?);
+                    def.reg
                 } else {
-                    return Err(self.token.clone().into_err(
-                        "unable to obtain a valid type for the provided variable init expression",
-                    ));
-                }
+                    self.base
+                };
+
+                asm.extend_from_slice(&e.load_address_to_register(load_val)?);
+
+                let mem = MemcpyStatement::new(
+                    self.token.clone(),
+                    load_val.reg,
+                    local_reg,
+                    self.dtype.byte_size(),
+                );
+
+                asm.extend_from_slice(&mem.get_exec_code()?);
+            } else {
+                return Err(self.token.clone().into_err("mismatch in data type"));
             }
+        } else {
+            return Err(self.token.clone().into_err(
+                "unable to obtain a valid type for the provided variable init expression",
+            ));
         }
 
         Ok(asm)

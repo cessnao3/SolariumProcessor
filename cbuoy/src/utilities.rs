@@ -171,7 +171,7 @@ impl Statement for MemcpyStatement {
                         LoopInstruction::Raw(x) => x,
                         LoopInstruction::InstructionCount(x) => x(loop_count),
                     })
-                    .map(|x| AsmToken::OperationLiteral(x)),
+                    .map(AsmToken::OperationLiteral),
             );
         }
 

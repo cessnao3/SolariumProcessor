@@ -98,7 +98,7 @@ impl ThreadState {
 
         let pc = self.cpu.get_current_pc().unwrap_or(0);
         if let Ok(inst) = self.cpu.get_current_inst() {
-            if let Some(disp_val) = self.inst_map.get_display_inst(inst.into()) {
+            if let Some(disp_val) = self.inst_map.get_display_inst(inst) {
                 inst_details = disp_val;
             }
         }

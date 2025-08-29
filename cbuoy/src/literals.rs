@@ -337,7 +337,7 @@ impl TryFrom<Token> for Literal {
             };
 
             if let Ok(val) = jib::text::character_to_byte(jib_char) {
-                Ok(LiteralValue::U8(val as u8))
+                Ok(LiteralValue::U8(val))
             } else {
                 Err(value
                     .clone()

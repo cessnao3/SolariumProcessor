@@ -8,8 +8,8 @@ use std::{
 use jib::cpu::{DataType, Register, convert_types};
 use jib_asm::{
     ArgumentType, AsmToken, Instruction, OpAdd, OpBand, OpBool, OpBor, OpBxor, OpCall, OpConv,
-    OpCopy, OpDiv, OpLd, OpMul, OpPopr, OpPush, OpSav, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle,
-    OpTneq,
+    OpCopy, OpDiv, OpLd, OpLdi, OpLdn, OpMul, OpPopr, OpPush, OpSav, OpSub, OpTeq, OpTg, OpTge,
+    OpTl, OpTle, OpTneq,
 };
 
 use crate::{
@@ -439,7 +439,15 @@ impl Expression for BinaryArithmeticExpression {
     }
 
     fn get_type(&self) -> Result<Type, TokenError> {
-        if let Some(Type::Primitive(a)) = self.lhs.get_type()?.base_type() {
+        if let Ok(t) = self.lhs.get_type()
+            && t.is_pointer()
+        {
+            Ok(t)
+        } else if let Ok(t) = self.rhs.get_type()
+            && t.is_pointer()
+        {
+            Ok(t)
+        } else if let Some(Type::Primitive(a)) = self.lhs.get_type()?.base_type() {
             if let Some(Type::Primitive(b)) = self.rhs.get_type()?.base_type() {
                 Ok(Type::Primitive(Type::coerce_type(a, b)))
             } else {
@@ -517,19 +525,75 @@ impl Expression for BinaryArithmeticExpression {
                 panic!("type error")
             }
 
-            let rhs_type = self.rhs.get_type()?;
-            let lhs_type = self.lhs.get_type()?;
+            let type_a = self.lhs.get_type()?;
+            let type_b = self.rhs.get_type()?;
 
-            if rhs_type.is_pointer() && lhs_type.is_pointer() {
-                return Err(self
-                    .get_token()
-                    .clone()
-                    .into_err("cannot add one pointer to another pointer directly"));
-            } else if rhs_type.is_pointer() {
-                //panic!("pointer arithmetic?");
-            } else if lhs_type.is_pointer() {
-                //panic!("pointer arithmetic?");
-            }
+            let pointer_instructions = if self.operation == BinaryArithmeticOperation::Plus
+                || self.operation == BinaryArithmeticOperation::Minus
+            {
+                if type_a.is_pointer() && type_b.is_pointer() {
+                    Err(self
+                        .get_token()
+                        .clone()
+                        .into_err("cannot add one pointer to another pointer directly"))
+                } else {
+                    fn get_base_size(t: &Type) -> Option<usize> {
+                        match t {
+                            Type::Pointer(base) => Some(base.byte_size()),
+                            _ => None,
+                        }
+                    }
+
+                    fn generate_ptr_mul_asm(
+                        size: usize,
+                        incr_val: Register,
+                        spare: Register,
+                    ) -> Result<Vec<AsmToken>, TokenError> {
+                        let mut insts = vec![AsmToken::OperationLiteral(Box::new(OpPush::new(
+                            spare.into(),
+                        )))];
+
+                        if size <= u16::MAX as usize {
+                            let reg_bt = ArgumentType::new(spare, DataType::U16);
+                            insts.push(AsmToken::OperationLiteral(Box::new(OpLdi::new(
+                                reg_bt,
+                                size as u16,
+                            ))));
+                        } else {
+                            let reg_bt = ArgumentType::new(spare, DataType::U32);
+                            insts.push(AsmToken::OperationLiteral(Box::new(OpLdn::new(reg_bt))));
+                            insts.push(AsmToken::Literal4(size as u32));
+                            insts.push(AsmToken::AlignInstruction);
+                        }
+                        insts.push(AsmToken::OperationLiteral(Box::new(OpMul::new(
+                            ArgumentType::new(incr_val, DataType::I32),
+                            spare.into(),
+                            incr_val.into(),
+                        ))));
+                        insts.push(AsmToken::OperationLiteral(Box::new(OpPopr::new(
+                            spare.into(),
+                        ))));
+
+                        Ok(insts)
+                    }
+
+                    if let Some(sa) = get_base_size(&type_a) {
+                        generate_ptr_mul_asm(sa, reg_b, reg_a)
+                    } else if let Some(sb) = get_base_size(&type_b) {
+                        generate_ptr_mul_asm(sb, reg_a, reg_b)
+                    } else {
+                        Ok(Vec::new())
+                    }
+                }?
+            } else {
+                Vec::new()
+            };
+
+            asm.extend(
+                pointer_instructions
+                    .into_iter()
+                    .map(|x| self.token.to_asm(x)),
+            );
 
             let reg_type = ArgumentType::new(reg.reg, dt);
 
@@ -921,7 +985,7 @@ impl Expression for FunctionCallExpression {
                 let var = Rc::new(LocalVariable::new(
                     p_name,
                     p.dtype.clone(),
-                    reg.reg.into(),
+                    reg.reg,
                     current_offset,
                     None,
                 )?);
@@ -1085,7 +1149,7 @@ fn process_binary_expressions(
         && let Some(BinaryExpressionMatching::Expression(e)) = exprs.first()
     {
         Ok(e.clone())
-    } else if exprs.len() > 0 && exprs.len() % 2 == 1 {
+    } else if !exprs.is_empty() && exprs.len() % 2 == 1 {
         let priorities: HashMap<BinaryOperation, i32> =
             HashMap::from_iter(BinaryOperation::ALL.iter().map(|x| (*x, x.get_priority())));
 
@@ -1093,7 +1157,7 @@ fn process_binary_expressions(
 
         for (i, val) in exprs.iter().enumerate() {
             if let BinaryExpressionMatching::BinaryOperation(op, _) = val {
-                let priority = priorities.get(&op).copied().unwrap_or(0);
+                let priority = priorities.get(op).copied().unwrap_or(0);
 
                 if let Some((highest, _)) = highest_priority
                     && priority > highest
