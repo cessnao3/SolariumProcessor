@@ -20,7 +20,10 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn read_type(tokens: &mut TokenIter, state: &CompilingState) -> Result<Self, TokenError> {
+    pub fn read_type(
+        tokens: &mut TokenIter,
+        state: &mut CompilingState,
+    ) -> Result<Self, TokenError> {
         let t = tokens.next()?;
         if t.get_value() == "*" {
             Ok(Self::Pointer(Box::new(Self::read_type(tokens, state)?)))
@@ -122,7 +125,7 @@ pub struct StructDefinition {
 impl StructDefinition {
     pub fn read_definition(
         tokens: &mut TokenIter,
-        state: &CompilingState,
+        state: &mut CompilingState,
     ) -> Result<(Self, Token), TokenError> {
         tokens.expect("struct")?;
         let name = tokens.next()?;
@@ -206,7 +209,7 @@ pub struct Function {
 impl Function {
     pub fn read_tokens(
         tokens: &mut TokenIter,
-        state: &CompilingState,
+        state: &mut CompilingState,
         include_names: bool,
     ) -> Result<Self, TokenError> {
         tokens.expect("(")?;

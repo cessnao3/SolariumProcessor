@@ -148,14 +148,14 @@ pub trait FromLiteral<T> {
 #[derive(Debug, Clone)]
 pub enum AsmToken {
     ChangeAddress(u32),
-    Operation(FnInst, String, Vec<String>),
+    Operation(FnInst, String, Vec<Rc<str>>),
     OperationLiteral(Box<dyn Instruction>),
     CreateLabel(String),
     LoadLoc(String),
     Literal1(u8),
     Literal2(u16),
     Literal4(u32),
-    LiteralText(String),
+    LiteralText(Rc<str>),
     AlignInstruction,
     Comment(String),
     Empty,
@@ -292,7 +292,7 @@ impl TryFrom<&str> for AsmToken {
                         Self::ChangeAddress(addr)
                     }
                     "loadloc" => Self::LoadLoc(arg.into()),
-                    "text" => Self::LiteralText(arg.into()),
+                    "text" => Self::LiteralText(arg.as_str().into()),
                     "u8" => Self::Literal1(parse_imm_u8(arg)?),
                     "u16" => Self::Literal2(parse_imm_u16(arg)?),
                     "u32" => Self::Literal4(parse_imm_u32(arg)?),
@@ -332,7 +332,7 @@ impl TryFrom<&str> for AsmToken {
             Self::Operation(
                 *inst_fn,
                 name.into(),
-                args.iter().map(|s| s.to_string()).collect(),
+                args.iter().map(|s| s.as_str().into()).collect(),
             )
         } else {
             return Err(Self::Error::UnknownInstruction(value.into(), None));
@@ -585,13 +585,18 @@ impl TokenList {
                     state.labels.insert(lbl.into(), state.addr);
                 }
                 AsmToken::LoadLoc(lbl) => {
-                    state.add_delay(DelayToken::LoadLoc { label: lbl.into() }, t.loc.clone())?;
+                    state.add_delay(
+                        DelayToken::LoadLoc {
+                            label: lbl.as_str().into(),
+                        },
+                        t.loc.clone(),
+                    )?;
                 }
                 AsmToken::Operation(func, _, args) => {
                     state.add_delay(
                         DelayToken::Operation {
                             inst: *func,
-                            args: args.to_owned(),
+                            args: args.clone(),
                         },
                         t.loc.clone(),
                     )?;
@@ -630,8 +635,8 @@ pub struct AssemblerOutput {
 
 #[derive(Debug, Clone)]
 enum DelayToken {
-    LoadLoc { label: String },
-    Operation { inst: FnInst, args: Vec<String> },
+    LoadLoc { label: Rc<str> },
+    Operation { inst: FnInst, args: Vec<Rc<str>> },
 }
 
 #[derive(Default)]
@@ -684,11 +689,11 @@ impl ParserState {
         for (addr, (tok, loc)) in self.delay_vals.iter() {
             let insert_value = match tok {
                 DelayToken::LoadLoc { label } => {
-                    if let Some(loc) = self.labels.get(label) {
+                    if let Some(loc) = self.labels.get(label.as_ref()) {
                         *loc
                     } else {
                         return Err(AssemblerErrorLoc {
-                            err: AssemblerError::UnknownLabel(label.into()),
+                            err: AssemblerError::UnknownLabel(label.to_string()),
                             loc: loc.clone(),
                         });
                     }
@@ -698,7 +703,7 @@ impl ParserState {
                     let mut new_args = Vec::new();
 
                     for a in args.iter() {
-                        let na = if let Some(v) = self.labels.get(a) {
+                        let na = if let Some(v) = self.labels.get(a.as_ref()) {
                             format!("{}", (*v as i32) - (*addr as i32))
                         } else {
                             a.to_string()

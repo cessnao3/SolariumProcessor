@@ -15,17 +15,15 @@ pub fn parse(s: &str) -> Result<Vec<AsmTokenLoc>, TokenError> {
 
     while let Some(next) = token_iter.peek().map(|v| v.get_value().to_string()) {
         if next == "global" {
-            state.add_global_var(VariableDefinition::parse(
-                "global",
-                &mut token_iter,
-                &state,
-            )?)?;
+            let var = VariableDefinition::parse("global", &mut token_iter, &mut state)?;
+            state.add_global_var(var)?;
         } else if next == "const" {
-            state.add_const_var(VariableDefinition::parse("const", &mut token_iter, &state)?)?;
+            let var = VariableDefinition::parse("const", &mut token_iter, &mut state)?;
+            state.add_const_var(var)?;
         } else if next == "fn" {
             parse_fn_statement(&mut token_iter, &mut state)?;
         } else if next == "struct" {
-            let (s, name) = StructDefinition::read_definition(&mut token_iter, &state)?;
+            let (s, name) = StructDefinition::read_definition(&mut token_iter, &mut state)?;
             state.add_struct(name, s)?;
         } else {
             return Err(token_iter

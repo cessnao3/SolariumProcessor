@@ -13,7 +13,7 @@ use crate::{
     TokenError,
     expressions::{Expression, RegisterDef},
     functions::FunctionDefinition,
-    literals::Literal,
+    literals::{Literal, StringLiteral},
     tokenizer::{Token, get_identifier},
     typing::{FunctionParameter, StructDefinition},
     utilities::load_to_register,
@@ -283,6 +283,7 @@ pub struct CompilingState {
     init_loc: u32,
     statements: Vec<Rc<dyn GlobalStatement>>,
     global_scope: HashMap<String, GlobalType>,
+    string_literals: HashMap<String, Rc<StringLiteral>>,
     current_id: usize,
     full_program: bool,
     scope_manager: Option<ScopeManager>,
@@ -293,6 +294,7 @@ impl Default for CompilingState {
         Self {
             init_loc: 0x2000,
             global_scope: HashMap::new(),
+            string_literals: HashMap::new(),
             current_id: 0,
             statements: Vec::new(),
             full_program: true,
@@ -350,6 +352,10 @@ impl CompilingState {
             asm.extend_from_slice(&s.get_init_code()?);
         }
 
+        for s in self.string_literals.values() {
+            asm.extend_from_slice(&s.get_init_code()?);
+        }
+
         if let Some(GlobalType::Function(f)) = self.global_scope.get("main") {
             asm.push(Self::blank_token_loc(AsmToken::OperationLiteral(Box::new(
                 OpCopy::new(Register::ArgumentBase.into(), Register::StackPointer.into()),
@@ -376,6 +382,10 @@ impl CompilingState {
 
         add_name(&mut asm, "Static");
         for s in self.statements.iter() {
+            asm.extend_from_slice(&s.get_static_code()?);
+        }
+
+        for s in self.string_literals.values() {
             asm.extend_from_slice(&s.get_static_code()?);
         }
 
@@ -447,6 +457,18 @@ impl CompilingState {
             def.init_expr,
         )?);
         self.add_to_global_scope(GlobalType::Variable(var))
+    }
+
+    pub fn add_string_literal(&mut self, token: &Token) -> Result<Rc<dyn Expression>, TokenError> {
+        if let Some(existing) = self.string_literals.get(token.get_value()) {
+            Ok(existing.clone())
+        } else {
+            let sv = Rc::new(StringLiteral::new(token.clone(), self.get_next_id())?);
+            let return_val = sv.clone();
+            self.string_literals
+                .insert(token.get_value().to_string(), sv);
+            Ok(return_val)
+        }
     }
 
     pub fn add_const_var(&mut self, def: VariableDefinition) -> Result<(), TokenError> {

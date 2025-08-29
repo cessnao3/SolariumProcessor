@@ -1,11 +1,12 @@
-use std::{fmt::Display, sync::LazyLock};
+use std::{fmt::Display, rc::Rc, sync::LazyLock};
 
 use jib::cpu::{DataType, OperationError, OperatorManager, convert_types};
-use jib_asm::{ArgumentType, AsmToken};
+use jib_asm::{ArgumentType, AsmToken, OpLdn};
 use regex::Regex;
 
 use crate::{
     TokenError,
+    compiler::{GlobalStatement, Statement},
     expressions::{BinaryArithmeticOperation, Expression, RegisterDef, UnaryOperation},
     tokenizer::Token,
     typing::Type,
@@ -351,5 +352,99 @@ impl TryFrom<Token> for Literal {
             token: value,
             value: res,
         })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StringLiteral {
+    token: Token,
+    value: Rc<str>,
+    id: usize,
+}
+
+impl StringLiteral {
+    pub fn new(token: Token, id: usize) -> Result<Self, TokenError> {
+        static STRING_REGEX: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r#"^"(?<text>.*)"$"#).unwrap());
+        if let Some(m) = STRING_REGEX.captures(token.get_value())
+            && let Some(t) = m.name("text")
+        {
+            let s = t.as_str().into();
+            Ok(Self {
+                token,
+                value: s,
+                id,
+            })
+        } else {
+            Err(token.into_err("unable to parse into a valid string literal"))
+        }
+    }
+
+    fn get_label(&self) -> String {
+        format!("global_string_value_{}", self.id)
+    }
+}
+
+impl Display for StringLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\"{}\"", self.value)
+    }
+}
+
+impl Expression for StringLiteral {
+    fn get_token(&self) -> &Token {
+        &self.token
+    }
+
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        Ok(self
+            .token
+            .to_asm_iter([
+                AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
+                    reg.reg,
+                    DataType::U32,
+                )))),
+                AsmToken::LoadLoc(self.get_label()),
+            ])
+            .into_iter()
+            .collect())
+    }
+
+    fn get_type(&self) -> Result<Type, TokenError> {
+        Ok(Type::Pointer(Box::new(Type::Primitive(DataType::U8))))
+    }
+
+    fn simplify(&self) -> Option<Literal> {
+        None
+    }
+}
+
+impl Statement for StringLiteral {
+    fn get_exec_code(&self) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        Err(self
+            .token
+            .clone()
+            .into_err("string literal is not a valid statement"))
+    }
+}
+
+impl GlobalStatement for StringLiteral {
+    fn get_init_code(&self) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        Ok(vec![])
+    }
+
+    fn get_static_code(&self) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        Ok(self
+            .token
+            .to_asm_iter([
+                AsmToken::CreateLabel(self.get_label()),
+                AsmToken::LiteralText(self.value.clone()),
+                AsmToken::AlignInstruction,
+            ])
+            .into_iter()
+            .collect())
     }
 }

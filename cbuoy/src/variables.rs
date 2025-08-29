@@ -400,7 +400,7 @@ impl VariableDefinition {
     pub fn parse(
         def_name: &str,
         tokens: &mut TokenIter,
-        state: &CompilingState,
+        state: &mut CompilingState,
     ) -> Result<Self, TokenError> {
         tokens.expect(def_name)?;
         let name_token = tokens.next()?;

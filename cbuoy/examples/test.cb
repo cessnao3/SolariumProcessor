@@ -10,7 +10,7 @@ global z: u8 = Z;
 global zz: [100]u8;
 global zzz: [10][50]u8;
 global func_test: fn()void;
-//global TEST: *u8 = "Hello, world!";
+global TEST_STR: *u8 = "Hello, world!";
 global PTR_TEST: u32 = 0;
 
 global ex_ptr: *u32 = 0x3000;
@@ -26,22 +26,12 @@ fn add_numbers(dest: *u16, a: u16, b: u16) u16 {
     *dest = 4 * a + b * 2;
 }
 
-fn print() void {
+fn print(c: *u8) void {
     def l: *u8 = 0xA000u32 + 5;
-    *l = 'H';
-    *l = 'e';
-    *l = 'l';
-    *l = 'l';
-    *l = 'o';
-    *l = ',';
-    *l = ' ';
-    *l = 'W';
-    *l = 'o';
-    *l = 'r';
-    *l = 'l';
-    *l = 'd';
-    *l = '!';
-    *l = '\n';
+    while (*c != 0) {
+        *l = *c;
+        c = c + 1;
+    }
 }
 
 fn test_fn(a: u16, b: u32) void {
@@ -49,7 +39,7 @@ fn test_fn(a: u16, b: u32) void {
 }
 
 fn main() void {
-    print();
+    print(TEST_STR);
     const X: i16 = 3;
     def a: u16 = 32;
     {
