@@ -241,7 +241,7 @@ impl TryFrom<Token> for Literal {
             Regex::new(r"^(((?<inum>(0x)?[a-fA-F\d]+)(?<itype>[ui](8|(16)|(32)))?)|((?<fnum>(\d+(\.\d*))|(\.\d+))f32)|(?<f32>\d*\.\d+))$").unwrap()
         });
         static CHAR_REGEX: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r"^'(?<num>\\?[\w])'$").unwrap());
+            LazyLock::new(|| Regex::new(r"^'(?<num>\\?[\w,\s\!\.\*\(\)\[\]\{\}])'$").unwrap());
 
         let res = if let Some(m) = LITERAL_REGEX.captures(value.get_value()) {
             if let Some(inum) = m.name("inum") {
@@ -309,7 +309,9 @@ impl TryFrom<Token> for Literal {
                         .into_err(format!("unable to get float value from {}", fnum.as_str()))),
                 }
             } else {
-                Err(value.clone().into_err("cannot parse as a literal"))
+                Err(value
+                    .clone()
+                    .into_err("cannot parse as a literal - unknown type"))
             }
         } else if let Some(m) = CHAR_REGEX.captures(value.get_value())
             && let Some(c) = m.name("num")

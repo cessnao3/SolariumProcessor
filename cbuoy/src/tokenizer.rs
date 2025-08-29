@@ -1,8 +1,12 @@
-use std::{collections::HashSet, fmt, iter::Peekable, rc::Rc, slice::Iter, sync::LazyLock};
+use std::{
+    collections::HashSet, fmt, iter::Peekable, rc::Rc, slice::Iter, sync::LazyLock, thread::current,
+};
 
 use jib::cpu::DataType;
 use jib_asm::{AsmToken, AsmTokenLoc};
 use regex::Regex;
+
+use crate::expressions::{BinaryOperation, UnaryOperation};
 
 fn strip_comments(s: &str) -> String {
     let mut lines = Vec::new();
@@ -19,6 +23,203 @@ fn strip_comments(s: &str) -> String {
 }
 
 pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
+    // Define the maximum count for operators
+    const MAX_OPERATOR_CHAR_COUNT: usize = 2;
+
+    // Define operator values
+    static OPERATORS: LazyLock<HashSet<String>> = LazyLock::new(|| {
+        let mut vals = HashSet::new();
+
+        for o in BinaryOperation::ALL {
+            vals.insert(o.to_string());
+        }
+
+        for o in UnaryOperation::ALL {
+            vals.insert(o.to_string());
+        }
+
+        for o in ["(", ")", ",", ";", ":", "{", "}", "[", "]", "."] {
+            vals.insert(o.to_string());
+        }
+
+        assert!(vals.iter().map(|x| x.len()).max().unwrap_or(0) <= MAX_OPERATOR_CHAR_COUNT);
+
+        vals
+    });
+    static OPERATOR_STARTS: LazyLock<HashSet<char>> = LazyLock::new(|| {
+        let mut vals = HashSet::new();
+
+        for o in OPERATORS.iter() {
+            if let Some(c) = o.chars().next() {
+                vals.insert(c);
+            }
+        }
+
+        vals
+    });
+
+    // Remove comments
+    let s = strip_comments(s);
+
+    // Loop through and process tokens
+    let mut tokens = Vec::new();
+
+    struct TokenMatch<'a> {
+        s: &'a str,
+        loc: Option<TokenLocation>,
+    }
+
+    impl From<TokenMatch<'_>> for Token {
+        fn from(value: TokenMatch) -> Self {
+            Self {
+                value: value.s.into(),
+                loc: value.loc.unwrap(),
+            }
+        }
+    }
+
+    struct TokenStart {
+        i: usize,
+        string_char: Option<char>,
+        last_was_escape: bool,
+    }
+
+    impl TokenStart {
+        fn new(i: usize) -> Self {
+            Self {
+                i,
+                string_char: None,
+                last_was_escape: false,
+            }
+        }
+
+        fn new_str(i: usize, c: char) -> Self {
+            Self {
+                i,
+                string_char: Some(c),
+                last_was_escape: false,
+            }
+        }
+
+        fn set_escape(&mut self, c: char) {
+            self.last_was_escape = self.string_char.is_some() && c == '\\';
+        }
+    }
+
+    for (line_num, l) in s.lines().enumerate() {
+        let mut current_state = None;
+
+        let get_loc = |start: usize| {
+            Some(TokenLocation {
+                line: line_num,
+                column: start,
+            })
+        };
+
+        for (col_num, c) in l.char_indices() {
+            if let Some(TokenStart {
+                i: start_index,
+                string_char: Some(string_char),
+                last_was_escape,
+            }) = current_state
+            {
+                if c == string_char && !last_was_escape {
+                    tokens.push(TokenMatch {
+                        s: &l[start_index..=col_num],
+                        loc: get_loc(start_index),
+                    });
+
+                    current_state = None;
+                }
+            } else if let Some(TokenStart {
+                i: start_index,
+                string_char: None,
+                last_was_escape,
+            }) = current_state
+            {
+                let prev = &l[start_index..col_num];
+                let current = &l[start_index..=col_num];
+
+                if c.is_whitespace() {
+                    tokens.push(TokenMatch {
+                        s: &l[start_index..col_num],
+                        loc: get_loc(start_index),
+                    });
+
+                    current_state = None;
+                } else if c == '\'' || c == '"' {
+                    tokens.push(TokenMatch {
+                        s: &l[start_index..col_num],
+                        loc: get_loc(start_index),
+                    });
+                    current_state = Some(TokenStart::new_str(col_num, c));
+                } else if OPERATORS.contains(prev) && !OPERATORS.contains(current) {
+                    tokens.push(TokenMatch {
+                        s: prev,
+                        loc: get_loc(start_index),
+                    });
+
+                    current_state = Some(TokenStart::new(col_num));
+                } else if !OPERATORS.contains(current) && OPERATOR_STARTS.contains(&c) {
+                    tokens.push(TokenMatch {
+                        s: prev,
+                        loc: get_loc(start_index),
+                    });
+
+                    current_state = Some(TokenStart::new(col_num));
+                }
+            } else if c == '\'' || c == '"' {
+                current_state = Some(TokenStart::new_str(col_num, c));
+            } else if !c.is_whitespace() {
+                current_state = Some(TokenStart::new(col_num));
+            }
+
+            if let Some(st) = &mut current_state {
+                st.set_escape(c);
+            }
+        }
+
+        if let Some(TokenStart {
+            i: start,
+            string_char: None,
+            ..
+        }) = current_state
+        {
+            let current = &l[start..];
+            tokens.push(TokenMatch {
+                s: current,
+                loc: get_loc(start),
+            });
+        } else if let Some(TokenStart {
+            i: start,
+            string_char: Some(_),
+            ..
+        }) = current_state
+        {
+            let current = &l[start..];
+
+            return Err(TokenError {
+                token: Some(Token::new(
+                    current,
+                    TokenLocation {
+                        line: line_num,
+                        column: start,
+                    },
+                )),
+                msg: format!("\"{current}\" not a valid token"),
+            });
+        }
+    }
+
+    // Return the resulting tokens
+    Ok(tokens
+        .into_iter()
+        .map(|t| Token::new(t.s, t.loc.unwrap()))
+        .collect())
+}
+
+/*
+pub fn tokenize2(s: &str) -> Result<Vec<Token>, TokenError> {
     // Remove comments
     let s = strip_comments(s);
 
@@ -112,6 +313,7 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
         .map(|t| Token::new(t.s, t.loc.unwrap()))
         .collect())
 }
+*/
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct TokenLocation {
@@ -334,6 +536,38 @@ mod tests {
             assert_eq!(token.get_loc().line, i);
             assert_eq!(token.get_loc().column, 0);
             assert_eq!(token.get_value(), *expected);
+        }
+    }
+
+    #[test]
+    fn definition_statement() {
+        let input_string = "global a: u16 = 255 + 5;";
+        let expected_token_values = ["global", "a", ":", "u16", "=", "255", "+", "5", ";"];
+
+        let tokens = tokenize(input_string);
+        assert!(tokens.is_ok());
+        let tokens = tokens.unwrap();
+        assert_eq!(tokens.len(), expected_token_values.len());
+
+        for (tok, expected) in tokens.iter().zip(expected_token_values) {
+            assert_eq!(tok.get_value(), expected);
+        }
+    }
+
+    #[test]
+    fn definition_statement_typing() {
+        let input_string = "global c: u32 = (-1) : u32;";
+        let expected_token_values = [
+            "global", "c", ":", "u32", "=", "(", "-", "1", ")", ":", "u32", ";",
+        ];
+
+        let tokens = tokenize(input_string);
+        assert!(tokens.is_ok());
+        let tokens = tokens.unwrap();
+        assert_eq!(tokens.len(), expected_token_values.len());
+
+        for (tok, expected) in tokens.iter().zip(expected_token_values) {
+            assert_eq!(tok.get_value(), expected);
         }
     }
 
