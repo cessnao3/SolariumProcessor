@@ -6,7 +6,6 @@ use regex::Regex;
 
 use crate::{
     TokenError,
-    compiler::{GlobalStatement, Statement},
     expressions::{BinaryArithmeticOperation, Expression, RegisterDef, UnaryOperation},
     tokenizer::Token,
     typing::Type,
@@ -145,6 +144,7 @@ impl LiteralValue {
             BinaryArithmeticOperation::Minus => OPERATIONS.get_arith(dt).sub(a, b)?.val,
             BinaryArithmeticOperation::Product => OPERATIONS.get_arith(dt).mul(a, b)?.val,
             BinaryArithmeticOperation::Divide => OPERATIONS.get_arith(dt).div(a, b)?.val,
+            BinaryArithmeticOperation::Mod => OPERATIONS.get_arith(dt).rem(a, b)?.val,
             BinaryArithmeticOperation::Greater => OPERATIONS.get_relative(dt).gt(a, b)? as u32,
             BinaryArithmeticOperation::GreaterEqual => {
                 OPERATIONS.get_relative(dt).geq(a, b)? as u32
@@ -383,6 +383,18 @@ impl StringLiteral {
     fn get_label(&self) -> String {
         format!("global_string_value_{}", self.id)
     }
+
+    pub fn get_static_code(&self) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+        Ok(self
+            .token
+            .to_asm_iter([
+                AsmToken::CreateLabel(self.get_label()),
+                AsmToken::LiteralText(self.value.to_string()),
+                AsmToken::AlignInstruction,
+            ])
+            .into_iter()
+            .collect())
+    }
 }
 
 impl Display for StringLiteral {
@@ -419,32 +431,5 @@ impl Expression for StringLiteral {
 
     fn simplify(&self) -> Option<Literal> {
         None
-    }
-}
-
-impl Statement for StringLiteral {
-    fn get_exec_code(&self) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
-        Err(self
-            .token
-            .clone()
-            .into_err("string literal is not a valid statement"))
-    }
-}
-
-impl GlobalStatement for StringLiteral {
-    fn get_init_code(&self) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
-        Ok(vec![])
-    }
-
-    fn get_static_code(&self) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
-        Ok(self
-            .token
-            .to_asm_iter([
-                AsmToken::CreateLabel(self.get_label()),
-                AsmToken::LiteralText(self.value.clone()),
-                AsmToken::AlignInstruction,
-            ])
-            .into_iter()
-            .collect())
     }
 }

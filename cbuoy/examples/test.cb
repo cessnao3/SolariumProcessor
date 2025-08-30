@@ -7,13 +7,12 @@ global f: i8 = -128;
 const Z: i8 = 10;
 global q: i8 = Z;
 global z: u8 = Z;
-global zz: [100]u8;
-global zzz: [10][50]u8;
 global func_test: fn()void;
 global TEST_STR: *u8 = "Hello, world!";
-global PTR_TEST: u32 = 0;
-
+global ptr_test: u32 = 0;
 global ex_ptr: *u32 = 0x3000;
+global SERIAL_OUT_LOC: *u8 = 0xA000u32 + 5;
+global DEBUG_REMAINDER: u8 = 0;
 
 struct TEST {
     a: u16;
@@ -27,10 +26,35 @@ fn add_numbers(dest: *u16, a: u16, b: u16) u16 {
 }
 
 fn print(c: *u8) void {
-    def l: *u8 = 0xA000u32 + 5;
     while (*c != 0) {
-        *l = *c;
+        *SERIAL_OUT_LOC = *c;
         c = c + 1;
+    }
+}
+
+fn print_digit(v: u8) void {
+    if (v < 10) {
+        *SERIAL_OUT_LOC = '0' + v;
+    } else {
+        *SERIAL_OUT_LOC = '!';
+    }
+}
+
+fn print_uint(v: u32) void {
+    def chars: [12]u8;
+    def cp: *u8 = &chars;
+    if (v == 0) {
+        print_digit(0);
+    } else {
+        while (v != 0) {
+            *cp = v % 10;
+            v = v / 10;
+            cp = cp + 1;
+        }
+        while (cp != &chars) {
+            print_digit(*cp);
+            cp = cp - 1;
+        }
     }
 }
 
@@ -39,7 +63,15 @@ fn test_fn(a: u16, b: u32) void {
 }
 
 fn main() void {
+    DEBUG_REMAINDER = 12 % 10;
+    print_uint(0);
+    print("\n");
+    print_uint(1);
+    print("\n");
+    print_uint(10);
+    print("\n");
     print(TEST_STR);
+    print("\n");
     const X: i16 = 3;
     def a: u16 = 32;
     {
@@ -80,7 +112,7 @@ fn main() void {
     q2 = Q;
     add_numbers(&c, 10, q2.a);
 
-    def ptr_local: *u16 = &PTR_TEST;
+    def ptr_local: *u16 = &ptr_test;
     *ptr_local = 1;
     *(ptr_local + 1) = 2;
 }

@@ -8,8 +8,8 @@ use std::{
 use jib::cpu::{DataType, Register, convert_types};
 use jib_asm::{
     ArgumentType, AsmToken, Instruction, OpAdd, OpBand, OpBool, OpBor, OpBxor, OpCall, OpConv,
-    OpCopy, OpDiv, OpLd, OpLdi, OpLdn, OpMul, OpPopr, OpPush, OpSav, OpSub, OpTeq, OpTg, OpTge,
-    OpTl, OpTle, OpTneq,
+    OpCopy, OpDiv, OpLd, OpLdi, OpLdn, OpMul, OpPopr, OpPush, OpRem, OpSav, OpSub, OpTeq, OpTg,
+    OpTge, OpTl, OpTle, OpTneq,
 };
 
 use crate::{
@@ -332,6 +332,7 @@ pub enum BinaryArithmeticOperation {
     Minus,
     Product,
     Divide,
+    Mod,
     And,
     Or,
     Equals,
@@ -351,6 +352,7 @@ impl BinaryArithmeticOperation {
         Self::Minus,
         Self::Product,
         Self::Divide,
+        Self::Mod,
         Self::And,
         Self::Or,
         Self::Equals,
@@ -370,6 +372,7 @@ impl BinaryArithmeticOperation {
             Self::Minus => -5,
             Self::Product => -10,
             Self::Divide => -10,
+            Self::Mod => -10,
             Self::And => 0,
             Self::Or => 0,
             Self::Equals => 0,
@@ -392,6 +395,7 @@ impl Display for BinaryArithmeticOperation {
             Self::Minus => "-",
             Self::Product => "*",
             Self::Divide => "/",
+            Self::Mod => "%",
             Self::And => "&&",
             Self::Or => "||",
             Self::Equals => "==",
@@ -627,6 +631,9 @@ impl Expression for BinaryArithmeticExpression {
                 }
                 BinaryArithmeticOperation::Divide => {
                     vec![Box::new(OpDiv::new(reg_type, reg_a.into(), reg_b.into()))]
+                }
+                BinaryArithmeticOperation::Mod => {
+                    vec![Box::new(OpRem::new(reg_type, reg_a.into(), reg_b.into()))]
                 }
                 BinaryArithmeticOperation::And => {
                     vec![

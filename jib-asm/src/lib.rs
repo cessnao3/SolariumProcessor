@@ -148,14 +148,14 @@ pub trait FromLiteral<T> {
 #[derive(Debug, Clone)]
 pub enum AsmToken {
     ChangeAddress(u32),
-    Operation(FnInst, String, Vec<Rc<str>>),
+    Operation(FnInst, String, Vec<String>),
     OperationLiteral(Box<dyn Instruction>),
     CreateLabel(String),
     LoadLoc(String),
     Literal1(u8),
     Literal2(u16),
     Literal4(u32),
-    LiteralText(Rc<str>),
+    LiteralText(String),
     AlignInstruction,
     Comment(String),
     Empty,
@@ -636,7 +636,7 @@ pub struct AssemblerOutput {
 #[derive(Debug, Clone)]
 enum DelayToken {
     LoadLoc { label: Rc<str> },
-    Operation { inst: FnInst, args: Vec<Rc<str>> },
+    Operation { inst: FnInst, args: Vec<String> },
 }
 
 #[derive(Default)]
@@ -703,7 +703,7 @@ impl ParserState {
                     let mut new_args = Vec::new();
 
                     for a in args.iter() {
-                        let na = if let Some(v) = self.labels.get(a.as_ref()) {
+                        let na = if let Some(v) = self.labels.get(a) {
                             format!("{}", (*v as i32) - (*addr as i32))
                         } else {
                             a.to_string()

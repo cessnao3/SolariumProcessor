@@ -352,10 +352,6 @@ impl CompilingState {
             asm.extend_from_slice(&s.get_init_code()?);
         }
 
-        for s in self.string_literals.values() {
-            asm.extend_from_slice(&s.get_init_code()?);
-        }
-
         if let Some(GlobalType::Function(f)) = self.global_scope.get("main") {
             asm.push(Self::blank_token_loc(AsmToken::OperationLiteral(Box::new(
                 OpCopy::new(Register::ArgumentBase.into(), Register::StackPointer.into()),
@@ -464,10 +460,9 @@ impl CompilingState {
             Ok(existing.clone())
         } else {
             let sv = Rc::new(StringLiteral::new(token.clone(), self.get_next_id())?);
-            let return_val = sv.clone();
             self.string_literals
-                .insert(token.get_value().to_string(), sv);
-            Ok(return_val)
+                .insert(token.get_value().to_string(), sv.clone());
+            Ok(sv)
         }
     }
 

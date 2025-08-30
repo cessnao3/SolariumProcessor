@@ -232,17 +232,31 @@ impl Statement for IfStatement {
 
         asm.extend(self.test_expr.load_value_to_register(def)?);
 
+        let false_label = format!("{label_base}_false");
+
         asm.extend(self.token.to_asm_iter([
             AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
                 def.spare,
                 DataType::U32,
             )))),
-            AsmToken::LoadLoc(format!("{label_base}_false")),
+            AsmToken::LoadLoc(false_label.clone()),
             AsmToken::OperationLiteral(Box::new(OpTz::new(def.reg.into()))),
             AsmToken::OperationLiteral(Box::new(OpJmp::new(def.spare.into()))),
         ]));
 
         asm.extend(self.true_statement.get_exec_code()?);
+
+        let end_label = format!("{label_base}_end");
+        if self.false_statement.is_some() {
+            asm.extend(self.token.to_asm_iter([
+                AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
+                    def.reg,
+                    DataType::U32,
+                )))),
+                AsmToken::LoadLoc(end_label.clone()),
+                AsmToken::OperationLiteral(Box::new(OpJmp::new(def.reg.into()))),
+            ]));
+        }
 
         asm.push(
             self.token
@@ -251,6 +265,7 @@ impl Statement for IfStatement {
 
         if let Some(fe) = &self.false_statement {
             asm.extend(fe.get_exec_code()?);
+            asm.push(self.token.to_asm(AsmToken::CreateLabel(end_label)));
         }
 
         Ok(asm)
