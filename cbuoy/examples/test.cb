@@ -12,6 +12,9 @@ global TEST_STR: *u8 = "Hello, world!";
 global ptr_test: u32 = 0;
 global ex_ptr: *u32 = 0x3000;
 global SERIAL_OUT_LOC: *u8 = 0xA000u32 + 5;
+global cp: *u8;
+global DEBUG_ARRAY_TMP: [12]u8;
+global DEBUG_VALUE: u32 = 123;
 global DEBUG_REMAINDER: u8 = 0;
 
 struct TEST {
@@ -42,7 +45,8 @@ fn print_digit(v: u8) void {
 
 fn print_uint(v: u32) void {
     def chars: [12]u8;
-    def cp: *u8 = &chars;
+    //def cp: *u8 = &DEBUG_ARRAY_TMP;
+    cp = &DEBUG_ARRAY_TMP;
     if (v == 0) {
         print_digit(0);
     } else {
@@ -68,7 +72,7 @@ fn main() void {
     print("\n");
     print_uint(1);
     print("\n");
-    print_uint(10);
+    print_uint(1234);
     print("\n");
     print(TEST_STR);
     print("\n");

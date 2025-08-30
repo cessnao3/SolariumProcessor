@@ -553,32 +553,37 @@ impl Expression for BinaryArithmeticExpression {
                         incr_val: Register,
                         spare: Register,
                     ) -> Result<Vec<AsmToken>, TokenError> {
-                        let mut insts = vec![AsmToken::OperationLiteral(Box::new(OpPush::new(
-                            spare.into(),
-                        )))];
+                        if size != 1 {
+                            let mut insts = vec![AsmToken::OperationLiteral(Box::new(
+                                OpPush::new(spare.into()),
+                            ))];
 
-                        if size <= u16::MAX as usize {
-                            let reg_bt = ArgumentType::new(spare, DataType::U16);
-                            insts.push(AsmToken::OperationLiteral(Box::new(OpLdi::new(
-                                reg_bt,
-                                size as u16,
+                            if size <= u16::MAX as usize {
+                                let reg_bt = ArgumentType::new(spare, DataType::U16);
+                                insts.push(AsmToken::OperationLiteral(Box::new(OpLdi::new(
+                                    reg_bt,
+                                    size as u16,
+                                ))));
+                            } else {
+                                let reg_bt = ArgumentType::new(spare, DataType::U32);
+                                insts
+                                    .push(AsmToken::OperationLiteral(Box::new(OpLdn::new(reg_bt))));
+                                insts.push(AsmToken::Literal4(size as u32));
+                                insts.push(AsmToken::AlignInstruction);
+                            }
+                            insts.push(AsmToken::OperationLiteral(Box::new(OpMul::new(
+                                ArgumentType::new(incr_val, DataType::I32),
+                                spare.into(),
+                                incr_val.into(),
                             ))));
-                        } else {
-                            let reg_bt = ArgumentType::new(spare, DataType::U32);
-                            insts.push(AsmToken::OperationLiteral(Box::new(OpLdn::new(reg_bt))));
-                            insts.push(AsmToken::Literal4(size as u32));
-                            insts.push(AsmToken::AlignInstruction);
-                        }
-                        insts.push(AsmToken::OperationLiteral(Box::new(OpMul::new(
-                            ArgumentType::new(incr_val, DataType::I32),
-                            spare.into(),
-                            incr_val.into(),
-                        ))));
-                        insts.push(AsmToken::OperationLiteral(Box::new(OpPopr::new(
-                            spare.into(),
-                        ))));
+                            insts.push(AsmToken::OperationLiteral(Box::new(OpPopr::new(
+                                spare.into(),
+                            ))));
 
-                        Ok(insts)
+                            Ok(insts)
+                        } else {
+                            Ok(Vec::new())
+                        }
                     }
 
                     if let Some(sa) = get_base_size(&type_a) {
