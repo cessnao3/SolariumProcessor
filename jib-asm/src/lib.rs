@@ -752,7 +752,7 @@ pub fn assemble_lines(txt: &[&str]) -> Result<AssemblerOutput, AssemblerErrorLoc
             column: 0,
             text: Some(l.to_string().into()),
         };
-        if let Err(e) = state.parse_line(&l, loc.clone()) {
+        if let Err(e) = state.parse_line(l, loc.clone()) {
             return Err(AssemblerErrorLoc { err: e, loc });
         }
     }
