@@ -292,37 +292,37 @@ impl Statement for LocalVariable {
                         )))),
                 );
             }
-        } else if let Some(e) = &self.init_expr
-            && let Ok(t) = e.get_type()
-        {
-            if t == self.dtype {
-                let def = RegisterDef::default();
-                let load_val = def.increment_token(&self.token)?;
+        } else if let Some(e) = &self.init_expr {
+            if let Ok(t) = e.get_type() {
+                if t == self.dtype {
+                    let def = RegisterDef::default();
+                    let load_val = def.increment_token(&self.token)?;
 
-                let local_reg = if self.offset > 0 {
-                    asm.extend_from_slice(&self.load_address_to_register(def)?);
-                    def.reg
+                    let local_reg = if self.offset > 0 {
+                        asm.extend_from_slice(&self.load_address_to_register(def)?);
+                        def.reg
+                    } else {
+                        self.base
+                    };
+
+                    asm.extend_from_slice(&e.load_address_to_register(load_val)?);
+
+                    let mem = MemcpyStatement::new(
+                        self.token.clone(),
+                        load_val.reg,
+                        local_reg,
+                        self.dtype.byte_size(),
+                    );
+
+                    asm.extend_from_slice(&mem.get_exec_code()?);
                 } else {
-                    self.base
-                };
-
-                asm.extend_from_slice(&e.load_address_to_register(load_val)?);
-
-                let mem = MemcpyStatement::new(
-                    self.token.clone(),
-                    load_val.reg,
-                    local_reg,
-                    self.dtype.byte_size(),
-                );
-
-                asm.extend_from_slice(&mem.get_exec_code()?);
+                    return Err(self.token.clone().into_err("mismatch in data type"));
+                }
             } else {
-                return Err(self.token.clone().into_err("mismatch in data type"));
+                return Err(self.token.clone().into_err(
+                    "unable to obtain a valid type for the provided variable init expression",
+                ));
             }
-        } else {
-            return Err(self.token.clone().into_err(
-                "unable to obtain a valid type for the provided variable init expression",
-            ));
         }
 
         Ok(asm)
