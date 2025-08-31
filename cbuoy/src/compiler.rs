@@ -1,5 +1,4 @@
 use std::{
-    any::Any,
     cell::RefCell,
     collections::{HashMap, hash_map::Entry},
     fmt::Debug,
@@ -285,7 +284,7 @@ impl Statement for ScopeRemoveStatement {
 
 #[derive(Debug, Clone)]
 pub enum UserTypeOptions {
-    Struct(Token, Rc<StructDefinition>),
+    Struct(Rc<StructDefinition>),
     OpaqueType(Token),
 }
 
@@ -307,7 +306,7 @@ impl UserTypes {
                         ))
                     }
                 }
-                UserTypeOptions::Struct(_, s) => Ok(s.clone()),
+                UserTypeOptions::Struct(s) => Ok(s.clone()),
             }
         } else {
             Err(t.clone().into_err("no valid type with provided name found"))
@@ -528,9 +527,9 @@ impl CompilingState {
         tv.types.clear();
 
         for (n, v) in self.global_scope.iter() {
-            if let GlobalType::Structure(t, s) = v {
+            if let GlobalType::Structure(_, s) = v {
                 tv.types
-                    .insert(n.clone(), UserTypeOptions::Struct(t.clone(), s.clone()));
+                    .insert(n.clone(), UserTypeOptions::Struct(s.clone()));
             } else if let GlobalType::OpaqueType(t) = v {
                 tv.types
                     .insert(n.clone(), UserTypeOptions::OpaqueType(t.clone()));

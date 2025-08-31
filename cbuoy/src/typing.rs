@@ -12,20 +12,20 @@ use crate::expressions::parse_expression;
 use crate::tokenizer::{Token, TokenError, TokenIter, get_identifier, is_identifier};
 
 #[derive(Debug, Clone)]
-pub struct OpaqueTypeDef {
+pub struct UserTypeReference {
     name: Token,
     db: Rc<RefCell<UserTypes>>,
 }
 
-impl OpaqueTypeDef {
+impl UserTypeReference {
     pub fn get_struct(&self) -> Result<Rc<StructDefinition>, TokenError> {
         self.db.borrow().get_struct(&self.name)
     }
 }
 
-impl Eq for OpaqueTypeDef {}
+impl Eq for UserTypeReference {}
 
-impl PartialEq for OpaqueTypeDef {
+impl PartialEq for UserTypeReference {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
     }
@@ -38,7 +38,7 @@ pub enum Type {
     Array(usize, Box<Self>),
     Struct(Rc<StructDefinition>),
     Function(Rc<Function>),
-    OpaqueType(OpaqueTypeDef),
+    Opaque(UserTypeReference),
 }
 
 impl Type {
@@ -73,7 +73,7 @@ impl Type {
             if let Ok(s) = state.get_struct(&t) {
                 Ok(Self::Struct(s))
             } else if state.get_opaque_type(&t).is_ok() {
-                Ok(Self::OpaqueType(OpaqueTypeDef {
+                Ok(Self::Opaque(UserTypeReference {
                     name: t.clone(),
                     db: state.get_user_type_db(),
                 }))
@@ -94,7 +94,7 @@ impl Type {
             Self::Array(size, t) => size * t.byte_size(),
             Self::Struct(s) => s.fields.values().map(|v| v.dtype.byte_size()).sum(),
             Self::Function(_) => DataType::U32.byte_size(),
-            Self::OpaqueType(_) => 0,
+            Self::Opaque(_) => 0,
         }
     }
 
@@ -105,7 +105,7 @@ impl Type {
             Self::Array(_, t) => Some(t.as_ref().clone()),
             Self::Struct(_) => None,
             Self::Function(_) => None,
-            Self::OpaqueType(t) => {
+            Self::Opaque(t) => {
                 if let Ok(s) = t.get_struct() {
                     Some(Self::Struct(s))
                 } else {
@@ -151,7 +151,7 @@ impl Display for Type {
                     .as_ref()
                     .map_or("void".to_string(), |r| r.to_string())
             ),
-            Self::OpaqueType(s) => write!(f, "{}", s.name),
+            Self::Opaque(s) => write!(f, "{}", s.name),
         }
     }
 }
