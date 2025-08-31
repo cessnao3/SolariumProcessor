@@ -7,9 +7,9 @@ use std::{
 
 use jib::cpu::{DataType, Register, convert_types};
 use jib_asm::{
-    ArgumentType, AsmToken, Instruction, OpAdd, OpBand, OpBool, OpBor, OpBxor, OpCall, OpConv,
-    OpCopy, OpDiv, OpLd, OpLdi, OpLdn, OpMul, OpPopr, OpPush, OpRem, OpSav, OpSub, OpTeq, OpTg,
-    OpTge, OpTl, OpTle, OpTneq,
+    ArgumentType, AsmToken, AsmTokenLoc, Instruction, OpAdd, OpBand, OpBnot, OpBool, OpBor, OpBxor,
+    OpCall, OpConv, OpCopy, OpDiv, OpLd, OpLdi, OpLdn, OpMul, OpNeg, OpNot, OpPopr, OpPush, OpRem,
+    OpSav, OpSub, OpTeq, OpTg, OpTge, OpTl, OpTle, OpTneq,
 };
 
 use crate::{
@@ -85,6 +85,11 @@ impl Display for RegisterDef {
     }
 }
 
+pub struct ExpressionData {
+    pub asm: Vec<AsmTokenLoc>,
+    pub allocated_stack: usize,
+}
+
 pub trait Expression: Debug + Display {
     fn get_token(&self) -> &Token;
 
@@ -101,19 +106,13 @@ pub trait Expression: Debug + Display {
         }
     }
 
-    fn load_address_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_address_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         Err(self.get_token().clone().into_err(format!(
             "expression does not have a mappable address in memory - cannot load to {reg}"
         )))
     }
 
-    fn load_value_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError>;
+    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError>;
 
     fn simplify(&self) -> Option<Literal> {
         None
@@ -174,13 +173,30 @@ impl Expression for UnaryExpression {
         }
     }
 
-    fn load_value_to_register(
-        &self,
-        _reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
-        //let
+    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
+        let mut base_expr = self.base.load_value_to_register(reg)?;
 
-        todo!()
+        let asm_inst = match self.op {
+            UnaryOperation::Plus => None,
+            UnaryOperation::Minus => Some(AsmToken::OperationLiteral(Box::new(OpNeg::new(
+                ArgumentType::new(reg.reg, self.base.get_primitive_type()?),
+                reg.reg.into(),
+            )))),
+            UnaryOperation::Not => Some(AsmToken::OperationLiteral(Box::new(OpNot::new(
+                reg.reg.into(),
+                reg.reg.into(),
+            )))),
+            UnaryOperation::BitNot => Some(AsmToken::OperationLiteral(Box::new(OpBnot::new(
+                ArgumentType::new(reg.reg, self.base.get_primitive_type()?),
+                reg.reg.into(),
+            )))),
+        };
+
+        if let Some(inst) = asm_inst {
+            base_expr.asm.push(self.token.to_asm(inst));
+        }
+
+        Ok(base_expr)
     }
 
     fn simplify(&self) -> Option<Literal> {
