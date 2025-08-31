@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt;
 use std::rc::Rc;
@@ -6,9 +7,29 @@ use std::{collections::HashMap, fmt::Display};
 
 use jib::cpu::DataType;
 
-use crate::compiler::CompilingState;
+use crate::compiler::{CompilingState, UserTypes};
 use crate::expressions::parse_expression;
 use crate::tokenizer::{Token, TokenError, TokenIter, get_identifier, is_identifier};
+
+#[derive(Debug, Clone)]
+pub struct OpaqueTypeDef {
+    name: Token,
+    db: Rc<RefCell<UserTypes>>,
+}
+
+impl OpaqueTypeDef {
+    pub fn get_struct(&self) -> Result<Rc<StructDefinition>, TokenError> {
+        self.db.borrow().get_struct(&self.name)
+    }
+}
+
+impl Eq for OpaqueTypeDef {}
+
+impl PartialEq for OpaqueTypeDef {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Type {
@@ -17,6 +38,7 @@ pub enum Type {
     Array(usize, Box<Self>),
     Struct(Rc<StructDefinition>),
     Function(Rc<Function>),
+    OpaqueType(OpaqueTypeDef),
 }
 
 impl Type {
@@ -48,7 +70,16 @@ impl Type {
                 tokens, state, false,
             )?)))
         } else if is_identifier(t.get_value()) {
-            Ok(Self::Struct(state.get_struct(&t)?))
+            if let Ok(s) = state.get_struct(&t) {
+                Ok(Self::Struct(s))
+            } else if state.get_opaque_type(&t).is_ok() {
+                Ok(Self::OpaqueType(OpaqueTypeDef {
+                    name: t.clone(),
+                    db: state.get_user_type_db(),
+                }))
+            } else {
+                Err(t.into_err("unable to find a valid struct or opaque type with name"))
+            }
         } else if let Ok(p) = DataType::try_from(t.get_value()) {
             Ok(Self::Primitive(p))
         } else {
@@ -63,6 +94,7 @@ impl Type {
             Self::Array(size, t) => size * t.byte_size(),
             Self::Struct(s) => s.fields.values().map(|v| v.dtype.byte_size()).sum(),
             Self::Function(_) => DataType::U32.byte_size(),
+            Self::OpaqueType(_) => 0,
         }
     }
 
@@ -73,6 +105,13 @@ impl Type {
             Self::Array(_, t) => Some(t.as_ref().clone()),
             Self::Struct(_) => None,
             Self::Function(_) => None,
+            Self::OpaqueType(t) => {
+                if let Ok(s) = t.get_struct() {
+                    Some(Self::Struct(s))
+                } else {
+                    None
+                }
+            }
         }
     }
 
@@ -112,6 +151,7 @@ impl Display for Type {
                     .as_ref()
                     .map_or("void".to_string(), |r| r.to_string())
             ),
+            Self::OpaqueType(s) => write!(f, "{}", s.name),
         }
     }
 }
@@ -126,10 +166,12 @@ impl StructDefinition {
     pub fn read_definition(
         tokens: &mut TokenIter,
         state: &mut CompilingState,
-    ) -> Result<(Self, Token), TokenError> {
+    ) -> Result<(Rc<Self>, Token), TokenError> {
         tokens.expect("struct")?;
         let name = tokens.next()?;
         get_identifier(&name)?;
+
+        state.add_opaque_type(name.clone())?;
 
         let mut s = Self {
             name: name.get_value().to_string(),
@@ -160,7 +202,10 @@ impl StructDefinition {
 
         tokens.expect("}")?;
 
-        Ok((s, name))
+        let rs = Rc::new(s);
+
+        state.upgrade_opaque_type(name.clone(), rs.clone())?;
+        Ok((rs, name))
     }
 
     pub fn get_name(&self) -> &str {

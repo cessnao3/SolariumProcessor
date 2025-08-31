@@ -1,4 +1,6 @@
 use std::{
+    any::Any,
+    cell::RefCell,
     collections::{HashMap, hash_map::Entry},
     fmt::Debug,
     rc::Rc,
@@ -35,6 +37,7 @@ enum GlobalType {
     Function(Rc<FunctionDefinition>),
     Constant(Rc<Literal>),
     Structure(Token, Rc<StructDefinition>),
+    OpaqueType(Token),
 }
 
 impl GlobalType {
@@ -44,6 +47,7 @@ impl GlobalType {
             Self::Function(v) => v.get_token(),
             Self::Constant(v) => v.get_token(),
             Self::Structure(t, _) => t,
+            Self::OpaqueType(t) => t,
         }
     }
 
@@ -51,8 +55,9 @@ impl GlobalType {
         match self {
             Self::Variable(var) => Some(Rc::new(GlobalVariableStatement::new(var.clone()))),
             Self::Function(func) => Some(func.clone()),
-            Self::Constant(_) => None,
-            Self::Structure(_, _) => None,
+            Self::Constant(..) => None,
+            Self::Structure(..) => None,
+            Self::OpaqueType(..) => None,
         }
     }
 }
@@ -278,11 +283,44 @@ impl Statement for ScopeRemoveStatement {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum UserTypeOptions {
+    Struct(Token, Rc<StructDefinition>),
+    OpaqueType(Token),
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct UserTypes {
+    types: HashMap<String, UserTypeOptions>,
+}
+
+impl UserTypes {
+    pub fn get_struct(&self, t: &Token) -> Result<Rc<StructDefinition>, TokenError> {
+        if let Some(e) = self.types.get(t.get_value()) {
+            match e {
+                UserTypeOptions::OpaqueType(next) => {
+                    if next.get_value() != t.get_value() {
+                        self.get_struct(next)
+                    } else {
+                        Err(t.clone().into_err(
+                            "recursive loop found when parsing opaque type into structure",
+                        ))
+                    }
+                }
+                UserTypeOptions::Struct(_, s) => Ok(s.clone()),
+            }
+        } else {
+            Err(t.clone().into_err("no valid type with provided name found"))
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct CompilingState {
     init_loc: u32,
     statements: Vec<Rc<dyn GlobalStatement>>,
     global_scope: HashMap<String, GlobalType>,
+    user_types: Rc<RefCell<UserTypes>>,
     string_literals: HashMap<String, Rc<StringLiteral>>,
     current_id: usize,
     full_program: bool,
@@ -294,6 +332,7 @@ impl Default for CompilingState {
         Self {
             init_loc: 0x2000,
             global_scope: HashMap::new(),
+            user_types: Rc::new(RefCell::new(UserTypes::default())),
             string_literals: HashMap::new(),
             current_id: 0,
             statements: Vec::new(),
@@ -445,6 +484,16 @@ impl CompilingState {
         }
     }
 
+    pub fn get_opaque_type(&self, name: &Token) -> Result<String, TokenError> {
+        if let Some(GlobalType::OpaqueType(t)) = self.global_scope.get(name.get_value()) {
+            Ok(t.get_value().to_string())
+        } else {
+            Err(name
+                .clone()
+                .into_err("no structure with provided name found"))
+        }
+    }
+
     pub fn add_global_var(&mut self, def: VariableDefinition) -> Result<(), TokenError> {
         let var = Rc::new(GlobalVariable::new(
             def.token,
@@ -474,8 +523,46 @@ impl CompilingState {
         self.add_to_global_scope(GlobalType::Function(func))
     }
 
-    pub fn add_struct(&mut self, name: Token, s: StructDefinition) -> Result<(), TokenError> {
-        self.add_to_global_scope(GlobalType::Structure(name, Rc::new(s)))
+    fn update_user_types(&mut self) {
+        let mut tv = self.user_types.borrow_mut();
+        tv.types.clear();
+
+        for (n, v) in self.global_scope.iter() {
+            if let GlobalType::Structure(t, s) = v {
+                tv.types
+                    .insert(n.clone(), UserTypeOptions::Struct(t.clone(), s.clone()));
+            } else if let GlobalType::OpaqueType(t) = v {
+                tv.types
+                    .insert(n.clone(), UserTypeOptions::OpaqueType(t.clone()));
+            }
+        }
+    }
+
+    pub fn get_user_type_db(&self) -> Rc<RefCell<UserTypes>> {
+        self.user_types.clone()
+    }
+
+    pub fn add_opaque_type(&mut self, name: Token) -> Result<(), TokenError> {
+        self.add_to_global_scope(GlobalType::OpaqueType(name))?;
+        self.update_user_types();
+        Ok(())
+    }
+
+    pub fn upgrade_opaque_type(
+        &mut self,
+        name: Token,
+        s: Rc<StructDefinition>,
+    ) -> Result<(), TokenError> {
+        if self.get_opaque_type(&name)? == name.get_value() {
+            self.global_scope
+                .insert(name.get_value().to_string(), GlobalType::Structure(name, s));
+            self.update_user_types();
+            Ok(())
+        } else {
+            Err(name.clone().into_err(format!(
+                "opaque type with provided name {name} not found for upgrade"
+            )))
+        }
     }
 
     fn add_to_global_scope(&mut self, t: GlobalType) -> Result<(), TokenError> {
@@ -495,6 +582,8 @@ impl CompilingState {
         if let Some(s) = statement {
             self.statements.push(s);
         }
+
+        self.update_user_types();
 
         Ok(())
     }

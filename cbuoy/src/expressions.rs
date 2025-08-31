@@ -752,7 +752,12 @@ struct DotExpression {
 
 impl DotExpression {
     fn get_struct(&self) -> Result<Rc<StructDefinition>, TokenError> {
-        if let Type::Struct(s) = self.s_expression.get_type()? {
+        let mut base_type = self.s_expression.get_type()?;
+        while let Some(new_type) = base_type.base_type() {
+            base_type = new_type;
+        }
+
+        if let Type::Struct(s) = base_type {
             Ok(s)
         } else {
             Err(self

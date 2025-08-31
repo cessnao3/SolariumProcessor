@@ -23,8 +23,7 @@ pub fn parse(s: &str) -> Result<Vec<AsmTokenLoc>, TokenError> {
         } else if next == "fn" {
             parse_fn_statement(&mut token_iter, &mut state)?;
         } else if next == "struct" {
-            let (s, name) = StructDefinition::read_definition(&mut token_iter, &mut state)?;
-            state.add_struct(name, s)?;
+            StructDefinition::read_definition(&mut token_iter, &mut state)?;
         } else {
             return Err(token_iter
                 .next()?
