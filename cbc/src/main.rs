@@ -27,6 +27,10 @@ fn main() -> std::process::ExitCode {
             for (v, k) in locs {
                 println!("  {v:04x} => {k}");
             }
+            println!("Debug:");
+            for (addr, cmt) in r.debug.iter() {
+                println!("  {addr:04x} => {cmt}");
+            }
         }
         Err(e) => {
             eprintln!("{e}");

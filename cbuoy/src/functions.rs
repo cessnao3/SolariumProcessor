@@ -99,6 +99,7 @@ impl Statement for FunctionDefinition {
     fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let mut init_asm = vec![
             AsmToken::CreateLabel(self.entry_label.clone()),
+            AsmToken::LocationComment(format!("+func({})", self.name)),
             AsmToken::OperationLiteral(Box::new(OpCopy::new(
                 RegisterDef::FN_BASE.into(),
                 Register::StackPointer.into(),
@@ -138,6 +139,7 @@ impl Statement for FunctionDefinition {
             ))));
         }
         asm_end.push(AsmToken::OperationLiteral(Box::new(OpRet)));
+        asm_end.push(AsmToken::LocationComment(format!("-func({})", self.name)));
 
         asm.extend(self.name.to_asm_iter(asm_end));
 

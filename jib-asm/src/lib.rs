@@ -158,6 +158,7 @@ pub enum AsmToken {
     LiteralText(String),
     AlignInstruction,
     Comment(String),
+    LocationComment(String),
     Empty,
 }
 
@@ -346,6 +347,7 @@ impl Display for AsmToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Comment(s) => write!(f, "; {s}"),
+            Self::LocationComment(s) => write!(f, "! {s}"),
             Self::LoadLoc(l) => write!(f, ".loadloc {l}"),
             Self::AlignInstruction => write!(f, ".align"),
             Self::ChangeAddress(addr) => write!(f, ".oper 0x{addr:x}"),
@@ -535,7 +537,8 @@ impl TokenList {
             let loc = t.loc.clone();
 
             match &t.tok {
-                AsmToken::Comment(_) => (),
+                AsmToken::Comment(..) => (),
+                AsmToken::LocationComment(s) => state.debug_comment.push((state.addr, s.clone())),
                 AsmToken::Empty => (),
                 AsmToken::AlignInstruction => state.align_boundary(Processor::BYTES_PER_WORD),
                 AsmToken::OperationLiteral(op) => {
@@ -618,6 +621,7 @@ impl TokenList {
                     start_address: min_addr,
                     bytes,
                     labels: state.labels,
+                    debug: state.debug_comment,
                 });
             }
         }
@@ -631,6 +635,7 @@ pub struct AssemblerOutput {
     pub start_address: u32,
     pub bytes: Vec<u8>,
     pub labels: HashMap<String, u32>,
+    pub debug: Vec<(u32, String)>,
 }
 
 #[derive(Debug, Clone)]
@@ -643,6 +648,7 @@ enum DelayToken {
 struct ParserState {
     addr: u32,
     labels: HashMap<String, u32>,
+    debug_comment: Vec<(u32, String)>,
     values: HashMap<u32, u8>,
     delay_vals: HashMap<u32, (DelayToken, LocationInfo)>,
 }

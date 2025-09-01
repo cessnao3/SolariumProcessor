@@ -133,6 +133,17 @@ impl GlobalStatement for GlobalVariableStatement {
         let var = &self.global_var;
         let mut asm_static = Vec::new();
 
+        asm_static.push(name.to_asm(AsmToken::LocationComment(format!(
+                "+gvar({}) : {}{}",
+                name,
+                self.global_var.dtype,
+                self.global_var
+                    .dtype
+                    .primitive_type()
+                    .map(|x| format!(" ({x})"))
+                    .unwrap_or(String::new())
+            ))));
+
         asm_static.push(name.to_asm(AsmToken::CreateLabel(var.access_label().into())));
 
         if let Some(a) = self.simplified_literal() {
@@ -249,6 +260,13 @@ impl LocalVariable {
 impl Statement for LocalVariable {
     fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let mut asm = Vec::new();
+
+        asm.push(self.token.to_asm(AsmToken::LocationComment(format!(
+            "+lvar({}) : {}{}",
+            self.token,
+            self.dtype,
+            self.dtype.primitive_type().map(|x| format!(" ({x})")).unwrap_or(String::new())
+        ))));
 
         if let Some(var_type) = self.dtype.primitive_type() {
             if let Some(e) = &self.init_expr {
