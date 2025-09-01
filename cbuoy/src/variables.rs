@@ -9,7 +9,7 @@ use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpConv, OpCopy, OpLd, 
 use crate::{
     TokenError,
     compiler::{CompilingState, GlobalStatement, Statement},
-    expressions::{Expression, RegisterDef, parse_expression},
+    expressions::{Expression, ExpressionData, RegisterDef, parse_expression},
     literals::Literal,
     tokenizer::{Token, TokenIter, get_identifier},
     typing::Type,
@@ -71,10 +71,7 @@ impl Expression for GlobalVariable {
         Ok(self.dtype.clone())
     }
 
-    fn load_value_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         if let Some(p) = self.dtype.primitive_type() {
             let vals = [
                 AsmToken::OperationLiteral(Box::new(jib_asm::OpLdn::new(ArgumentType::new(
@@ -87,7 +84,7 @@ impl Expression for GlobalVariable {
                     reg.reg.into(),
                 ))),
             ];
-            Ok(self.to_token_loc(vals).collect())
+            Ok(ExpressionData::new(self.to_token_loc(vals)))
         } else {
             Err(self.name.clone().into_err(format!(
                 "unable to load value for {} to register",
@@ -96,16 +93,14 @@ impl Expression for GlobalVariable {
         }
     }
 
-    fn load_address_to_register(&self, reg: RegisterDef) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        Ok(self
-            .to_token_loc([
-                AsmToken::OperationLiteral(Box::new(jib_asm::OpLdn::new(ArgumentType::new(
-                    reg.reg,
-                    jib::cpu::DataType::U32,
-                )))),
-                AsmToken::LoadLoc(self.access_label().into()),
-            ])
-            .collect())
+    fn load_address_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
+        Ok(ExpressionData::new(self.to_token_loc([
+            AsmToken::OperationLiteral(Box::new(jib_asm::OpLdn::new(ArgumentType::new(
+                reg.reg,
+                jib::cpu::DataType::U32,
+            )))),
+            AsmToken::LoadLoc(self.access_label().into()),
+        ])))
     }
 }
 
@@ -190,8 +185,11 @@ impl GlobalStatement for GlobalVariableStatement {
                     self.global_var.get_name()
                 ))));
 
-                asm_init.extend_from_slice(&var.load_address_to_register(reg_state_var)?);
-                asm_init.extend_from_slice(&init_expr.load_value_to_register(reg_state_init)?);
+                asm_init
+                    .extend_from_slice(&var.load_address_to_register(reg_state_var)?.into_asm());
+                asm_init.extend_from_slice(
+                    &init_expr.load_value_to_register(reg_state_init)?.into_asm(),
+                );
 
                 let reg_init = reg_state_init.reg;
                 let reg_var = reg_state_var.reg;
@@ -267,12 +265,12 @@ impl Statement for LocalVariable {
                 ))));
 
                 let addr_reg = if self.offset > 0 {
-                    asm.extend_from_slice(&self.load_address_to_register(def)?);
+                    asm.extend_from_slice(&self.load_address_to_register(def)?.into_asm());
                     def.reg
                 } else {
                     self.base
                 };
-                asm.extend_from_slice(&e.load_value_to_register(load_val)?);
+                asm.extend_from_slice(&e.load_value_to_register(load_val)?.into_asm());
 
                 if var_type != expr_type {
                     asm.push(
@@ -299,13 +297,13 @@ impl Statement for LocalVariable {
                     let load_val = def.increment_token(&self.token)?;
 
                     let local_reg = if self.offset > 0 {
-                        asm.extend_from_slice(&self.load_address_to_register(def)?);
+                        asm.extend_from_slice(&self.load_address_to_register(def)?.into_asm());
                         def.reg
                     } else {
                         self.base
                     };
 
-                    asm.extend_from_slice(&e.load_address_to_register(load_val)?);
+                    asm.extend_from_slice(&e.load_address_to_register(load_val)?.into_asm());
 
                     let mem = MemcpyStatement::new(
                         self.token.clone(),
@@ -344,10 +342,7 @@ impl Expression for LocalVariable {
         Ok(self.dtype.clone())
     }
 
-    fn load_address_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_address_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         let mut asm = Vec::new();
 
         if self.offset > 0 {
@@ -364,16 +359,13 @@ impl Expression for LocalVariable {
             ))))
         }
 
-        Ok(self.token.to_asm_iter(asm).into_iter().collect())
+        Ok(ExpressionData::new(self.token.to_asm_iter(asm).into_iter()))
     }
 
-    fn load_value_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         if let Some(dt) = self.dtype.primitive_type() {
             let mut asm = self.load_address_to_register(reg)?;
-            asm.push(
+            asm.push_asm(
                 self.token
                     .to_asm(AsmToken::OperationLiteral(Box::new(OpLd::new(
                         ArgumentType::new(reg.reg, dt),

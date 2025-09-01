@@ -8,7 +8,7 @@ use jib_asm::{
 use crate::{
     TokenError,
     compiler::{CompilingState, GlobalStatement, ScopeManager, Statement},
-    expressions::{Expression, RegisterDef, parse_expression},
+    expressions::{Expression, ExpressionData, RegisterDef, parse_expression},
     tokenizer::{EndOfTokenStream, Token, TokenIter, get_identifier},
     typing::{Function, Type},
     utilities::load_to_register,
@@ -77,10 +77,7 @@ impl Expression for FunctionLabelExpr {
         Ok(Type::Function(Rc::new(self.dtype.clone())))
     }
 
-    fn load_value_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         let asm = vec![
             AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
                 reg.reg,
@@ -88,7 +85,7 @@ impl Expression for FunctionLabelExpr {
             )))),
             AsmToken::LoadLoc(self.entry_label.clone()),
         ];
-        Ok(self.name.to_asm_iter(asm).into_iter().collect())
+        Ok(ExpressionData::new(self.name.to_asm_iter(asm).into_iter()))
     }
 }
 
@@ -230,7 +227,7 @@ impl Statement for IfStatement {
             self.id, self.token,
         )))];
 
-        asm.extend(self.test_expr.load_value_to_register(def)?);
+        asm.extend(self.test_expr.load_value_to_register(def)?.into_asm());
 
         let false_label = format!("{label_base}_false");
 
@@ -295,7 +292,7 @@ impl Statement for WhileStatement {
                 .to_asm(AsmToken::CreateLabel(format!("{label_base}_test"))),
         ];
 
-        asm.extend(self.test_expr.load_value_to_register(def)?);
+        asm.extend(self.test_expr.load_value_to_register(def)?.into_asm());
 
         asm.extend(self.token.to_asm_iter([
             AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
@@ -343,7 +340,10 @@ struct ExpressionStatement {
 
 impl Statement for ExpressionStatement {
     fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        self.expr.load_value_to_register(RegisterDef::default())
+        Ok(self
+            .expr
+            .load_value_to_register(RegisterDef::default())?
+            .into_asm())
     }
 }
 

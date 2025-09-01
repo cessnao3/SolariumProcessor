@@ -85,9 +85,36 @@ impl Display for RegisterDef {
     }
 }
 
+#[derive(Debug, Default, Clone)]
 pub struct ExpressionData {
-    pub asm: Vec<AsmTokenLoc>,
-    pub allocated_stack: usize,
+    asm: Vec<AsmTokenLoc>,
+    allocated_stack: usize,
+}
+
+impl ExpressionData {
+    pub fn new<T: IntoIterator<Item = AsmTokenLoc>>(asm: T) -> Self {
+        Self {
+            asm: asm.into_iter().collect(),
+            allocated_stack: 0,
+        }
+    }
+
+    pub fn push_asm(&mut self, v: AsmTokenLoc) {
+        self.asm.push(v);
+    }
+
+    pub fn append(&mut self, other: Self) {
+        self.asm.extend(other.asm);
+        self.allocated_stack += other.allocated_stack;
+    }
+
+    pub fn extend_asm<T: IntoIterator<Item = AsmTokenLoc>>(&mut self, asm: T) {
+        self.asm.extend(asm.into_iter());
+    }
+
+    pub fn into_asm(self) -> Vec<AsmTokenLoc> {
+        self.asm
+    }
 }
 
 pub trait Expression: Debug + Display {
@@ -234,21 +261,15 @@ impl Expression for DereferenceExpression {
         &self.token
     }
 
-    fn load_address_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_address_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         self.base.load_value_to_register(reg)
     }
 
-    fn load_value_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         let mut asm = self.base.load_value_to_register(reg)?;
         let dt = self.get_primitive_type()?;
 
-        asm.push(
+        asm.push_asm(
             self.token
                 .to_asm(AsmToken::OperationLiteral(Box::new(OpLd::new(
                     ArgumentType::new(reg.reg, dt),
@@ -281,10 +302,7 @@ impl Expression for AddressOfExpression {
         Ok(Type::Pointer(Box::new(self.base.get_type()?)))
     }
 
-    fn load_value_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         self.base.load_address_to_register(reg)
     }
 }
@@ -499,27 +517,24 @@ impl Expression for BinaryArithmeticExpression {
         }
     }
 
-    fn load_value_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         if let Some(dt) = self.get_type()?.primitive_type() {
             let mut asm = self.lhs.load_value_to_register(reg)?;
             let reg_a = reg.reg;
 
             let reg_b;
             if let Some(reg_next) = reg.increment() {
-                asm.extend_from_slice(&self.rhs.load_value_to_register(reg_next)?);
+                asm.append(self.rhs.load_value_to_register(reg_next)?);
                 reg_b = reg_next.reg;
             } else {
-                asm.push(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
+                asm.push_asm(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
                     OpPush::new(reg.reg.into()),
                 ))));
-                asm.extend_from_slice(&self.rhs.load_value_to_register(reg)?);
-                asm.push(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
+                asm.append(self.rhs.load_value_to_register(reg)?);
+                asm.push_asm(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
                     OpCopy::new(reg.spare.into(), reg.reg.into()),
                 ))));
-                asm.push(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
+                asm.push_asm(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
                     OpPopr::new(reg.reg.into()),
                 ))));
                 reg_b = reg.spare;
@@ -527,7 +542,7 @@ impl Expression for BinaryArithmeticExpression {
 
             if let Some(p) = self.lhs.get_type()?.primitive_type() {
                 if p != dt {
-                    asm.push(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
+                    asm.push_asm(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
                         OpConv::new(ArgumentType::new(reg_a, dt), ArgumentType::new(reg_a, p)),
                     ))));
                 }
@@ -537,7 +552,7 @@ impl Expression for BinaryArithmeticExpression {
 
             if let Some(p) = self.rhs.get_type()?.primitive_type() {
                 if p != dt {
-                    asm.push(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
+                    asm.push_asm(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
                         OpConv::new(ArgumentType::new(reg_b, dt), ArgumentType::new(reg_b, p)),
                     ))));
                 }
@@ -614,7 +629,7 @@ impl Expression for BinaryArithmeticExpression {
                 Vec::new()
             };
 
-            asm.extend(
+            asm.extend_asm(
                 pointer_instructions
                     .into_iter()
                     .map(|x| self.token.to_asm(x)),
@@ -680,7 +695,7 @@ impl Expression for BinaryArithmeticExpression {
                 }
             };
 
-            asm.extend(
+            asm.extend_asm(
                 self.get_token()
                     .to_asm_iter(op_instructions.into_iter().map(AsmToken::OperationLiteral)),
             );
@@ -717,16 +732,13 @@ impl Expression for AsExpression {
         Ok(self.data_type.clone())
     }
 
-    fn load_value_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         let mut asm = self.expr.load_value_to_register(reg)?;
         if let Some(dt) = self.data_type.primitive_type() {
             let src_type = self.expr.get_primitive_type()?;
 
             if dt != src_type {
-                asm.push(
+                asm.push_asm(
                     self.token
                         .to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
                             ArgumentType::new(reg.reg, dt),
@@ -805,16 +817,13 @@ impl Expression for DotExpression {
         Ok(self.get_field()?.dtype.clone())
     }
 
-    fn load_address_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_address_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         let mut asm = self.s_expression.load_address_to_register(reg)?;
-        asm.extend(
+        asm.extend_asm(
             self.token
                 .to_asm_iter(load_to_register(reg.spare, self.get_field()?.offset as u32)),
         );
-        asm.push(
+        asm.push_asm(
             self.token
                 .to_asm(AsmToken::OperationLiteral(Box::new(OpAdd::new(
                     ArgumentType::new(reg.reg, DataType::U32),
@@ -825,14 +834,11 @@ impl Expression for DotExpression {
         Ok(asm)
     }
 
-    fn load_value_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         let mut asm = self.load_address_to_register(reg)?;
         let dt = self.get_primitive_type()?;
 
-        asm.push(
+        asm.push_asm(
             self.token
                 .to_asm(AsmToken::OperationLiteral(Box::new(OpLd::new(
                     ArgumentType::new(reg.reg, dt),
@@ -872,14 +878,11 @@ impl Expression for AssignmentExpression {
         self.addr_expr.get_type()
     }
 
-    fn load_value_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         let tok = self.addr_expr.get_token();
 
-        let mut asm = Vec::new();
-        asm.push(self.token.to_asm(AsmToken::Comment(format!(
+        let mut asm = ExpressionData::default();
+        asm.push_asm(self.token.to_asm(AsmToken::Comment(format!(
             "assignment of {} with {}",
             self.addr_expr, self.val_expr
         ))));
@@ -890,17 +893,17 @@ impl Expression for AssignmentExpression {
         if let Some(dest_dtype) = self.addr_expr.get_type()?.primitive_type() {
             let val_dtype = self.val_expr.get_primitive_type()?;
 
-            asm.extend(self.val_expr.load_value_to_register(val_def)?);
-            asm.extend(self.addr_expr.load_address_to_register(addr_def)?);
+            asm.append(self.val_expr.load_value_to_register(val_def)?);
+            asm.append(self.addr_expr.load_address_to_register(addr_def)?);
 
             if val_dtype != dest_dtype {
-                asm.push(tok.to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
+                asm.push_asm(tok.to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
                     ArgumentType::new(val_def.reg, dest_dtype),
                     ArgumentType::new(val_def.reg, val_dtype),
                 )))));
             }
 
-            asm.push(tok.to_asm(AsmToken::OperationLiteral(Box::new(OpSav::new(
+            asm.push_asm(tok.to_asm(AsmToken::OperationLiteral(Box::new(OpSav::new(
                 ArgumentType::new(addr_def.reg, dest_dtype),
                 val_def.reg.into(),
             )))));
@@ -910,8 +913,8 @@ impl Expression for AssignmentExpression {
             && let Ok(target_type) = self.addr_expr.get_type()
         {
             if val_type == target_type {
-                asm.extend(self.addr_expr.load_address_to_register(addr_def)?);
-                asm.extend(self.val_expr.load_address_to_register(val_def)?);
+                asm.append(self.addr_expr.load_address_to_register(addr_def)?);
+                asm.append(self.val_expr.load_address_to_register(val_def)?);
 
                 let mem = MemcpyStatement::new(
                     self.token.clone(),
@@ -920,7 +923,7 @@ impl Expression for AssignmentExpression {
                     val_type.byte_size(),
                 );
 
-                asm.extend(mem.get_exec_code()?);
+                asm.extend_asm(mem.get_exec_code()?);
 
                 Ok(asm)
             } else {
@@ -971,10 +974,7 @@ impl Expression for FunctionCallExpression {
         }
     }
 
-    fn load_value_to_register(
-        &self,
-        reg: RegisterDef,
-    ) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
         let func = if let Type::Function(f) = self.func.get_type()? {
             f.clone()
         } else {
@@ -984,7 +984,7 @@ impl Expression for FunctionCallExpression {
                 .into_err("caller value is not a function type"));
         };
 
-        let mut asm = vec![
+        let mut asm = ExpressionData::new(vec![
             self.token
                 .to_asm(AsmToken::Comment(format!("calling {}", self.func))),
             self.token
@@ -996,10 +996,10 @@ impl Expression for FunctionCallExpression {
                     reg.reg.into(),
                     Register::StackPointer.into(),
                 )))),
-        ];
+        ]);
 
         let func_loc = reg.increment_token(&self.token)?;
-        asm.extend(self.func.load_value_to_register(func_loc)?);
+        asm.append(self.func.load_value_to_register(func_loc)?);
 
         let next_load = func_loc.increment_token(&self.token)?;
         let mut current_offset = 0;
@@ -1029,7 +1029,7 @@ impl Expression for FunctionCallExpression {
                     val_expr: e.clone(),
                 });
 
-                asm.extend(assign.load_value_to_register(next_load)?);
+                asm.append(assign.load_value_to_register(next_load)?);
                 current_offset += p.dtype.byte_size();
             } else {
                 return Err(self
@@ -1039,12 +1039,12 @@ impl Expression for FunctionCallExpression {
             }
         }
 
-        asm.extend(
+        asm.extend_asm(
             self.token
                 .to_asm_iter(load_to_register(next_load.reg, func.param_size() as u32)), // TODO - Add return value here?
         );
 
-        asm.extend(self.token.to_asm_iter([
+        asm.extend_asm(self.token.to_asm_iter([
             AsmToken::OperationLiteral(Box::new(OpAdd::new(
                 ArgumentType::new(Register::StackPointer, DataType::U32),
                 Register::StackPointer.into(),
@@ -1057,12 +1057,12 @@ impl Expression for FunctionCallExpression {
             AsmToken::OperationLiteral(Box::new(OpCall::new(func_loc.reg.into()))),
         ]));
 
-        asm.extend(
+        asm.extend_asm(
             self.token
                 .to_asm_iter(load_to_register(reg.reg, func.param_size() as u32)),
         );
 
-        asm.extend(self.token.to_asm_iter([
+        asm.extend_asm(self.token.to_asm_iter([
             AsmToken::OperationLiteral(Box::new(OpSub::new(
                 ArgumentType::new(Register::StackPointer, DataType::U32),
                 Register::StackPointer.into(),
