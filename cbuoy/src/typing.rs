@@ -160,6 +160,7 @@ impl Display for Type {
 pub struct StructDefinition {
     name: String,
     fields: HashMap<String, Rc<StructField>>,
+    size: usize,
 }
 
 impl StructDefinition {
@@ -176,10 +177,10 @@ impl StructDefinition {
         let mut s = Self {
             name: name.get_value().to_string(),
             fields: HashMap::new(),
+            size: 0,
         };
 
         tokens.expect("{")?;
-        let mut offset = 0;
 
         while !tokens.expect_peek("}") {
             let field_token = tokens.next()?;
@@ -191,13 +192,16 @@ impl StructDefinition {
             tokens.expect(";")?;
 
             match s.fields.entry(field_name) {
-                Entry::Vacant(e) => e.insert(Rc::new(StructField { offset, dtype })),
+                Entry::Vacant(e) => e.insert(Rc::new(StructField {
+                    offset: s.size,
+                    dtype,
+                })),
                 Entry::Occupied(_) => {
                     return Err(field_token.into_err("field with name already exists"));
                 }
             };
 
-            offset += dtype_size;
+            s.size += dtype_size;
         }
 
         tokens.expect("}")?;
@@ -214,6 +218,14 @@ impl StructDefinition {
 
     pub fn get_field(&self, field_name: &str) -> Option<Rc<StructField>> {
         self.fields.get(field_name).cloned()
+    }
+
+    pub fn get_fields(&self) -> &HashMap<String, Rc<StructField>> {
+        &self.fields
+    }
+
+    pub fn get_size(&self) -> usize {
+        self.size
     }
 }
 

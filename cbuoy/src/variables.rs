@@ -262,8 +262,10 @@ impl Statement for LocalVariable {
         let mut asm = Vec::new();
 
         asm.push(self.token.to_asm(AsmToken::LocationComment(format!(
-            "+lvar({}) : {}{}",
+            "+lvar({}) ${}+{} : {}{}",
             self.token,
+            self.base,
+            self.offset,
             self.dtype,
             self.dtype.primitive_type().map(|x| format!(" ({x})")).unwrap_or(String::new())
         ))));

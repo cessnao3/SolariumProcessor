@@ -375,6 +375,33 @@ impl CompilingState {
             Vec::new()
         };
 
+        for gv in self.global_scope.values() {
+            if let GlobalType::Structure(tok, s) = gv {
+                asm.push(tok.to_asm(AsmToken::LocationComment(format!(
+                    "+struct({}) {}",
+                    tok,
+                    s.get_size(),
+                ))));
+
+                let mut struct_vals = s
+                    .get_fields()
+                    .iter()
+                    .map(|(k, v)| (v.offset, k, v.dtype.clone()))
+                    .collect::<Vec<_>>();
+                struct_vals.sort_by(|a, b| a.0.cmp(&b.0));
+
+                for (offset, name, dtype) in struct_vals {
+                    asm.push(tok.to_asm(AsmToken::LocationComment(format!(
+                        "+field({}) +{} : {}{}",
+                        name,
+                        offset,
+                        dtype,
+                        dtype.primitive_type().map(|x| format!(" ({x})")).unwrap_or(String::new()),
+                    ))));
+                }
+            }
+        }
+
         add_name(&mut asm, "Initialization");
         asm.push(Self::blank_token_loc(AsmToken::CreateLabel(
             init_label.clone(),
