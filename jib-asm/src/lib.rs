@@ -165,7 +165,29 @@ pub enum AsmToken {
 impl AsmToken {
     fn trim_line(line: &str) -> &str {
         let s = line.trim();
-        if let Some(ind) = s.find(';') {
+        let mut ind = None;
+
+        let mut is_escape = false;
+        let mut within_quote = false;
+
+        for (i, c) in line.char_indices() {
+            if is_escape {
+                continue;
+            } else if c == '\\' {
+                if !is_escape {
+                    is_escape = true;
+                }
+            } else if c == '"' {
+                within_quote = !within_quote;
+            } else if !within_quote {
+                if c == '!' || c == ';' {
+                    ind = Some(i);
+                    break;
+                }
+            }
+        }
+
+        if let Some(ind) = ind {
             &s[..ind]
         } else {
             s
