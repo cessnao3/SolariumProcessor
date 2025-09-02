@@ -6,17 +6,17 @@ use jib_asm::{
 
 use crate::{TokenError, compiler::Statement, expressions::RegisterDef, tokenizer::Token};
 
-pub fn load_to_register(reg: Register, val: u32) -> Box<[AsmToken]> {
+pub fn load_to_register(reg: Register, val: u32) -> Vec<AsmToken> {
     if val <= u16::MAX as u32 {
-        Box::new([AsmToken::OperationLiteral(Box::new(OpLdi::new(
+        vec![AsmToken::OperationLiteral(Box::new(OpLdi::new(
             ArgumentType::new(reg, DataType::U16),
             val as u16,
-        )))])
+        )))]
     } else {
-        Box::new([
+        vec![
             AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(reg, DataType::U32)))),
             AsmToken::Literal4(val),
-        ])
+        ]
     }
 }
 

@@ -177,7 +177,7 @@ impl GlobalStatement for GlobalVariableStatement {
     }
 
     fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        let mut asm_init = Vec::new();
+        let mut init_data = ExpressionData::default();
 
         if self.simplified_literal().is_none()
             && let Some(init_expr) = &self.global_var.init_expr
@@ -187,20 +187,16 @@ impl GlobalStatement for GlobalVariableStatement {
             if let Ok(init_type) = init_expr.get_primitive_type() {
                 let var = &self.global_var;
 
-                // TODO - Replace with a better expression (operation expression value?)
                 let reg_state_var = RegisterDef::default();
                 let reg_state_init = reg_state_var.increment_token(name)?;
 
-                asm_init.push(name.to_asm(AsmToken::Comment(format!(
+                init_data.push_asm(name.to_asm(AsmToken::Comment(format!(
                     "Initializing Global Variable {}",
                     self.global_var.get_name()
                 ))));
 
-                asm_init
-                    .extend_from_slice(&var.load_address_to_register(reg_state_var)?.into_asm());
-                asm_init.extend_from_slice(
-                    &init_expr.load_value_to_register(reg_state_init)?.into_asm(),
-                );
+                init_data.append(var.load_address_to_register(reg_state_var)?);
+                init_data.append(init_expr.load_value_to_register(reg_state_init)?);
 
                 let reg_init = reg_state_init.reg;
                 let reg_var = reg_state_var.reg;
@@ -208,13 +204,15 @@ impl GlobalStatement for GlobalVariableStatement {
                 let var_type = var.get_primitive_type()?;
 
                 if init_type != var_type {
-                    asm_init.push(name.to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
-                        ArgumentType::new(reg_init, init_type),
-                        ArgumentType::new(reg_init, var_type),
-                    )))));
+                    init_data.push_asm(name.to_asm(AsmToken::OperationLiteral(Box::new(
+                        OpConv::new(
+                            ArgumentType::new(reg_init, init_type),
+                            ArgumentType::new(reg_init, var_type),
+                        ),
+                    ))));
                 }
 
-                asm_init.push(name.to_asm(AsmToken::OperationLiteral(Box::new(OpSav::new(
+                init_data.push_asm(name.to_asm(AsmToken::OperationLiteral(Box::new(OpSav::new(
                     ArgumentType::new(reg_var, var_type),
                     reg_init.into(),
                 )))));
@@ -225,7 +223,7 @@ impl GlobalStatement for GlobalVariableStatement {
             }
         }
 
-        Ok(asm_init)
+        Ok(init_data.into_asm())
     }
 }
 
@@ -259,9 +257,9 @@ impl LocalVariable {
 
 impl Statement for LocalVariable {
     fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        let mut asm = Vec::new();
+        let mut init_data = ExpressionData::default();
 
-        asm.push(self.token.to_asm(AsmToken::LocationComment(format!(
+        init_data.push_asm(self.token.to_asm(AsmToken::LocationComment(format!(
             "+lvar({}) ${}+{} : {}{}",
             self.token,
             self.base,
@@ -277,7 +275,7 @@ impl Statement for LocalVariable {
                 let def = RegisterDef::default();
                 let load_val = def.increment_token(&self.token)?;
 
-                asm.push(self.token.to_asm(AsmToken::Comment(format!(
+                init_data.push_asm(self.token.to_asm(AsmToken::Comment(format!(
                     "initializing local variable \"{}\" with offset {} from {}",
                     self.token.get_value(),
                     self.offset,
@@ -285,30 +283,25 @@ impl Statement for LocalVariable {
                 ))));
 
                 let addr_reg = if self.offset > 0 {
-                    asm.extend_from_slice(&self.load_address_to_register(def)?.into_asm());
+                    init_data.append(self.load_address_to_register(def)?);
                     def.reg
                 } else {
                     self.base
                 };
-                asm.extend_from_slice(&e.load_value_to_register(load_val)?.into_asm());
+                init_data.append(e.load_value_to_register(load_val)?);
 
                 if var_type != expr_type {
-                    asm.push(
-                        self.token
-                            .to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
-                                ArgumentType::new(load_val.reg, var_type),
-                                ArgumentType::new(load_val.reg, expr_type),
-                            )))),
-                    );
+                    init_data.push_asm(self.token.to_asm(AsmToken::OperationLiteral(Box::new(
+                        OpConv::new(
+                            ArgumentType::new(load_val.reg, var_type),
+                            ArgumentType::new(load_val.reg, expr_type),
+                        ),
+                    ))));
                 }
 
-                asm.push(
-                    self.token
-                        .to_asm(AsmToken::OperationLiteral(Box::new(OpSav::new(
-                            ArgumentType::new(addr_reg, var_type),
-                            load_val.reg.into(),
-                        )))),
-                );
+                init_data.push_asm(self.token.to_asm(AsmToken::OperationLiteral(Box::new(
+                    OpSav::new(ArgumentType::new(addr_reg, var_type), load_val.reg.into()),
+                ))));
             }
         } else if let Some(e) = &self.init_expr {
             if let Ok(t) = e.get_type() {
@@ -317,13 +310,13 @@ impl Statement for LocalVariable {
                     let load_val = def.increment_token(&self.token)?;
 
                     let local_reg = if self.offset > 0 {
-                        asm.extend_from_slice(&self.load_address_to_register(def)?.into_asm());
+                        init_data.append(self.load_address_to_register(def)?);
                         def.reg
                     } else {
                         self.base
                     };
 
-                    asm.extend_from_slice(&e.load_address_to_register(load_val)?.into_asm());
+                    init_data.append(e.load_address_to_register(load_val)?);
 
                     let mem = MemcpyStatement::new(
                         self.token.clone(),
@@ -332,7 +325,7 @@ impl Statement for LocalVariable {
                         self.dtype.byte_size(),
                     );
 
-                    asm.extend_from_slice(&mem.get_exec_code()?);
+                    init_data.extend_asm(mem.get_exec_code()?);
                 } else {
                     return Err(self.token.clone().into_err("mismatch in data type"));
                 }
@@ -343,7 +336,7 @@ impl Statement for LocalVariable {
             }
         }
 
-        Ok(asm)
+        Ok(init_data.into_asm())
     }
 }
 

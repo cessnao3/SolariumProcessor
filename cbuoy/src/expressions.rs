@@ -87,15 +87,13 @@ impl Display for RegisterDef {
 
 #[derive(Debug, Default, Clone)]
 pub struct ExpressionData {
-    asm: Vec<AsmTokenLoc>,
-    allocated_stack: usize,
+    pub asm: Vec<AsmTokenLoc>,
 }
 
 impl ExpressionData {
     pub fn new<T: IntoIterator<Item = AsmTokenLoc>>(asm: T) -> Self {
         Self {
             asm: asm.into_iter().collect(),
-            allocated_stack: 0,
         }
     }
 
@@ -105,7 +103,6 @@ impl ExpressionData {
 
     pub fn append(&mut self, other: Self) {
         self.asm.extend(other.asm);
-        self.allocated_stack += other.allocated_stack;
     }
 
     pub fn extend_asm<T: IntoIterator<Item = AsmTokenLoc>>(&mut self, asm: T) {
@@ -987,6 +984,11 @@ impl Expression for FunctionCallExpression {
         let mut asm = ExpressionData::new(vec![
             self.token
                 .to_asm(AsmToken::Comment(format!("calling {}", self.func))),
+        ]);
+
+        // TODO: Add space for a return variable structure
+
+        asm.extend_asm([
             self.token
                 .to_asm(AsmToken::OperationLiteral(Box::new(OpPush::new(
                     Register::ArgumentBase.into(),
@@ -998,8 +1000,12 @@ impl Expression for FunctionCallExpression {
                 )))),
         ]);
 
+        // Load the function location
+
         let func_loc = reg.increment_token(&self.token)?;
         asm.append(self.func.load_value_to_register(func_loc)?);
+
+        // Add parameter values
 
         let next_load = func_loc.increment_token(&self.token)?;
         let mut current_offset = 0;
@@ -1039,9 +1045,11 @@ impl Expression for FunctionCallExpression {
             }
         }
 
+        // Allocate stack space for the new parameters and call the function
+
         asm.extend_asm(
             self.token
-                .to_asm_iter(load_to_register(next_load.reg, func.param_size() as u32)), // TODO - Add return value here?
+                .to_asm_iter(load_to_register(next_load.reg, func.param_size() as u32)),
         );
 
         asm.extend_asm(self.token.to_asm_iter([
@@ -1057,6 +1065,8 @@ impl Expression for FunctionCallExpression {
             AsmToken::OperationLiteral(Box::new(OpCall::new(func_loc.reg.into()))),
         ]));
 
+        // Remove the added stack space from the parameters
+
         asm.extend_asm(
             self.token
                 .to_asm_iter(load_to_register(reg.reg, func.param_size() as u32)),
@@ -1071,6 +1081,7 @@ impl Expression for FunctionCallExpression {
             AsmToken::OperationLiteral(Box::new(OpPopr::new(Register::ArgumentBase.into()))),
         ]));
 
+        // Return the result
         Ok(asm)
     }
 }
