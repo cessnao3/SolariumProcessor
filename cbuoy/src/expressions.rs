@@ -40,9 +40,10 @@ impl Display for RegisterDefError {
 }
 
 impl RegisterDef {
-    pub const FN_BASE: Register = Register::first_gp_register();
-    pub const SPARE: Register = Self::increment_const(Self::FN_BASE);
-    pub const FIRST_USEABLE: Register = Self::increment_const(Self::SPARE);
+    pub const FN_VAR_BASE: Register = Register::first_gp_register();
+    pub const FN_TEMPVAR_BASE: Register = Self::increment_const(Self::FN_VAR_BASE);
+    pub const SPARE: Register = Self::increment_const(Self::FN_TEMPVAR_BASE);
+    pub const FIRST_USEABLE: Register = Self::increment_const(Self::FN_TEMPVAR_BASE);
 
     const fn increment_const(reg: Register) -> Register {
         let next = Register::GeneralPurpose(reg.get_index() + 1);
@@ -97,6 +98,14 @@ impl ExpressionData {
         }
     }
 
+    pub fn merge<T: IntoIterator<Item = Self>>(other: T) -> Self {
+        let mut s = Self::default();
+        for i in other.into_iter() {
+            s.append(i);
+        }
+        s
+    }
+
     pub fn push_asm(&mut self, v: AsmTokenLoc) {
         self.asm.push(v);
     }
@@ -111,6 +120,70 @@ impl ExpressionData {
 
     pub fn into_asm(self) -> Vec<AsmTokenLoc> {
         self.asm
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct TemporaryStackTracker {
+    pub offset: usize,
+}
+
+impl TemporaryStackTracker {
+    pub fn merge(&mut self, other: TemporaryStackTracker) {
+        self.offset = self.offset.max(other.offset);
+    }
+
+    pub fn add_offset_value(&mut self, val: usize) {
+        self.offset += val;
+    }
+
+    pub fn load_current_offset(&mut self, reg: Register) -> Vec<AsmToken> {
+        let mut ops = load_to_register(RegisterDef::SPARE, self.offset as u32);
+        ops.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+            ArgumentType::new(reg, DataType::U32),
+            RegisterDef::SPARE.into(),
+            reg.into(),
+        ))));
+        ops
+    }
+
+    pub fn get_start_code(&self) -> Vec<AsmToken> {
+        let mut asm = Vec::new();
+        if self.offset > 0 {
+            asm.push(AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                RegisterDef::FN_TEMPVAR_BASE.into(),
+                Register::StackPointer.into(),
+            ))));
+
+            let reg = RegisterDef::SPARE;
+            asm.extend(load_to_register(
+                RegisterDef::default().reg,
+                self.offset as u32,
+            ));
+            asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                ArgumentType::new(Register::StackPointer, DataType::U32),
+                Register::StackPointer.into(),
+                reg.into(),
+            ))));
+        }
+        asm
+    }
+
+    pub fn get_end_code(&self) -> Vec<AsmToken> {
+        let mut asm = Vec::new();
+        if self.offset > 0 {
+            let reg = RegisterDef::SPARE;
+            asm.extend(load_to_register(
+                RegisterDef::default().reg,
+                self.offset as u32,
+            ));
+            asm.push(AsmToken::OperationLiteral(Box::new(OpSub::new(
+                ArgumentType::new(Register::StackPointer, DataType::U32),
+                Register::StackPointer.into(),
+                reg.into(),
+            ))));
+        }
+        asm
     }
 }
 
@@ -130,13 +203,21 @@ pub trait Expression: Debug + Display {
         }
     }
 
-    fn load_address_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
+    fn load_address_to_register(
+        &self,
+        reg: RegisterDef,
+        #[allow(unused_variables)] required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
         Err(self.get_token().clone().into_err(format!(
             "expression does not have a mappable address in memory - cannot load to {reg}"
         )))
     }
 
-    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError>;
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError>;
 
     fn simplify(&self) -> Option<Literal> {
         None
@@ -197,8 +278,12 @@ impl Expression for UnaryExpression {
         }
     }
 
-    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
-        let mut base_expr = self.base.load_value_to_register(reg)?;
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
+        let mut base_expr = self.base.load_value_to_register(reg, required_stack)?;
 
         let asm_inst = match self.op {
             UnaryOperation::Plus => None,
@@ -258,12 +343,20 @@ impl Expression for DereferenceExpression {
         &self.token
     }
 
-    fn load_address_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
-        self.base.load_value_to_register(reg)
+    fn load_address_to_register(
+        &self,
+        reg: RegisterDef,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
+        self.base.load_value_to_register(reg, required_stack)
     }
 
-    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
-        let mut asm = self.base.load_value_to_register(reg)?;
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
+        let mut asm = self.base.load_value_to_register(reg, required_stack)?;
         let dt = self.get_primitive_type()?;
 
         asm.push_asm(
@@ -299,8 +392,12 @@ impl Expression for AddressOfExpression {
         Ok(Type::Pointer(Box::new(self.base.get_type()?)))
     }
 
-    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
-        self.base.load_address_to_register(reg)
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
+        self.base.load_address_to_register(reg, required_stack)
     }
 }
 
@@ -514,20 +611,24 @@ impl Expression for BinaryArithmeticExpression {
         }
     }
 
-    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
         if let Some(dt) = self.get_type()?.primitive_type() {
-            let mut asm = self.lhs.load_value_to_register(reg)?;
+            let mut asm = self.lhs.load_value_to_register(reg, required_stack)?;
             let reg_a = reg.reg;
 
             let reg_b;
             if let Some(reg_next) = reg.increment() {
-                asm.append(self.rhs.load_value_to_register(reg_next)?);
+                asm.append(self.rhs.load_value_to_register(reg_next, required_stack)?);
                 reg_b = reg_next.reg;
             } else {
                 asm.push_asm(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
                     OpPush::new(reg.reg.into()),
                 ))));
-                asm.append(self.rhs.load_value_to_register(reg)?);
+                asm.append(self.rhs.load_value_to_register(reg, required_stack)?);
                 asm.push_asm(self.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
                     OpCopy::new(reg.spare.into(), reg.reg.into()),
                 ))));
@@ -729,8 +830,12 @@ impl Expression for AsExpression {
         Ok(self.data_type.clone())
     }
 
-    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
-        let mut asm = self.expr.load_value_to_register(reg)?;
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
+        let mut asm = self.expr.load_value_to_register(reg, required_stack)?;
         if let Some(dt) = self.data_type.primitive_type() {
             let src_type = self.expr.get_primitive_type()?;
 
@@ -814,8 +919,14 @@ impl Expression for DotExpression {
         Ok(self.get_field()?.dtype.clone())
     }
 
-    fn load_address_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
-        let mut asm = self.s_expression.load_address_to_register(reg)?;
+    fn load_address_to_register(
+        &self,
+        reg: RegisterDef,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
+        let mut asm = self
+            .s_expression
+            .load_address_to_register(reg, required_stack)?;
         asm.extend_asm(
             self.token
                 .to_asm_iter(load_to_register(reg.spare, self.get_field()?.offset as u32)),
@@ -831,8 +942,12 @@ impl Expression for DotExpression {
         Ok(asm)
     }
 
-    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
-        let mut asm = self.load_address_to_register(reg)?;
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
+        let mut asm = self.load_address_to_register(reg, required_stack)?;
         let dt = self.get_primitive_type()?;
 
         asm.push_asm(
@@ -875,7 +990,11 @@ impl Expression for AssignmentExpression {
         self.addr_expr.get_type()
     }
 
-    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
         let tok = self.addr_expr.get_token();
 
         let mut asm = ExpressionData::default();
@@ -890,8 +1009,14 @@ impl Expression for AssignmentExpression {
         if let Some(dest_dtype) = self.addr_expr.get_type()?.primitive_type() {
             let val_dtype = self.val_expr.get_primitive_type()?;
 
-            asm.append(self.val_expr.load_value_to_register(val_def)?);
-            asm.append(self.addr_expr.load_address_to_register(addr_def)?);
+            asm.append(
+                self.val_expr
+                    .load_value_to_register(val_def, required_stack)?,
+            );
+            asm.append(
+                self.addr_expr
+                    .load_address_to_register(addr_def, required_stack)?,
+            );
 
             if val_dtype != dest_dtype {
                 asm.push_asm(tok.to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
@@ -910,8 +1035,14 @@ impl Expression for AssignmentExpression {
             && let Ok(target_type) = self.addr_expr.get_type()
         {
             if val_type == target_type {
-                asm.append(self.addr_expr.load_address_to_register(addr_def)?);
-                asm.append(self.val_expr.load_address_to_register(val_def)?);
+                asm.append(
+                    self.addr_expr
+                        .load_address_to_register(addr_def, required_stack)?,
+                );
+                asm.append(
+                    self.val_expr
+                        .load_address_to_register(val_def, required_stack)?,
+                );
 
                 let mem = MemcpyStatement::new(
                     self.token.clone(),
@@ -920,7 +1051,7 @@ impl Expression for AssignmentExpression {
                     val_type.byte_size(),
                 );
 
-                asm.extend_asm(mem.get_exec_code()?);
+                asm.extend_asm(mem.get_exec_code(required_stack)?);
 
                 Ok(asm)
             } else {
@@ -971,7 +1102,29 @@ impl Expression for FunctionCallExpression {
         }
     }
 
-    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
+    fn load_address_to_register(
+        &self,
+        reg: RegisterDef,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
+        if let Type::Function(f) = self.func.get_type()?
+            && let Some(rt) = &f.return_type
+            && rt.primitive_type().is_none()
+        {
+            self.load_value_to_register(reg, required_stack)
+        } else {
+            Err(self
+                .token
+                .clone()
+                .into_err("unable to load function with non-struct return type as address"))
+        }
+    }
+
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
         let func = if let Type::Function(f) = self.func.get_type()? {
             f.clone()
         } else {
@@ -986,24 +1139,21 @@ impl Expression for FunctionCallExpression {
                 .to_asm(AsmToken::Comment(format!("calling {}", self.func))),
         ]);
 
-        // TODO: Add space for a return variable structure
+        // TODO - Fix a call-within-a-call
 
-        asm.extend_asm([
-            self.token
-                .to_asm(AsmToken::OperationLiteral(Box::new(OpPush::new(
-                    Register::ArgumentBase.into(),
-                )))),
-            self.token
-                .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                    reg.reg.into(),
-                    Register::StackPointer.into(),
-                )))),
-        ]);
+        // Add space for a return variable structure
+
+        asm.extend_asm([self
+            .token
+            .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                reg.reg.into(),
+                Register::StackPointer.into(),
+            ))))]);
 
         // Load the function location
 
         let func_loc = reg.increment_token(&self.token)?;
-        asm.append(self.func.load_value_to_register(func_loc)?);
+        asm.append(self.func.load_value_to_register(func_loc, required_stack)?);
 
         // Add parameter values
 
@@ -1035,7 +1185,7 @@ impl Expression for FunctionCallExpression {
                     val_expr: e.clone(),
                 });
 
-                asm.append(assign.load_value_to_register(next_load)?);
+                asm.append(assign.load_value_to_register(next_load, required_stack)?);
                 current_offset += p.dtype.byte_size();
             } else {
                 return Err(self
@@ -1047,10 +1197,31 @@ impl Expression for FunctionCallExpression {
 
         // Allocate stack space for the new parameters and call the function
 
+        assert_eq!(current_offset, func.param_size());
+
         asm.extend_asm(
             self.token
                 .to_asm_iter(load_to_register(next_load.reg, func.param_size() as u32)),
         );
+
+        let ret_temp = next_load.increment_token(&self.token)?;
+        asm.push_asm(
+            self.token
+                .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                    ret_temp.reg.into(),
+                    Register::Return.into(),
+                )))),
+        );
+
+        if let Some(rt) = &func.return_type
+            && rt.primitive_type().is_none()
+        {
+            asm.extend_asm(
+                self.token
+                    .to_asm_iter(required_stack.load_current_offset(Register::Return)),
+            );
+            required_stack.add_offset_value(rt.byte_size());
+        }
 
         asm.extend_asm(self.token.to_asm_iter([
             AsmToken::OperationLiteral(Box::new(OpAdd::new(
@@ -1078,10 +1249,18 @@ impl Expression for FunctionCallExpression {
                 Register::StackPointer.into(),
                 reg.reg.into(),
             ))),
-            AsmToken::OperationLiteral(Box::new(OpPopr::new(Register::ArgumentBase.into()))),
+            AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                reg.reg.into(),
+                Register::Return.into(),
+            ))),
+            AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                Register::Return.into(),
+                reg.reg.into(),
+            ))),
         ]));
 
         // Return the result
+
         Ok(asm)
     }
 }

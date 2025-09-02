@@ -2,17 +2,20 @@ use std::{fmt::Display, rc::Rc};
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
-    ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpBrk, OpCopy, OpJmp, OpLdn, OpRet, OpSub, OpTz,
+    ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpBrk, OpConv, OpCopy, OpJmp, OpLdn, OpRet, OpSub,
+    OpTz,
 };
 
 use crate::{
     TokenError,
     compiler::{CompilingState, GlobalStatement, ScopeManager, Statement},
-    expressions::{Expression, ExpressionData, RegisterDef, parse_expression},
+    expressions::{
+        Expression, ExpressionData, RegisterDef, TemporaryStackTracker, parse_expression,
+    },
     tokenizer::{EndOfTokenStream, Token, TokenIter, get_identifier},
     typing::{Function, Type},
     utilities::load_to_register,
-    variables::VariableDefinition,
+    variables::{LocalVariable, VariableDefinition},
 };
 
 #[derive(Debug)]
@@ -26,18 +29,22 @@ pub struct FunctionDefinition {
 }
 
 impl FunctionDefinition {
+    pub fn create_label_base(id: usize, name: &Token) -> Result<String, TokenError> {
+        let ident = get_identifier(name)?;
+        Ok(format!("func_{id}_{ident}"))
+    }
+
     pub fn new(
-        id: usize,
+        label_base: &str,
         name: Token,
         func: Function,
         statements: Vec<Rc<dyn Statement>>,
         scope_manager: ScopeManager,
     ) -> Result<Self, TokenError> {
-        let ident = get_identifier(&name)?.to_string();
         Ok(Self {
             name,
-            entry_label: format!("func_{id}_{ident}_start"),
-            end_label: format!("func_{id}_{ident}_end"),
+            entry_label: format!("{label_base}_start"),
+            end_label: format!("{label_base}_end"),
             statements,
             dtype: func,
             scope_manager,
@@ -77,7 +84,11 @@ impl Expression for FunctionLabelExpr {
         Ok(Type::Function(Rc::new(self.dtype.clone())))
     }
 
-    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+        _required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
         let asm = vec![
             AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
                 reg.reg,
@@ -95,13 +106,21 @@ impl Display for FunctionLabelExpr {
     }
 }
 
-impl Statement for FunctionDefinition {
-    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+impl GlobalStatement for FunctionDefinition {
+    fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        Ok(Vec::new())
+    }
+
+    fn get_static_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        Ok(Vec::new())
+    }
+
+    fn get_func_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let mut init_asm = vec![
             AsmToken::CreateLabel(self.entry_label.clone()),
             AsmToken::LocationComment(format!("+func({})", self.name)),
             AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                RegisterDef::FN_BASE.into(),
+                RegisterDef::FN_VAR_BASE.into(),
                 Register::StackPointer.into(),
             ))),
         ];
@@ -117,19 +136,29 @@ impl Statement for FunctionDefinition {
             ))));
         }
 
+        let mut stack_requirements = TemporaryStackTracker::default();
+        let mut statement_asm = Vec::new();
+
+        for s in self.statements.iter() {
+            let mut local_stack = TemporaryStackTracker::default();
+            statement_asm.extend(s.get_exec_code(&mut local_stack)?);
+            stack_requirements.merge(local_stack);
+        }
+
+        init_asm.extend(stack_requirements.get_start_code());
+
         let mut asm = self
             .name
             .to_asm_iter(init_asm)
             .into_iter()
             .collect::<Vec<_>>();
 
-        for s in self.statements.iter() {
-            asm.extend_from_slice(&s.get_exec_code()?);
-        }
+        asm.extend(statement_asm);
 
         let mut asm_end = Vec::new();
 
         asm_end.push(AsmToken::CreateLabel(self.end_label.clone()));
+        asm_end.extend(stack_requirements.get_end_code());
         if scope_size > 0 {
             asm_end.extend(load_to_register(RegisterDef::SPARE, scope_size as u32));
             asm_end.push(AsmToken::OperationLiteral(Box::new(OpSub::new(
@@ -144,16 +173,6 @@ impl Statement for FunctionDefinition {
         asm.extend(self.name.to_asm_iter(asm_end));
 
         Ok(asm)
-    }
-}
-
-impl GlobalStatement for FunctionDefinition {
-    fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        Ok(Vec::new())
-    }
-
-    fn get_static_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        Ok(Vec::new())
     }
 }
 
@@ -178,14 +197,21 @@ pub fn parse_fn_statement(
 
     let mut statements = Vec::new();
 
-    while let Some(s) = parse_statement(tokens, state)? {
+    let base_label = FunctionDefinition::create_label_base(state.get_next_id(), &name_token)?;
+
+    while let Some(s) = parse_statement(
+        tokens,
+        state,
+        &format!("{base_label}_end"),
+        func_type.return_type.as_ref(),
+    )? {
         statements.push(s);
     }
 
     tokens.expect("}")?;
 
     let def = Rc::new(FunctionDefinition::new(
-        state.get_next_id(),
+        &base_label,
         name_token.clone(),
         func_type,
         statements,
@@ -200,10 +226,15 @@ struct StatementGroup {
 }
 
 impl Statement for StatementGroup {
-    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+    fn get_exec_code(
+        &self,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let mut asm = Vec::new();
         for s in self.statements.iter() {
-            asm.extend(s.get_exec_code()?.into_iter());
+            let mut local_stack = TemporaryStackTracker::default();
+            asm.extend(s.get_exec_code(&mut local_stack)?.into_iter());
+            required_stack.merge(local_stack);
         }
         Ok(asm)
     }
@@ -219,7 +250,10 @@ struct IfStatement {
 }
 
 impl Statement for IfStatement {
-    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+    fn get_exec_code(
+        &self,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let def = RegisterDef::default();
 
         let label_base = format!("if_statement_{}", self.id);
@@ -229,7 +263,11 @@ impl Statement for IfStatement {
             self.id, self.token,
         )))];
 
-        asm.extend(self.test_expr.load_value_to_register(def)?.into_asm());
+        asm.extend(
+            self.test_expr
+                .load_value_to_register(def, required_stack)?
+                .into_asm(),
+        );
 
         let false_label = format!("{label_base}_false");
 
@@ -243,7 +281,9 @@ impl Statement for IfStatement {
             AsmToken::OperationLiteral(Box::new(OpJmp::new(def.spare.into()))),
         ]));
 
-        asm.extend(self.true_statement.get_exec_code()?);
+        let mut true_stack = TemporaryStackTracker::default();
+        asm.extend(self.true_statement.get_exec_code(&mut true_stack)?);
+        required_stack.merge(true_stack);
 
         let end_label = format!("{label_base}_end");
         if self.false_statement.is_some() {
@@ -263,8 +303,10 @@ impl Statement for IfStatement {
         );
 
         if let Some(fe) = &self.false_statement {
-            asm.extend(fe.get_exec_code()?);
+            let mut false_stack = TemporaryStackTracker::default();
+            asm.extend(fe.get_exec_code(&mut false_stack)?);
             asm.push(self.token.to_asm(AsmToken::CreateLabel(end_label)));
+            required_stack.merge(false_stack);
         }
 
         Ok(asm)
@@ -280,7 +322,10 @@ struct WhileStatement {
 }
 
 impl Statement for WhileStatement {
-    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+    fn get_exec_code(
+        &self,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let def = RegisterDef::default();
 
         let label_base = format!("while_statement_{}", self.id);
@@ -294,7 +339,11 @@ impl Statement for WhileStatement {
                 .to_asm(AsmToken::CreateLabel(format!("{label_base}_test"))),
         ];
 
-        asm.extend(self.test_expr.load_value_to_register(def)?.into_asm());
+        asm.extend(
+            self.test_expr
+                .load_value_to_register(def, required_stack)?
+                .into_asm(),
+        );
 
         asm.extend(self.token.to_asm_iter([
             AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
@@ -306,7 +355,9 @@ impl Statement for WhileStatement {
             AsmToken::OperationLiteral(Box::new(OpJmp::new(def.spare.into()))),
         ]));
 
-        asm.extend(self.statement.get_exec_code()?);
+        let mut statement_stack = TemporaryStackTracker::default();
+        asm.extend(self.statement.get_exec_code(&mut statement_stack)?);
+        required_stack.merge(statement_stack);
 
         asm.extend(self.token.to_asm_iter([
             AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
@@ -330,7 +381,10 @@ impl Statement for WhileStatement {
 struct EmptyStatement;
 
 impl Statement for EmptyStatement {
-    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+    fn get_exec_code(
+        &self,
+        _required_stack: &mut TemporaryStackTracker,
+    ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         Ok(Vec::new())
     }
 }
@@ -341,10 +395,13 @@ struct ExpressionStatement {
 }
 
 impl Statement for ExpressionStatement {
-    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+    fn get_exec_code(
+        &self,
+        required_stack: &mut TemporaryStackTracker,
+    ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         Ok(self
             .expr
-            .load_value_to_register(RegisterDef::default())?
+            .load_value_to_register(RegisterDef::default(), required_stack)?
             .into_asm())
     }
 }
@@ -355,7 +412,10 @@ struct DebugBreakpointStatement {
 }
 
 impl Statement for DebugBreakpointStatement {
-    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+    fn get_exec_code(
+        &self,
+        _required_stack: &mut TemporaryStackTracker,
+    ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         Ok(vec![
             self.token
                 .to_asm(AsmToken::OperationLiteral(Box::new(OpBrk))),
@@ -363,9 +423,92 @@ impl Statement for DebugBreakpointStatement {
     }
 }
 
+#[derive(Debug, Clone)]
+struct ReturnStatementTempVar {
+    token: Token,
+    temp_var: LocalVariable,
+    jump_label: String,
+}
+
+impl Statement for ReturnStatementTempVar {
+    fn get_exec_code(
+        &self,
+        temporary_stack_tracker: &mut TemporaryStackTracker,
+    ) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        let mut asm = self.temp_var.get_exec_code(temporary_stack_tracker)?;
+
+        asm.extend(self.token.to_asm_iter([
+            AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
+                RegisterDef::SPARE,
+                DataType::U32,
+            )))),
+            AsmToken::LoadLoc(self.jump_label.clone()),
+            AsmToken::OperationLiteral(Box::new(OpJmp::new(RegisterDef::SPARE.into()))),
+        ]));
+
+        Ok(asm)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ReturnStatementRegVar {
+    token: Token,
+    jump_label: String,
+    expr: Option<(DataType, Rc<dyn Expression>)>,
+}
+
+impl Statement for ReturnStatementRegVar {
+    fn get_exec_code(
+        &self,
+        temporary_stack_tracker: &mut TemporaryStackTracker,
+    ) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        let mut asm = Vec::new();
+
+        if let Some((ret_type, e)) = &self.expr {
+            let expr_type = e.get_primitive_type()?;
+            let rd = RegisterDef::default();
+            asm.extend(
+                e.load_value_to_register(rd, temporary_stack_tracker)?
+                    .into_asm(),
+            );
+
+            asm.push(
+                self.token
+                    .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                        rd.reg.into(),
+                        Register::Return.into(),
+                    )))),
+            );
+
+            if expr_type != *ret_type {
+                asm.push(
+                    self.token
+                        .to_asm(AsmToken::OperationLiteral(Box::new(OpConv::new(
+                            ArgumentType::new(Register::Return, *ret_type),
+                            ArgumentType::new(Register::Return, expr_type),
+                        )))),
+                );
+            }
+        }
+
+        asm.extend(self.token.to_asm_iter([
+            AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
+                RegisterDef::SPARE,
+                DataType::U32,
+            )))),
+            AsmToken::LoadLoc(self.jump_label.clone()),
+            AsmToken::OperationLiteral(Box::new(OpJmp::new(RegisterDef::SPARE.into()))),
+        ]));
+
+        Ok(asm)
+    }
+}
+
 fn parse_statement(
     tokens: &mut TokenIter,
     state: &mut CompilingState,
+    return_jump_label: &str,
+    return_type: Option<&Type>,
 ) -> Result<Option<Rc<dyn Statement>>, TokenError> {
     if let Some(next) = tokens.peek() {
         if next.get_value() == "def" {
@@ -378,7 +521,7 @@ fn parse_statement(
         } else if next.get_value() == "{" {
             state.get_scopes_mut()?.add_scope(tokens.expect("{")?);
             let mut statements = Vec::new();
-            while let Some(s) = parse_statement(tokens, state)? {
+            while let Some(s) = parse_statement(tokens, state, return_jump_label, return_type)? {
                 statements.push(s);
             }
             tokens.expect("}")?;
@@ -391,18 +534,19 @@ fn parse_statement(
             let test_expr = parse_expression(tokens, state)?;
             tokens.expect(")")?;
 
-            let true_statement = match parse_statement(tokens, state)? {
-                Some(s) => s,
-                None => {
-                    return Err(
-                        if_token.into_err("must have a valid statement after if expression")
-                    );
-                }
-            };
+            let true_statement =
+                match parse_statement(tokens, state, return_jump_label, return_type)? {
+                    Some(s) => s,
+                    None => {
+                        return Err(
+                            if_token.into_err("must have a valid statement after if expression")
+                        );
+                    }
+                };
 
             let false_statement = if tokens.expect_peek("else") {
                 tokens.expect("else")?;
-                parse_statement(tokens, state)?
+                parse_statement(tokens, state, return_jump_label, return_type)?
             } else {
                 None
             };
@@ -421,7 +565,7 @@ fn parse_statement(
             let test_expr = parse_expression(tokens, state)?;
             tokens.expect(")")?;
 
-            let statement = match parse_statement(tokens, state)? {
+            let statement = match parse_statement(tokens, state, return_jump_label, return_type)? {
                 Some(s) => s,
                 None => {
                     return Err(while_token.into_err("while statement must have a valid statement"));
@@ -438,6 +582,40 @@ fn parse_statement(
             let tok = tokens.expect("brkpt")?;
             tokens.expect(";")?;
             Ok(Some(Rc::new(DebugBreakpointStatement { token: tok })))
+        } else if next.get_value() == "return" {
+            let tok = tokens.expect("return")?;
+
+            let ret_statement: Rc<dyn Statement> = if let Some(rt) = return_type {
+                if let Some(pt) = rt.primitive_type() {
+                    Rc::new(ReturnStatementRegVar {
+                        token: tok,
+                        jump_label: return_jump_label.to_string(),
+                        expr: Some((pt, parse_expression(tokens, state)?)),
+                    })
+                } else {
+                    let temp_var = LocalVariable::new_unchecked(
+                        tok.clone(),
+                        rt.clone(),
+                        Register::Return,
+                        0,
+                        Some(parse_expression(tokens, state)?),
+                    );
+                    Rc::new(ReturnStatementTempVar {
+                        jump_label: return_jump_label.to_string(),
+                        token: tok,
+                        temp_var,
+                    })
+                }
+            } else {
+                Rc::new(ReturnStatementRegVar {
+                    token: tok,
+                    jump_label: return_jump_label.to_string(),
+                    expr: None,
+                })
+            };
+
+            tokens.expect(";")?;
+            Ok(Some(ret_statement))
         } else if next.get_value() == "}" {
             Ok(None)
         } else if next.get_value() == ";" {

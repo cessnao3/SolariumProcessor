@@ -12,7 +12,7 @@ use jib_asm::{
 
 use crate::{
     TokenError,
-    expressions::{Expression, RegisterDef},
+    expressions::{Expression, RegisterDef, TemporaryStackTracker},
     functions::FunctionDefinition,
     literals::{Literal, StringLiteral},
     tokenizer::{Token, get_identifier},
@@ -22,12 +22,16 @@ use crate::{
 };
 
 pub trait Statement: Debug {
-    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError>;
+    fn get_exec_code(
+        &self,
+        temporary_stack_tracker: &mut TemporaryStackTracker,
+    ) -> Result<Vec<AsmTokenLoc>, TokenError>;
 }
 
-pub trait GlobalStatement: Statement {
+pub trait GlobalStatement: Debug {
     fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError>;
     fn get_static_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError>;
+    fn get_func_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError>;
 }
 
 #[derive(Debug, Clone)]
@@ -83,13 +87,9 @@ impl ScopeManager {
         self.scopes.push(ScopeBlock::new(token));
     }
 
-    pub fn remove_scope(&mut self) -> Result<Box<ScopeRemoveStatement>, TokenError> {
-        if let Some(s) = self.scopes.pop() {
-            let size = s.size()?;
-            Ok(Box::new(ScopeRemoveStatement {
-                token: s.token.clone().unwrap_or(self.token.clone()),
-                size,
-            }))
+    pub fn remove_scope(&mut self) -> Result<(), TokenError> {
+        if self.scopes.pop().is_some() {
+            Ok(())
         } else {
             Err(TokenError {
                 token: None,
@@ -117,7 +117,7 @@ impl ScopeManager {
                     let var = Rc::new(LocalVariable::new(
                         def.token,
                         def.dtype,
-                        RegisterDef::FN_BASE,
+                        RegisterDef::FN_VAR_BASE,
                         offset,
                         def.init_expr,
                     )?);
@@ -181,7 +181,6 @@ impl ScopeManager {
 
         match self.parameters.variables.entry(ident) {
             Entry::Vacant(e) => {
-                //let var_size = def.dtype.byte_size();
                 let var = Rc::new(LocalVariable::new(
                     token.clone(),
                     def.dtype,
@@ -192,7 +191,6 @@ impl ScopeManager {
 
                 // Update the scope values and maximum size of the stack
                 e.insert(ScopeVariables::Local(var.clone()));
-                //self.max_size = self.max_size.max(offset + var_size);
                 Ok(())
             }
             Entry::Occupied(_) => Err(token
@@ -261,6 +259,7 @@ impl ScopeBlock {
     }
 }
 
+/*
 #[derive(Debug, Clone)]
 pub struct ScopeRemoveStatement {
     token: Token,
@@ -268,7 +267,10 @@ pub struct ScopeRemoveStatement {
 }
 
 impl Statement for ScopeRemoveStatement {
-    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+    fn get_exec_code(
+        &self,
+        _required_stack: &mut TemporaryStackTracker,
+    ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let mut asm = Vec::new();
         asm.extend_from_slice(&load_to_register(RegisterDef::SPARE, self.size as u32));
 
@@ -281,6 +283,7 @@ impl Statement for ScopeRemoveStatement {
         Ok(self.token.to_asm_iter(asm).into_iter().collect())
     }
 }
+*/
 
 #[derive(Debug, Clone)]
 pub enum UserTypeOptions {
@@ -452,7 +455,7 @@ impl CompilingState {
 
         add_name(&mut asm, "Functions");
         for s in self.statements.iter() {
-            asm.extend_from_slice(&s.get_exec_code()?);
+            asm.extend_from_slice(&s.get_func_code()?);
         }
 
         Ok(asm)

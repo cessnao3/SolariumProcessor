@@ -1,13 +1,15 @@
 use std::{fmt::Display, rc::Rc, sync::LazyLock};
 
 use jib::cpu::{DataType, OperationError, OperatorManager, convert_types};
-use jib_asm::{ArgumentType, AsmToken, OpLdn};
+use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, OpLdn};
 use regex::Regex;
 
 use crate::{
     TokenError,
+    compiler::GlobalStatement,
     expressions::{
-        BinaryArithmeticOperation, Expression, ExpressionData, RegisterDef, UnaryOperation,
+        BinaryArithmeticOperation, Expression, ExpressionData, RegisterDef, TemporaryStackTracker,
+        UnaryOperation,
     },
     tokenizer::Token,
     typing::Type,
@@ -193,7 +195,11 @@ impl Expression for Literal {
         Ok(Type::Primitive(self.value.get_dtype()))
     }
 
-    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+        _required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
         let op_lit = match self.value {
             LiteralValue::U32(x) => jib_asm::AsmToken::Literal4(x),
             LiteralValue::U16(x) => jib_asm::AsmToken::Literal2(x),
@@ -382,8 +388,10 @@ impl StringLiteral {
     fn get_label(&self) -> String {
         format!("global_string_value_{}", self.id)
     }
+}
 
-    pub fn get_static_code(&self) -> Result<Vec<jib_asm::AsmTokenLoc>, TokenError> {
+impl GlobalStatement for StringLiteral {
+    fn get_static_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
         Ok(self
             .token
             .to_asm_iter([
@@ -393,6 +401,14 @@ impl StringLiteral {
             ])
             .into_iter()
             .collect())
+    }
+
+    fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        Ok(Vec::new())
+    }
+
+    fn get_func_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        Ok(Vec::new())
     }
 }
 
@@ -407,7 +423,11 @@ impl Expression for StringLiteral {
         &self.token
     }
 
-    fn load_value_to_register(&self, reg: RegisterDef) -> Result<ExpressionData, TokenError> {
+    fn load_value_to_register(
+        &self,
+        reg: RegisterDef,
+        _required_stack: &mut TemporaryStackTracker,
+    ) -> Result<ExpressionData, TokenError> {
         Ok(ExpressionData::new(
             self.token
                 .to_asm_iter([

@@ -4,7 +4,12 @@ use jib_asm::{
     OpLdn, OpPopr, OpPush, OpSav, OpSub, OpTz,
 };
 
-use crate::{TokenError, compiler::Statement, expressions::RegisterDef, tokenizer::Token};
+use crate::{
+    TokenError,
+    compiler::Statement,
+    expressions::{RegisterDef, TemporaryStackTracker},
+    tokenizer::Token,
+};
 
 pub fn load_to_register(reg: Register, val: u32) -> Vec<AsmToken> {
     if val <= u16::MAX as u32 {
@@ -55,7 +60,10 @@ impl MemcpyStatement {
 }
 
 impl Statement for MemcpyStatement {
-    fn get_exec_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+    fn get_exec_code(
+        &self,
+        _required_stack: &mut TemporaryStackTracker,
+    ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let mut asm = Vec::new();
 
         let spare_reg = RegisterDef::SPARE;
