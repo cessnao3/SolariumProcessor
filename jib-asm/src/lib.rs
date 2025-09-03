@@ -179,11 +179,9 @@ impl AsmToken {
                 }
             } else if c == '"' {
                 within_quote = !within_quote;
-            } else if !within_quote {
-                if c == '!' || c == ';' {
-                    ind = Some(i);
-                    break;
-                }
+            } else if !within_quote && (c == '!' || c == ';') {
+                ind = Some(i);
+                break;
             }
         }
 

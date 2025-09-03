@@ -7,7 +7,7 @@ use std::{
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
-    ArgumentType, AsmToken, AsmTokenLoc, LocationInfo, OpCall, OpCopy, OpHalt, OpLdi, OpLdn, OpSub,
+    ArgumentType, AsmToken, AsmTokenLoc, LocationInfo, OpCall, OpCopy, OpHalt, OpLdi, OpLdn,
 };
 
 use crate::{
@@ -17,7 +17,6 @@ use crate::{
     literals::{Literal, StringLiteral},
     tokenizer::{Token, get_identifier},
     typing::{FunctionParameter, StructDefinition},
-    utilities::load_to_register,
     variables::{GlobalVariable, GlobalVariableStatement, LocalVariable, VariableDefinition},
 };
 
@@ -83,8 +82,8 @@ impl ScopeManager {
         }
     }
 
-    pub fn add_scope(&mut self, token: Token) {
-        self.scopes.push(ScopeBlock::new(token));
+    pub fn add_scope(&mut self) {
+        self.scopes.push(ScopeBlock::default());
     }
 
     pub fn remove_scope(&mut self) -> Result<(), TokenError> {
@@ -242,18 +241,10 @@ impl ScopeVariables {
 
 #[derive(Debug, Default, Clone)]
 struct ScopeBlock {
-    token: Option<Token>,
     variables: HashMap<String, ScopeVariables>,
 }
 
 impl ScopeBlock {
-    pub fn new(token: Token) -> Self {
-        Self {
-            token: Some(token),
-            variables: HashMap::new(),
-        }
-    }
-
     pub fn size(&self) -> Result<usize, TokenError> {
         self.variables.values().map(|v| v.stack_size()).sum()
     }

@@ -145,7 +145,7 @@ impl GlobalStatement for GlobalVariableStatement {
                     .dtype
                     .primitive_type()
                     .map(|x| format!(" ({x})"))
-                    .unwrap_or(String::new())
+                    .unwrap_or_default()
             ))));
 
         asm_static.push(name.to_asm(AsmToken::CreateLabel(var.access_label().into())));
@@ -293,7 +293,7 @@ impl Statement for LocalVariable {
             self.base,
             self.offset,
             self.dtype,
-            self.dtype.primitive_type().map(|x| format!(" ({x})")).unwrap_or(String::new())
+            self.dtype.primitive_type().map(|x| format!(" ({x})")).unwrap_or_default()
         ))));
 
         if let Some(e) = &self.init_expr {
@@ -406,7 +406,7 @@ impl Expression for LocalVariable {
             ))))
         }
 
-        Ok(ExpressionData::new(self.token.to_asm_iter(asm).into_iter()))
+        Ok(ExpressionData::new(self.token.to_asm_iter(asm)))
     }
 
     fn load_value_to_register(

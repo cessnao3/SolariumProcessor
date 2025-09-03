@@ -96,7 +96,7 @@ impl Expression for FunctionLabelExpr {
             )))),
             AsmToken::LoadLoc(self.entry_label.clone()),
         ];
-        Ok(ExpressionData::new(self.name.to_asm_iter(asm).into_iter()))
+        Ok(ExpressionData::new(self.name.to_asm_iter(asm)))
     }
 }
 
@@ -192,7 +192,7 @@ pub fn parse_fn_statement(
         state.get_scopes_mut()?.add_parameter(p.clone())?;
     }
 
-    state.get_scopes_mut()?.add_scope(name_token.clone());
+    state.get_scopes_mut()?.add_scope();
     tokens.expect("{")?;
 
     let mut statements = Vec::new();
@@ -519,7 +519,8 @@ fn parse_statement(
             state.get_scopes_mut()?.add_const(def)?;
             Ok(Some(Rc::new(EmptyStatement)))
         } else if next.get_value() == "{" {
-            state.get_scopes_mut()?.add_scope(tokens.expect("{")?);
+            tokens.expect("{")?;
+            state.get_scopes_mut()?.add_scope();
             let mut statements = Vec::new();
             while let Some(s) = parse_statement(tokens, state, return_jump_label, return_type)? {
                 statements.push(s);

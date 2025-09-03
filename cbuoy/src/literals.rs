@@ -214,11 +214,11 @@ impl Expression for Literal {
             self.value.get_dtype(),
         ))));
 
-        Ok(ExpressionData::new(
-            self.get_token()
-                .to_asm_iter([op_load, op_lit, AsmToken::AlignInstruction])
-                .into_iter(),
-        ))
+        Ok(ExpressionData::new(self.get_token().to_asm_iter([
+            op_load,
+            op_lit,
+            AsmToken::AlignInstruction,
+        ])))
     }
 
     fn simplify(&self) -> Option<Literal> {
@@ -428,17 +428,13 @@ impl Expression for StringLiteral {
         reg: RegisterDef,
         _required_stack: &mut TemporaryStackTracker,
     ) -> Result<ExpressionData, TokenError> {
-        Ok(ExpressionData::new(
-            self.token
-                .to_asm_iter([
-                    AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
-                        reg.reg,
-                        DataType::U32,
-                    )))),
-                    AsmToken::LoadLoc(self.get_label()),
-                ])
-                .into_iter(),
-        ))
+        Ok(ExpressionData::new(self.token.to_asm_iter([
+            AsmToken::OperationLiteral(Box::new(OpLdn::new(ArgumentType::new(
+                reg.reg,
+                DataType::U32,
+            )))),
+            AsmToken::LoadLoc(self.get_label()),
+        ])))
     }
 
     fn get_type(&self) -> Result<Type, TokenError> {

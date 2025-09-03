@@ -115,7 +115,7 @@ impl ExpressionData {
     }
 
     pub fn extend_asm<T: IntoIterator<Item = AsmTokenLoc>>(&mut self, asm: T) {
-        self.asm.extend(asm.into_iter());
+        self.asm.extend(asm);
     }
 
     pub fn into_asm(self) -> Vec<AsmTokenLoc> {
