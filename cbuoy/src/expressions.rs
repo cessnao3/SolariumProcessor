@@ -43,7 +43,7 @@ impl RegisterDef {
     pub const FN_VAR_BASE: Register = Register::first_gp_register();
     pub const FN_TEMPVAR_BASE: Register = Self::increment_const(Self::FN_VAR_BASE);
     pub const SPARE: Register = Self::increment_const(Self::FN_TEMPVAR_BASE);
-    pub const FIRST_USEABLE: Register = Self::increment_const(Self::FN_TEMPVAR_BASE);
+    pub const FIRST_USEABLE: Register = Self::increment_const(Self::SPARE);
 
     const fn increment_const(reg: Register) -> Register {
         let next = Register::GeneralPurpose(reg.get_index() + 1);
@@ -126,44 +126,32 @@ impl ExpressionData {
 #[derive(Debug, Default, Copy, Clone)]
 pub struct TemporaryStackTracker {
     pub offset: usize,
+    pub max_size: usize,
 }
 
 impl TemporaryStackTracker {
     pub fn merge(&mut self, other: TemporaryStackTracker) {
-        self.offset = self.offset.max(other.offset);
+        self.max_size = self.max_size.max(other.max_size);
     }
 
     pub fn add_offset_value(&mut self, val: usize) {
         self.offset += val;
-    }
-
-    pub fn load_current_offset(&mut self, reg: Register) -> Vec<AsmToken> {
-        let mut ops = load_to_register(RegisterDef::SPARE, self.offset as u32);
-        ops.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
-            ArgumentType::new(reg, DataType::U32),
-            RegisterDef::SPARE.into(),
-            reg.into(),
-        ))));
-        ops
+        self.max_size = self.max_size.max(self.offset);
     }
 
     pub fn get_start_code(&self) -> Vec<AsmToken> {
         let mut asm = Vec::new();
-        if self.offset > 0 {
-            asm.push(AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                RegisterDef::FN_TEMPVAR_BASE.into(),
-                Register::StackPointer.into(),
-            ))));
+        asm.push(AsmToken::OperationLiteral(Box::new(OpCopy::new(
+            RegisterDef::FN_TEMPVAR_BASE.into(),
+            Register::StackPointer.into(),
+        )))); // TODO - This can be moved in if the size is zero, leave here for debugging for now
 
-            let reg = RegisterDef::SPARE;
-            asm.extend(load_to_register(
-                RegisterDef::default().reg,
-                self.offset as u32,
-            ));
+        if self.max_size > 0 {
+            asm.extend(load_to_register(RegisterDef::SPARE, self.max_size as u32));
             asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
                 ArgumentType::new(Register::StackPointer, DataType::U32),
                 Register::StackPointer.into(),
-                reg.into(),
+                RegisterDef::SPARE.into(),
             ))));
         }
         asm
@@ -171,16 +159,12 @@ impl TemporaryStackTracker {
 
     pub fn get_end_code(&self) -> Vec<AsmToken> {
         let mut asm = Vec::new();
-        if self.offset > 0 {
-            let reg = RegisterDef::SPARE;
-            asm.extend(load_to_register(
-                RegisterDef::default().reg,
-                self.offset as u32,
-            ));
+        if self.max_size > 0 {
+            asm.extend(load_to_register(RegisterDef::SPARE, self.max_size as u32));
             asm.push(AsmToken::OperationLiteral(Box::new(OpSub::new(
                 ArgumentType::new(Register::StackPointer, DataType::U32),
                 Register::StackPointer.into(),
-                reg.into(),
+                RegisterDef::SPARE.into(),
             ))));
         }
         asm
@@ -1139,15 +1123,18 @@ impl Expression for FunctionCallExpression {
                 .to_asm(AsmToken::Comment(format!("calling {}", self.func))),
         ]);
 
-        // TODO - Fix a call-within-a-call
+        // Initially use the provided register to demark the temporary parameters
 
-        // Add space for a return variable structure
-
+        asm.extend_asm(
+            self.token
+                .to_asm_iter(load_to_register(reg.reg, required_stack.offset as u32)),
+        );
         asm.extend_asm([self
             .token
-            .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
+            .to_asm(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                ArgumentType::new(reg.reg, DataType::U32),
                 reg.reg.into(),
-                Register::StackPointer.into(),
+                RegisterDef::FN_TEMPVAR_BASE.into(),
             ))))]);
 
         // Load the function location
@@ -1158,7 +1145,6 @@ impl Expression for FunctionCallExpression {
         // Add parameter values
 
         let next_load = func_loc.increment_token(&self.token)?;
-        let mut current_offset = 0;
 
         if self.args.len() != func.parameters.len() {
             return Err(self.token.clone().into_err(format!(
@@ -1175,18 +1161,27 @@ impl Expression for FunctionCallExpression {
                     p_name,
                     p.dtype.clone(),
                     reg.reg,
-                    current_offset,
+                    required_stack.offset,
                     None,
                 )?);
+                required_stack.add_offset_value(p.dtype.byte_size());
 
+                // Use an assignment expression for better control over the register usage
                 let assign = Rc::new(AssignmentExpression {
                     addr_expr: var,
                     token: self.token.clone(),
                     val_expr: e.clone(),
                 });
 
-                asm.append(assign.load_value_to_register(next_load, required_stack)?);
-                current_offset += p.dtype.byte_size();
+                let mut tmp_vals = required_stack.clone();
+                asm.push_asm(self.token.to_asm(AsmToken::Comment(format!(
+                    "func {} arg {} :: {}",
+                    self.func,
+                    p.name.as_ref().map(|x| x.get_value().to_string()).unwrap_or("??".to_string()),
+                    assign
+                ))));
+                asm.append(assign.load_value_to_register(next_load, &mut tmp_vals)?);
+                required_stack.merge(tmp_vals);
             } else {
                 return Err(self
                     .token
@@ -1195,40 +1190,31 @@ impl Expression for FunctionCallExpression {
             }
         }
 
-        // Allocate stack space for the new parameters and call the function
-
-        assert_eq!(current_offset, func.param_size());
-
-        asm.extend_asm(
-            self.token
-                .to_asm_iter(load_to_register(next_load.reg, func.param_size() as u32)),
-        );
-
-        let ret_temp = next_load.increment_token(&self.token)?;
-        asm.push_asm(
-            self.token
-                .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                    ret_temp.reg.into(),
-                    Register::Return.into(),
-                )))),
-        );
+        asm.extend_asm(self.token.to_asm_iter([AsmToken::OperationLiteral(Box::new(
+            OpPush::new(Register::Return.into()),
+        ))]));
 
         if let Some(rt) = &func.return_type
             && rt.primitive_type().is_none()
         {
-            asm.extend_asm(
-                self.token
-                    .to_asm_iter(required_stack.load_current_offset(Register::Return)),
-            );
+            asm.extend_asm(self.token.to_asm_iter(load_to_register(
+                Register::Return,
+                required_stack.offset as u32,
+            )));
             required_stack.add_offset_value(rt.byte_size());
+
+            asm.push_asm(
+                self.token
+                    .to_asm(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                        ArgumentType::new(Register::Return, DataType::U32),
+                        Register::Return.into(),
+                        RegisterDef::FN_TEMPVAR_BASE.into(),
+                    )))),
+            );
         }
 
         asm.extend_asm(self.token.to_asm_iter([
-            AsmToken::OperationLiteral(Box::new(OpAdd::new(
-                ArgumentType::new(Register::StackPointer, DataType::U32),
-                Register::StackPointer.into(),
-                next_load.reg.into(),
-            ))),
+            AsmToken::OperationLiteral(Box::new(OpPush::new(Register::ArgumentBase.into()))),
             AsmToken::OperationLiteral(Box::new(OpCopy::new(
                 Register::ArgumentBase.into(),
                 reg.reg.into(),
@@ -1238,25 +1224,13 @@ impl Expression for FunctionCallExpression {
 
         // Remove the added stack space from the parameters
 
-        asm.extend_asm(
-            self.token
-                .to_asm_iter(load_to_register(reg.reg, func.param_size() as u32)),
-        );
-
         asm.extend_asm(self.token.to_asm_iter([
-            AsmToken::OperationLiteral(Box::new(OpSub::new(
-                ArgumentType::new(Register::StackPointer, DataType::U32),
-                Register::StackPointer.into(),
-                reg.reg.into(),
-            ))),
             AsmToken::OperationLiteral(Box::new(OpCopy::new(
                 reg.reg.into(),
                 Register::Return.into(),
             ))),
-            AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                Register::Return.into(),
-                reg.reg.into(),
-            ))),
+            AsmToken::OperationLiteral(Box::new(OpPopr::new(Register::ArgumentBase.into()))),
+            AsmToken::OperationLiteral(Box::new(OpPopr::new(Register::Return.into()))),
         ]));
 
         // Return the result

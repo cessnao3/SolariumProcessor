@@ -339,6 +339,10 @@ impl Statement for WhileStatement {
                 .to_asm(AsmToken::CreateLabel(format!("{label_base}_test"))),
         ];
 
+        asm.push(self.token.to_asm(AsmToken::Comment(format!(
+            "while test using {}",
+            self.test_expr
+        ))));
         asm.extend(
             self.test_expr
                 .load_value_to_register(def, required_stack)?
@@ -475,8 +479,8 @@ impl Statement for ReturnStatementRegVar {
             asm.push(
                 self.token
                     .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                        rd.reg.into(),
                         Register::Return.into(),
+                        rd.reg.into(),
                     )))),
             );
 

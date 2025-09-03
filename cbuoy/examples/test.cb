@@ -12,10 +12,6 @@ global TEST_STR: *u8 = "Hello, world!";
 global ptr_test: u32 = 0;
 global ex_ptr: *u32 = 0x3000;
 global SERIAL_OUT_LOC: *u8 = 0xA000u32 + 5;
-global DEBUG_LOC: *u8 = 0;
-global DEBUG_LEN: u32 = 0;
-global DEBUG_CHAR: u8 = 0;
-global DEBUG_TEST_VAL: u8 = 0;
 
 struct TEST {
     a: u16;
@@ -71,14 +67,7 @@ fn strlen(c: *u8) u32 {
     def len: u32 = 0u32;
     while (*c != 0) {
         len = len + 1;
-
-        DEBUG_LOC = c;
-        DEBUG_CHAR = *c;
-        DEBUG_LEN = len;
-        brkpt;
-
         c = c + 1;
-        DEBUG_TEST_VAL = *c != 0;
     }
     return len;
 }
