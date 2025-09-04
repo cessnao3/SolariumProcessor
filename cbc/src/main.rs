@@ -6,9 +6,8 @@ static INPUT_TEXT: &str = include_str!("../../cbuoy/examples/test.cb");
 fn main() -> std::process::ExitCode {
     let asm = match parse(INPUT_TEXT) {
         Ok(asm) => {
-            println!("Assembly:");
             for t in asm.iter() {
-                println!("  {}", t.tok);
+                println!("{}", t.tok);
             }
             asm
         }
@@ -20,16 +19,16 @@ fn main() -> std::process::ExitCode {
 
     match assemble_tokens(asm) {
         Ok(r) => {
-            println!("Program Start: {:04x}", r.start_address);
-            println!("Labels:");
+            println!(";Program Start: {:04x}", r.start_address);
+            println!(";Labels:");
             let mut locs = r.labels.iter().map(|(k, v)| (*v, k)).collect::<Vec<_>>();
             locs.sort_by(|a, b| a.0.cmp(&b.0));
             for (v, k) in locs {
-                println!("  {v:04x} => {k}");
+                println!(";  {v:04x} => {k}");
             }
-            println!("Debug:");
+            println!(";Debug:");
             for (addr, cmt) in r.debug.iter() {
-                println!("  {addr:04x} => {cmt}");
+                println!(";  {addr:04x} => {cmt}");
             }
         }
         Err(e) => {
