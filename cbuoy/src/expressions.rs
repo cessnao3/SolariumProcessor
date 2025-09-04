@@ -1137,14 +1137,9 @@ impl Expression for FunctionCallExpression {
                 RegisterDef::FN_TEMPVAR_BASE.into(),
             ))))]);
 
-        // Load the function location
-
-        let func_loc = reg.increment_token(&self.token)?;
-        asm.append(self.func.load_value_to_register(func_loc, required_stack)?);
-
         // Add parameter values
 
-        let next_load = func_loc.increment_token(&self.token)?;
+        let next_load = reg.increment_token(&self.token)?;
 
         if self.args.len() != func.parameters.len() {
             return Err(self.token.clone().into_err(format!(
@@ -1190,6 +1185,13 @@ impl Expression for FunctionCallExpression {
             }
         }
 
+        // Load the function location
+
+        asm.append(
+            self.func
+                .load_value_to_register(next_load, required_stack)?,
+        );
+
         asm.extend_asm(self.token.to_asm_iter([AsmToken::OperationLiteral(Box::new(
             OpPush::new(Register::Return.into()),
         ))]));
@@ -1219,7 +1221,7 @@ impl Expression for FunctionCallExpression {
                 Register::ArgumentBase.into(),
                 reg.reg.into(),
             ))),
-            AsmToken::OperationLiteral(Box::new(OpCall::new(func_loc.reg.into()))),
+            AsmToken::OperationLiteral(Box::new(OpCall::new(next_load.reg.into()))),
         ]));
 
         // Remove the added stack space from the parameters

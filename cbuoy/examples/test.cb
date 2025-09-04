@@ -64,10 +64,12 @@ fn print_uint(v: u32) void {
 }
 
 fn strlen(c: *u8) u32 {
+    brkpt;
     def len: u32 = 0u32;
     while (*c != 0) {
-        len = len + 1;
-        c = c + 1;
+        brkpt;
+        len = len + 1u32;
+        c = c + 1u8;
     }
     return len;
 }
