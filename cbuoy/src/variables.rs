@@ -4,7 +4,7 @@ use std::{
 };
 
 use jib::cpu::{DataType, Register};
-use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpConv, OpCopy, OpLd, OpSav};
+use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpConv, OpCopy, OpLd, OpSav, OpSub};
 
 use crate::{
     TokenError,
@@ -206,7 +206,20 @@ impl GlobalStatement for GlobalVariableStatement {
                     init_expr.load_value_to_register(reg_state_init, &mut stack_tracker)?,
                 ]);
 
-                asm.extend_asm(var.get_token().to_asm_iter(stack_tracker.get_start_code()));
+                if stack_tracker.max_size > 0 {
+                    asm.extend_asm(var.get_token().to_asm_iter(load_to_register(
+                        RegisterDef::SPARE,
+                        stack_tracker.max_size as u32,
+                    )));
+                    asm.push_asm(var.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
+                        OpAdd::new(
+                            ArgumentType::new(Register::StackPointer, DataType::U32),
+                            Register::StackPointer.into(),
+                            RegisterDef::SPARE.into(),
+                        ),
+                    ))));
+                }
+
                 asm.append(stack_asm);
 
                 let reg_init = reg_state_init.reg;
@@ -226,7 +239,19 @@ impl GlobalStatement for GlobalVariableStatement {
                     reg_init.into(),
                 )))));
 
-                asm.extend_asm(var.get_token().to_asm_iter(stack_tracker.get_end_code()));
+                if stack_tracker.max_size > 0 {
+                    asm.extend_asm(var.get_token().to_asm_iter(load_to_register(
+                        RegisterDef::SPARE,
+                        stack_tracker.max_size as u32,
+                    )));
+                    asm.push_asm(var.get_token().to_asm(AsmToken::OperationLiteral(Box::new(
+                        OpSub::new(
+                            ArgumentType::new(Register::StackPointer, DataType::U32),
+                            Register::StackPointer.into(),
+                            RegisterDef::SPARE.into(),
+                        ),
+                    ))));
+                }
             } else {
                 return Err(name
                     .clone()

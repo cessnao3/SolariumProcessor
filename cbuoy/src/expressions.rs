@@ -138,37 +138,6 @@ impl TemporaryStackTracker {
         self.offset += val;
         self.max_size = self.max_size.max(self.offset);
     }
-
-    pub fn get_start_code(&self) -> Vec<AsmToken> {
-        let mut asm = Vec::new();
-        asm.push(AsmToken::OperationLiteral(Box::new(OpCopy::new(
-            RegisterDef::FN_TEMPVAR_BASE.into(),
-            Register::StackPointer.into(),
-        )))); // TODO - This can be moved in if the size is zero, leave here for debugging for now
-
-        if self.max_size > 0 {
-            asm.extend(load_to_register(RegisterDef::SPARE, self.max_size as u32));
-            asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
-                ArgumentType::new(Register::StackPointer, DataType::U32),
-                Register::StackPointer.into(),
-                RegisterDef::SPARE.into(),
-            ))));
-        }
-        asm
-    }
-
-    pub fn get_end_code(&self) -> Vec<AsmToken> {
-        let mut asm = Vec::new();
-        if self.max_size > 0 {
-            asm.extend(load_to_register(RegisterDef::SPARE, self.max_size as u32));
-            asm.push(AsmToken::OperationLiteral(Box::new(OpSub::new(
-                ArgumentType::new(Register::StackPointer, DataType::U32),
-                Register::StackPointer.into(),
-                RegisterDef::SPARE.into(),
-            ))));
-        }
-        asm
-    }
 }
 
 pub trait Expression: Debug + Display {

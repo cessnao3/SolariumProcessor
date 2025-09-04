@@ -415,7 +415,6 @@ impl CompilingState {
             asm.push(Self::blank_token_loc(AsmToken::OperationLiteral(Box::new(
                 OpCopy::new(Register::ArgumentBase.into(), Register::StackPointer.into()),
             ))));
-
             asm.push(Self::blank_token_loc(AsmToken::OperationLiteral(Box::new(
                 OpLdn::new(ArgumentType::new(RegisterDef::SPARE, DataType::U32)),
             ))));

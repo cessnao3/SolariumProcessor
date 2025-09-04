@@ -127,15 +127,6 @@ impl GlobalStatement for FunctionDefinition {
 
         let scope_size = self.scope_manager.get_max_size();
 
-        if scope_size > 0 {
-            init_asm.extend(load_to_register(RegisterDef::SPARE, scope_size as u32));
-            init_asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
-                ArgumentType::new(Register::StackPointer, DataType::U32),
-                Register::StackPointer.into(),
-                RegisterDef::SPARE.into(),
-            ))));
-        }
-
         let mut stack_requirements = TemporaryStackTracker::default();
         let mut statement_asm = Vec::new();
 
@@ -145,7 +136,35 @@ impl GlobalStatement for FunctionDefinition {
             stack_requirements.merge(local_stack);
         }
 
-        init_asm.extend(stack_requirements.get_start_code());
+        let total_stack_size = scope_size + stack_requirements.max_size;
+
+        if total_stack_size > 0 {
+            init_asm.extend(load_to_register(
+                RegisterDef::SPARE,
+                total_stack_size as u32,
+            ));
+            init_asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                ArgumentType::new(Register::StackPointer, DataType::U32),
+                Register::StackPointer.into(),
+                RegisterDef::SPARE.into(),
+            ))));
+        }
+
+        if stack_requirements.max_size > 0 {
+            init_asm.push(AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                RegisterDef::FN_TEMPVAR_BASE.into(),
+                RegisterDef::FN_VAR_BASE.into(),
+            ))));
+
+            if scope_size > 0 {
+                init_asm.extend(load_to_register(RegisterDef::SPARE, scope_size as u32));
+                init_asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                    ArgumentType::new(RegisterDef::FN_TEMPVAR_BASE, DataType::U32),
+                    RegisterDef::FN_TEMPVAR_BASE.into(),
+                    RegisterDef::SPARE.into(),
+                ))));
+            }
+        }
 
         let mut asm = self
             .name
@@ -158,15 +177,18 @@ impl GlobalStatement for FunctionDefinition {
         let mut asm_end = Vec::new();
 
         asm_end.push(AsmToken::CreateLabel(self.end_label.clone()));
-        asm_end.extend(stack_requirements.get_end_code());
-        if scope_size > 0 {
-            asm_end.extend(load_to_register(RegisterDef::SPARE, scope_size as u32));
+        if total_stack_size > 0 {
+            asm_end.extend(load_to_register(
+                RegisterDef::SPARE,
+                total_stack_size as u32,
+            ));
             asm_end.push(AsmToken::OperationLiteral(Box::new(OpSub::new(
                 ArgumentType::new(Register::StackPointer, DataType::U32),
                 Register::StackPointer.into(),
                 RegisterDef::SPARE.into(),
             ))));
         }
+
         asm_end.push(AsmToken::OperationLiteral(Box::new(OpRet)));
         asm_end.push(AsmToken::LocationComment(format!("-func({})", self.name)));
 
