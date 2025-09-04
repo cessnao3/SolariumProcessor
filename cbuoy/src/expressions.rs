@@ -1125,17 +1125,32 @@ impl Expression for FunctionCallExpression {
 
         // Initially use the provided register to demark the temporary parameters
 
-        asm.extend_asm(
-            self.token
-                .to_asm_iter(load_to_register(reg.reg, required_stack.offset as u32)),
-        );
-        asm.extend_asm([self
-            .token
-            .to_asm(AsmToken::OperationLiteral(Box::new(OpAdd::new(
-                ArgumentType::new(reg.reg, DataType::U32),
-                reg.reg.into(),
-                RegisterDef::FN_TEMPVAR_BASE.into(),
-            ))))]);
+        let init_offset = required_stack.offset;
+
+        // Load the original stack offset for the variable values
+
+        if init_offset > 0 {
+            asm.extend_asm(
+                self.token
+                    .to_asm_iter(load_to_register(reg.reg, init_offset as u32)),
+            );
+            asm.push_asm(
+                self.token
+                    .to_asm(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                        ArgumentType::new(reg.reg, DataType::U32),
+                        reg.reg.into(),
+                        RegisterDef::FN_TEMPVAR_BASE.into(),
+                    )))),
+            );
+        } else {
+            asm.push_asm(
+                self.token
+                    .to_asm(AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                        reg.reg.into(),
+                        RegisterDef::FN_TEMPVAR_BASE.into(),
+                    )))),
+            );
+        }
 
         // Add parameter values
 
@@ -1155,7 +1170,7 @@ impl Expression for FunctionCallExpression {
                 let var = Rc::new(LocalVariable::new(
                     p_name,
                     p.dtype.clone(),
-                    reg.reg,
+                    RegisterDef::FN_TEMPVAR_BASE,
                     required_stack.offset,
                     None,
                 )?);

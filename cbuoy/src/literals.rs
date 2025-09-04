@@ -2,7 +2,7 @@ use std::{fmt::Display, rc::Rc, sync::LazyLock};
 
 use jib::cpu::{DataType, OperationError, OperatorManager, convert_types};
 use jib_asm::{ArgumentType, AsmToken, AsmTokenLoc, OpLdn};
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 
 use crate::{
     TokenError,
@@ -324,17 +324,7 @@ impl TryFrom<Token> for Literal {
         {
             let cs = c.as_str();
 
-            let jib_char = if let Some(escape) = cs.strip_prefix("\\") {
-                match escape {
-                    "n" => '\n',
-                    "t" => '\t',
-                    _ => {
-                        return Err(value
-                            .clone()
-                            .into_err(format!("escape sequence for '\\{escape}' unknown")));
-                    }
-                }
-            } else if cs.len() == 1 {
+            let jib_char = if cs.len() == 1 {
                 cs.chars().next().unwrap()
             } else {
                 return Err(value
@@ -369,12 +359,18 @@ pub struct StringLiteral {
 
 impl StringLiteral {
     pub fn new(token: Token, id: usize) -> Result<Self, TokenError> {
-        static STRING_REGEX: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r#"^"(?<text>.*)"$"#).unwrap());
+        static STRING_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+            RegexBuilder::new(r#"^"(?<text>.*)"$"#)
+                .multi_line(false)
+                .dot_matches_new_line(true)
+                .build()
+                .unwrap()
+        });
         if let Some(m) = STRING_REGEX.captures(token.get_value())
             && let Some(t) = m.name("text")
         {
             let s = t.as_str().into();
+
             Ok(Self {
                 token,
                 value: s,

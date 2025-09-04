@@ -468,17 +468,13 @@ impl Statement for ReturnStatementRegVar {
     ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let mut asm = Vec::new();
 
-        asm.extend(
-            self.token.to_asm_iter([
-                AsmToken::Comment(
-                    self.expr
-                        .as_ref()
-                        .map(|(dt, e)| format!("return ({e}) : {dt}"))
-                        .unwrap_or("return".to_string()),
-                ),
-                AsmToken::LocationComment("return_test_value".to_string()),
-                AsmToken::OperationLiteral(Box::new(OpBrk)),
-            ]),
+        asm.push(
+            self.token.to_asm(AsmToken::Comment(
+                self.expr
+                    .as_ref()
+                    .map(|(dt, e)| format!("return ({e}) : {dt}"))
+                    .unwrap_or("return".to_string()),
+            )),
         );
 
         if let Some((ret_type, e)) = &self.expr {

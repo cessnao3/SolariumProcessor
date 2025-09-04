@@ -64,10 +64,8 @@ fn print_uint(v: u32) void {
 }
 
 fn strlen(c: *u8) u32 {
-    brkpt;
     def len: u32 = 0u32;
     while (*c != 0) {
-        brkpt;
         len = len + 1u32;
         c = c + 1u8;
     }
@@ -99,6 +97,14 @@ fn main() void {
     print_uint(strlen(TEST_STR));
     print("\n");
     print_uint(strlens(TEST_STR).len);
+    print("\n");
+
+    def s1: u32 = strlen(TEST_STR);
+    def s2: LenStruct = strlens(TEST_STR);
+
+    print_uint(s1);
+    print("\n");
+    print_uint(s2.len);
     print("\n");
 
     print_uint(0);

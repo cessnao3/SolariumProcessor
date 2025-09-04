@@ -62,20 +62,6 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
     // Loop through and process tokens
     let mut tokens = Vec::new();
 
-    struct TokenMatch<'a> {
-        s: &'a str,
-        loc: Option<TokenLocation>,
-    }
-
-    impl From<TokenMatch<'_>> for Token {
-        fn from(value: TokenMatch) -> Self {
-            Self {
-                value: value.s.into(),
-                loc: value.loc.unwrap(),
-            }
-        }
-    }
-
     struct TokenStart {
         i: usize,
         string_char: Option<char>,
@@ -107,12 +93,42 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
     for (line_num, l) in s.lines().enumerate() {
         let mut current_state = None;
 
-        let get_loc = |start: usize| {
-            Some(TokenLocation {
-                line: line_num,
-                column: start,
-            })
+        let get_loc = |start: usize| TokenLocation {
+            line: line_num,
+            column: start,
         };
+
+        fn convert_escape_characters(s: Token, string_char: char) -> Result<Token, TokenError> {
+            let mut within_escape = false;
+            let mut result = Vec::new();
+
+            for c in s.get_value().chars() {
+                if within_escape {
+                    let res = match c {
+                        'n' => '\n',
+                        '\\' => '\\',
+                        '\'' if string_char == '\'' => '\'',
+                        '"' if string_char == '"' => '"',
+                        _ => {
+                            return Err(s.into_err(format!(
+                                "unable to convert {c} into valid escape sequence"
+                            )));
+                        }
+                    };
+                    result.push(res);
+                    within_escape = false;
+                } else if c == '\\' {
+                    within_escape = true;
+                } else {
+                    result.push(c);
+                }
+            }
+
+            Ok(Token::new(
+                &result.into_iter().collect::<String>(),
+                *s.get_loc(),
+            ))
+        }
 
         for (col_num, c) in l.char_indices() {
             if let Some(TokenStart {
@@ -122,10 +138,9 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
             }) = current_state
             {
                 if c == string_char && !last_was_escape {
-                    tokens.push(TokenMatch {
-                        s: &l[start_index..=col_num],
-                        loc: get_loc(start_index),
-                    });
+                    let init_tok =
+                        Token::new(&l[start_index..=col_num].to_string(), get_loc(start_index));
+                    tokens.push(convert_escape_characters(init_tok, string_char)?);
 
                     current_state = None;
                 }
@@ -139,25 +154,16 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
                 let current = &l[start_index..=col_num];
 
                 if c.is_whitespace() {
-                    tokens.push(TokenMatch {
-                        s: &l[start_index..col_num],
-                        loc: get_loc(start_index),
-                    });
+                    tokens.push(Token::new(&l[start_index..col_num], get_loc(start_index)));
 
                     current_state = None;
                 } else if c == '\'' || c == '"' {
-                    tokens.push(TokenMatch {
-                        s: &l[start_index..col_num],
-                        loc: get_loc(start_index),
-                    });
+                    tokens.push(Token::new(&l[start_index..col_num], get_loc(start_index)));
                     current_state = Some(TokenStart::new_str(col_num, c));
                 } else if (OPERATORS.contains(prev) && !OPERATORS.contains(current))
                     || (!OPERATORS.contains(current) && OPERATOR_STARTS.contains(&c))
                 {
-                    tokens.push(TokenMatch {
-                        s: prev,
-                        loc: get_loc(start_index),
-                    });
+                    tokens.push(Token::new(prev, get_loc(start_index)));
 
                     current_state = Some(TokenStart::new(col_num));
                 }
@@ -179,10 +185,7 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
         }) = current_state
         {
             let current = &l[start..];
-            tokens.push(TokenMatch {
-                s: current,
-                loc: get_loc(start),
-            });
+            tokens.push(Token::new(current, get_loc(start)));
         } else if let Some(TokenStart {
             i: start,
             string_char: Some(_),
@@ -205,108 +208,8 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
     }
 
     // Return the resulting tokens
-    Ok(tokens
-        .into_iter()
-        .map(|t| Token::new(t.s, t.loc.unwrap()))
-        .collect())
+    Ok(tokens)
 }
-
-/*
-pub fn tokenize2(s: &str) -> Result<Vec<Token>, TokenError> {
-    // Remove comments
-    let s = strip_comments(s);
-
-    // Define the splitting regex
-    static SPLIT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r##"(\w+)|\.|,|:|;|\{|\}|\(|\)|\+|\-|\*|/|(&&?)|(\|\|?)|([<>!=]=?)|\[|\]|('(([\w])|(\\[\w]))')|("(([^\\"])|(\\"))*")"##).unwrap()
-    });
-
-    struct TokenMatch<'a> {
-        s: &'a str,
-        start: usize,
-        end: usize,
-        loc: Option<TokenLocation>,
-    }
-
-    impl From<TokenMatch<'_>> for Token {
-        fn from(value: TokenMatch) -> Self {
-            Self {
-                value: value.s.into(),
-                loc: value.loc.unwrap(),
-            }
-        }
-    }
-
-    let mut tokens: Vec<TokenMatch> = SPLIT_REGEX
-        .find_iter(&s)
-        .map(|m| TokenMatch {
-            s: m.as_str(),
-            start: m.start(),
-            end: m.end(),
-            loc: None,
-        })
-        .collect::<Vec<_>>();
-
-    let mut last_end = None;
-    for t in tokens.iter() {
-        let last_index = last_end.unwrap_or(0);
-        let check = s[last_index..t.start].trim();
-
-        let line = s.chars().filter(|c| *c == '\n').count();
-
-        let mut col_val = 0;
-        for (i, c) in s.char_indices().take(t.start) {
-            if c == '\n' {
-                col_val = i;
-            }
-        }
-
-        let column = t.start - col_val;
-
-        if !check.is_empty() {
-            return Err(TokenError {
-                msg: format!("unexpected token \"{}\" found", check),
-                token: Some(Token {
-                    value: check.into(),
-                    loc: TokenLocation { line, column },
-                }),
-            });
-        }
-
-        last_end = Some(t.end);
-    }
-
-    // Determine Locations
-    let mut char_iter = s.chars();
-    let mut current_index = 0;
-    let mut current_line = 0;
-    let mut current_col = 0;
-
-    for t in tokens.iter_mut() {
-        while current_index < t.start && current_index < s.len() {
-            if Some('\n') == char_iter.next() {
-                current_line += 1;
-                current_col = 0;
-            } else {
-                current_col += 1;
-            }
-
-            current_index += 1;
-        }
-
-        t.loc = Some(TokenLocation {
-            line: current_line,
-            column: current_col,
-        });
-    }
-
-    // Return the resulting tokens
-    Ok(tokens
-        .into_iter()
-        .map(|t| Token::new(t.s, t.loc.unwrap()))
-        .collect())
-}
-*/
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct TokenLocation {
