@@ -179,7 +179,7 @@ impl AsmToken {
                 }
             } else if c == '"' {
                 within_quote = !within_quote;
-            } else if !within_quote && (c == '!' || c == ';') {
+            } else if !within_quote && c == ';' {
                 ind = Some(i);
                 break;
             }
@@ -268,6 +268,11 @@ impl TryFrom<&str> for AsmToken {
         // Create the instruction list
         static INSTRUCTION_LIST: LazyLock<InstructionList> =
             LazyLock::new(InstructionList::default);
+
+        // Check for a debug comment
+        if let Some(cmt) = value.trim().strip_prefix("!") {
+            return Ok(Self::LocationComment(cmt.trim().to_string()));
+        }
 
         // Trim Comments
         let s = Self::trim_line(value);

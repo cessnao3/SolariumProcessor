@@ -238,17 +238,26 @@ fn build_code_column(
                                 .collect::<Vec<_>>()
                                 .join("\n");
 
-                            match jib_asm::assemble_text(asm.as_str()) {
+                            match jib_asm::assemble_tokens(v) {
                                 Ok(v) => {
-                                    let mut locs =
+                                    let mut label_locs =
                                         v.labels.iter().map(|(k, v)| (*v, k)).collect::<Vec<_>>();
-                                    locs.sort_by(|a, b| a.0.cmp(&b.0));
-                                    let label_vals = locs
+                                    label_locs.sort_by(|a, b| a.0.cmp(&b.0));
+                                    let label_vals = label_locs
                                         .into_iter()
-                                        .map(|(v, k)| format!("; {v:04x} = {k}"))
+                                        .map(|(addr, txt)| format!(";? {addr:04x} = {txt}"))
                                         .collect::<Vec<_>>()
                                         .join("\n");
-                                    asm = format!("{asm}\n\n{label_vals}");
+                                    asm = format!("{asm}\n\n{label_vals}").trim().to_string();
+
+                                    let mut debug_vals = v.debug.clone();
+                                    debug_vals.sort_by(|a, b| a.0.cmp(&b.0));
+                                    let debug_text = debug_vals
+                                        .into_iter()
+                                        .map(|(addr, txt)| format!(";> {addr:04x} = {txt}"))
+                                        .collect::<Vec<_>>()
+                                        .join("\n");
+                                    asm = format!("{asm}\n\n{debug_text}").trim().to_string();
 
                                     tx_ui.send(UiToThread::SetCode(v)).unwrap();
                                     tx_thread
