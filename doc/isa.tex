@@ -18,7 +18,7 @@
 \author{Ian O'Rourke}
 \date{\today \\ \titlelogoimage}
 
-\lstset{basicstyle=\tiny,frame=single}
+\lstset{basicstyle=\tiny,frame=single,captionpos=b}
 
 \begin{document}
 
@@ -505,11 +505,28 @@ Note that, in this case, both functions and variables share the same namespace. 
 \end{tabular}
 \end{table}
 
-\pagebreak
+This makes use of a few extra conventions. At the start of each function, stack space is reserved both for any local variables, as well as any temporary variables, that are required. A few extra registers are defined in the Table \ref{table:cbuoy-register-references} below.
 
-This provides an example program in Listing \ref{listing:example-cbuoy} below.
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{l|cl}
+        \hline
+        Register & Description \\
+        \hline
+        6 & Function Local Variables  \\
+        7 & Function Temporary Variables \\
+        8 & Spare Register \\
+        \hline
+    \end{tabular}
+    \caption{Additional registers defined/allocated for use by C/Buoy}
+    \label{table:cbuoy-register-references}
+\end{table}
 
-\lstinputlisting[caption={Example C/Buoy program}, label={listing:example-cbuoy}]{../cbuoy/examples/test.cb}
+When returning a parameter, if the parameter is a primitive, it is returned by value in the return register directly. However, if it is a structure, the address of the temporary to write into is written into the return register before the function call. This is typically a temporary allocated on the stack, as mentioned above.
+
+This provides an example program in Listing \ref{listing:example-cbuoy} below, which provides an example of printing text to a serial device, both using a string literal, but also converting numeric values into their text equivalents.
+
+\lstinputlisting[label={listing:example-cbuoy},caption={Example C/Buoy program for printing out a string to a serial output device}]{../cbuoy/examples/printing.cb}
 
 \pagebreak
 
