@@ -956,19 +956,19 @@ impl Expression for AssignmentExpression {
             self.addr_expr, self.val_expr
         ))));
 
-        let val_def = reg;
-        let addr_def = val_def.increment_token(tok)?;
+        let addr_def = reg;
+        let val_def = addr_def.increment_token(tok)?;
 
         if let Some(dest_dtype) = self.addr_expr.get_type()?.primitive_type() {
             let val_dtype = self.val_expr.get_primitive_type()?;
 
             asm.append(
-                self.val_expr
-                    .load_value_to_register(val_def, required_stack)?,
-            );
-            asm.append(
                 self.addr_expr
                     .load_address_to_register(addr_def, required_stack)?,
+            );
+            asm.append(
+                self.val_expr
+                    .load_value_to_register(val_def, required_stack)?,
             );
 
             if val_dtype != dest_dtype {

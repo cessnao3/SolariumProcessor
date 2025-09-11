@@ -9,7 +9,7 @@ use std::sync::mpsc::{Receiver, RecvError, Sender, TryRecvError};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub const WRITE_CPU_HISTORY: bool = true;
+pub const WRITE_CPU_HISTORY: bool = false;
 
 struct CircularBuffer<T, const S: usize> {
     history: [Option<T>; S],

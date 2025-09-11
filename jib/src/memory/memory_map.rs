@@ -6,8 +6,6 @@ use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::mem::size_of;
 
-extern crate std;
-
 struct SegmentData {
     base: u32,
     seg: Rc<RefCell<dyn MemorySegment>>,
@@ -29,7 +27,6 @@ impl SegmentData {
     }
 
     pub fn set(&self, addr: u32, val: u8) -> Result<(), MemoryError> {
-        std::println!("Writing {val:#04x} to {addr:#010x}");
         let offset = addr - self.base;
         let res = self.seg.borrow_mut().set(offset, val);
         self.segment_to_memory(res)
