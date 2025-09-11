@@ -368,11 +368,15 @@ impl TryFrom<&str> for AsmToken {
     }
 }
 
+fn update_comment_values(s: &str) -> String {
+    s.replace('\n', "\\n")
+}
+
 impl Display for AsmToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Comment(s) => write!(f, "; {s}"),
-            Self::LocationComment(s) => write!(f, "! {}", s.replace('\n', "\\n")),
+            Self::Comment(s) => write!(f, "; {}", update_comment_values(s)),
+            Self::LocationComment(s) => write!(f, "! {}", update_comment_values(s)),
             Self::LoadLoc(l) => write!(f, ".loadloc {l}"),
             Self::AlignInstruction => write!(f, ".align"),
             Self::ChangeAddress(addr) => write!(f, ".oper 0x{addr:x}"),
