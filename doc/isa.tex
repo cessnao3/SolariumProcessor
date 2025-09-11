@@ -310,7 +310,7 @@ Reference names are available to link to the special register values, as listed 
 
 \subsection{Calling Convention}
 
-The calling convention...
+The calling convention allocates the required arguments in a contiguous block of memory, one after another. The address of the start is placed in the argument base register, and then the function may be called. For return variables, primitives should be placed directly in the output register. If a larger value is desired to be output than may be placed directly in the return register, then the desired output address should be created by the caller and assigned to the return register prior the function call. The function may then be called, where it will write to the provided address in the return register. In this case, the return register should not be directly written to, but instead used as a if it were a pointer argument. This convention should be followed for both assembly functions as well as higher-level language functions, if possible, for compatibility between the two.
 
 \pagebreak
 
