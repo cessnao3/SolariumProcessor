@@ -758,6 +758,7 @@ fn parse_statement(
         } else if next.get_value() == "}" {
             Ok(None)
         } else if next.get_value() == ";" {
+            tokens.expect(";")?;
             Ok(Some(Rc::new(EmptyStatement)))
         } else {
             let expr = parse_expression(tokens, state)?;

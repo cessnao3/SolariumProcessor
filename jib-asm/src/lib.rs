@@ -275,14 +275,14 @@ impl TryFrom<&str> for AsmToken {
         }
 
         // Trim Comments
-        let s = Self::trim_line(value);
+        let s = Self::trim_line(value.trim());
 
         let words = Self::split_asm_delim(s)?;
 
         let first: &str = if let Some(w) = words.first() {
             w
         } else {
-            return Ok(Self::Empty); // Empty Instruction
+            return Ok(Self::Empty);
         };
 
         let tok = if let Some(op) = first.strip_prefix('.') {

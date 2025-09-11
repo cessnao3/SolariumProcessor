@@ -71,10 +71,9 @@ fn print_uint(v: u32) void {
     }
 }
 
-fn strlenasm(c: *u8) u32 {
+asmfn strlenasm(c: *u8) u32 {
     "ldi 8:u16 1";
     "ldi 9:u16 0";
-    "brk";
     "ld 10:u32 $arg";
     "ld 11:u8 10";
     "tz 11";
