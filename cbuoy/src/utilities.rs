@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use jib::cpu::{DataType, Register};
 use jib_asm::{
     ArgumentType, AsmToken, AsmTokenLoc, INST_SIZE, Instruction, OpAdd, OpJmpri, OpLd, OpLdi,
@@ -191,5 +193,15 @@ impl Statement for MemcpyStatement {
         ))));
 
         Ok(self.token.to_asm_iter(asm).into_iter().collect())
+    }
+}
+
+impl Display for MemcpyStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "memcpy {} -> {} @ {}",
+            self.from_addr, self.to_addr, self.size
+        )
     }
 }

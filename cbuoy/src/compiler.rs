@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     collections::{HashMap, hash_map::Entry},
-    fmt::Debug,
+    fmt::{Debug, Display},
     rc::Rc,
 };
 
@@ -20,7 +20,7 @@ use crate::{
     variables::{GlobalVariable, GlobalVariableStatement, LocalVariable, VariableDefinition},
 };
 
-pub trait Statement: Debug {
+pub trait Statement: Debug + Display {
     fn get_exec_code(
         &self,
         temporary_stack_tracker: &mut TemporaryStackTracker,

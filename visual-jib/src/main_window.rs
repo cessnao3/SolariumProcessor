@@ -1,3 +1,5 @@
+use std::{fs::File, io::Write};
+
 //use gtk::glib::clone;
 use crate::cpu_thread::cpu_thread;
 use crate::messages::{ThreadToUi, UiToThread};
@@ -254,7 +256,9 @@ fn build_code_column(
                                     debug_vals.sort_by(|a, b| a.0.cmp(&b.0));
                                     let debug_text = debug_vals
                                         .into_iter()
-                                        .map(|(addr, txt)| format!(";> {addr:04x} = {txt}"))
+                                        .map(|(addr, txt)| {
+                                            format!(";> {addr:04x} = {}", txt.replace('\n', "\\n"))
+                                        })
                                         .collect::<Vec<_>>()
                                         .join("\n");
                                     asm = format!("{asm}\n\n{debug_text}").trim().to_string();
@@ -273,6 +277,11 @@ fn build_code_column(
                                         )))
                                         .unwrap();
                                 }
+                            }
+
+                            if crate::cpu_thread::WRITE_CPU_HISTORY {
+                                let mut f = File::create("history.jb").unwrap();
+                                write!(f, "{asm}").unwrap();
                             }
 
                             buffer_asm_code.set_text(&asm);

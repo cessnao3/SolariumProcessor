@@ -9,6 +9,8 @@ use std::sync::mpsc::{Receiver, RecvError, Sender, TryRecvError};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+pub const WRITE_CPU_HISTORY: bool = true;
+
 struct CircularBuffer<T, const S: usize> {
     history: [Option<T>; S],
     index: usize,
@@ -90,7 +92,11 @@ impl ThreadState {
             inst_history: Default::default(),
             inst_map: InstructionList::default(),
             breakpoint: None,
-            history_file: Some(std::fs::File::create("history.csv").expect("unable to open file")),
+            history_file: if WRITE_CPU_HISTORY {
+                Some(std::fs::File::create("history.csv").expect("unable to open file"))
+            } else {
+                None
+            },
             step_count: 0,
         };
 

@@ -372,7 +372,7 @@ impl Display for AsmToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Comment(s) => write!(f, "; {s}"),
-            Self::LocationComment(s) => write!(f, "! {s}"),
+            Self::LocationComment(s) => write!(f, "! {}", s.replace('\n', "\\n")),
             Self::LoadLoc(l) => write!(f, ".loadloc {l}"),
             Self::AlignInstruction => write!(f, ".align"),
             Self::ChangeAddress(addr) => write!(f, ".oper 0x{addr:x}"),

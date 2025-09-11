@@ -26,7 +26,7 @@ pub trait FunctionDefinition: GlobalStatement {
 }
 
 #[derive(Debug)]
-pub struct CBuoyFunctionDefinition {
+pub struct StandardFunctionDefinition {
     name: Token,
     entry_label: String,
     end_label: String,
@@ -35,7 +35,7 @@ pub struct CBuoyFunctionDefinition {
     scope_manager: ScopeManager,
 }
 
-impl CBuoyFunctionDefinition {
+impl StandardFunctionDefinition {
     pub fn create_label_base(id: usize, name: &Token) -> Result<String, TokenError> {
         let ident = get_identifier(name)?;
         Ok(format!("___func_{id}_{ident}"))
@@ -59,7 +59,7 @@ impl CBuoyFunctionDefinition {
     }
 }
 
-impl FunctionDefinition for CBuoyFunctionDefinition {
+impl FunctionDefinition for StandardFunctionDefinition {
     fn get_entry_label(&self) -> &str {
         &self.entry_label
     }
@@ -74,6 +74,99 @@ impl FunctionDefinition for CBuoyFunctionDefinition {
             dtype: self.dtype.clone(),
             entry_label: self.entry_label.clone(),
         })
+    }
+}
+
+impl GlobalStatement for StandardFunctionDefinition {
+    fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        Ok(Vec::new())
+    }
+
+    fn get_static_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        Ok(Vec::new())
+    }
+
+    fn get_func_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        let mut init_asm = vec![
+            AsmToken::CreateLabel(self.entry_label.clone()),
+            AsmToken::LocationComment(format!("+func({})", self.name)),
+            AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                RegisterDef::FN_VAR_BASE.into(),
+                Register::StackPointer.into(),
+            ))),
+        ];
+
+        let scope_size = self.scope_manager.get_max_size();
+
+        let mut stack_requirements = TemporaryStackTracker::default();
+        let mut statement_asm = Vec::new();
+
+        for s in self.statements.iter() {
+            let mut local_stack = TemporaryStackTracker::default();
+            statement_asm.push(self.name.to_asm(AsmToken::LocationComment(format!("{s}"))));
+            statement_asm.extend(s.get_exec_code(&mut local_stack)?);
+            stack_requirements.merge(local_stack);
+        }
+
+        let total_stack_size = scope_size + stack_requirements.max_size;
+
+        if total_stack_size > 0 {
+            init_asm.extend(load_to_register(
+                RegisterDef::SPARE,
+                total_stack_size as u32,
+            ));
+            init_asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                ArgumentType::new(Register::StackPointer, DataType::U32),
+                Register::StackPointer.into(),
+                RegisterDef::SPARE.into(),
+            ))));
+        }
+
+        if stack_requirements.max_size > 0 {
+            init_asm.push(AsmToken::OperationLiteral(Box::new(OpCopy::new(
+                RegisterDef::FN_TEMPVAR_BASE.into(),
+                RegisterDef::FN_VAR_BASE.into(),
+            ))));
+
+            if scope_size > 0 {
+                init_asm.extend(load_to_register(RegisterDef::SPARE, scope_size as u32));
+                init_asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
+                    ArgumentType::new(RegisterDef::FN_TEMPVAR_BASE, DataType::U32),
+                    RegisterDef::FN_TEMPVAR_BASE.into(),
+                    RegisterDef::SPARE.into(),
+                ))));
+            }
+        }
+
+        let mut asm = self
+            .name
+            .to_asm_iter(init_asm)
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        asm.extend(statement_asm);
+
+        let mut asm_end = Vec::new();
+
+        asm_end.push(AsmToken::CreateLabel(self.end_label.clone()));
+        if total_stack_size > 0 {
+            asm_end.extend(load_to_register(
+                RegisterDef::SPARE,
+                total_stack_size as u32,
+            ));
+            asm_end.push(AsmToken::OperationLiteral(Box::new(OpSub::new(
+                ArgumentType::new(Register::StackPointer, DataType::U32),
+                Register::StackPointer.into(),
+                RegisterDef::SPARE.into(),
+            ))));
+        }
+
+        asm_end.push(AsmToken::OperationLiteral(Box::new(OpRet)));
+        asm_end.push(AsmToken::LocationComment(format!("-func({})", self.name)));
+
+        asm.extend(self.name.to_asm_iter(asm_end));
+
+        Ok(asm)
     }
 }
 
@@ -170,98 +263,6 @@ impl Display for FunctionLabelExpr {
     }
 }
 
-impl GlobalStatement for CBuoyFunctionDefinition {
-    fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        Ok(Vec::new())
-    }
-
-    fn get_static_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        Ok(Vec::new())
-    }
-
-    fn get_func_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        let mut init_asm = vec![
-            AsmToken::CreateLabel(self.entry_label.clone()),
-            AsmToken::LocationComment(format!("+func({})", self.name)),
-            AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                RegisterDef::FN_VAR_BASE.into(),
-                Register::StackPointer.into(),
-            ))),
-        ];
-
-        let scope_size = self.scope_manager.get_max_size();
-
-        let mut stack_requirements = TemporaryStackTracker::default();
-        let mut statement_asm = Vec::new();
-
-        for s in self.statements.iter() {
-            let mut local_stack = TemporaryStackTracker::default();
-            statement_asm.extend(s.get_exec_code(&mut local_stack)?);
-            stack_requirements.merge(local_stack);
-        }
-
-        let total_stack_size = scope_size + stack_requirements.max_size;
-
-        if total_stack_size > 0 {
-            init_asm.extend(load_to_register(
-                RegisterDef::SPARE,
-                total_stack_size as u32,
-            ));
-            init_asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
-                ArgumentType::new(Register::StackPointer, DataType::U32),
-                Register::StackPointer.into(),
-                RegisterDef::SPARE.into(),
-            ))));
-        }
-
-        if stack_requirements.max_size > 0 {
-            init_asm.push(AsmToken::OperationLiteral(Box::new(OpCopy::new(
-                RegisterDef::FN_TEMPVAR_BASE.into(),
-                RegisterDef::FN_VAR_BASE.into(),
-            ))));
-
-            if scope_size > 0 {
-                init_asm.extend(load_to_register(RegisterDef::SPARE, scope_size as u32));
-                init_asm.push(AsmToken::OperationLiteral(Box::new(OpAdd::new(
-                    ArgumentType::new(RegisterDef::FN_TEMPVAR_BASE, DataType::U32),
-                    RegisterDef::FN_TEMPVAR_BASE.into(),
-                    RegisterDef::SPARE.into(),
-                ))));
-            }
-        }
-
-        let mut asm = self
-            .name
-            .to_asm_iter(init_asm)
-            .into_iter()
-            .collect::<Vec<_>>();
-
-        asm.extend(statement_asm);
-
-        let mut asm_end = Vec::new();
-
-        asm_end.push(AsmToken::CreateLabel(self.end_label.clone()));
-        if total_stack_size > 0 {
-            asm_end.extend(load_to_register(
-                RegisterDef::SPARE,
-                total_stack_size as u32,
-            ));
-            asm_end.push(AsmToken::OperationLiteral(Box::new(OpSub::new(
-                ArgumentType::new(Register::StackPointer, DataType::U32),
-                Register::StackPointer.into(),
-                RegisterDef::SPARE.into(),
-            ))));
-        }
-
-        asm_end.push(AsmToken::OperationLiteral(Box::new(OpRet)));
-        asm_end.push(AsmToken::LocationComment(format!("-func({})", self.name)));
-
-        asm.extend(self.name.to_asm_iter(asm_end));
-
-        Ok(asm)
-    }
-}
-
 pub fn parse_fn_statement(
     tokens: &mut TokenIter,
     state: &mut CompilingState,
@@ -285,7 +286,8 @@ pub fn parse_fn_statement(
 
     let mut statements = Vec::new();
 
-    let base_label = CBuoyFunctionDefinition::create_label_base(state.get_next_id(), &name_token)?;
+    let base_label =
+        StandardFunctionDefinition::create_label_base(state.get_next_id(), &name_token)?;
 
     while let Some(s) = parse_statement(
         tokens,
@@ -298,7 +300,7 @@ pub fn parse_fn_statement(
 
     tokens.expect("}")?;
 
-    let def = Rc::new(CBuoyFunctionDefinition::new(
+    let def = Rc::new(StandardFunctionDefinition::new(
         &base_label,
         name_token.clone(),
         func_type,
@@ -347,6 +349,7 @@ pub fn parse_asmfn_statement(
 
 #[derive(Debug, Clone)]
 struct StatementGroup {
+    token: Token,
     statements: Vec<Rc<dyn Statement>>,
 }
 
@@ -358,10 +361,21 @@ impl Statement for StatementGroup {
         let mut asm = Vec::new();
         for s in self.statements.iter() {
             let mut local_stack = TemporaryStackTracker::default();
+            asm.push(self.token.to_asm(AsmToken::LocationComment(format!("{s}"))));
             asm.extend(s.get_exec_code(&mut local_stack)?.into_iter());
             required_stack.merge(local_stack);
         }
         Ok(asm)
+    }
+}
+
+impl Display for StatementGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{")?;
+        for s in self.statements.iter() {
+            write!(f, " {s};")?;
+        }
+        write!(f, " }}")
     }
 }
 
@@ -438,6 +452,18 @@ impl Statement for IfStatement {
     }
 }
 
+impl Display for IfStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "if ({}) {{ {} }}", self.test_expr, self.true_statement)?;
+
+        if let Some(st) = &self.false_statement {
+            write!(f, " else {{ {st} }}")?;
+        }
+
+        write!(f, ";")
+    }
+}
+
 #[derive(Debug, Clone)]
 struct WhileStatement {
     token: Token,
@@ -506,6 +532,12 @@ impl Statement for WhileStatement {
     }
 }
 
+impl Display for WhileStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "while ({}) {{ {} }}", self.test_expr, self.statement)
+    }
+}
+
 #[derive(Default, Debug, Clone)]
 struct EmptyStatement;
 
@@ -515,6 +547,12 @@ impl Statement for EmptyStatement {
         _required_stack: &mut TemporaryStackTracker,
     ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         Ok(Vec::new())
+    }
+}
+
+impl Display for EmptyStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{NOOP}}")
     }
 }
 
@@ -535,6 +573,12 @@ impl Statement for ExpressionStatement {
     }
 }
 
+impl Display for ExpressionStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.expr)
+    }
+}
+
 #[derive(Debug, Clone)]
 struct DebugBreakpointStatement {
     token: Token,
@@ -549,6 +593,12 @@ impl Statement for DebugBreakpointStatement {
             self.token
                 .to_asm(AsmToken::OperationLiteral(Box::new(OpBrk))),
         ])
+    }
+}
+
+impl Display for DebugBreakpointStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BRKPT")
     }
 }
 
@@ -576,6 +626,12 @@ impl Statement for ReturnStatementTempVar {
         ]));
 
         Ok(asm)
+    }
+}
+
+impl Display for ReturnStatementTempVar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "return {};", self.temp_var)
     }
 }
 
@@ -642,6 +698,16 @@ impl Statement for ReturnStatementRegVar {
     }
 }
 
+impl Display for ReturnStatementRegVar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some((_, r)) = &self.expr {
+            write!(f, "return {r};")
+        } else {
+            write!(f, "return;")
+        }
+    }
+}
+
 fn parse_statement(
     tokens: &mut TokenIter,
     state: &mut CompilingState,
@@ -657,7 +723,7 @@ fn parse_statement(
             state.get_scopes_mut()?.add_const(def)?;
             Ok(Some(Rc::new(EmptyStatement)))
         } else if next.get_value() == "{" {
-            tokens.expect("{")?;
+            let init_tok = tokens.expect("{")?;
             state.get_scopes_mut()?.add_scope();
             let mut statements = Vec::new();
             while let Some(s) = parse_statement(tokens, state, return_jump_label, return_type)? {
@@ -665,7 +731,10 @@ fn parse_statement(
             }
             tokens.expect("}")?;
             state.get_scopes_mut()?.remove_scope()?;
-            Ok(Some(Rc::new(StatementGroup { statements })))
+            Ok(Some(Rc::new(StatementGroup {
+                token: init_tok,
+                statements,
+            })))
         } else if next.get_value() == "if" {
             let if_token = tokens.expect("if")?;
             let id = state.get_next_id();
