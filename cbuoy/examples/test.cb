@@ -30,11 +30,19 @@ fn add_numbers(dest: *u16, a: u16, b: u16) u16 {
     *dest = 4 * a + b * 2;
 }
 
-fn print(c: *u8) void {
-    while (*c != 0) {
-        *SERIAL_OUT_LOC = *c;
-        c = c + 1;
-    }
+asmfn print(c: *u8) void {
+    "ldn 8:u32";
+    ".u32 0xA005";
+    ".align";
+    "ldi 9:u16 1";
+    "ld 10:u32 $arg";
+    "ld 11:u8 10";
+    "tz 11";
+    "jmpri 16";
+    "sav 8:u8 11";
+    "add 10:u32 10 9";
+    "jmpri -20";
+    "ret";
 }
 
 fn print_digit(v: u8) void {
@@ -61,6 +69,21 @@ fn print_uint(v: u32) void {
             print_digit(*cp);
         }
     }
+}
+
+fn strlenasm(c: *u8) u32 {
+    "ldi 8:u16 1";
+    "ldi 9:u16 0";
+    "brk";
+    "ld 10:u32 $arg";
+    "ld 11:u8 10";
+    "tz 11";
+    "jmpri 16";
+    "add 9:u32 9 8";
+    "add 10:u32 10 8";
+    "jmpri -20";
+    "copy $ret 9";
+    "ret";
 }
 
 fn strlen(c: *u8) u32 {
@@ -94,6 +117,11 @@ fn test_fn(a: u16, b: u32) void {
 }
 
 fn main() void {
+    print(TEST_STR);
+    print("\n");
+    print_uint(strlenasm(TEST_STR));
+    print("\n");
+
     print_uint(strlen(TEST_STR));
     print("\n");
     print_uint(strlens(TEST_STR).len);

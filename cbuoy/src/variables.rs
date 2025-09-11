@@ -33,7 +33,7 @@ impl GlobalVariable {
         dtype: Type,
         init_expr: Option<Rc<dyn Expression>>,
     ) -> Result<Self, TokenError> {
-        let label = format!("global_variable_{}_{}", id, get_identifier(&token)?).into();
+        let label = format!("___global_variable_{}_{}", id, get_identifier(&token)?).into();
         Ok(Self {
             name: token,
             dtype,

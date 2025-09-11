@@ -36,7 +36,7 @@ pub trait GlobalStatement: Debug {
 #[derive(Debug, Clone)]
 enum GlobalType {
     Variable(Rc<GlobalVariable>),
-    Function(Rc<FunctionDefinition>),
+    Function(Rc<dyn FunctionDefinition>),
     Constant(Rc<Literal>),
     Structure(Token, Rc<StructDefinition>),
     OpaqueType(Token),
@@ -249,32 +249,6 @@ impl ScopeBlock {
         self.variables.values().map(|v| v.stack_size()).sum()
     }
 }
-
-/*
-#[derive(Debug, Clone)]
-pub struct ScopeRemoveStatement {
-    token: Token,
-    size: usize,
-}
-
-impl Statement for ScopeRemoveStatement {
-    fn get_exec_code(
-        &self,
-        _required_stack: &mut TemporaryStackTracker,
-    ) -> Result<Vec<AsmTokenLoc>, TokenError> {
-        let mut asm = Vec::new();
-        asm.extend_from_slice(&load_to_register(RegisterDef::SPARE, self.size as u32));
-
-        asm.push(AsmToken::OperationLiteral(Box::new(OpSub::new(
-            ArgumentType::new(Register::StackPointer, DataType::U32),
-            Register::StackPointer.into(),
-            RegisterDef::SPARE.into(),
-        ))));
-
-        Ok(self.token.to_asm_iter(asm).into_iter().collect())
-    }
-}
-*/
 
 #[derive(Debug, Clone)]
 pub enum UserTypeOptions {
@@ -538,7 +512,7 @@ impl CompilingState {
         self.add_to_global_scope(GlobalType::Constant(Rc::new(def.into_literal()?)))
     }
 
-    pub fn add_function(&mut self, func: Rc<FunctionDefinition>) -> Result<(), TokenError> {
+    pub fn add_function(&mut self, func: Rc<dyn FunctionDefinition>) -> Result<(), TokenError> {
         self.add_to_global_scope(GlobalType::Function(func))
     }
 

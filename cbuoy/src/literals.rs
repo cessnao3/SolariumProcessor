@@ -381,8 +381,12 @@ impl StringLiteral {
         }
     }
 
+    pub fn get_text(&self) -> &str {
+        &self.value
+    }
+
     fn get_label(&self) -> String {
-        format!("global_string_value_{}", self.id)
+        format!("___global_string_value_{}", self.id)
     }
 }
 

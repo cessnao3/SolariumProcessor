@@ -12,14 +12,21 @@ use crate::{
     expressions::{
         Expression, ExpressionData, RegisterDef, TemporaryStackTracker, parse_expression,
     },
+    literals::StringLiteral,
     tokenizer::{EndOfTokenStream, Token, TokenIter, get_identifier},
     typing::{Function, Type},
     utilities::load_to_register,
     variables::{LocalVariable, VariableDefinition},
 };
 
+pub trait FunctionDefinition: GlobalStatement {
+    fn get_token(&self) -> &Token;
+    fn as_expr(&self) -> Rc<dyn Expression>;
+    fn get_entry_label(&self) -> &str;
+}
+
 #[derive(Debug)]
-pub struct FunctionDefinition {
+pub struct CBuoyFunctionDefinition {
     name: Token,
     entry_label: String,
     end_label: String,
@@ -28,10 +35,10 @@ pub struct FunctionDefinition {
     scope_manager: ScopeManager,
 }
 
-impl FunctionDefinition {
+impl CBuoyFunctionDefinition {
     pub fn create_label_base(id: usize, name: &Token) -> Result<String, TokenError> {
         let ident = get_identifier(name)?;
-        Ok(format!("func_{id}_{ident}"))
+        Ok(format!("___func_{id}_{ident}"))
     }
 
     pub fn new(
@@ -50,21 +57,78 @@ impl FunctionDefinition {
             scope_manager,
         })
     }
+}
 
-    pub fn get_entry_label(&self) -> &str {
+impl FunctionDefinition for CBuoyFunctionDefinition {
+    fn get_entry_label(&self) -> &str {
         &self.entry_label
     }
 
-    pub fn get_token(&self) -> &Token {
+    fn get_token(&self) -> &Token {
         &self.name
     }
 
-    pub fn as_expr(&self) -> Rc<dyn Expression> {
+    fn as_expr(&self) -> Rc<dyn Expression> {
         Rc::new(FunctionLabelExpr {
             name: self.name.clone(),
             dtype: self.dtype.clone(),
             entry_label: self.entry_label.clone(),
         })
+    }
+}
+
+#[derive(Debug)]
+pub struct AsmFunctionDefinition {
+    name: Token,
+    entry_label: String,
+    dtype: Function,
+    asm_text: Vec<Token>,
+}
+
+impl FunctionDefinition for AsmFunctionDefinition {
+    fn get_entry_label(&self) -> &str {
+        &self.entry_label
+    }
+
+    fn get_token(&self) -> &Token {
+        &self.name
+    }
+
+    fn as_expr(&self) -> Rc<dyn Expression> {
+        Rc::new(FunctionLabelExpr {
+            name: self.name.clone(),
+            dtype: self.dtype.clone(),
+            entry_label: self.entry_label.clone(),
+        })
+    }
+}
+
+impl GlobalStatement for AsmFunctionDefinition {
+    fn get_func_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        let mut vals = vec![
+            self.name
+                .to_asm(AsmToken::CreateLabel(self.entry_label.to_string())),
+        ];
+        for t in self.asm_text.iter() {
+            let s = StringLiteral::new(t.clone(), 0)?;
+            match AsmToken::try_from(s.get_text()) {
+                Ok(asm) => vals.push(t.to_asm(asm)),
+                Err(e) => {
+                    return Err(t.clone().into_err(format!(
+                        "unable to convert '{t}' into a valid assembly - {e}"
+                    )));
+                }
+            };
+        }
+        Ok(vals)
+    }
+
+    fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        Ok(Vec::default())
+    }
+
+    fn get_static_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
+        Ok(Vec::default())
     }
 }
 
@@ -106,7 +170,7 @@ impl Display for FunctionLabelExpr {
     }
 }
 
-impl GlobalStatement for FunctionDefinition {
+impl GlobalStatement for CBuoyFunctionDefinition {
     fn get_init_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
         Ok(Vec::new())
     }
@@ -206,6 +270,8 @@ pub fn parse_fn_statement(
     let name_token = tokens.next()?;
     get_identifier(&name_token)?;
 
+    // TODO - Self-referrential functions for recursion?
+
     state.init_scope(name_token.clone())?;
 
     let func_type = Function::read_tokens(tokens, state, true)?;
@@ -219,7 +285,7 @@ pub fn parse_fn_statement(
 
     let mut statements = Vec::new();
 
-    let base_label = FunctionDefinition::create_label_base(state.get_next_id(), &name_token)?;
+    let base_label = CBuoyFunctionDefinition::create_label_base(state.get_next_id(), &name_token)?;
 
     while let Some(s) = parse_statement(
         tokens,
@@ -232,7 +298,7 @@ pub fn parse_fn_statement(
 
     tokens.expect("}")?;
 
-    let def = Rc::new(FunctionDefinition::new(
+    let def = Rc::new(CBuoyFunctionDefinition::new(
         &base_label,
         name_token.clone(),
         func_type,
@@ -240,6 +306,43 @@ pub fn parse_fn_statement(
         state.extract_scope()?,
     )?);
     state.add_function(def)
+}
+
+pub fn parse_asmfn_statement(
+    tokens: &mut TokenIter,
+    state: &mut CompilingState,
+) -> Result<(), TokenError> {
+    tokens.expect("asmfn")?;
+    let name_token = tokens.next()?;
+    let name = get_identifier(&name_token)?;
+
+    let func_type = Function::read_tokens(tokens, state, true)?;
+
+    tokens.expect("{")?;
+
+    let mut statements = Vec::new();
+    loop {
+        let t = tokens.next()?;
+        if t.get_value() == "}" {
+            break;
+        } else if StringLiteral::new(t.clone(), 0).is_ok() {
+            tokens.expect(";")?;
+            statements.push(t);
+        } else {
+            return Err(t.into_err("unable to convert into a string literal for the asmfn context"));
+        }
+    }
+
+    let entry_label = format!("__asmfn_{}_{name}", state.get_next_id());
+
+    let func = Rc::new(AsmFunctionDefinition {
+        name: name_token,
+        entry_label,
+        dtype: func_type,
+        asm_text: statements,
+    });
+
+    state.add_function(func)
 }
 
 #[derive(Debug, Clone)]
@@ -278,7 +381,7 @@ impl Statement for IfStatement {
     ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let def = RegisterDef::default();
 
-        let label_base = format!("if_statement_{}", self.id);
+        let label_base = format!("___if_statement_{}", self.id);
 
         let mut asm = vec![self.token.to_asm(AsmToken::Comment(format!(
             "if statement for {} {}",
@@ -350,7 +453,7 @@ impl Statement for WhileStatement {
     ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let def = RegisterDef::default();
 
-        let label_base = format!("while_statement_{}", self.id);
+        let label_base = format!("___while_statement_{}", self.id);
 
         let mut asm = vec![
             self.token.to_asm(AsmToken::Comment(format!(
