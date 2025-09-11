@@ -71,7 +71,7 @@ struct ThreadState {
     inst_history: CircularBuffer<String, 10>,
     inst_map: InstructionList,
     breakpoint: Option<u32>,
-    history_file: std::fs::File,
+    history_file: Option<std::fs::File>,
     step_count: u128,
 }
 
@@ -90,7 +90,7 @@ impl ThreadState {
             inst_history: Default::default(),
             inst_map: InstructionList::default(),
             breakpoint: None,
-            history_file: std::fs::File::create("history.csv").expect("unable to open file"),
+            history_file: Some(std::fs::File::create("history.csv").expect("unable to open file")),
             step_count: 0,
         };
 
@@ -134,7 +134,20 @@ impl ThreadState {
             false
         };
 
-        if let Err(e) = self.cpu.step() {
+        self.step_count += 1;
+        let res = self.cpu.step();
+
+        if let Some(h) = self.history_file.as_mut() {
+            write!(h, "{}", self.step_count).unwrap();
+
+            for r in self.cpu.get_register_state().get_state() {
+                write!(h, ",{r:#010x}").unwrap();
+            }
+
+            writeln!(h, ",{inst_details}").unwrap();
+        }
+
+        if let Err(e) = res {
             let msg = format!(
                 "{}\n{}",
                 e,
@@ -146,20 +159,18 @@ impl ThreadState {
                     .join("\n")
             );
 
+            if let Some(h) = self.history_file.as_mut() {
+                writeln!(h, "# {e}").unwrap();
+                for i in self.inst_history.list().into_iter() {
+                    writeln!(h, "#   {i}").unwrap();
+                }
+            }
+
             Err(ThreadToUi::LogMessage(msg))
         } else {
             if debug_stop {
                 self.running = false;
             }
-
-            self.step_count += 1;
-            write!(self.history_file, "{}", self.step_count).unwrap();
-
-            for r in self.cpu.get_register_state().get_state() {
-                write!(self.history_file, ",{r:#010x}").unwrap();
-            }
-
-            writeln!(self.history_file, ",{inst_details}").unwrap();
 
             Ok(())
         }
@@ -174,30 +185,32 @@ impl ThreadState {
         self.inst_history.reset();
         self.step_count = 0;
 
-        write!(self.history_file, "#StepCount").unwrap();
+        if let Some(h) = self.history_file.as_mut() {
+            write!(h, "#StepCount").unwrap();
 
-        for (i, _) in self.cpu.get_register_state().get_state().iter().enumerate() {
-            let extra_details = match i {
-                0 => "PC",
-                1 => "Stat",
-                2 => "SP",
-                3 => "OVF",
-                4 => "Ret",
-                5 => "ArgBase",
-                6 => "FunctionLocal",
-                7 => "FunctionTemp",
-                8 => "Spare",
-                _ => "",
-            };
+            for (i, _) in self.cpu.get_register_state().get_state().iter().enumerate() {
+                let extra_details = match i {
+                    0 => "PC",
+                    1 => "Stat",
+                    2 => "SP",
+                    3 => "OVF",
+                    4 => "Ret",
+                    5 => "ArgBase",
+                    6 => "FunctionLocal",
+                    7 => "FunctionTemp",
+                    8 => "Spare",
+                    _ => "",
+                };
 
-            write!(self.history_file, ",{i:02}").unwrap();
+                write!(h, ",{i:02}").unwrap();
 
-            if extra_details.len() > 0 {
-                write!(self.history_file, " ({extra_details})").unwrap();
+                if extra_details.len() > 0 {
+                    write!(h, " ({extra_details})").unwrap();
+                }
             }
-        }
 
-        writeln!(self.history_file, ",Details").unwrap();
+            writeln!(h, ",Details").unwrap();
+        }
 
         let reset_vec_data: Vec<u8> = (0..INIT_RO_LEN)
             .map(|i| {

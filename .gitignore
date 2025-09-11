@@ -6,4 +6,5 @@
 
 target/
 Cargo.lock
-history.csv
+/history.*
+.[Dd][Ss]_[Ss]tore
