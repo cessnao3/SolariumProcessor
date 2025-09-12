@@ -17,7 +17,7 @@ fn print_digit(v: u8) void {
     if (v < 10) {
         *SERIAL_OUT_LOC = '0' + v;
     } else {
-        *SERIAL_OUT_LOC = '!';
+        *SERIAL_OUT_LOC = '?';
     }
 }
 

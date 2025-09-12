@@ -5,7 +5,6 @@
 \usepackage{graphicx}
 
 \usepackage{amsmath}
-%\usepackage{easyReview}
 
 \newcommand{\titlelogoimage}{
 \begin{figure}[h!]
@@ -471,7 +470,8 @@ Note that, in this case, both functions and variables share the same namespace. 
     BaseStatement & $\rightarrow$ \\
     & \textlangle BaseStatement\textrangle \textlangle BaseStatement\textrangle \\
     & fn \texttt{FunctionName}(\texttt{Variable}[, \texttt{Variable}\dots]) \{ \textlangle StatementList\textrangle \} \\
-    & static VarType \texttt{Variable}[ = \textlangle BaseExpression\textrangle]; \\
+    & asmfn \texttt{FunctionName}(\texttt{Variable}[, \texttt{Variable}\dots) \{ [\textlangle WordLiteral; \textrangle \dots] \} \\
+    & global VarType \texttt{Variable}[ = \textlangle BaseExpression\textrangle]; \\
     Statement & $\rightarrow$ \\
     & def \texttt{Variable}: \textlangle VarType\textrangle [ = \textlangle BaseExpression\textrangle]; \\
     & return; \\
@@ -495,15 +495,17 @@ Note that, in this case, both functions and variables share the same namespace. 
     & \texttt{FunctionName}([\textlangle BaseExpression\textrangle[, \textlangle BaseExpression\textrangle,\dots]]) \\
     & (\textlangle BaseExpression\textrangle) \\
     BinaryOp & $\rightarrow$  \\
-    & +, -, *, /, \textless, \textgreater, \textless=, \textgreater=, \&\&, \textbar\textbar, \&, \textbar, ==, !=\\
+    & +, -, *, /, \textless, \textgreater, \textless=, \textgreater=, \&\&, \textbar\textbar, \&, \textbar, ==, != \\
     UnaryOp & $\rightarrow$ \\
-    & *, -, +, !, \textasciitilde \\
+    & *, -, +, !, \&, \textasciitilde \\
     VarType & $\rightarrow$ \\
-    & auto \\
-    & auto[\textlangle WordLiteral\textrangle] \\
-    & [int, uint] \\
+    & \textlangle PrimitiveType \textrangle \\
+    & *\textlangle VarType \textrangle \\
+    & [\textlangle NumericValue \textrangle]\textlangle VarType \textrangle \\
 \end{tabular}
 \end{table}
+
+\pagebreak
 
 This makes use of a few extra conventions. At the start of each function, stack space is reserved both for any local variables, as well as any temporary variables, that are required. A few extra registers are defined in the Table \ref{table:cbuoy-register-references} below.
 
@@ -527,6 +529,34 @@ When returning a parameter, if the parameter is a primitive, it is returned by v
 This provides an example program in Listing \ref{listing:example-cbuoy} below, which provides an example of printing text to a serial device, both using a string literal, but also converting numeric values into their text equivalents.
 
 \lstinputlisting[label={listing:example-cbuoy},caption={Example C/Buoy program for printing out a string to a serial output device}]{../cbuoy/examples/printing.cb}
+
+C/Buoy allows working with structs, primitives, functions, and more. This allows for an easier programming experience, at the cost of occasionally some additional generated machine code, resulting in slightly larger execution times, than could necessarily be done by hand in Jib assembly.
+
+To combat this, Jib assembly code can also be mixed in with functions to increase the speed of certain functions. As the compiler is currently not an optimizing compiler, this provides the opportunity to convert commonly-used smaller functions into compact assembly code to increase the speed of execution. Identifiers from the overall C/Buoy program can be mixed into the assembly code by using replacement characters, as denoted in Table \ref{table:cbuoy-assembly-mixin}.
+
+\pagebreak
+
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{l|cl}
+        \hline
+        Parameter & Format & Result \\
+        \hline
+        Global Variable / & \texttt{\%\{IDENTIFIER\}\%} & Provides the entry/access label for \\ Function Location & & the provided function or global variable \\
+        Global Literal Value & \texttt{\textasciicircum\{IDENTIFIER\}\textasciicircum} & Provides the raw value of the \\ & & provided literal/constant at the global scope \\
+        Local Variable Offset & \texttt{@\{IDENTIFIER\}@ } & Provides the offset (from the argument base) \\ & & for the given local variable or function parameter \\
+        Member Offset & \texttt{\&\{IDENTIFIER\}\&} & Provides the offset of the provided \\ & & structure member value \\
+        \hline
+    \end{tabular}
+    \caption{Formats for parameters that are replaced in the assembly code with the resulting value for better interoperability with the overall function}
+    \label{table:cbuoy-assembly-mixin}
+\end{table}
+
+For example, the above listing could have the print function replaced by the print function in List \ref{listing:example-cbuoy-print-asm} and be considerably more efficient.
+
+\lstinputlisting[label={listing:example-cbuoy-print-asm},caption={Replacement print function to improve the speed of the resulting output}]{../cbuoy/examples/printing_asm.cb}
+
+The original program in Listing \ref{listing:example-cbuoy} runs to a halt in 1320 CPU cycles. After replacing the print function with the one in Listing \ref{listing:example-cbuoy-print-asm}, the same program completes to a halt in 1010 CPU cycles. Used appropriately, similar optimizations can be made throughout program code to target and improve execution time for different functions as-needed. This also the programmer to slowly learn assembly language by starting with a higher-level programming language as an entry-point, and then working to the lower-level functionality gradually over time as they get familiar with the system. Assembly language is required for several key pieces of functionality, including setting up things to manage the stack directly - such as creating threads - and for interfacing more efficiently with hardware input/output devices.
 
 \pagebreak
 
