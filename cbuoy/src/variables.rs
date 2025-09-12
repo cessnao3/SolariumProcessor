@@ -288,6 +288,10 @@ impl LocalVariable {
         Ok(Self::new_unchecked(name, dtype, base, offset, init_expr))
     }
 
+    pub fn get_offset(&self) -> usize {
+        self.offset
+    }
+
     pub fn new_unchecked(
         name: Token,
         dtype: Type,

@@ -228,8 +228,12 @@ impl AsmFunctionDefinition {
         tokens.expect("asmfn")?;
         let name_token = tokens.next()?;
         let name = get_identifier(&name_token)?;
+        state.init_scope(name_token.clone())?;
 
         let func_type = Function::read_tokens(tokens, state, true)?;
+        for p in func_type.parameters.iter() {
+            state.get_scopes_mut()?.add_parameter(p.clone())?;
+        }
 
         tokens.expect("{")?;
 
@@ -273,8 +277,8 @@ impl AsmFunctionDefinition {
                                 .get_global_constant(name)
                                 .map(|x| x.get_value().to_asm_string())
                         }),
-                        MatchFunctionValue::new("local_var", "@", |_state, _name| {
-                            todo!("local var offsets")
+                        MatchFunctionValue::new("local_var", "@", |state, name| {
+                            state.get_local_variable_offset(name).map(|x| x.to_string())
                         }),
                         MatchFunctionValue::new("struct_offset", "&", |_state_, _name| {
                             todo!("dtype.field offsets")
@@ -319,6 +323,7 @@ impl AsmFunctionDefinition {
             asm_text: statements,
         });
 
+        state.extract_scope()?;
         state.add_function(func)
     }
 }

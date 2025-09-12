@@ -200,19 +200,25 @@ impl ScopeManager {
 
     pub fn get_variable(&self, name: &Token) -> Result<&ScopeVariables, TokenError> {
         let ident = get_identifier(name)?;
+        match self.get_variable_name(ident) {
+            Some(v) => Ok(v),
+            None => Err(name
+                .clone()
+                .into_err("no variable with provided name found")),
+        }
+    }
 
+    fn get_variable_name(&self, ident: &str) -> Option<&ScopeVariables> {
         for s in self.scopes.iter().rev() {
             if let Some(var) = s.variables.get(ident) {
-                return Ok(var);
+                return Some(var);
             }
         }
 
         if let Some(p) = self.parameters.variables.get(ident) {
-            Ok(p)
+            Some(p)
         } else {
-            Err(name
-                .clone()
-                .into_err("no variable with provided name found"))
+            None
         }
     }
 }
@@ -616,6 +622,19 @@ impl CompilingState {
         match self.global_scope.get(name) {
             Some(GlobalType::Constant(v)) => Some(v.clone()),
             _ => None,
+        }
+    }
+
+    pub fn get_local_variable_offset(&self, name: &str) -> Option<usize> {
+        if let Some(sm) = &self.scope_manager {
+            sm.get_variable_name(name)
+                .map(|x| match x {
+                    ScopeVariables::Local(v) => Some(v.get_offset()),
+                    _ => None,
+                })
+                .flatten()
+        } else {
+            None
         }
     }
 }

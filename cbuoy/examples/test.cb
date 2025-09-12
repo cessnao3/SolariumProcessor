@@ -37,7 +37,9 @@ asmfn print(c: *u8) void {
     ".align";
     "ldi 9:u16 1";
     "ld 10:u32 $arg";
-    "ld 11:u8 ^{Z}^";
+    "ldi 11:u16 @{c}@";
+    "add 10:u32 10 11";
+    "ld 11:u8 10";
     "tz 11";
     "jmpri 16";
     "sav 8:u8 11";
