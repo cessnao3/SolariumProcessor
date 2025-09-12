@@ -240,14 +240,14 @@ impl AsmFunctionDefinition {
                 break;
             } else if let Some(token_text) = StringLiteral::get_quoted_text(t.get_value()) {
                 struct MatchFunctionValue {
-                    name: String,
+                    name: &'static str,
                     matcher: Regex,
                     match_func: fn(&CompilingState, &str) -> Option<String>,
                 }
                 impl MatchFunctionValue {
                     fn new(
-                        name: String,
-                        bounding_char: char,
+                        name: &'static str,
+                        bounding_char: &str,
                         match_func: fn(&CompilingState, &str) -> Option<String>,
                     ) -> Self {
                         Self {
@@ -265,22 +265,20 @@ impl AsmFunctionDefinition {
 
                 static MATCHES: LazyLock<[MatchFunctionValue; 4]> = LazyLock::new(|| {
                     [
-                        MatchFunctionValue::new("global_loc".to_string(), '%', |state, name| {
+                        MatchFunctionValue::new("global_loc", "%", |state, name| {
                             state.get_global_location_label(name).map(|x| x.to_string())
                         }),
-                        MatchFunctionValue::new("global_lit".to_string(), '^', |state, name| {
+                        MatchFunctionValue::new("global_lit", "\\^", |state, name| {
                             state
                                 .get_global_constant(name)
-                                .map(|x| x.get_value().as_asm_literal().to_string())
+                                .map(|x| x.get_value().to_asm_string())
                         }),
-                        MatchFunctionValue::new("local_var".to_string(), '@', |_state, _name| {
+                        MatchFunctionValue::new("local_var", "@", |_state, _name| {
                             todo!("local var offsets")
                         }),
-                        MatchFunctionValue::new(
-                            "struct_offset".to_string(),
-                            '&',
-                            |_state_, _name| todo!("dtype.field offsets"),
-                        ),
+                        MatchFunctionValue::new("struct_offset", "&", |_state_, _name| {
+                            todo!("dtype.field offsets")
+                        }),
                     ]
                 });
 

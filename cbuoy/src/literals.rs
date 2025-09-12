@@ -184,6 +184,18 @@ impl LiteralValue {
             DataType::F32 => Self::F32(f32::from_bits(val)),
         }
     }
+
+    pub fn to_asm_string(&self) -> String {
+        match self {
+            Self::F32(x) => x.to_string(),
+            Self::U8(x) => x.to_string(),
+            Self::U16(x) => x.to_string(),
+            Self::U32(x) => x.to_string(),
+            Self::I8(x) => x.to_string(),
+            Self::I16(x) => x.to_string(),
+            Self::I32(x) => x.to_string(),
+        }
+    }
 }
 
 impl Expression for Literal {
