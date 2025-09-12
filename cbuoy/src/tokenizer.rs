@@ -349,8 +349,8 @@ impl TokenIter<'_> {
 
 static RESERVED_KEYWORDS: LazyLock<HashSet<String>> = LazyLock::new(|| {
     let keywords = [
-        "if", "while", "else", "global", "def", "fn", "asmfn", "const", "struct", "void", "break",
-        "brkpt", "return",
+        "if", "while", "else", "global", "def", "fn", "fnint", "asmfn", "const", "struct", "void",
+        "break", "brkpt", "return",
     ]
     .map(|v| v.to_string());
     let primitives = DataType::ALL.iter().map(|v| v.to_string());

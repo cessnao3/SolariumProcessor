@@ -2,8 +2,8 @@ use std::{fmt::Display, rc::Rc, sync::LazyLock};
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
-    ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpBrk, OpConv, OpCopy, OpJmp, OpLdn, OpRet, OpSub,
-    OpTz,
+    ArgumentType, AsmToken, AsmTokenLoc, Instruction, OpAdd, OpBrk, OpConv, OpCopy, OpJmp, OpLdn,
+    OpRet, OpRetInt, OpSub, OpTz,
 };
 use regex::Regex;
 
@@ -26,6 +26,13 @@ pub trait FunctionDefinition: GlobalStatement {
     fn get_entry_label(&self) -> &str;
 }
 
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
+pub enum StandardFunctionType {
+    #[default]
+    Default,
+    Interrupt,
+}
+
 #[derive(Debug)]
 pub struct StandardFunctionDefinition {
     name: Token,
@@ -34,6 +41,7 @@ pub struct StandardFunctionDefinition {
     statements: Vec<Rc<dyn Statement>>,
     dtype: Function,
     scope_manager: ScopeManager,
+    func_type: StandardFunctionType,
 }
 
 impl StandardFunctionDefinition {
@@ -48,6 +56,7 @@ impl StandardFunctionDefinition {
         func: Function,
         statements: Vec<Rc<dyn Statement>>,
         scope_manager: ScopeManager,
+        func_type: StandardFunctionType,
     ) -> Result<Self, TokenError> {
         Ok(Self {
             name,
@@ -56,10 +65,15 @@ impl StandardFunctionDefinition {
             statements,
             dtype: func,
             scope_manager,
+            func_type,
         })
     }
 
-    pub fn parse(tokens: &mut TokenIter, state: &mut CompilingState) -> Result<(), TokenError> {
+    pub fn parse(
+        tokens: &mut TokenIter,
+        state: &mut CompilingState,
+        func_type: StandardFunctionType,
+    ) -> Result<(), TokenError> {
         tokens.expect("fn")?;
         let name_token = tokens.next()?;
         get_identifier(&name_token)?;
@@ -68,9 +82,9 @@ impl StandardFunctionDefinition {
 
         state.init_scope(name_token.clone())?;
 
-        let func_type = Function::read_tokens(tokens, state, true)?;
+        let dtype = Function::read_tokens(tokens, state, true)?;
 
-        for p in func_type.parameters.iter() {
+        for p in dtype.parameters.iter() {
             state.get_scopes_mut()?.add_parameter(p.clone())?;
         }
 
@@ -86,7 +100,7 @@ impl StandardFunctionDefinition {
             tokens,
             state,
             &format!("{base_label}_end"),
-            func_type.return_type.as_ref(),
+            dtype.return_type.as_ref(),
         )? {
             statements.push(s);
         }
@@ -96,9 +110,10 @@ impl StandardFunctionDefinition {
         let def = Rc::new(StandardFunctionDefinition::new(
             &base_label,
             name_token.clone(),
-            func_type,
+            dtype,
             statements,
             state.extract_scope()?,
+            func_type,
         )?);
         state.add_function(def)
     }
@@ -206,7 +221,12 @@ impl GlobalStatement for StandardFunctionDefinition {
             ))));
         }
 
-        asm_end.push(AsmToken::OperationLiteral(Box::new(OpRet)));
+        let op: Box<dyn Instruction> = match self.func_type {
+            StandardFunctionType::Default => Box::new(OpRet),
+            StandardFunctionType::Interrupt => Box::new(OpRetInt),
+        };
+
+        asm_end.push(AsmToken::OperationLiteral(op));
         asm_end.push(AsmToken::LocationComment(format!("-func({})", self.name)));
 
         asm.extend(self.name.to_asm_iter(asm_end));

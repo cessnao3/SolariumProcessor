@@ -21,7 +21,9 @@ pub fn parse(s: &str) -> Result<Vec<AsmTokenLoc>, TokenError> {
             let var = VariableDefinition::parse("const", &mut token_iter, &mut state)?;
             state.add_const_var(var)?;
         } else if next == "fn" {
-            StandardFunctionDefinition::parse(&mut token_iter, &mut state)?;
+            StandardFunctionDefinition::parse(&mut token_iter, &mut state, false)?;
+        } else if next == "fnint" {
+            StandardFunctionDefinition::parse(&mut token_iter, &mut state, true)?
         } else if next == "asmfn" {
             AsmFunctionDefinition::parse(&mut token_iter, &mut state)?;
         } else if next == "struct" {
