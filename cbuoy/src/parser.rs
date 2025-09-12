@@ -2,7 +2,7 @@ use jib_asm::AsmTokenLoc;
 
 use crate::{
     compiler::CompilingState,
-    functions::{parse_asmfn_statement, parse_fn_statement},
+    functions::{AsmFunctionDefinition, StandardFunctionDefinition},
     tokenizer::{TokenError, TokenIter, tokenize},
     typing::StructDefinition,
     variables::VariableDefinition,
@@ -21,9 +21,9 @@ pub fn parse(s: &str) -> Result<Vec<AsmTokenLoc>, TokenError> {
             let var = VariableDefinition::parse("const", &mut token_iter, &mut state)?;
             state.add_const_var(var)?;
         } else if next == "fn" {
-            parse_fn_statement(&mut token_iter, &mut state)?;
+            StandardFunctionDefinition::parse(&mut token_iter, &mut state)?;
         } else if next == "asmfn" {
-            parse_asmfn_statement(&mut token_iter, &mut state)?;
+            AsmFunctionDefinition::parse(&mut token_iter, &mut state)?;
         } else if next == "struct" {
             StructDefinition::read_definition(&mut token_iter, &mut state)?;
         } else {

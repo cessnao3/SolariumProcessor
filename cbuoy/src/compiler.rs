@@ -198,17 +198,17 @@ impl ScopeManager {
         }
     }
 
-    pub fn get_variable(&self, name: &Token) -> Result<Rc<dyn Expression>, TokenError> {
+    pub fn get_variable(&self, name: &Token) -> Result<&ScopeVariables, TokenError> {
         let ident = get_identifier(name)?;
 
         for s in self.scopes.iter().rev() {
             if let Some(var) = s.variables.get(ident) {
-                return Ok(var.get_expr());
+                return Ok(var);
             }
         }
 
         if let Some(p) = self.parameters.variables.get(ident) {
-            Ok(p.get_expr())
+            Ok(p)
         } else {
             Err(name
                 .clone()
@@ -218,7 +218,7 @@ impl ScopeManager {
 }
 
 #[derive(Debug, Clone)]
-enum ScopeVariables {
+pub enum ScopeVariables {
     Local(Rc<LocalVariable>),
     Const(Rc<Literal>),
 }
@@ -585,7 +585,7 @@ impl CompilingState {
         let ident = get_identifier(name)?.to_string();
 
         if let Ok(v) = self.get_scopes().and_then(|x| x.get_variable(name)) {
-            return Ok(v);
+            return Ok(v.get_expr());
         }
 
         match self.global_scope.get(&ident).map_or(
@@ -601,6 +601,21 @@ impl CompilingState {
                 .get_token()
                 .clone()
                 .into_err("global is not a variable type")),
+        }
+    }
+
+    pub fn get_global_location_label(&self, name: &str) -> Option<&str> {
+        match self.global_scope.get(name) {
+            Some(GlobalType::Variable(v)) => Some(v.access_label()),
+            Some(GlobalType::Function(v)) => Some(v.get_entry_label()),
+            _ => None,
+        }
+    }
+
+    pub fn get_global_constant(&self, name: &str) -> Option<Rc<Literal>> {
+        match self.global_scope.get(name) {
+            Some(GlobalType::Constant(v)) => Some(v.clone()),
+            _ => None,
         }
     }
 }

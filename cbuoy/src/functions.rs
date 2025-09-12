@@ -1,10 +1,11 @@
-use std::{fmt::Display, rc::Rc};
+use std::{fmt::Display, rc::Rc, sync::LazyLock};
 
 use jib::cpu::{DataType, Register};
 use jib_asm::{
     ArgumentType, AsmToken, AsmTokenLoc, OpAdd, OpBrk, OpConv, OpCopy, OpJmp, OpLdn, OpRet, OpSub,
     OpTz,
 };
+use regex::Regex;
 
 use crate::{
     TokenError,
@@ -56,6 +57,50 @@ impl StandardFunctionDefinition {
             dtype: func,
             scope_manager,
         })
+    }
+
+    pub fn parse(tokens: &mut TokenIter, state: &mut CompilingState) -> Result<(), TokenError> {
+        tokens.expect("fn")?;
+        let name_token = tokens.next()?;
+        get_identifier(&name_token)?;
+
+        // TODO - Self-referrential functions for recursion?
+
+        state.init_scope(name_token.clone())?;
+
+        let func_type = Function::read_tokens(tokens, state, true)?;
+
+        for p in func_type.parameters.iter() {
+            state.get_scopes_mut()?.add_parameter(p.clone())?;
+        }
+
+        state.get_scopes_mut()?.add_scope();
+        tokens.expect("{")?;
+
+        let mut statements = Vec::new();
+
+        let base_label =
+            StandardFunctionDefinition::create_label_base(state.get_next_id(), &name_token)?;
+
+        while let Some(s) = parse_statement(
+            tokens,
+            state,
+            &format!("{base_label}_end"),
+            func_type.return_type.as_ref(),
+        )? {
+            statements.push(s);
+        }
+
+        tokens.expect("}")?;
+
+        let def = Rc::new(StandardFunctionDefinition::new(
+            &base_label,
+            name_token.clone(),
+            func_type,
+            statements,
+            state.extract_scope()?,
+        )?);
+        state.add_function(def)
     }
 }
 
@@ -178,6 +223,108 @@ pub struct AsmFunctionDefinition {
     asm_text: Vec<Token>,
 }
 
+impl AsmFunctionDefinition {
+    pub fn parse(tokens: &mut TokenIter, state: &mut CompilingState) -> Result<(), TokenError> {
+        tokens.expect("asmfn")?;
+        let name_token = tokens.next()?;
+        let name = get_identifier(&name_token)?;
+
+        let func_type = Function::read_tokens(tokens, state, true)?;
+
+        tokens.expect("{")?;
+
+        let mut statements = Vec::new();
+        loop {
+            let t = tokens.next()?;
+            if t.get_value() == "}" {
+                break;
+            } else if let Some(token_text) = StringLiteral::get_quoted_text(t.get_value()) {
+                struct MatchFunctionValue {
+                    name: String,
+                    matcher: Regex,
+                    match_func: fn(&CompilingState, &str) -> Option<String>,
+                }
+                impl MatchFunctionValue {
+                    fn new(
+                        name: String,
+                        bounding_char: char,
+                        match_func: fn(&CompilingState, &str) -> Option<String>,
+                    ) -> Self {
+                        Self {
+                            name,
+                            match_func,
+                            matcher: Regex::new(&format!(
+                                "{bounding_char}\\{{(?<name>[\\w\\d_]+)\\}}{bounding_char}"
+                            ))
+                            .unwrap(),
+                        }
+                    }
+                }
+                unsafe impl Send for MatchFunctionValue {}
+                unsafe impl Sync for MatchFunctionValue {}
+
+                static MATCHES: LazyLock<[MatchFunctionValue; 4]> = LazyLock::new(|| {
+                    [
+                        MatchFunctionValue::new("global_loc".to_string(), '%', |state, name| {
+                            state.get_global_location_label(name).map(|x| x.to_string())
+                        }),
+                        MatchFunctionValue::new("global_lit".to_string(), '^', |state, name| {
+                            state
+                                .get_global_constant(name)
+                                .map(|x| x.get_value().as_asm_literal().to_string())
+                        }),
+                        MatchFunctionValue::new("local_var".to_string(), '@', |_state, _name| {
+                            todo!("local var offsets")
+                        }),
+                        MatchFunctionValue::new(
+                            "struct_offset".to_string(),
+                            '&',
+                            |_state_, _name| todo!("dtype.field offsets"),
+                        ),
+                    ]
+                });
+
+                let mut replacement_labels = Vec::new();
+
+                for mg in MATCHES.iter() {
+                    for c in mg.matcher.captures_iter(token_text) {
+                        let (haystack, [name]) = c.extract();
+                        if let Some(label) = (mg.match_func)(state, name) {
+                            replacement_labels.push((haystack.to_string(), label.to_string()));
+                        } else {
+                            return Err(t.into_err(format!("unknown {} access", mg.name)));
+                        }
+                    }
+                }
+
+                let mut tok_str = t.get_value().to_string();
+                for (src, replacement) in replacement_labels {
+                    tok_str = tok_str.replace(&src, &replacement);
+                }
+                let t = Token::new(&tok_str, *t.get_loc());
+
+                tokens.expect(";")?;
+                statements.push(t);
+            } else {
+                return Err(
+                    t.into_err("unable to convert into a string literal for the asmfn context")
+                );
+            }
+        }
+
+        let entry_label = format!("__asmfn_{}_{name}", state.get_next_id());
+
+        let func = Rc::new(AsmFunctionDefinition {
+            name: name_token,
+            entry_label,
+            dtype: func_type,
+            asm_text: statements,
+        });
+
+        state.add_function(func)
+    }
+}
+
 impl FunctionDefinition for AsmFunctionDefinition {
     fn get_entry_label(&self) -> &str {
         &self.entry_label
@@ -203,7 +350,15 @@ impl GlobalStatement for AsmFunctionDefinition {
                 .to_asm(AsmToken::CreateLabel(self.entry_label.to_string())),
         ];
         for t in self.asm_text.iter() {
-            let s = StringLiteral::get_quoted_text(t.get_value())?;
+            let s = match StringLiteral::get_quoted_text(t.get_value()) {
+                Some(txt) => txt,
+                None => {
+                    return Err(t
+                        .clone()
+                        .into_err(format!("unable to get a string literal from value")));
+                }
+            };
+
             match AsmToken::try_from(s) {
                 Ok(asm) => vals.push(t.to_asm(asm)),
                 Err(e) => {
@@ -261,90 +416,6 @@ impl Display for FunctionLabelExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name.get_value())
     }
-}
-
-pub fn parse_fn_statement(
-    tokens: &mut TokenIter,
-    state: &mut CompilingState,
-) -> Result<(), TokenError> {
-    tokens.expect("fn")?;
-    let name_token = tokens.next()?;
-    get_identifier(&name_token)?;
-
-    // TODO - Self-referrential functions for recursion?
-
-    state.init_scope(name_token.clone())?;
-
-    let func_type = Function::read_tokens(tokens, state, true)?;
-
-    for p in func_type.parameters.iter() {
-        state.get_scopes_mut()?.add_parameter(p.clone())?;
-    }
-
-    state.get_scopes_mut()?.add_scope();
-    tokens.expect("{")?;
-
-    let mut statements = Vec::new();
-
-    let base_label =
-        StandardFunctionDefinition::create_label_base(state.get_next_id(), &name_token)?;
-
-    while let Some(s) = parse_statement(
-        tokens,
-        state,
-        &format!("{base_label}_end"),
-        func_type.return_type.as_ref(),
-    )? {
-        statements.push(s);
-    }
-
-    tokens.expect("}")?;
-
-    let def = Rc::new(StandardFunctionDefinition::new(
-        &base_label,
-        name_token.clone(),
-        func_type,
-        statements,
-        state.extract_scope()?,
-    )?);
-    state.add_function(def)
-}
-
-pub fn parse_asmfn_statement(
-    tokens: &mut TokenIter,
-    state: &mut CompilingState,
-) -> Result<(), TokenError> {
-    tokens.expect("asmfn")?;
-    let name_token = tokens.next()?;
-    let name = get_identifier(&name_token)?;
-
-    let func_type = Function::read_tokens(tokens, state, true)?;
-
-    tokens.expect("{")?;
-
-    let mut statements = Vec::new();
-    loop {
-        let t = tokens.next()?;
-        if t.get_value() == "}" {
-            break;
-        } else if StringLiteral::is_string_literal(t.get_value()) {
-            tokens.expect(";")?;
-            statements.push(t);
-        } else {
-            return Err(t.into_err("unable to convert into a string literal for the asmfn context"));
-        }
-    }
-
-    let entry_label = format!("__asmfn_{}_{name}", state.get_next_id());
-
-    let func = Rc::new(AsmFunctionDefinition {
-        name: name_token,
-        entry_label,
-        dtype: func_type,
-        asm_text: statements,
-    });
-
-    state.add_function(func)
 }
 
 #[derive(Debug, Clone)]

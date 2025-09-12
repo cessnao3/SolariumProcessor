@@ -5,12 +5,7 @@ static INPUT_TEXT: &str = include_str!("../../cbuoy/examples/test.cb");
 
 fn main() -> std::process::ExitCode {
     let asm = match parse(INPUT_TEXT) {
-        Ok(asm) => {
-            for t in asm.iter() {
-                println!("{}", t.tok);
-            }
-            asm
-        }
+        Ok(asm) => asm,
         Err(e) => {
             print_error(INPUT_TEXT, &e);
             return 1.into();

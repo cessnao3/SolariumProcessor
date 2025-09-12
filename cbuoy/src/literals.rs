@@ -367,17 +367,11 @@ impl StringLiteral {
     });
 
     pub fn get_quoted_text(s: &str) -> Option<&str> {
-        if let Some(capture) = Self::STRING_REGEX.captures(s)
-            && let Some(val) = capture.name("text")
-        {
-            Some(val.as_str())
+        if let Some(capture) = Self::STRING_REGEX.captures(s) {
+            capture.name("text").map(|x| x.as_str())
         } else {
             None
         }
-    }
-
-    pub fn is_string_literal(s: &str) -> bool {
-        Self::STRING_REGEX.captures(s).is_some()
     }
 
     pub fn new(token: Token, id: usize) -> Result<Self, TokenError> {
@@ -390,10 +384,6 @@ impl StringLiteral {
         } else {
             Err(token.into_err("unable to parse into a valid string literal"))
         }
-    }
-
-    pub fn get_text(&self) -> &str {
-        &self.value
     }
 
     fn get_label(&self) -> String {

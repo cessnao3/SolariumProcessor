@@ -32,7 +32,8 @@ fn add_numbers(dest: *u16, a: u16, b: u16) u16 {
 
 asmfn print(c: *u8) void {
     "ldn 8:u32";
-    ".u32 0xA005";
+    ".loadloc %{SERIAL_OUT_LOC}%";
+    "ld 8:u32 8";
     ".align";
     "ldi 9:u16 1";
     "ld 10:u32 $arg";
