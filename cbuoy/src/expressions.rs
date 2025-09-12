@@ -1152,7 +1152,7 @@ impl Expression for FunctionCallExpression {
                     val_expr: e.clone(),
                 });
 
-                let mut tmp_vals = required_stack.clone();
+                let mut tmp_vals = *required_stack;
                 asm.push_asm(self.token.to_asm(AsmToken::Comment(format!(
                     "func {} arg {} :: {}",
                     self.func,

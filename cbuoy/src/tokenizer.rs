@@ -138,8 +138,7 @@ pub fn tokenize(s: &str) -> Result<Vec<Token>, TokenError> {
             }) = current_state
             {
                 if c == string_char && !last_was_escape {
-                    let init_tok =
-                        Token::new(&l[start_index..=col_num].to_string(), get_loc(start_index));
+                    let init_tok = Token::new(&l[start_index..=col_num], get_loc(start_index));
                     tokens.push(convert_escape_characters(init_tok, string_char)?);
 
                     current_state = None;
@@ -347,10 +346,37 @@ impl TokenIter<'_> {
     }
 }
 
+pub const KEYWORD_IF: &str = "if";
+pub const KEYWORD_WHILE: &str = "while";
+pub const KEYWORD_ELSE: &str = "else";
+pub const KEYWORD_GLOBAL: &str = "global";
+pub const KEYWORD_DEF: &str = "def";
+pub const KEYWORD_FN: &str = "fn";
+pub const KEYWORD_FNINT: &str = "fnint";
+pub const KEYWORD_ASMFN: &str = "asmfn";
+pub const KEYWORD_CONST: &str = "const";
+pub const KEYWORD_STRUCT: &str = "struct";
+pub const KEYWORD_VOID: &str = "void";
+pub const KEYWORD_BREAK: &str = "break";
+pub const KEYWORD_DBG_BREAK: &str = "brkpt";
+pub const KEYWORD_RETURN: &str = "return";
+
 static RESERVED_KEYWORDS: LazyLock<HashSet<String>> = LazyLock::new(|| {
     let keywords = [
-        "if", "while", "else", "global", "def", "fn", "fnint", "asmfn", "const", "struct", "void",
-        "break", "brkpt", "return",
+        KEYWORD_IF,
+        KEYWORD_WHILE,
+        KEYWORD_ELSE,
+        KEYWORD_GLOBAL,
+        KEYWORD_DEF,
+        KEYWORD_FN,
+        KEYWORD_FNINT,
+        KEYWORD_ASMFN,
+        KEYWORD_CONST,
+        KEYWORD_STRUCT,
+        KEYWORD_VOID,
+        KEYWORD_BREAK,
+        KEYWORD_DBG_BREAK,
+        KEYWORD_RETURN,
     ]
     .map(|v| v.to_string());
     let primitives = DataType::ALL.iter().map(|v| v.to_string());

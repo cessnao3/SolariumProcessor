@@ -210,7 +210,7 @@ impl ThreadState {
 
                 write!(h, ",{i:02}").unwrap();
 
-                if extra_details.len() > 0 {
+                if !extra_details.is_empty() {
                     write!(h, " ({extra_details})").unwrap();
                 }
             }

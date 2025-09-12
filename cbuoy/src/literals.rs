@@ -185,7 +185,7 @@ impl LiteralValue {
         }
     }
 
-    pub fn to_asm_string(&self) -> String {
+    pub fn get_asm_string(&self) -> String {
         match self {
             Self::F32(x) => x.to_string(),
             Self::U8(x) => x.to_string(),
@@ -370,16 +370,16 @@ pub struct StringLiteral {
 }
 
 impl StringLiteral {
-    const STRING_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        RegexBuilder::new(r#"^"(?<text>.*)"$"#)
-            .multi_line(false)
-            .dot_matches_new_line(true)
-            .build()
-            .unwrap()
-    });
-
     pub fn get_quoted_text(s: &str) -> Option<&str> {
-        if let Some(capture) = Self::STRING_REGEX.captures(s) {
+        static STRING_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+            RegexBuilder::new(r#"^"(?<text>.*)"$"#)
+                .multi_line(false)
+                .dot_matches_new_line(true)
+                .build()
+                .unwrap()
+        });
+
+        if let Some(capture) = STRING_REGEX.captures(s) {
             capture.name("text").map(|x| x.as_str())
         } else {
             None

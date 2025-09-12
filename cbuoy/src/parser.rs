@@ -2,8 +2,11 @@ use jib_asm::AsmTokenLoc;
 
 use crate::{
     compiler::CompilingState,
-    functions::{AsmFunctionDefinition, StandardFunctionDefinition},
-    tokenizer::{TokenError, TokenIter, tokenize},
+    functions::{AsmFunctionDefinition, StandardFunctionDefinition, StandardFunctionType},
+    tokenizer::{
+        KEYWORD_ASMFN, KEYWORD_CONST, KEYWORD_FN, KEYWORD_FNINT, KEYWORD_GLOBAL, KEYWORD_STRUCT,
+        TokenError, TokenIter, tokenize,
+    },
     typing::StructDefinition,
     variables::VariableDefinition,
 };
@@ -14,19 +17,27 @@ pub fn parse(s: &str) -> Result<Vec<AsmTokenLoc>, TokenError> {
     let mut token_iter = TokenIter::from(&tokens);
 
     while let Some(next) = token_iter.peek().map(|v| v.get_value().to_string()) {
-        if next == "global" {
-            let var = VariableDefinition::parse("global", &mut token_iter, &mut state)?;
+        if next == KEYWORD_GLOBAL {
+            let var = VariableDefinition::parse(KEYWORD_GLOBAL, &mut token_iter, &mut state)?;
             state.add_global_var(var)?;
-        } else if next == "const" {
-            let var = VariableDefinition::parse("const", &mut token_iter, &mut state)?;
+        } else if next == KEYWORD_CONST {
+            let var = VariableDefinition::parse(KEYWORD_CONST, &mut token_iter, &mut state)?;
             state.add_const_var(var)?;
-        } else if next == "fn" {
-            StandardFunctionDefinition::parse(&mut token_iter, &mut state, false)?;
-        } else if next == "fnint" {
-            StandardFunctionDefinition::parse(&mut token_iter, &mut state, true)?
-        } else if next == "asmfn" {
+        } else if next == KEYWORD_FN {
+            StandardFunctionDefinition::parse(
+                &mut token_iter,
+                &mut state,
+                StandardFunctionType::Default,
+            )?;
+        } else if next == KEYWORD_FNINT {
+            StandardFunctionDefinition::parse(
+                &mut token_iter,
+                &mut state,
+                StandardFunctionType::Interrupt,
+            )?
+        } else if next == KEYWORD_ASMFN {
             AsmFunctionDefinition::parse(&mut token_iter, &mut state)?;
-        } else if next == "struct" {
+        } else if next == KEYWORD_STRUCT {
             StructDefinition::read_definition(&mut token_iter, &mut state)?;
         } else {
             return Err(token_iter

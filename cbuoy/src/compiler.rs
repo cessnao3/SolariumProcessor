@@ -626,15 +626,11 @@ impl CompilingState {
     }
 
     pub fn get_local_variable_offset(&self, name: &str) -> Option<usize> {
-        if let Some(sm) = &self.scope_manager {
-            sm.get_variable_name(name)
-                .map(|x| match x {
-                    ScopeVariables::Local(v) => Some(v.get_offset()),
-                    _ => None,
-                })
-                .flatten()
-        } else {
-            None
-        }
+        self.scope_manager.as_ref().and_then(|sm| {
+            sm.get_variable_name(name).and_then(|x| match x {
+                ScopeVariables::Local(v) => Some(v.get_offset()),
+                _ => None,
+            })
+        })
     }
 }

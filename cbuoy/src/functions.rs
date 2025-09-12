@@ -14,7 +14,11 @@ use crate::{
         Expression, ExpressionData, RegisterDef, TemporaryStackTracker, parse_expression,
     },
     literals::StringLiteral,
-    tokenizer::{EndOfTokenStream, Token, TokenIter, get_identifier},
+    tokenizer::{
+        EndOfTokenStream, KEYWORD_ASMFN, KEYWORD_CONST, KEYWORD_DBG_BREAK, KEYWORD_DEF,
+        KEYWORD_ELSE, KEYWORD_FN, KEYWORD_FNINT, KEYWORD_IF, KEYWORD_RETURN, KEYWORD_WHILE, Token,
+        TokenIter, get_identifier,
+    },
     typing::{Function, Type},
     utilities::load_to_register,
     variables::{LocalVariable, VariableDefinition},
@@ -33,6 +37,15 @@ pub enum StandardFunctionType {
     Interrupt,
 }
 
+impl StandardFunctionType {
+    fn keyword(&self) -> &str {
+        match self {
+            Self::Default => KEYWORD_FN,
+            Self::Interrupt => KEYWORD_FNINT,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct StandardFunctionDefinition {
     name: Token,
@@ -45,11 +58,6 @@ pub struct StandardFunctionDefinition {
 }
 
 impl StandardFunctionDefinition {
-    pub fn create_label_base(id: usize, name: &Token) -> Result<String, TokenError> {
-        let ident = get_identifier(name)?;
-        Ok(format!("___func_{id}_{ident}"))
-    }
-
     pub fn new(
         label_base: &str,
         name: Token,
@@ -74,9 +82,9 @@ impl StandardFunctionDefinition {
         state: &mut CompilingState,
         func_type: StandardFunctionType,
     ) -> Result<(), TokenError> {
-        tokens.expect("fn")?;
+        tokens.expect(func_type.keyword())?;
         let name_token = tokens.next()?;
-        get_identifier(&name_token)?;
+        let ident = get_identifier(&name_token)?;
 
         // TODO - Self-referrential functions for recursion?
 
@@ -93,8 +101,12 @@ impl StandardFunctionDefinition {
 
         let mut statements = Vec::new();
 
-        let base_label =
-            StandardFunctionDefinition::create_label_base(state.get_next_id(), &name_token)?;
+        let base_label = format!(
+            "___{}_{}_{}",
+            func_type.keyword(),
+            state.get_next_id(),
+            ident
+        );
 
         while let Some(s) = parse_statement(
             tokens,
@@ -149,7 +161,7 @@ impl GlobalStatement for StandardFunctionDefinition {
     fn get_func_code(&self) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let mut init_asm = vec![
             AsmToken::CreateLabel(self.entry_label.clone()),
-            AsmToken::LocationComment(format!("+func({})", self.name)),
+            AsmToken::LocationComment(format!("+{}({})", self.func_type.keyword(), self.name)),
             AsmToken::OperationLiteral(Box::new(OpCopy::new(
                 RegisterDef::FN_VAR_BASE.into(),
                 Register::StackPointer.into(),
@@ -227,7 +239,11 @@ impl GlobalStatement for StandardFunctionDefinition {
         };
 
         asm_end.push(AsmToken::OperationLiteral(op));
-        asm_end.push(AsmToken::LocationComment(format!("-func({})", self.name)));
+        asm_end.push(AsmToken::LocationComment(format!(
+            "-{}({})",
+            self.func_type.keyword(),
+            self.name
+        )));
 
         asm.extend(self.name.to_asm_iter(asm_end));
 
@@ -245,7 +261,7 @@ pub struct AsmFunctionDefinition {
 
 impl AsmFunctionDefinition {
     pub fn parse(tokens: &mut TokenIter, state: &mut CompilingState) -> Result<(), TokenError> {
-        tokens.expect("asmfn")?;
+        tokens.expect(KEYWORD_ASMFN)?;
         let name_token = tokens.next()?;
         let name = get_identifier(&name_token)?;
         state.init_scope(name_token.clone())?;
@@ -295,7 +311,7 @@ impl AsmFunctionDefinition {
                         MatchFunctionValue::new("global_lit", "\\^", |state, name| {
                             state
                                 .get_global_constant(name)
-                                .map(|x| x.get_value().to_asm_string())
+                                .map(|x| x.get_value().get_asm_string())
                         }),
                         MatchFunctionValue::new("local_var", "@", |state, name| {
                             state.get_local_variable_offset(name).map(|x| x.to_string())
@@ -334,7 +350,7 @@ impl AsmFunctionDefinition {
             }
         }
 
-        let entry_label = format!("__asmfn_{}_{name}", state.get_next_id());
+        let entry_label = format!("__{KEYWORD_ASMFN}_{}_{name}", state.get_next_id());
 
         let func = Rc::new(AsmFunctionDefinition {
             name: name_token,
@@ -378,7 +394,7 @@ impl GlobalStatement for AsmFunctionDefinition {
                 None => {
                     return Err(t
                         .clone()
-                        .into_err(format!("unable to get a string literal from value")));
+                        .into_err("unable to get a string literal from value"));
                 }
             };
 
@@ -489,10 +505,10 @@ impl Statement for IfStatement {
     ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let def = RegisterDef::default();
 
-        let label_base = format!("___if_statement_{}", self.id);
+        let label_base = format!("___{KEYWORD_IF}_statement_{}", self.id);
 
         let mut asm = vec![self.token.to_asm(AsmToken::Comment(format!(
-            "if statement for {} {}",
+            "{KEYWORD_IF} statement for {} {}",
             self.id, self.token,
         )))];
 
@@ -548,10 +564,14 @@ impl Statement for IfStatement {
 
 impl Display for IfStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "if ({}) {{ {} }}", self.test_expr, self.true_statement)?;
+        write!(
+            f,
+            "{KEYWORD_IF} ({}) {{ {} }}",
+            self.test_expr, self.true_statement
+        )?;
 
         if let Some(st) = &self.false_statement {
-            write!(f, " else {{ {st} }}")?;
+            write!(f, " {KEYWORD_ELSE} {{ {st} }}")?;
         }
 
         write!(f, ";")
@@ -573,7 +593,7 @@ impl Statement for WhileStatement {
     ) -> Result<Vec<AsmTokenLoc>, TokenError> {
         let def = RegisterDef::default();
 
-        let label_base = format!("___while_statement_{}", self.id);
+        let label_base = format!("___{KEYWORD_WHILE}_statement_{}", self.id);
 
         let mut asm = vec![
             self.token.to_asm(AsmToken::Comment(format!(
@@ -585,7 +605,7 @@ impl Statement for WhileStatement {
         ];
 
         asm.push(self.token.to_asm(AsmToken::Comment(format!(
-            "while test using {}",
+            "{KEYWORD_WHILE} test using {}",
             self.test_expr
         ))));
         asm.extend(
@@ -628,7 +648,11 @@ impl Statement for WhileStatement {
 
 impl Display for WhileStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "while ({}) {{ {} }}", self.test_expr, self.statement)
+        write!(
+            f,
+            "{KEYWORD_WHILE} ({}) {{ {} }}",
+            self.test_expr, self.statement
+        )
     }
 }
 
@@ -692,7 +716,7 @@ impl Statement for DebugBreakpointStatement {
 
 impl Display for DebugBreakpointStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "BRKPT")
+        write!(f, "{KEYWORD_DBG_BREAK}")
     }
 }
 
@@ -725,7 +749,7 @@ impl Statement for ReturnStatementTempVar {
 
 impl Display for ReturnStatementTempVar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "return {};", self.temp_var)
+        write!(f, "{KEYWORD_RETURN} {};", self.temp_var)
     }
 }
 
@@ -747,8 +771,8 @@ impl Statement for ReturnStatementRegVar {
             self.token.to_asm(AsmToken::Comment(
                 self.expr
                     .as_ref()
-                    .map(|(dt, e)| format!("return ({e}) : {dt}"))
-                    .unwrap_or("return".to_string()),
+                    .map(|(dt, e)| format!("{KEYWORD_RETURN} ({e}) : {dt}"))
+                    .unwrap_or(KEYWORD_RETURN.to_string()),
             )),
         );
 
@@ -795,9 +819,9 @@ impl Statement for ReturnStatementRegVar {
 impl Display for ReturnStatementRegVar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some((_, r)) = &self.expr {
-            write!(f, "return {r};")
+            write!(f, "{KEYWORD_RETURN} {r};")
         } else {
-            write!(f, "return;")
+            write!(f, "{KEYWORD_RETURN};")
         }
     }
 }
@@ -809,11 +833,11 @@ fn parse_statement(
     return_type: Option<&Type>,
 ) -> Result<Option<Rc<dyn Statement>>, TokenError> {
     if let Some(next) = tokens.peek() {
-        if next.get_value() == "def" {
-            let def = VariableDefinition::parse("def", tokens, state)?;
+        if next.get_value() == KEYWORD_DEF {
+            let def = VariableDefinition::parse(KEYWORD_DEF, tokens, state)?;
             Ok(Some(state.get_scopes_mut()?.add_var(def)?))
-        } else if next.get_value() == "const" {
-            let def = VariableDefinition::parse("const", tokens, state)?;
+        } else if next.get_value() == KEYWORD_CONST {
+            let def = VariableDefinition::parse(KEYWORD_CONST, tokens, state)?;
             state.get_scopes_mut()?.add_const(def)?;
             Ok(Some(Rc::new(EmptyStatement)))
         } else if next.get_value() == "{" {
@@ -829,8 +853,8 @@ fn parse_statement(
                 token: init_tok,
                 statements,
             })))
-        } else if next.get_value() == "if" {
-            let if_token = tokens.expect("if")?;
+        } else if next.get_value() == KEYWORD_IF {
+            let if_token = tokens.expect(KEYWORD_IF)?;
             let id = state.get_next_id();
             tokens.expect("(")?;
             let test_expr = parse_expression(tokens, state)?;
@@ -846,8 +870,8 @@ fn parse_statement(
                     }
                 };
 
-            let false_statement = if tokens.expect_peek("else") {
-                tokens.expect("else")?;
+            let false_statement = if tokens.expect_peek(KEYWORD_ELSE) {
+                tokens.expect(KEYWORD_ELSE)?;
                 parse_statement(tokens, state, return_jump_label, return_type)?
             } else {
                 None
@@ -860,8 +884,8 @@ fn parse_statement(
                 true_statement,
                 false_statement,
             })))
-        } else if next.get_value() == "while" {
-            let while_token = tokens.expect("while")?;
+        } else if next.get_value() == KEYWORD_WHILE {
+            let while_token = tokens.expect(KEYWORD_WHILE)?;
             let id = state.get_next_id();
             tokens.expect("(")?;
             let test_expr = parse_expression(tokens, state)?;
@@ -880,12 +904,12 @@ fn parse_statement(
                 test_expr,
                 statement,
             })))
-        } else if next.get_value() == "brkpt" {
-            let tok = tokens.expect("brkpt")?;
+        } else if next.get_value() == KEYWORD_DBG_BREAK {
+            let tok = tokens.expect(KEYWORD_DBG_BREAK)?;
             tokens.expect(";")?;
             Ok(Some(Rc::new(DebugBreakpointStatement { token: tok })))
-        } else if next.get_value() == "return" {
-            let tok = tokens.expect("return")?;
+        } else if next.get_value() == KEYWORD_RETURN {
+            let tok = tokens.expect(KEYWORD_RETURN)?;
 
             let ret_statement: Rc<dyn Statement> = if let Some(rt) = return_type {
                 if let Some(pt) = rt.primitive_type() {
