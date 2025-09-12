@@ -203,8 +203,8 @@ impl GlobalStatement for AsmFunctionDefinition {
                 .to_asm(AsmToken::CreateLabel(self.entry_label.to_string())),
         ];
         for t in self.asm_text.iter() {
-            let s = StringLiteral::new(t.clone(), 0)?;
-            match AsmToken::try_from(s.get_text()) {
+            let s = StringLiteral::get_quoted_text(t.get_value())?;
+            match AsmToken::try_from(s) {
                 Ok(asm) => vals.push(t.to_asm(asm)),
                 Err(e) => {
                     return Err(t.clone().into_err(format!(
@@ -327,7 +327,7 @@ pub fn parse_asmfn_statement(
         let t = tokens.next()?;
         if t.get_value() == "}" {
             break;
-        } else if StringLiteral::new(t.clone(), 0).is_ok() {
+        } else if StringLiteral::is_string_literal(t.get_value()) {
             tokens.expect(";")?;
             statements.push(t);
         } else {

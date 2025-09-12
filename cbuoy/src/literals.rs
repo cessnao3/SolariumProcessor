@@ -358,22 +358,33 @@ pub struct StringLiteral {
 }
 
 impl StringLiteral {
-    pub fn new(token: Token, id: usize) -> Result<Self, TokenError> {
-        static STRING_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-            RegexBuilder::new(r#"^"(?<text>.*)"$"#)
-                .multi_line(false)
-                .dot_matches_new_line(true)
-                .build()
-                .unwrap()
-        });
-        if let Some(m) = STRING_REGEX.captures(token.get_value())
-            && let Some(t) = m.name("text")
-        {
-            let s = t.as_str().into();
+    const STRING_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+        RegexBuilder::new(r#"^"(?<text>.*)"$"#)
+            .multi_line(false)
+            .dot_matches_new_line(true)
+            .build()
+            .unwrap()
+    });
 
+    pub fn get_quoted_text(s: &str) -> Option<&str> {
+        if let Some(capture) = Self::STRING_REGEX.captures(s)
+            && let Some(val) = capture.name("text")
+        {
+            Some(val.as_str())
+        } else {
+            None
+        }
+    }
+
+    pub fn is_string_literal(s: &str) -> bool {
+        Self::STRING_REGEX.captures(s).is_some()
+    }
+
+    pub fn new(token: Token, id: usize) -> Result<Self, TokenError> {
+        if let Some(txt) = Self::get_quoted_text(token.get_value()).map(|x| x.to_string()) {
             Ok(Self {
                 token,
-                value: s,
+                value: txt.into(),
                 id,
             })
         } else {
